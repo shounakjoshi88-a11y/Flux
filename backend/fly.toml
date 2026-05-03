@@ -1,0 +1,12 @@
+app = "flux-ai-workflow"   # <-- use your exact app name here
+primary_region = "bom" # or choose your preferred region
+
+[build]
+  dockerfile = "Dockerfile"
+
+[[services]]
+  internal_port = 3001
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
