@@ -521,7 +521,6 @@ app.post("/flux_ask/canvas", middleware, async (req, res) => {
             if (streamClosed) break;
             fullResponse += textPart;
 
-            // Send entire code so far every 200ms
             if (Date.now() - lastSend > 200) {
                 const currentCode = extractCode(fullResponse);
                 res.write(`data: ${JSON.stringify({ type: "stream", code: currentCode })}\n\n`);
@@ -592,12 +591,10 @@ app.post("/canvas/save", middleware, async (req, res) => {
                 },
             });
 
-            // Auto‑rename the conversation if it still has the default title
             if (
                 conversation.title === "New Thread" ||
                 conversation.slug.startsWith("new-thread-")
             ) {
-                // Find the first user message to use as the title prompt
                 const firstUserMsg = await prisma.message.findFirst({
                     where: { conversationId, role: "User" },
                     orderBy: { createdAt: "asc" },
@@ -606,7 +603,6 @@ app.post("/canvas/save", middleware, async (req, res) => {
                 const queryForTitle = firstUserMsg?.content?.trim() || "Canvas project";
                 const model = selectModel(undefined);
 
-                // Run title generation asynchronously (don't block the response)
                 autoRenameConversation(conversationId, queryForTitle, model).catch((err) =>
                     console.error("Canvas auto‑rename failed:", err)
                 );
@@ -639,6 +635,12 @@ app.delete("/conversations/:conversationId", middleware, async (req, res) => {
     }
 });
 
-app.listen(3001, () => {
-    console.log("Flux backend running on port 3001");
-});
+// ✅ Local development only: start the server
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(3001, () => {
+        console.log("Flux backend running on port 3001");
+    });
+}
+
+// ✅ Export for serverless environments (Vercel)
+export default app;
