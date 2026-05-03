@@ -1,0 +1,370 @@
+/* ===================================================
+   dashboard.css – Enhanced Flux UI (v2.2 – Compact)
+   =================================================== */
+
+/* ---------- CSS CUSTOM PROPERTIES (Theme Variables) ---------- */
+:root {
+  --bg-primary: #0d1320;
+  --bg-secondary: #030507;
+  --surface-bg: rgba(255, 255, 255, 0.03);
+  --surface-border: rgba(255, 255, 255, 0.08);
+  --text-primary: #e4e6eb;
+  --text-secondary: #94a3b8;
+  --text-muted: rgba(255, 255, 255, 0.35);
+  --accent: #40E0FF;
+  --accent-glow: rgba(64, 224, 255, 0.3);
+  --user-msg-bg: rgba(45, 48, 52, 0.88);
+  --user-msg-border: rgba(255, 255, 255, 0.12);
+  --file-chip-bg: rgba(59, 130, 246, 0.15);
+  --file-chip-border: rgba(59, 130, 246, 0.3);
+  --code-bg: #0d1117;
+  --skeleton-bg: rgba(255, 255, 255, 0.10);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.15);
+  --shadow-heavy: rgba(0, 0, 0, 0.5);
+}
+
+.light {
+  --bg-primary: #f0f4ff;
+  --bg-secondary: #f9fafb;
+  --surface-bg: rgba(0, 0, 0, 0.02);
+  --surface-border: rgba(0, 0, 0, 0.08);
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: rgba(0, 0, 0, 0.40);
+  --accent: #2563eb;
+  --accent-glow: rgba(37, 99, 235, 0.25);
+  --user-msg-bg: rgba(220, 222, 226, 0.80);
+  --user-msg-border: rgba(0, 0, 0, 0.08);
+  --file-chip-bg: rgba(59, 130, 246, 0.10);
+  --file-chip-border: rgba(59, 130, 246, 0.25);
+  --code-bg: #f8fafc;
+  --skeleton-bg: rgba(0, 0, 0, 0.06);
+  --scrollbar-thumb: rgba(0, 0, 0, 0.12);
+  --shadow-heavy: rgba(0, 0, 0, 0.1);
+}
+
+/* ---------- GLOBAL ANIMATION SMOOTHING ---------- */
+* {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* ---------- THEME TRANSITIONS ---------- */
+body {
+  transition: background-color 0.5s ease, color 0.4s ease;
+}
+
+.theme-surface {
+  transition: background-color 0.4s ease,
+              border-color 0.4s ease,
+              box-shadow 0.35s ease;
+}
+
+/* ---------- SCROLLBAR ---------- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 9999px;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 9999px;
+}
+
+/* ---------- MAIN BACKGROUND ---------- */
+.main-container {
+  background: radial-gradient(ellipse at top, var(--bg-primary) 0%, var(--bg-secondary) 70%);
+  transition: background 0.5s ease;
+}
+
+/* ---------- SIDEBAR ---------- */
+.sidebar-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* ---------- MESSAGES ---------- */
+.user-message {
+  border-radius: 1rem;
+  padding: 0.875rem 1.375rem;
+  font-size: 17px;
+  letter-spacing: 0.015em;
+  line-height: 1.6;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background: var(--user-msg-bg);
+  border: 1px solid var(--user-msg-border);
+  color: var(--text-primary);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  max-width: 85%;
+  word-break: break-word;
+}
+
+/* 👇 TIGHTENED ASSISTANT SECTIONS */
+.assistant-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;        /* was 2rem, now much tighter */
+}
+
+.follow-ups-section {
+  margin-top: 1.5rem;
+  border-top: 1px solid;
+  padding-top: 1.25rem;
+  border-color: var(--surface-border);
+}
+
+.follow-up-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0.75rem;
+  text-align: left;
+  font-size: 16px;
+  letter-spacing: 0.015em;
+  color: var(--text-secondary);
+  border-radius: 0.75rem;
+  transition: all 0.25s ease;
+}
+
+.follow-up-item:hover {
+  color: var(--text-primary);
+  background: var(--surface-bg);
+  transform: translateX(4px);
+}
+
+.follow-up-icon {
+  border-radius: 9999px;
+  padding: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.25s ease, transform 0.2s ease;
+  background: var(--surface-bg);
+}
+
+.follow-up-item:hover .follow-up-icon {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+/* ---------- CODE BLOCKS ---------- */
+.code-block-wrapper {
+  margin: 1.25rem 0;
+  overflow: hidden;
+  border-radius: 0.875rem;
+  border: 1px solid var(--surface-border);
+  background: var(--code-bg);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--surface-border);
+  letter-spacing: 0.025em;
+}
+
+.inline-code {
+  border-radius: 0.25rem;
+  background: var(--surface-bg);
+  padding: 0.125rem 0.5rem;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  color: var(--text-primary);
+}
+
+/* ---------- CITATIONS ---------- */
+.citation-btn {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 0.375rem;
+  padding: 0.125rem 0.5rem;
+  font-size: 13px;
+  font-weight: 500;
+  margin: 0 0.125rem;
+  background: var(--surface-bg);
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  transition: all 0.25s ease;
+}
+
+.citation-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.light .citation-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--text-primary);
+}
+
+/* ---------- TABS ---------- */
+.tab-btn {
+  padding-bottom: 0.375rem;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+  transition: all 0.25s ease;
+}
+
+.tab-btn.active {
+  border-bottom: 2px solid var(--accent);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.tab-btn:not(.active) {
+  color: var(--text-secondary);
+}
+
+.tab-btn:not(.active):hover {
+  color: var(--text-primary);
+}
+
+/* ---------- SOURCES ---------- */
+.source-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border-radius: 0.875rem;
+  border: 1px solid var(--surface-border);
+  padding: 0.875rem;
+  text-align: left;
+  background: var(--surface-bg);
+  transition: all 0.3s ease;
+}
+
+.source-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+}
+
+.light .source-card:hover {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: var(--accent);
+}
+
+/* ---------- INPUT AREA (standout glass) ---------- */
+.input-container {
+  background: rgba(40, 40, 42, 0.92);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 40px var(--shadow-heavy);
+  transition: all 0.35s ease;
+  max-width: 800px;
+  width: 100%;
+  border-radius: 1rem;
+}
+
+.light .input-container {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 32px var(--shadow-heavy);
+}
+
+.input-container:focus-within {
+  box-shadow: 0 0 0 2px var(--accent-glow), 0 8px 40px var(--shadow-heavy);
+  border-color: var(--accent);
+}
+
+.attach-label {
+  margin-bottom: 0.25rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  color: var(--text-secondary);
+  border-radius: 9999px;
+  transition: all 0.25s ease;
+}
+
+.attach-label:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+  transform: scale(1.1);
+}
+
+.light .attach-label:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--text-primary);
+}
+
+/* ---------- LOADING SKELETON ---------- */
+.loading-skeleton {
+  margin: 0 auto;
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.skeleton-line {
+  height: 1rem;
+  border-radius: 0.375rem;
+  background: var(--skeleton-bg);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 0.7; }
+}
+
+/* ---------- EMPTY STATE ---------- */
+.empty-state {
+  margin: 3rem auto 0;   /* brings cards down from the very top */
+  max-width: 36rem;
+  text-align: center;
+}
+
+/* ---------- FILE ATTACHMENT CHIP (outside bubble) ---------- */
+.file-chip-separate {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  background: var(--file-chip-bg);
+  border: 1px solid var(--file-chip-border);
+  border-radius: 0.75rem;
+  padding: 0.5rem 1rem;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  max-width: fit-content;
+  transition: all 0.25s ease;
+}
+
+.file-chip-separate:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+/* ---------- BOTTOM DISCLAIMER ---------- */
+.ai-disclaimer {
+  font-size: 12px;
+  color: var(--text-secondary);
+  opacity: 0.7;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  user-select: none;
+}

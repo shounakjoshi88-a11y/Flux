@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="./logo.svg" />
+    <title>Flux</title>
+    <!-- Zero-flicker theme script – must run before any rendering -->
+    <script>
+      (function() {
+        const stored = localStorage.getItem("flux-theme");
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = stored === "light"
+          ? "light"
+          : (stored === "dark" || prefersDark ? "dark" : "light");
+        document.documentElement.classList.toggle("dark", theme === "dark");
+        document.documentElement.classList.toggle("light", theme === "light");
+        localStorage.setItem("flux-theme", theme);
+      })();
+    </script>
+    <script type="module" src="./frontend.tsx" async></script>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

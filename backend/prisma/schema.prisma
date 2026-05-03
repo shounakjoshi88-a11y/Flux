@@ -1,0 +1,51 @@
+generator client {
+  provider   = "prisma-client"
+  output     = "./generated"
+  engineType = "client"
+  runtime    = "bun"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String
+  provider      AuthProvider
+  name          String
+  supabaseId    String         @unique
+  conversations Conversation[]
+}
+
+model Conversation {
+  id       String    @id @default(uuid())
+  title    String?
+  slug     String
+  userId   String
+  user     User      @relation(fields: [userId], references: [id])
+  messages Message[]
+}
+
+model Message {
+  id             Int          @id @default(autoincrement())
+  content        String
+  role           MessageRole
+  type           String?      // "canvas" for canvas playground messages
+  metadata       Json?        // { canvasCode: "…" }
+  conversationId String
+  createdAt      DateTime     @default(now())
+  sources        Json?
+  fileAttachment Json?
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+enum MessageRole {
+  User
+  Assistant
+}
+
+enum AuthProvider {
+  Github
+  Google
+}
