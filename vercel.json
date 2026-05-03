@@ -1,14 +1,15 @@
 {
-  "buildCommand": "cd frontend && bun install && bun run build",
+  "installCommand": "cd backend && bun install && cd ../frontend && bun install",
+  "buildCommand": "cd frontend && bun run build",
   "outputDirectory": "frontend/dist",
-  "installCommand": "cd frontend && bun install",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
-    { "source": "/((?!api).*)", "destination": "/frontend/$1" }
+    { "source": "/(.*)", "destination": "/frontend/$1" }
   ],
   "functions": {
     "api/index.ts": {
-      "runtime": "nodejs20.x"
+      "runtime": "nodejs20.x",
+      "includeFiles": "backend/**"
     }
   }
 }
