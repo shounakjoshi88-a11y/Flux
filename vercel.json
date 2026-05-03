@@ -1,5 +1,5 @@
 {
-  "installCommand": "cd backend && bun install && cd ../frontend && bun install",
+  "installCommand": "npm install -g bun && cd backend && bun install && cd ../frontend && bun install",
   "buildCommand": "cd frontend && bun run build",
   "outputDirectory": "frontend/dist",
   "rewrites": [
