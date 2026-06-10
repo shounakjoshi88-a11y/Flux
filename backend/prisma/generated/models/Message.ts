@@ -38,30 +38,33 @@ export type MessageMinAggregateOutputType = {
   id: number | null
   content: string | null
   role: $Enums.MessageRole | null
-  type: string | null
   conversationId: string | null
   createdAt: Date | null
+  type: string | null
 }
 
 export type MessageMaxAggregateOutputType = {
   id: number | null
   content: string | null
   role: $Enums.MessageRole | null
-  type: string | null
   conversationId: string | null
   createdAt: Date | null
+  type: string | null
 }
 
 export type MessageCountAggregateOutputType = {
   id: number
   content: number
   role: number
-  type: number
-  metadata: number
   conversationId: number
   createdAt: number
   sources: number
   fileAttachment: number
+  followUps: number
+  thoughtProcess: number
+  generatedFiles: number
+  metadata: number
+  type: number
   _all: number
 }
 
@@ -78,30 +81,33 @@ export type MessageMinAggregateInputType = {
   id?: true
   content?: true
   role?: true
-  type?: true
   conversationId?: true
   createdAt?: true
+  type?: true
 }
 
 export type MessageMaxAggregateInputType = {
   id?: true
   content?: true
   role?: true
-  type?: true
   conversationId?: true
   createdAt?: true
+  type?: true
 }
 
 export type MessageCountAggregateInputType = {
   id?: true
   content?: true
   role?: true
-  type?: true
-  metadata?: true
   conversationId?: true
   createdAt?: true
   sources?: true
   fileAttachment?: true
+  followUps?: true
+  thoughtProcess?: true
+  generatedFiles?: true
+  metadata?: true
+  type?: true
   _all?: true
 }
 
@@ -195,12 +201,15 @@ export type MessageGroupByOutputType = {
   id: number
   content: string
   role: $Enums.MessageRole
-  type: string | null
-  metadata: runtime.JsonValue | null
   conversationId: string
   createdAt: Date
   sources: runtime.JsonValue | null
   fileAttachment: runtime.JsonValue | null
+  followUps: runtime.JsonValue | null
+  thoughtProcess: runtime.JsonValue | null
+  generatedFiles: runtime.JsonValue | null
+  metadata: runtime.JsonValue | null
+  type: string | null
   _count: MessageCountAggregateOutputType | null
   _avg: MessageAvgAggregateOutputType | null
   _sum: MessageSumAggregateOutputType | null
@@ -230,12 +239,15 @@ export type MessageWhereInput = {
   id?: Prisma.IntFilter<"Message"> | number
   content?: Prisma.StringFilter<"Message"> | string
   role?: Prisma.EnumMessageRoleFilter<"Message"> | $Enums.MessageRole
-  type?: Prisma.StringNullableFilter<"Message"> | string | null
-  metadata?: Prisma.JsonNullableFilter<"Message">
   conversationId?: Prisma.StringFilter<"Message"> | string
   createdAt?: Prisma.DateTimeFilter<"Message"> | Date | string
   sources?: Prisma.JsonNullableFilter<"Message">
   fileAttachment?: Prisma.JsonNullableFilter<"Message">
+  followUps?: Prisma.JsonNullableFilter<"Message">
+  thoughtProcess?: Prisma.JsonNullableFilter<"Message">
+  generatedFiles?: Prisma.JsonNullableFilter<"Message">
+  metadata?: Prisma.JsonNullableFilter<"Message">
+  type?: Prisma.StringNullableFilter<"Message"> | string | null
   conversation?: Prisma.XOR<Prisma.ConversationScalarRelationFilter, Prisma.ConversationWhereInput>
 }
 
@@ -243,12 +255,15 @@ export type MessageOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   content?: Prisma.SortOrder
   role?: Prisma.SortOrder
-  type?: Prisma.SortOrderInput | Prisma.SortOrder
-  metadata?: Prisma.SortOrderInput | Prisma.SortOrder
   conversationId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   sources?: Prisma.SortOrderInput | Prisma.SortOrder
   fileAttachment?: Prisma.SortOrderInput | Prisma.SortOrder
+  followUps?: Prisma.SortOrderInput | Prisma.SortOrder
+  thoughtProcess?: Prisma.SortOrderInput | Prisma.SortOrder
+  generatedFiles?: Prisma.SortOrderInput | Prisma.SortOrder
+  metadata?: Prisma.SortOrderInput | Prisma.SortOrder
+  type?: Prisma.SortOrderInput | Prisma.SortOrder
   conversation?: Prisma.ConversationOrderByWithRelationInput
 }
 
@@ -259,12 +274,15 @@ export type MessageWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.MessageWhereInput | Prisma.MessageWhereInput[]
   content?: Prisma.StringFilter<"Message"> | string
   role?: Prisma.EnumMessageRoleFilter<"Message"> | $Enums.MessageRole
-  type?: Prisma.StringNullableFilter<"Message"> | string | null
-  metadata?: Prisma.JsonNullableFilter<"Message">
   conversationId?: Prisma.StringFilter<"Message"> | string
   createdAt?: Prisma.DateTimeFilter<"Message"> | Date | string
   sources?: Prisma.JsonNullableFilter<"Message">
   fileAttachment?: Prisma.JsonNullableFilter<"Message">
+  followUps?: Prisma.JsonNullableFilter<"Message">
+  thoughtProcess?: Prisma.JsonNullableFilter<"Message">
+  generatedFiles?: Prisma.JsonNullableFilter<"Message">
+  metadata?: Prisma.JsonNullableFilter<"Message">
+  type?: Prisma.StringNullableFilter<"Message"> | string | null
   conversation?: Prisma.XOR<Prisma.ConversationScalarRelationFilter, Prisma.ConversationWhereInput>
 }, "id">
 
@@ -272,12 +290,15 @@ export type MessageOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   content?: Prisma.SortOrder
   role?: Prisma.SortOrder
-  type?: Prisma.SortOrderInput | Prisma.SortOrder
-  metadata?: Prisma.SortOrderInput | Prisma.SortOrder
   conversationId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   sources?: Prisma.SortOrderInput | Prisma.SortOrder
   fileAttachment?: Prisma.SortOrderInput | Prisma.SortOrder
+  followUps?: Prisma.SortOrderInput | Prisma.SortOrder
+  thoughtProcess?: Prisma.SortOrderInput | Prisma.SortOrder
+  generatedFiles?: Prisma.SortOrderInput | Prisma.SortOrder
+  metadata?: Prisma.SortOrderInput | Prisma.SortOrder
+  type?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.MessageCountOrderByAggregateInput
   _avg?: Prisma.MessageAvgOrderByAggregateInput
   _max?: Prisma.MessageMaxOrderByAggregateInput
@@ -292,22 +313,28 @@ export type MessageScalarWhereWithAggregatesInput = {
   id?: Prisma.IntWithAggregatesFilter<"Message"> | number
   content?: Prisma.StringWithAggregatesFilter<"Message"> | string
   role?: Prisma.EnumMessageRoleWithAggregatesFilter<"Message"> | $Enums.MessageRole
-  type?: Prisma.StringNullableWithAggregatesFilter<"Message"> | string | null
-  metadata?: Prisma.JsonNullableWithAggregatesFilter<"Message">
   conversationId?: Prisma.StringWithAggregatesFilter<"Message"> | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Message"> | Date | string
   sources?: Prisma.JsonNullableWithAggregatesFilter<"Message">
   fileAttachment?: Prisma.JsonNullableWithAggregatesFilter<"Message">
+  followUps?: Prisma.JsonNullableWithAggregatesFilter<"Message">
+  thoughtProcess?: Prisma.JsonNullableWithAggregatesFilter<"Message">
+  generatedFiles?: Prisma.JsonNullableWithAggregatesFilter<"Message">
+  metadata?: Prisma.JsonNullableWithAggregatesFilter<"Message">
+  type?: Prisma.StringNullableWithAggregatesFilter<"Message"> | string | null
 }
 
 export type MessageCreateInput = {
   content: string
   role: $Enums.MessageRole
-  type?: string | null
-  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   sources?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fileAttachment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  followUps?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  thoughtProcess?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  generatedFiles?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  type?: string | null
   conversation: Prisma.ConversationCreateNestedOneWithoutMessagesInput
 }
 
@@ -315,22 +342,28 @@ export type MessageUncheckedCreateInput = {
   id?: number
   content: string
   role: $Enums.MessageRole
-  type?: string | null
-  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   conversationId: string
   createdAt?: Date | string
   sources?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fileAttachment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  followUps?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  thoughtProcess?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  generatedFiles?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  type?: string | null
 }
 
 export type MessageUpdateInput = {
   content?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.EnumMessageRoleFieldUpdateOperationsInput | $Enums.MessageRole
-  type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sources?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fileAttachment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  followUps?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  thoughtProcess?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  generatedFiles?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   conversation?: Prisma.ConversationUpdateOneRequiredWithoutMessagesNestedInput
 }
 
@@ -338,46 +371,58 @@ export type MessageUncheckedUpdateInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
   content?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.EnumMessageRoleFieldUpdateOperationsInput | $Enums.MessageRole
-  type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   conversationId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sources?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fileAttachment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  followUps?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  thoughtProcess?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  generatedFiles?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type MessageCreateManyInput = {
   id?: number
   content: string
   role: $Enums.MessageRole
-  type?: string | null
-  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   conversationId: string
   createdAt?: Date | string
   sources?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fileAttachment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  followUps?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  thoughtProcess?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  generatedFiles?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  type?: string | null
 }
 
 export type MessageUpdateManyMutationInput = {
   content?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.EnumMessageRoleFieldUpdateOperationsInput | $Enums.MessageRole
-  type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sources?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fileAttachment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  followUps?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  thoughtProcess?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  generatedFiles?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type MessageUncheckedUpdateManyInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
   content?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.EnumMessageRoleFieldUpdateOperationsInput | $Enums.MessageRole
-  type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   conversationId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sources?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fileAttachment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  followUps?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  thoughtProcess?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  generatedFiles?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type MessageListRelationFilter = {
@@ -394,12 +439,15 @@ export type MessageCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   content?: Prisma.SortOrder
   role?: Prisma.SortOrder
-  type?: Prisma.SortOrder
-  metadata?: Prisma.SortOrder
   conversationId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   sources?: Prisma.SortOrder
   fileAttachment?: Prisma.SortOrder
+  followUps?: Prisma.SortOrder
+  thoughtProcess?: Prisma.SortOrder
+  generatedFiles?: Prisma.SortOrder
+  metadata?: Prisma.SortOrder
+  type?: Prisma.SortOrder
 }
 
 export type MessageAvgOrderByAggregateInput = {
@@ -410,18 +458,18 @@ export type MessageMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   content?: Prisma.SortOrder
   role?: Prisma.SortOrder
-  type?: Prisma.SortOrder
   conversationId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  type?: Prisma.SortOrder
 }
 
 export type MessageMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   content?: Prisma.SortOrder
   role?: Prisma.SortOrder
-  type?: Prisma.SortOrder
   conversationId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  type?: Prisma.SortOrder
 }
 
 export type MessageSumOrderByAggregateInput = {
@@ -489,22 +537,28 @@ export type IntFieldUpdateOperationsInput = {
 export type MessageCreateWithoutConversationInput = {
   content: string
   role: $Enums.MessageRole
-  type?: string | null
-  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   sources?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fileAttachment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  followUps?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  thoughtProcess?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  generatedFiles?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  type?: string | null
 }
 
 export type MessageUncheckedCreateWithoutConversationInput = {
   id?: number
   content: string
   role: $Enums.MessageRole
-  type?: string | null
-  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   sources?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fileAttachment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  followUps?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  thoughtProcess?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  generatedFiles?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  type?: string | null
 }
 
 export type MessageCreateOrConnectWithoutConversationInput = {
@@ -540,55 +594,70 @@ export type MessageScalarWhereInput = {
   id?: Prisma.IntFilter<"Message"> | number
   content?: Prisma.StringFilter<"Message"> | string
   role?: Prisma.EnumMessageRoleFilter<"Message"> | $Enums.MessageRole
-  type?: Prisma.StringNullableFilter<"Message"> | string | null
-  metadata?: Prisma.JsonNullableFilter<"Message">
   conversationId?: Prisma.StringFilter<"Message"> | string
   createdAt?: Prisma.DateTimeFilter<"Message"> | Date | string
   sources?: Prisma.JsonNullableFilter<"Message">
   fileAttachment?: Prisma.JsonNullableFilter<"Message">
+  followUps?: Prisma.JsonNullableFilter<"Message">
+  thoughtProcess?: Prisma.JsonNullableFilter<"Message">
+  generatedFiles?: Prisma.JsonNullableFilter<"Message">
+  metadata?: Prisma.JsonNullableFilter<"Message">
+  type?: Prisma.StringNullableFilter<"Message"> | string | null
 }
 
 export type MessageCreateManyConversationInput = {
   id?: number
   content: string
   role: $Enums.MessageRole
-  type?: string | null
-  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   sources?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fileAttachment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  followUps?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  thoughtProcess?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  generatedFiles?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  type?: string | null
 }
 
 export type MessageUpdateWithoutConversationInput = {
   content?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.EnumMessageRoleFieldUpdateOperationsInput | $Enums.MessageRole
-  type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sources?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fileAttachment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  followUps?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  thoughtProcess?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  generatedFiles?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type MessageUncheckedUpdateWithoutConversationInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
   content?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.EnumMessageRoleFieldUpdateOperationsInput | $Enums.MessageRole
-  type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sources?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fileAttachment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  followUps?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  thoughtProcess?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  generatedFiles?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type MessageUncheckedUpdateManyWithoutConversationInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
   content?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.EnumMessageRoleFieldUpdateOperationsInput | $Enums.MessageRole
-  type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sources?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   fileAttachment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  followUps?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  thoughtProcess?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  generatedFiles?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 
@@ -597,12 +666,15 @@ export type MessageSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   id?: boolean
   content?: boolean
   role?: boolean
-  type?: boolean
-  metadata?: boolean
   conversationId?: boolean
   createdAt?: boolean
   sources?: boolean
   fileAttachment?: boolean
+  followUps?: boolean
+  thoughtProcess?: boolean
+  generatedFiles?: boolean
+  metadata?: boolean
+  type?: boolean
   conversation?: boolean | Prisma.ConversationDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["message"]>
 
@@ -610,12 +682,15 @@ export type MessageSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exten
   id?: boolean
   content?: boolean
   role?: boolean
-  type?: boolean
-  metadata?: boolean
   conversationId?: boolean
   createdAt?: boolean
   sources?: boolean
   fileAttachment?: boolean
+  followUps?: boolean
+  thoughtProcess?: boolean
+  generatedFiles?: boolean
+  metadata?: boolean
+  type?: boolean
   conversation?: boolean | Prisma.ConversationDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["message"]>
 
@@ -623,12 +698,15 @@ export type MessageSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exten
   id?: boolean
   content?: boolean
   role?: boolean
-  type?: boolean
-  metadata?: boolean
   conversationId?: boolean
   createdAt?: boolean
   sources?: boolean
   fileAttachment?: boolean
+  followUps?: boolean
+  thoughtProcess?: boolean
+  generatedFiles?: boolean
+  metadata?: boolean
+  type?: boolean
   conversation?: boolean | Prisma.ConversationDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["message"]>
 
@@ -636,15 +714,18 @@ export type MessageSelectScalar = {
   id?: boolean
   content?: boolean
   role?: boolean
-  type?: boolean
-  metadata?: boolean
   conversationId?: boolean
   createdAt?: boolean
   sources?: boolean
   fileAttachment?: boolean
+  followUps?: boolean
+  thoughtProcess?: boolean
+  generatedFiles?: boolean
+  metadata?: boolean
+  type?: boolean
 }
 
-export type MessageOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "content" | "role" | "type" | "metadata" | "conversationId" | "createdAt" | "sources" | "fileAttachment", ExtArgs["result"]["message"]>
+export type MessageOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "content" | "role" | "conversationId" | "createdAt" | "sources" | "fileAttachment" | "followUps" | "thoughtProcess" | "generatedFiles" | "metadata" | "type", ExtArgs["result"]["message"]>
 export type MessageInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   conversation?: boolean | Prisma.ConversationDefaultArgs<ExtArgs>
 }
@@ -664,12 +745,15 @@ export type $MessagePayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     id: number
     content: string
     role: $Enums.MessageRole
-    type: string | null
-    metadata: runtime.JsonValue | null
     conversationId: string
     createdAt: Date
     sources: runtime.JsonValue | null
     fileAttachment: runtime.JsonValue | null
+    followUps: runtime.JsonValue | null
+    thoughtProcess: runtime.JsonValue | null
+    generatedFiles: runtime.JsonValue | null
+    metadata: runtime.JsonValue | null
+    type: string | null
   }, ExtArgs["result"]["message"]>
   composites: {}
 }
@@ -1097,12 +1181,15 @@ export interface MessageFieldRefs {
   readonly id: Prisma.FieldRef<"Message", 'Int'>
   readonly content: Prisma.FieldRef<"Message", 'String'>
   readonly role: Prisma.FieldRef<"Message", 'MessageRole'>
-  readonly type: Prisma.FieldRef<"Message", 'String'>
-  readonly metadata: Prisma.FieldRef<"Message", 'Json'>
   readonly conversationId: Prisma.FieldRef<"Message", 'String'>
   readonly createdAt: Prisma.FieldRef<"Message", 'DateTime'>
   readonly sources: Prisma.FieldRef<"Message", 'Json'>
   readonly fileAttachment: Prisma.FieldRef<"Message", 'Json'>
+  readonly followUps: Prisma.FieldRef<"Message", 'Json'>
+  readonly thoughtProcess: Prisma.FieldRef<"Message", 'Json'>
+  readonly generatedFiles: Prisma.FieldRef<"Message", 'Json'>
+  readonly metadata: Prisma.FieldRef<"Message", 'Json'>
+  readonly type: Prisma.FieldRef<"Message", 'String'>
 }
     
 

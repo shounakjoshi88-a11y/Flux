@@ -35,18 +35,18 @@ export default function Auth() {
 
     if (checking) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-[#000000]">
-                <Loader2 className="size-8 animate-spin text-[#40E0FF]" />
+            <div className="flex min-h-screen items-center justify-center bg-background">
+                <Loader2 className="size-8 animate-spin text-primary" />
             </div>
         );
     }
 
     return (
-        <div className="relative flex min-h-screen items-center justify-center bg-[#000000] p-4">
-            {/* Background glow */}
-            <div className="absolute inset-0 -z-10 overflow-hidden">
-                <div className="absolute -top-40 -right-40 size-96 rounded-full bg-[#40E0FF]/10 blur-3xl" />
-                <div className="absolute -bottom-40 -left-40 size-96 rounded-full bg-purple-500/10 blur-3xl" />
+        <div className="relative flex min-h-screen items-center justify-center bg-background p-4">
+            {/* Background glow using warm coral brand accent */}
+            <div className="absolute inset-0 -z-10 overflow-hidden opacity-40">
+                <div className="absolute -top-40 -right-40 size-96 rounded-full bg-primary/10 blur-3xl" />
+                <div className="absolute -bottom-40 -left-40 size-96 rounded-full bg-primary/5 blur-3xl" />
             </div>
 
             <motion.div
@@ -55,21 +55,21 @@ export default function Auth() {
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="w-full max-w-md"
             >
-                <div className="rounded-2xl border border-white/10 bg-[#0b0b0b]/90 p-8 shadow-2xl backdrop-blur-xl">
+                <div className="rounded-2xl border border-border/80 bg-card/90 p-8 shadow-2xl backdrop-blur-xl">
                     {/* Logo & tagline */}
                     <div className="mb-10 flex flex-col items-center text-center">
                         <motion.div
                             initial={{ scale: 0.9 }}
                             animate={{ scale: 1 }}
                             transition={{ delay: 0.1 }}
-                            className="mb-5 flex size-14 items-center justify-center rounded-xl bg-gradient-to-br from-[#40E0FF] to-purple-500 shadow-lg shadow-[#40E0FF]/25"
+                            className="mb-5 flex size-14 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/25"
                         >
                             <Bot className="size-7 text-white" />
                         </motion.div>
-                        <h1 className="mb-2 text-2xl font-semibold tracking-tight text-white">
+                        <h1 className="mb-2 font-serif text-3xl font-normal tracking-tight text-foreground">
                             Welcome to Flux
                         </h1>
-                        <p className="text-sm text-white/60">
+                        <p className="text-sm text-muted-foreground/80">
                             Fast, intelligent answers with real‑time web intelligence. Sign in to continue.
                         </p>
                     </div>
@@ -79,23 +79,23 @@ export default function Auth() {
                         <Button
                             disabled={loading}
                             onClick={() => login("google")}
-                            className="h-12 w-full rounded-xl bg-white text-black hover:bg-white/90 transition-all duration-200 disabled:opacity-60"
+                            className="h-12 w-full rounded-xl transition-all duration-200 disabled:opacity-60"
                         >
                             <GoogleIcon className="mr-2 size-5" />
                             Continue with Google
                         </Button>
                         <Button
                             disabled={loading}
-                            variant="secondary"
+                            variant="outline"
                             onClick={() => login("github")}
-                            className="h-12 w-full rounded-xl border border-white/10 bg-white/5 text-white hover:bg-white/10 transition-all duration-200 disabled:opacity-60"
+                            className="h-12 w-full rounded-xl transition-all duration-200 disabled:opacity-60"
                         >
                             <GithubIcon className="mr-2 size-5" />
                             Continue with GitHub
                         </Button>
                     </div>
 
-                    <p className="mt-6 text-center text-xs text-white/40">
+                    <p className="mt-6 text-center text-xs text-muted-foreground/60">
                         By continuing, you agree to our Terms of Service and Privacy Policy.
                     </p>
                 </div>

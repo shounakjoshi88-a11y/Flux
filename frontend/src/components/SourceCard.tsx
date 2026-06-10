@@ -1,5 +1,5 @@
 // src/components/SourceCard.tsx
-import { useState } from "react";
+import { useState, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 type SourceCardProps = {
@@ -33,7 +33,7 @@ function getTrustInfo(score: number): { label: string; description: string } {
   };
 }
 
-export function SourceCard({
+export const SourceCard = memo(function SourceCard({
   url,
   domain,
   trustScore,
@@ -48,8 +48,8 @@ export function SourceCard({
     <motion.button
       whileHover={{
         scale: 1.02,
-        borderColor: "rgba(64,224,255,0.6)",
-        boxShadow: "0 0 28px rgba(64,224,255,0.18)",
+        borderColor: "var(--accent)",
+        boxShadow: "0 0 28px var(--accent-glow)",
       }}
       whileTap={{ scale: 0.98 }}
       transition={{
@@ -72,7 +72,7 @@ export function SourceCard({
         <p className="truncate text-sm font-semibold leading-tight">{domain}</p>
         <p className="truncate text-xs text-muted-foreground leading-snug">{url}</p>
 
-        {/* Trust badge with silky tooltip */}
+        {/* Trust badge with tooltip */}
         <div
           className="relative inline-block mt-1.5"
           onMouseEnter={() => setShowTooltip(true)}
@@ -147,4 +147,4 @@ export function SourceCard({
       </span>
     </motion.button>
   );
-}
+});

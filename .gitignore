@@ -1,0 +1,35 @@
+node_modules/
+.pnp
+.pnp.js
+
+# bun
+backend/package-lock.json
+frontend/package-lock.json
+
+# Large model/data directories
+backend/models_cache/
+backend/Bonsai-Image-Demo/
+backend/image_generation_backend/__pycache__/
+backend/image_generation_backend/*.pyc
+
+# Temp files
+backend/last_response.txt
+dashboard.txt
+
+# Editor/IDE
+.kilocode/
+.cursor/
+.agents/
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log

@@ -48,28 +48,48 @@ export function extractLiveContent(raw: string): {
   let answer = "";
   let followUps: string[] = [];
 
-  // Extract answer between <ANSWER>…</ANSWER>, even if opening tag missing
-  const answerStart = raw.indexOf("<ANSWER>");
-  const answerEnd = raw.indexOf("</ANSWER>");
+  // 1. Remove thought blocks entirely before processing answer
+  const cleanRaw = raw
+    .replace(/<(?:thought|think|THOUGHT|THINK)>[\s\S]*?(?:<\/(?:thought|think|THOUGHT|THINK)>|$)/gi, "")
+    .replace(/^\s*(?:\{[\s\S]*?\}|\[[\s\S]*?\])\s*/g, '')
+    .trim();
+
+  // 2. Look for <ANSWER> block
+  const rawUpper = raw.toUpperCase();
+  const answerStart = rawUpper.indexOf("<ANSWER>");
+  const answerEnd = rawUpper.indexOf("</ANSWER>");
 
   if (answerStart !== -1) {
-    const startIdx = answerStart + "<ANSWER>".length;
+    const startIdx = answerStart + 8;
     const endIdx = answerEnd !== -1 ? answerEnd : raw.length;
-    answer = raw.slice(startIdx, endIdx).trim();
+    answer = raw.slice(startIdx, endIdx)
+      .replace(/^(?:assistant|[}\],:\s])+/gi, "")
+      .trimStart();
   } else if (answerEnd !== -1) {
-    // No opening tag, but closing tag exists – take everything before closing
-    answer = raw.slice(0, answerEnd).trim();
+    // No opening tag but closing exists – take everything before closing but after thoughts
+    const thoughtEnd = rawUpper.lastIndexOf("</THOUGHT>");
+    const startIdx = thoughtEnd !== -1 ? thoughtEnd + 10 : 0;
+    answer = raw.slice(startIdx, answerEnd)
+      .replace(/^(?:assistant|[}\],:\s])+/gi, "")
+      .trimStart();
+  } else if (rawUpper.includes("<THOUGHT>") || rawUpper.includes("<THINK>")) {
+    // We are still in thinking phase or haven't seen <ANSWER> yet.
+    // Return cleanRaw (which has thoughts stripped) to avoid raw markup leak if thoughts are unclosed.
+    answer = cleanRaw.replace(/^(?:assistant|[}\],:\s])+/gi, "");
   } else {
-    // No tags at all – use the whole raw string
-    answer = raw.trim();
+    // Fallback for legacy messages or non-tagged streams
+    answer = cleanRaw.replace(/^(?:assistant|[}\],:\s])+/gi, "");
   }
 
+  // 🔥 REMOVED: short answer filter – we keep answers of any length
+  // if (answer.length < 5) answer = "";
+
   // Extract follow‑up questions
-  const followStart = raw.indexOf("<FOLLOW_UPS>");
-  const followEnd = raw.indexOf("</FOLLOW_UPS>");
+  const followStart = rawUpper.indexOf("<FOLLOW_UPS>");
+  const followEnd = rawUpper.indexOf("</FOLLOW_UPS>");
 
   if (followStart !== -1) {
-    const startIdx = followStart + "<FOLLOW_UPS>".length;
+    const startIdx = followStart + 12;
     const endIdx = followEnd !== -1 ? followEnd : raw.length;
     const section = raw.slice(startIdx, endIdx);
     const questionMatches = section.matchAll(/<question>(.+?)<\/question>/gs);

@@ -1,5 +1,5 @@
 // src/components/MessageRenderer.tsx
-import React, { useState, Fragment, useMemo } from "react";
+import React, { useState, Fragment, useMemo, useEffect, useRef } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Copy, Check, ChevronDown } from "lucide-react";
@@ -7,7 +7,21 @@ import katex from "katex";
 import "katex/dist/katex.min.css";
 import type { Source } from "@/types";
 
-// ----- Math Components -----
+// ─── Import ChartRenderer (separate file) ─────────────────
+import { ChartRenderer, type ChartData } from "./ChartBlock";
+
+// ─── Lazy load mermaid ─────────────────────────────────────
+let mermaid: any = null;
+const loadMermaid = async () => {
+  if (!mermaid) {
+    const mod = await import("mermaid");
+    mermaid = mod.default;
+    mermaid.initialize({ startOnLoad: false, theme: "dark" });
+  }
+  return mermaid;
+};
+
+// ─── Math Components ──────────────────────────────────────
 export function InlineMath({ formula }: { formula: string }) {
   const html = katex.renderToString(formula, {
     throwOnError: false,
@@ -36,7 +50,32 @@ function DisplayMath({ formula }: { formula: string }) {
   );
 }
 
-// ----- Helpers -----
+// ─── Mermaid Renderer ──────────────────────────────────────
+function MermaidRenderer({ code }: { code: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const m = await loadMermaid();
+        if (ref.current) {
+          ref.current.innerHTML = "";
+          const { svg } = await m.render("mermaid-" + Date.now(), code);
+          ref.current.innerHTML = svg;
+        }
+      } catch (err) {
+        setError("Failed to render Mermaid diagram");
+        console.error(err);
+      }
+    })();
+  }, [code]);
+
+  if (error) return <div className="text-red-400 text-sm">{error}</div>;
+  return <div ref={ref} className="mermaid-renderer my-4" />;
+}
+
+// ─── Code Block ────────────────────────────────────────────
 function CodeBlock({ language, code }: { language: string; code: string }) {
   const [copied, setCopied] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -92,13 +131,13 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
             margin: 0,
             borderRadius: "0",
             background: "transparent",
-            padding: "1rem",
+            padding: "0.75rem",
             overflowX: "auto",
           }}
           codeTagProps={{
             style: {
               fontFamily: "JetBrains Mono, monospace",
-              fontSize: "0.875rem",
+              fontSize: "0.75rem",
             },
           }}
         >
@@ -113,7 +152,30 @@ function InlineCode({ children }: { children: string }) {
   return <code className="inline-code">{children}</code>;
 }
 
-// ----- Inline formatting (unchanged) -----
+// ─── Linkify URLs ──────────────────────────────────────────
+function linkifyUrls(text: string, keyPrefix = ""): React.ReactNode[] {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  const urlTest = /^https?:\/\/[^\s]+$/;
+  return parts.map((part, idx) => {
+    if (urlTest.test(part)) {
+      return (
+        <a
+          key={`${keyPrefix}url-${idx}`}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[var(--accent)] hover:underline"
+        >
+          {part}
+        </a>
+      );
+    }
+    return <span key={`${keyPrefix}text-${idx}`}>{part}</span>;
+  });
+}
+
+// ─── Inline formatting ────────────────────────────────────
 function splitWithDelimiters(
   text: string,
   regex: RegExp
@@ -182,7 +244,7 @@ function formatInlineText(
                 onClick={(e) => {
                   e.stopPropagation();
                   onCitationClick(index);
-                  if (valid) window.open(sources[index].url, "_blank");
+                  if (valid && sources[index]) window.open(sources[index].url, "_blank");
                 }}
                 className="citation-btn text-[0.7em] align-super ml-0.5"
               >
@@ -190,16 +252,15 @@ function formatInlineText(
               </button>
             );
           }
-          return (
-            <span key={`${keyBase}-t${cIdx}`}>{cPart}</span>
-          );
+          const linkKey = `${keyBase}-c${cIdx}`;
+          return linkifyUrls(cPart, linkKey);
         });
       });
     });
   });
 }
 
-// ----- Tokenizer (display math only) -----
+// ─── Tokenizer (display math only) ──────────────────────
 type Token =
   | { type: "text"; value: string }
   | { type: "display_math"; value: string };
@@ -226,14 +287,16 @@ function tokenize(content: string): Token[] {
   return tokens;
 }
 
-// ----- Table helpers (unchanged) -----
-function isTableLine(line: string) {
+// ─── Table helpers ────────────────────────────────────────
+function isTableLine(line: string | undefined): line is string {
+  if (!line) return false;
   const t = line.trim();
   return t.startsWith("|") && t.endsWith("|") && t.indexOf("|", 1) > 0;
 }
 
-function isTableSeparator(line: string) {
-  return /^\|[\s:-]+\|[\s|:-]+\|$/.test(line.trim());
+function isTableSeparator(line: string | undefined): line is string {
+  if (!line) return false;
+  return /^\|[\s:-]+\|(?:\s*[\s:-]+\s*\|)*$/.test(line.trim());
 }
 
 function parseTableRow(line: string) {
@@ -289,17 +352,91 @@ function Table({
   );
 }
 
-// ─── GLOBAL CODE‑BLOCK EXTRACTION ────────────────────
+// ─── Enhanced segment extraction ──────────────────────────
 type Segment =
   | { type: "code"; language: string; content: string }
+  | { type: "svg"; content: string }
+  | { type: "mermaid"; content: string }
+  | { type: "chart"; content: string }
   | { type: "text"; value: string };
 
-/**
- * Splits rawText into an array of Segments, where fenced code blocks
- * are extracted as `code` segments and everything else becomes `text`.
- * Code fences are recognised by a line matching exactly ``` (optional
- * language tag) and a closing line that is exactly ``` (no language).
- */
+function extractSpecialBlocks(rawText: string): Segment[] {
+  const segments: Segment[] = [];
+  let remaining = rawText;
+
+  // Helper to extract the first occurrence of a block
+  const extractBlock = (openTag: string, closeTag: string, type: Segment["type"]) => {
+    const openIdx = remaining.indexOf(openTag);
+    if (openIdx === -1) return null;
+    const closeIdx = remaining.indexOf(closeTag, openIdx + openTag.length);
+    if (closeIdx === -1) return null;
+    const content = remaining.slice(openIdx + openTag.length, closeIdx).trim();
+    const before = remaining.slice(0, openIdx);
+    const after = remaining.slice(closeIdx + closeTag.length);
+    return { before, content, after };
+  };
+
+  // Loop until no more special blocks
+  let loopGuard = 0;
+  while (loopGuard < 1000) {
+    loopGuard++;
+    const svgBlock = extractBlock("<svg", "</svg>", "svg");
+    const mermaidBlock = extractBlock("<MERMAID>", "</MERMAID>", "mermaid");
+    const chartBlock = extractBlock("<CHART>", "</CHART>", "chart");
+
+    // Find the earliest block
+    let earliest: { type: Segment["type"]; before: string; content: string; after: string } | null = null;
+    let earliestIdx = Infinity;
+
+    if (svgBlock) {
+      const idx = remaining.indexOf("<svg");
+      if (idx < earliestIdx) {
+        earliestIdx = idx;
+        earliest = { type: "svg", ...svgBlock };
+      }
+    }
+    if (mermaidBlock) {
+      const idx = remaining.indexOf("<MERMAID>");
+      if (idx < earliestIdx) {
+        earliestIdx = idx;
+        earliest = { type: "mermaid", ...mermaidBlock };
+      }
+    }
+    if (chartBlock) {
+      const idx = remaining.indexOf("<CHART>");
+      if (idx < earliestIdx) {
+        earliestIdx = idx;
+        earliest = { type: "chart", ...chartBlock };
+      }
+    }
+
+    if (!earliest) break;
+
+    // Add text before the block
+    if (earliest.before.trim()) {
+      segments.push({ type: "text", value: earliest.before });
+    }
+    // Add the special block
+    if (earliest.type === "code") {
+        // This should not happen based on logic but for completeness
+    } else {
+        segments.push({ type: earliest.type, content: earliest.content } as Segment);
+    }
+    // Continue with the remaining text
+    remaining = earliest.after;
+  }
+
+  // After extracting all special blocks, process the remaining text for code blocks and plain text
+  if (remaining.trim()) {
+    // Now extract standard code blocks from remaining
+    const codeSegments = extractCodeBlocks(remaining);
+    segments.push(...codeSegments);
+  }
+
+  return segments;
+}
+
+// ─── Original code-block extractor ────────────────────────
 function extractCodeBlocks(rawText: string): Segment[] {
   const segments: Segment[] = [];
   const lines = rawText.split("\n");
@@ -307,34 +444,33 @@ function extractCodeBlocks(rawText: string): Segment[] {
   let currentText: string[] = [];
 
   while (i < lines.length) {
-    const trimmed = lines[i].trim();
-
-    // Opening fence: must start with ```, optionally followed by letters/digits
-    if (/^```[a-zA-Z0-9]*$/.test(trimmed)) {
-      // Flush any accumulated text
+    const line = lines[i];
+    if (line === undefined) { i++; continue; }
+    const trimmed = line.trim();
+    if (trimmed.startsWith("```")) {
       if (currentText.length > 0) {
         segments.push({ type: "text", value: currentText.join("\n") });
         currentText = [];
       }
       const lang = trimmed.slice(3).trim();
-      i++; // move past opening fence
+      i++;
       const codeLines: string[] = [];
       while (i < lines.length) {
-        if (lines[i].trim() === "```") {
-          i++; // skip closing fence
+        const cLine = lines[i];
+        if (cLine === undefined || cLine.trim() === "```") {
+          i++;
           break;
         }
-        codeLines.push(lines[i]);
+        codeLines.push(cLine);
         i++;
       }
       segments.push({ type: "code", language: lang, content: codeLines.join("\n") });
     } else {
-      currentText.push(lines[i]);
+      currentText.push(line);
       i++;
     }
   }
 
-  // Flush remaining text
   if (currentText.length > 0) {
     segments.push({ type: "text", value: currentText.join("\n") });
   }
@@ -342,7 +478,7 @@ function extractCodeBlocks(rawText: string): Segment[] {
   return segments;
 }
 
-// ─── PARAGRAPH PROCESSOR (for text segments) ──────────
+// ─── Paragraph processor ──────────────────────────────────
 function processTextSegment(
   text: string,
   onCitationClick: (index: number) => void,
@@ -359,6 +495,7 @@ function processTextSegment(
     while (j < lines.length && loopGuard < 20000) {
       loopGuard++;
       const line = lines[j];
+      if (line === undefined) { j++; continue; }
       const trimmed = line.trim();
 
       if (!trimmed) {
@@ -366,7 +503,18 @@ function processTextSegment(
         continue;
       }
 
-      // Table detection
+      if (trimmed === "---") {
+        elements.push(
+          <hr
+            key={`divider-${parentPrefix}-${i}-${j}`}
+            className="my-8 border-t border-stone-500/60"
+            style={{ borderTopWidth: "1.5px" }}
+          />
+        );
+        j++;
+        continue;
+      }
+
       const remainingLines = lines.slice(j);
       if (
         remainingLines.length >= 3 &&
@@ -376,14 +524,13 @@ function processTextSegment(
       ) {
         const header = parseTableRow(remainingLines[0]);
         let consumed = 2;
-        const rows: string[][] = [];
         while (
           consumed < remainingLines.length &&
           isTableLine(remainingLines[consumed])
         ) {
-          rows.push(parseTableRow(remainingLines[consumed]));
           consumed++;
         }
+        const rows = remainingLines.slice(2, consumed).map(l => parseTableRow(l!));
         elements.push(
           <Table
             key={`table-${parentPrefix}-${i}-${j}`}
@@ -398,30 +545,33 @@ function processTextSegment(
         continue;
       }
 
-      // Heading
       const hMatch = trimmed.match(/^(#{1,3})\s+(.+)/);
       if (hMatch) {
-        const Tag = `h${hMatch[1].length}` as keyof JSX.IntrinsicElements;
+        const level = hMatch[1]?.length ?? 1;
+        const Tag = `h${level}` as any;
         const key = `h-${parentPrefix}-${i}-${j}`;
         elements.push(
           <Tag key={key} className="mt-3 mb-2 font-semibold tracking-tight text-foreground">
-            {formatInlineText(hMatch[2], onCitationClick, sources, key)}
+            {formatInlineText(hMatch[2] ?? "", onCitationClick, sources, key)}
           </Tag>
         );
         j++;
         continue;
       }
 
-      // Unordered list
-      if (/^[-*]\s+/.test(trimmed)) {
+      if (/^[-*•]\s+/.test(trimmed)) {
         const items: string[] = [];
-        while (j < lines.length && /^[-*]\s+/.test(lines[j].trim())) {
-          items.push(lines[j].trim().replace(/^[-*]\s+/, ""));
+        while (j < lines.length) {
+          const l = lines[j];
+          if (l === undefined) break;
+          const t = l.trim();
+          if (!/^[-*•]\s+/.test(t)) break;
+          items.push(t.replace(/^[-*•]\s+/, ""));
           j++;
         }
         const key = `ul-${parentPrefix}-${i}-${j}`;
         elements.push(
-          <ul key={key} className="my-2 list-disc pl-5 space-y-0.5 text-[15px]">
+          <ul key={key} className="my-2 list-disc pl-5 space-y-0.5">
             {items.map((item, itemIdx) => (
               <li key={`${key}-${itemIdx}`}>
                 {formatInlineText(item, onCitationClick, sources, `${key}-${itemIdx}`)}
@@ -432,16 +582,19 @@ function processTextSegment(
         continue;
       }
 
-      // Ordered list (1–2 digits)
       if (/^\d{1,2}\.\s+/.test(trimmed)) {
         const items: string[] = [];
-        while (j < lines.length && /^\d{1,2}\.\s+/.test(lines[j].trim())) {
-          items.push(lines[j].trim().replace(/^\d{1,2}\.\s+/, ""));
+        while (j < lines.length) {
+          const l = lines[j];
+          if (l === undefined) break;
+          const t = l.trim();
+          if (!/^\d{1,2}\.\s+/.test(t)) break;
+          items.push(t.replace(/^\d{1,2}\.\s+/, ""));
           j++;
         }
         const key = `ol-${parentPrefix}-${i}-${j}`;
         elements.push(
-          <ol key={key} className="my-2 list-decimal pl-5 space-y-0.5 text-[15px]">
+          <ol key={key} className="my-2 list-decimal pl-5 space-y-0.5">
             {items.map((item, itemIdx) => (
               <li key={`${key}-${itemIdx}`}>
                 {formatInlineText(item, onCitationClick, sources, `${key}-${itemIdx}`)}
@@ -452,41 +605,47 @@ function processTextSegment(
         continue;
       }
 
-      // Regular paragraph
       let paraLines: string[] = [];
-      while (
-        j < lines.length &&
-        lines[j].trim() &&
-        !/^(#{1,3}\s+)/.test(lines[j].trim()) &&
-        !/^[-*]\s+/.test(lines[j].trim()) &&
-        !/^\d{1,2}\.\s+/.test(lines[j].trim()) &&
-        !isTableLine(lines[j])
-      ) {
-        paraLines.push(lines[j]);
+      while (j < lines.length) {
+        const l = lines[j];
+        if (l === undefined) break;
+        const t = l.trim();
+        if (!t || /^(#{1,3}\s+)/.test(t) || /^[-*•]\s+/.test(t) || /^\d{1,2}\.\s+/.test(t) || isTableLine(l)) {
+          break;
+        }
+        paraLines.push(l);
         j++;
       }
 
       if (paraLines.length > 0) {
         const key = `p-${parentPrefix}-${i}-${j}`;
-        const inlineNodes = paraLines.map((l, lineIdx) => {
+        const inlineNodes = paraLines.flatMap((l, lineIdx) => {
           const hasHardBreak = l.endsWith("  ");
           const content = hasHardBreak ? l.slice(0, -2) : l;
-          return (
+          const frag = (
             <Fragment key={`${key}-l${lineIdx}`}>
               {formatInlineText(content, onCitationClick, sources, `${key}-l${lineIdx}`)}
-              {hasHardBreak && lineIdx < paraLines.length - 1 && <br />}
             </Fragment>
           );
+          const result: React.ReactNode[] = [frag];
+          if (hasHardBreak && lineIdx < paraLines.length - 1) {
+            result.push(<br key={`${key}-br${lineIdx}`} />);
+          } else if (lineIdx < paraLines.length - 1) {
+            result.push(<React.Fragment key={`${key}-sp${lineIdx}`}> </React.Fragment>);
+          }
+          return result;
         });
         elements.push(
-          <p key={key} className="text-[15px] leading-7 mt-1 mb-2">
+          <p key={key} className="mt-1 mb-2 last:mb-0">
             {inlineNodes}
           </p>
         );
       }
 
-      // Safety advance
-      if (j < lines.length && (!lines[j] || !lines[j].trim())) j++;
+      if (j < lines.length) {
+          const l = lines[j];
+          if (l === undefined || !l.trim()) j++;
+      }
     }
 
     if (loopGuard >= 20000) {
@@ -497,46 +656,81 @@ function processTextSegment(
   return elements;
 }
 
-// ─── MAIN RENDERER ───────────────────────────────────
+// ─── Main renderer ─────────────────────────────────────────
 function renderContent(
   rawText: string,
   onCitationClick: (index: number) => void,
   sources: Source[]
 ) {
-  const segments = extractCodeBlocks(rawText);
+  if (!rawText) return [];
+  const segments = extractSpecialBlocks(rawText);
   const elements: React.ReactNode[] = [];
 
   segments.forEach((segment, segIdx) => {
-    if (segment.type === "code") {
-      elements.push(
-        <CodeBlock
-          key={`code-${segIdx}`}
-          language={segment.language}
-          code={segment.content}
-        />
-      );
-      return;
-    }
-
-    // Text segment: handle display math and then paragraphs
-    const tokens = tokenize(segment.value);
-    tokens.forEach((token, tokIdx) => {
-      const prefix = `seg${segIdx}-tok${tokIdx}`;
-      if (token.type === "display_math") {
+    switch (segment.type) {
+      case "code":
         elements.push(
-          <DisplayMath key={`dm-${prefix}`} formula={token.value} />
+          <CodeBlock
+            key={`code-${segIdx}`}
+            language={segment.language}
+            code={segment.content}
+          />
         );
-      } else {
-        const processed = processTextSegment(token.value, onCitationClick, sources, prefix);
-        elements.push(...processed);
+        return;
+
+      case "svg":
+        elements.push(
+          <div
+            key={`svg-${segIdx}`}
+            className="svg-renderer my-4"
+            dangerouslySetInnerHTML={{ __html: segment.content }}
+          />
+        );
+        return;
+
+      case "mermaid":
+        elements.push(
+          <MermaidRenderer key={`mermaid-${segIdx}`} code={segment.content} />
+        );
+        return;
+
+      case "chart":
+        try {
+          const chartData = JSON.parse(segment.content) as ChartData;
+          elements.push(
+            <ChartRenderer key={`chart-${segIdx}`} data={chartData} />
+          );
+        } catch (e) {
+          elements.push(
+            <div key={`chart-${segIdx}`} className="text-red-400 text-sm">
+              Invalid chart JSON: {(e as Error).message}
+            </div>
+          );
+        }
+        return;
+
+      case "text": {
+        const tokens = tokenize(segment.value);
+        tokens.forEach((token, tokIdx) => {
+          const prefix = `seg${segIdx}-tok${tokIdx}`;
+          if (token.type === "display_math") {
+            elements.push(
+              <DisplayMath key={`dm-${prefix}`} formula={token.value} />
+            );
+          } else {
+            const processed = processTextSegment(token.value, onCitationClick, sources, prefix);
+            elements.push(...processed);
+          }
+        });
+        return;
       }
-    });
+    }
   });
 
   return elements;
 }
 
-// ----- Public component (memoized) -----
+// ─── Public component (memoized) ──────────────────────────
 export const MessageRenderer = React.memo(function MessageRenderer({
   content,
   onCitationClick,
@@ -546,9 +740,10 @@ export const MessageRenderer = React.memo(function MessageRenderer({
   onCitationClick: (index: number) => void;
   sources: Source[];
 }) {
+  const safeContent = content ?? "";
   const rendered = useMemo(
-    () => renderContent(content, onCitationClick, sources),
-    [content, onCitationClick, sources]
+    () => renderContent(safeContent, onCitationClick, sources),
+    [safeContent, onCitationClick, sources]
   );
   return <>{rendered}</>;
 });

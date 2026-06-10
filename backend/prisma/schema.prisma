@@ -1,8 +1,9 @@
 generator client {
-  provider   = "prisma-client"
-  output     = "./generated"
-  engineType = "client"
-  runtime    = "bun"
+  provider        = "prisma-client"
+  output          = "./generated"
+  previewFeatures = ["partialIndexes"]
+  engineType      = "client"
+  runtime         = "bun"
 }
 
 datasource db {
@@ -16,6 +17,7 @@ model User {
   name          String
   supabaseId    String         @unique
   conversations Conversation[]
+  memories      Memory[]
 }
 
 model Conversation {
@@ -25,19 +27,45 @@ model Conversation {
   userId   String
   user     User      @relation(fields: [userId], references: [id])
   messages Message[]
+
+  @@index([userId])
 }
 
 model Message {
   id             Int          @id @default(autoincrement())
   content        String
   role           MessageRole
-  type           String?      // "canvas" for canvas playground messages
-  metadata       Json?        // { canvasCode: "…" }
   conversationId String
   createdAt      DateTime     @default(now())
-  sources        Json?
-  fileAttachment Json?
+  sources        Json?        // Array of source objects
+  fileAttachment Json?        // For user file attachments
+  followUps      Json?        // Array of follow-up questions
+  thoughtProcess Json?        // Array of status events (steps) for the thought process
+  generatedFiles Json?        // Array of generated document objects (base64, filename, mime, etc.)
+  metadata       Json?        // Legacy metadata
+  type           String?      // Legacy type
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt(sort: Desc)])
+  @@index([conversationId])
+}
+
+model Memory {
+  id                   String                @id @default(uuid())
+  userId               String
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category             String                // preference, project, personal, decision, feedback
+  fact                 String
+  embedding            Unsupported("vector(1024)")
+  sourceConversationId String?
+  importance           Float                 @default(0.5)
+  accessCount          Int                   @default(0)
+  lastAccessedAt       DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  @@index([userId])
+  @@index([userId, category])
 }
 
 enum MessageRole {

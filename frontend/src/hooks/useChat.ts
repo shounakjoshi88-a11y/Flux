@@ -1,9 +1,10 @@
 // src/hooks/useChat.ts
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { flushSync } from "react-dom";
 import { createClient } from "@/lib/client";
 import { BACKEND_URL } from "@/lib/config";
 import { extractLiveContent } from "@/lib/chat-utils";
-import type { Message, AttachedFile, Source } from "@/types";
+import type { Message, AttachedFile, Source, GeneratedFile } from "@/types";
 
 const supabase = createClient();
 
@@ -16,14 +17,23 @@ type UseChatCallbacks = {
   onNewConversationId?: (id: string) => void;
   onStreamUpdate?: (parsed: { content: string; sources: Source[] }) => void;
   onComplete?: () => void;
+  onThought?: (thought: { type: string; content: string }) => void;
+  onMessageId?: (id: string) => void;
   fileContent?: string;
   attachedFiles?: { name: string; content?: string }[];
 };
 
+let nextId = 1;
+
 export function useChat(user: any) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [statusMessages, setStatusMessages] = useState<string[]>([]);
+  const [statusMessages, setStatusMessages] = useState<any[]>([]);
+  const [thoughtProcessHistory, setThoughtProcessHistory] = useState<any[]>([]);
+  const [activeGenerationStatus, setActiveGenerationStatus] = useState<{
+    subtype: string;
+    message: string;
+  } | null>(null);
   const isLoadingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const lastRequestRef = useRef<{
@@ -31,18 +41,80 @@ export function useChat(user: any) {
     activeConversationId: string | null;
     selectedModel: string;
     attachedFiles: AttachedFile[] | null;
-    safetyEnabled: boolean;
+    fileContent: string;
   } | null>(null);
+  const realMessageIdRef = useRef<string | null>(null);
+  const lastCallbacksRef = useRef<UseChatCallbacks | undefined>(undefined);
+  const streamErrorRef = useRef<string | null>(null);
+
+  const latestFollowUpsRef = useRef<string[]>([]);
+  const latestGeneratedFilesRef = useRef<GeneratedFile[]>([]);
+
+  // ── Track the assistant raw buffer ──
+  const assistantRawRef = useRef<string>("");
+  const statusMessagesRef = useRef<any[]>([]);
+  const thoughtHistoryRef = useRef<any[]>([]);
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   const resetMessages = useCallback(() => {
     setMessages([]);
     setStatusMessages([]);
+    setThoughtProcessHistory([]);
     setIsLoading(false);
     isLoadingRef.current = false;
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
     lastRequestRef.current = null;
+    realMessageIdRef.current = null;
+    lastCallbacksRef.current = undefined;
+    latestFollowUpsRef.current = [];
+    latestGeneratedFilesRef.current = [];
+    setActiveGenerationStatus(null);
+    assistantRawRef.current = "";
   }, []);
+
+  // ── Clean thought tags ──
+  function cleanThoughtText(raw: string): string {
+    const closeIdx = raw.indexOf("</THOUGHT>");
+    if (closeIdx === -1) return "";
+    const openIdx = raw.indexOf("<THOUGHT>");
+    if (openIdx === -1) return "";
+    return raw.slice(openIdx + 9, closeIdx).trim();
+  }
+
+  // ── Clean answer tags ──
+  // The backend strips <ANSWER>...</ANSWER> before SSE-sending chunks, so
+  // assistantRawRef contains plain answer text.  We still handle the rare
+  // case where the tags leak through (e.g. model puts them in mid-stream).
+  function cleanAnswerText(raw: string): string {
+    if (!raw.trim()) return "";
+
+    // Case A: both tags present — extract the content between them
+    const openIdx = raw.indexOf("<ANSWER>");
+    const closeIdx = raw.indexOf("</ANSWER>");
+    if (openIdx !== -1 && closeIdx !== -1 && closeIdx > openIdx) {
+      return raw.slice(openIdx + 8, closeIdx).trim();
+    }
+    // Case B: opening tag present but not yet closed (mid-stream) — show what arrived
+    if (openIdx !== -1) {
+      return raw.slice(openIdx + 8).trim();
+    }
+
+    // Case C (normal): backend already stripped the tags — return raw content
+    // but defensively strip any residual structural tags that might have leaked.
+    return raw
+      .replace(/<THOUGHT>[\s\S]*?<\/THOUGHT>/gi, "")
+      .replace(/<\/?THOUGHT>/gi, "")
+      .replace(/<\/?ANSWER>/gi, "")
+      .replace(/<\/?FOLLOW_UPS>/gi, "")
+      .replace(/<\/?question>/gi, "")
+      .trim();
+  }
 
   const handleSubmit = useCallback(
     async (
@@ -50,7 +122,6 @@ export function useChat(user: any) {
       activeConversationId: string | null,
       selectedModel: string,
       attachedFiles: AttachedFile[] | null,
-      safetyEnabled: boolean,
       callbacks?: UseChatCallbacks
     ) => {
       if (!prompt.trim() || isLoadingRef.current || !user) return;
@@ -61,34 +132,43 @@ export function useChat(user: any) {
 
       setIsLoading(true);
       isLoadingRef.current = true;
+      statusMessagesRef.current = [];
+      thoughtHistoryRef.current = [];
       setStatusMessages([]);
+      setThoughtProcessHistory([]);
+      setActiveGenerationStatus(null);
+      realMessageIdRef.current = null;
+      latestFollowUpsRef.current = [];
+      latestGeneratedFilesRef.current = [];
+      streamErrorRef.current = null;
+      assistantRawRef.current = "";
 
-      lastRequestRef.current = { prompt, activeConversationId, selectedModel, attachedFiles, safetyEnabled };
+      lastRequestRef.current = {
+        prompt,
+        activeConversationId,
+        selectedModel,
+        attachedFiles,
+        fileContent: callbacks?.fileContent ?? "",
+      };
+      lastCallbacksRef.current = callbacks;
 
       const token = await getAccessToken();
 
-      // Build request body with multiple file attachments
       const body: any = {
         query: prompt,
         model: selectedModel,
-        safetyEnabled,
         fileContent: callbacks?.fileContent ?? "",
         attachedFiles: attachedFiles && attachedFiles.length > 0
-          ? attachedFiles.map((f) => ({ name: f.name, content: f.content }))
+          ? attachedFiles.map((f) => ({ name: f.name, content: f.content, type: f.type }))
           : undefined,
+        conversationId: activeConversationId ?? undefined,
       };
 
-      if (activeConversationId) {
-        body.conversationId = activeConversationId;
-      }
+      const endpoint = `${BACKEND_URL}/flux_ask`;
 
-      const endpoint = activeConversationId
-        ? `${BACKEND_URL}/flux_ask/follow_up`
-        : `${BACKEND_URL}/flux_ask`;
-
-      // Optimistic user message
+      const userMsgId = nextId++;
       const optimisticUser: Message = {
-        id: Date.now(),
+        id: userMsgId,
         role: "User",
         content: attachedFiles && attachedFiles.length > 0
           ? `${prompt}\n\n${attachedFiles.map((f) => `[attached: ${f.name}]`).join("\n")}`
@@ -97,14 +177,30 @@ export function useChat(user: any) {
         fileAttachment: attachedFiles
           ? attachedFiles.map((f) => ({ name: f.name, content: f.content }))
           : [],
-      } as any;
+      };
 
-      setMessages((prev) => [...prev, optimisticUser]);
+      const assistantMsgId = `temp-assistant-${nextId++}`;
+      const optimisticAssistant: Message = {
+        id: assistantMsgId,
+        role: "Assistant",
+        content: "",
+        createdAt: new Date().toISOString(),
+        sources: [],
+        followUps: [],
+        generatedFiles: [],
+      };
+
+      setMessages((prev) => [...prev, optimisticUser, optimisticAssistant]);
+
+      let finalAssistantId: string | null = null;
 
       try {
         const response = await fetch(endpoint, {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: token },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
           body: JSON.stringify(body),
           signal: controller.signal,
         });
@@ -118,8 +214,8 @@ export function useChat(user: any) {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
-        let assistantRaw = "";
         let latestSources: Source[] = [];
+        let hasReceivedFinalAnswer = false;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -148,48 +244,158 @@ export function useChat(user: any) {
             const data = dataLines.join("\n");
             if (!data) continue;
 
-            if (eventType === "sources") {
-              try { latestSources = JSON.parse(data) as Source[]; } catch {}
-            } else if (eventType === "status") {
-              setStatusMessages((prev) => [...prev, data]);
-            } else if (eventType === "error") {
-              // skip
-            } else {
-              assistantRaw += data;
+            // ─── SERVER ERROR ───────────────────────────
+            if (eventType === "error") {
+              let errorMessage = "Server error";
+              try {
+                const parsed = JSON.parse(data);
+                errorMessage = parsed.message || "Server error";
+              } catch {}
+              streamErrorRef.current = errorMessage;
+              await reader.cancel();
+              break;
             }
 
-            const { answer, followUps } = extractLiveContent(assistantRaw);
+            // ─── SOURCES ───────────────────────────────
+            if (eventType === "sources") {
+              try { latestSources = JSON.parse(data) as Source[]; } catch {}
+            }
+            // ─── FOLLOW_UPS ────────────────────────────
+            else if (eventType === "follow_ups") {
+              try { latestFollowUpsRef.current = JSON.parse(data) as string[]; } catch {}
+            }
+            // ─── STATUS ─────────────────────────────────
+            else if (eventType === "status") {
+              try {
+                const parsed = JSON.parse(data);
+                statusMessagesRef.current = [...statusMessagesRef.current, parsed];
+                setStatusMessages([...statusMessagesRef.current]);
+                if (
+                  parsed.subtype === 'generating_file' ||
+                  parsed.subtype === 'generating_chart' ||
+                  parsed.subtype === 'image_enhancing' ||
+                  parsed.subtype === 'image_generating'
+                ) {
+                  setActiveGenerationStatus({ subtype: parsed.subtype, message: parsed.message });
+                }
+              } catch {}
+            }
+            // ─── THOUGHT ───────────────────────────────
+            else if (eventType === "thought") {
+              try {
+                const parsed = JSON.parse(data);
+                const cleanContent = cleanThoughtText(parsed.content || "");
+                if (cleanContent) {
+                  const entry = { type: "thought", content: cleanContent };
+                  thoughtHistoryRef.current = [...thoughtHistoryRef.current, entry];
+                  setThoughtProcessHistory([...thoughtHistoryRef.current]);
+                }
+              } catch {}
+            }
+            // ─── FILE ──────────────────────────────────
+            else if (eventType === "file") {
+              try {
+                const parsed = JSON.parse(data) as GeneratedFile;
+                const alreadyExists = latestGeneratedFilesRef.current.some(
+                  (f) => f.filename === parsed.filename
+                );
+                if (!alreadyExists) {
+                  latestGeneratedFilesRef.current.push(parsed);
+                }
+                const targetId = realMessageIdRef.current ?? assistantMsgId;
+                // ✅ Update the assistant message with the generated file
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    String(m.id) === String(targetId) || String(m.id) === String(assistantMsgId) || String(m.id) === "-1"
+                      ? { 
+                          ...m, 
+                          generatedFiles: [...latestGeneratedFilesRef.current],
+                        }
+                      : m
+                  )
+                );
+                // Clear inline generation indicator once file arrives
+                setActiveGenerationStatus(null);
+              } catch (e) {
+                console.error("Failed to parse file event:", e);
+              }
+            }
+            // ─── MESSAGE_ID ────────────────────────────
+            else if (eventType === "message_id") {
+              try {
+                const parsed = JSON.parse(data);
+                realMessageIdRef.current = parsed.id;
+                finalAssistantId = parsed.id;
+                callbacks?.onMessageId?.(parsed.id);
+              } catch {}
+            }
+            // ─── TEXT ANSWER (default) ─────────────────
+            else {
+              if (data === "[DONE]") continue;
+              assistantRawRef.current += data;
+            }
 
-            setMessages((prev) => {
-              const withoutTemp = prev.filter((m) => m.id !== -1);
-              const assistantMsg: Message = {
-                id: -1,
-                role: "Assistant",
-                content: answer,
-                createdAt: new Date().toISOString(),
-                sources: latestSources.length > 0 ? latestSources : [],
-                followUps,
-              } as Message;
-              return [...withoutTemp, assistantMsg];
-            });
-
-            callbacks?.onStreamUpdate?.({ content: answer, sources: latestSources });
+            // ─── Update assistant message with partial answer ──
+            try {
+              const cleanAns = cleanAnswerText(assistantRawRef.current);
+              if (cleanAns) {
+                hasReceivedFinalAnswer = true;
+                const targetId = realMessageIdRef.current ?? assistantMsgId;
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    String(m.id) === String(targetId) || String(m.id) === String(assistantMsgId) || String(m.id) === "-1"
+                      ? {
+                          ...m,
+                          id: realMessageIdRef.current ?? m.id,
+                          content: cleanAns,
+                          sources: latestSources.length > 0 ? latestSources : m.sources,
+                          followUps: latestFollowUpsRef.current,
+                          generatedFiles: latestGeneratedFilesRef.current.length > 0
+                            ? [...latestGeneratedFilesRef.current]
+                            : m.generatedFiles,
+                          thoughtProcess: [...statusMessagesRef.current, ...thoughtHistoryRef.current],
+                        }
+                      : m
+                  )
+                );
+              }
+            } catch (innerErr) {
+              console.error("Stream update error:", innerErr);
+            }
           }
         }
 
-        setMessages((prev) =>
-          prev.map((m) => (m.id === -1 ? { ...m, id: Date.now() + 1 } : m))
-        );
-        setStatusMessages([]);
+        // ─── If the server sent an error event, surface it ──────────────────
+        if (streamErrorRef.current) {
+          throw new Error(streamErrorRef.current);
+        }
 
-        const finalAnswer = extractLiveContent(assistantRaw).answer;
-        if (!finalAnswer || finalAnswer.startsWith("[Error")) {
+        // ─── Attach thought process to the assistant message ──
+        const finalTP = [...statusMessagesRef.current, ...thoughtHistoryRef.current];
+        if (finalTP.length > 0) {
+          const targetId = realMessageIdRef.current ?? assistantMsgId;
+          setMessages((prev) =>
+            prev.map((m) =>
+              String(m.id) === String(targetId) || String(m.id) === String(assistantMsgId) || String(m.id) === "-1"
+                ? { ...m, thoughtProcess: finalTP }
+                : m
+            )
+          );
+        }
+
+        // ─── Final cleanup ──────────────────────────────
+        const finalAnswer = cleanAnswerText(assistantRawRef.current);
+        const hasGeneratedFiles = latestGeneratedFilesRef.current.length > 0;
+        const hasImageFiles = latestGeneratedFilesRef.current.some(f => f.mime?.startsWith("image/"));
+
+        // ✅ If we have generated files, don't show an error even if answer is empty
+        if ((!finalAnswer || finalAnswer.startsWith("[Error")) && !hasGeneratedFiles) {
           setMessages((prev) => {
             const withoutLast = prev.slice(0, -1);
             return [
               ...withoutLast,
               {
-                id: Date.now() + 1,
+                id: nextId++,
                 role: "Assistant",
                 content: "",
                 createdAt: new Date().toISOString(),
@@ -199,23 +405,26 @@ export function useChat(user: any) {
             ];
           });
         }
+
       } catch (error: any) {
         if (error.name === "AbortError") {
           setMessages((prev) =>
-            prev.map((m) => (m.id === -1 ? { ...m, id: Date.now() + 1 } : m))
+            prev.map((m) => (String(m.id) === String(assistantMsgId) || String(m.id) === "-1" ? { ...m, id: nextId++ } : m))
           );
-          setStatusMessages([]);
         } else {
           console.error("Send failed:", error);
+          const errMsg = error?.message && !error.message.includes("fetch")
+            ? error.message
+            : "Message failed. Please try again.";
           setMessages((prev) => [
-            ...prev.filter((m) => m.id !== -1),
+            ...prev.filter((m) => String(m.id) !== String(assistantMsgId) && String(m.id) !== "-1" && String(m.id) !== String(realMessageIdRef.current)),
             {
-              id: Date.now() + 1,
+              id: nextId++,
               role: "Assistant",
               content: "",
               createdAt: new Date().toISOString(),
               error: true,
-              errorMessage: "Message failed. Please try again.",
+              errorMessage: errMsg,
             } as Message,
           ]);
         }
@@ -223,6 +432,7 @@ export function useChat(user: any) {
         setIsLoading(false);
         isLoadingRef.current = false;
         abortControllerRef.current = null;
+        setActiveGenerationStatus(null);
         callbacks?.onComplete?.();
       }
     },
@@ -236,13 +446,36 @@ export function useChat(user: any) {
   const retry = useCallback(() => {
     const last = lastRequestRef.current;
     if (!last || isLoading) return;
-    setMessages((prev) => prev.filter((m) => !(m as any).error));
-    handleSubmit(last.prompt, last.activeConversationId, last.selectedModel, last.attachedFiles, last.safetyEnabled, {
-      onNewConversationId: (id) => {},
-      onStreamUpdate: () => {},
-      onComplete: () => {},
-    });
+
+    setMessages((prev) => prev.filter((m) => !m.error));
+
+    const originalCallbacks = lastCallbacksRef.current;
+    const callbacksForRetry: UseChatCallbacks = {
+      ...(originalCallbacks || {}),
+      fileContent: last.fileContent,
+    };
+
+    handleSubmit(
+      last.prompt,
+      last.activeConversationId,
+      last.selectedModel,
+      last.attachedFiles,
+      callbacksForRetry
+    );
   }, [isLoading, handleSubmit]);
 
-  return { messages, setMessages, isLoading, handleSubmit, resetMessages, retry, stop, statusMessages };
+  return {
+    messages,
+    setMessages,
+    isLoading,
+    handleSubmit,
+    resetMessages,
+    retry,
+    stop,
+    statusMessages,
+    setStatusMessages,
+    thoughtProcessHistory,
+    setThoughtProcessHistory,
+    activeGenerationStatus,
+  };
 }

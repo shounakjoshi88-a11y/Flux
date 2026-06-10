@@ -1,71 +1,56 @@
 // src/components/ToolsDropdown.tsx
 import { motion, AnimatePresence } from "framer-motion";
-import { Pencil, SearchCheck, Loader2 } from "lucide-react";
+import { Pencil, SearchCheck } from "lucide-react";
+import { memo } from "react";
 
 type ToolsDropdownProps = {
-  isOpen: boolean;
-  onClose: () => void;
-  onCanvasSelect: () => void;
+  activeTab: "answer" | "links" | "images";
+  onTabChange: (tab: "answer" | "links" | "images") => void;
+  showPromptHistory: boolean;
+  onTogglePromptHistory: () => void;
 };
 
-export function ToolsDropdown({ isOpen, onClose, onCanvasSelect }: ToolsDropdownProps) {
+export const ToolsDropdown = memo(function ToolsDropdown({
+  activeTab,
+  onTabChange,
+  showPromptHistory,
+  onTogglePromptHistory,
+}: ToolsDropdownProps) {
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop to close on click outside */}
-          <div
-            className="fixed inset-0 z-40"
-            onClick={onClose}
-          />
-
-          <motion.div
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 4 }}
-            className="absolute bottom-full left-0 mb-2 w-52 rounded-xl border border-white/10 bg-[#1a1a1a] shadow-lg z-50 overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Canvas option */}
-            <button
-              type="button"
-              onClick={() => {
-                onCanvasSelect();
-                onClose();
-              }}
-              className="flex items-center gap-3 w-full px-4 py-3 text-sm text-white hover:bg-white/10 transition text-left"
-            >
-              <div className="p-1.5 rounded-lg bg-blue-500/20">
-                <Pencil className="size-4 text-blue-400" />
-              </div>
-              <div>
-                <p className="font-medium">Canvas</p>
-                <p className="text-xs text-muted-foreground">Live HTML playground</p>
-              </div>
-            </button>
-
-            {/* Deep Research (disabled) */}
-            <button
-              type="button"
-              disabled
-              className="flex items-center gap-3 w-full px-4 py-3 text-sm text-muted-foreground cursor-not-allowed text-left"
-            >
-              <div className="p-1.5 rounded-lg bg-gray-500/20">
-                <SearchCheck className="size-4 text-gray-500" />
-              </div>
-              <div>
-                <p className="font-medium flex items-center gap-2">
-                  Deep Research
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-800 text-gray-400">
-                    soon
-                  </span>
-                </p>
-                <p className="text-xs opacity-70">Multi‑source analysis</p>
-              </div>
-            </button>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+    <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl">
+      <button
+        onClick={() => onTabChange("answer")}
+        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${
+          activeTab === "answer" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/60"
+        }`}
+      >
+        Answer
+      </button>
+      <button
+        onClick={() => onTabChange("links")}
+        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${
+          activeTab === "links" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/60"
+        }`}
+      >
+        Links
+      </button>
+      <button
+        onClick={() => onTabChange("images")}
+        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${
+          activeTab === "images" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/60"
+        }`}
+      >
+        Images
+      </button>
+      <div className="w-[1px] h-4 bg-white/10 mx-1" />
+      <button
+        onClick={onTogglePromptHistory}
+        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${
+          showPromptHistory ? "bg-white/10 text-white" : "text-white/40 hover:text-white/60"
+        }`}
+      >
+        History
+      </button>
+    </div>
   );
-}
+});

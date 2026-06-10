@@ -11,4 +11,5 @@
 export type * from './models/User.ts'
 export type * from './models/Conversation.ts'
 export type * from './models/Message.ts'
+export type * from './models/Memory.ts'
 export type * from './commonInputTypes.ts'

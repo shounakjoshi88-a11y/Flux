@@ -11,12 +11,12 @@ Classify the user query as either SAFE or UNSAFE.
 Consider categories: violence, hate speech, self-harm, sexual content, child safety, illegal activities, harassment, etc.
 Respond with only the word "SAFE" or "UNSAFE".`;
 
-    const model = nim.chatModel(SAFETY_MODEL);
+    const model = (nim as any).chatModel(SAFETY_MODEL);
     const { text } = await generateText({
         model,
         prompt,
         maxTokens: 5,
-    });
+    } as any);
 
     const verdict = text.trim().toUpperCase();
     return verdict === "SAFE";

@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "skills": {
+    "analyze-bundle": {
+      "source": "vercel-labs/dev3000",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/analyze-bundle/SKILL.md",
+      "computedHash": "5f3a614d629eb887a846fd0d32ad9fa9da6042400d51928187ba6b5bbd06a6d9"
+    },
+    "bun": {
+      "source": "bun.sh",
+      "sourceType": "well-known",
+      "computedHash": "959aa11169f7532aa08da08ab16d4409f5785bd08b125164dfba3e92d336cd76"
+    },
+    "bun-development": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/bun-development/SKILL.md",
+      "computedHash": "6c482188750497e5f4a1f1ff222f0dcbe5332c59424075de57d4fe0b97320657"
+    },
+    "bun-runtime": {
+      "source": "affaan-m/everything-claude-code",
+      "sourceType": "github",
+      "skillPath": "skills/bun-runtime/SKILL.md",
+      "computedHash": "5e8627ece37efa7f9ea4fdd7360ef95ad8bce4ce92ae8afd90a27347df1b6f9c"
+    },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "computedHash": "516bd2154eb843a8240e43d5b285229129853114ad7075a5e141e1c08e408c84"
+    },
+    "logo-creator": {
+      "source": "resciencelab/opc-skills",
+      "sourceType": "github",
+      "skillPath": "skills/logo-creator/SKILL.md",
+      "computedHash": "cfb6815ea42686977fb54fe7f6bbd349056a2fcf61f7675fd1becd721029f82b"
+    },
+    "multi-agent-orchestration": {
+      "source": "qodex-ai/ai-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/multi-agent-orchestration/SKILL.md",
+      "computedHash": "d50072e06e7180468a91e8985827f64ad05f090a6dd435f5c51813b4e9417b69"
+    },
+    "web-design-guidelines": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/web-design-guidelines/SKILL.md",
+      "computedHash": "f3bc47f890f42a44db1007ab390709ec368e4b8c089baee6b0007182236ac474"
+    }
+  }
+}

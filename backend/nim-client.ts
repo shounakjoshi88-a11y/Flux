@@ -1,3 +1,4 @@
+// nim-client.ts
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 
 export const nim = createOpenAICompatible({

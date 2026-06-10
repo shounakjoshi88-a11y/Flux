@@ -1,4 +1,5 @@
 // voice-client.ts – Free STT/TTS via NVIDIA NIM
+import { generateText } from 'ai';
 import { nim } from './nim-client';
 
 const ASR_MODEL = 'nvidia/parakeet-1.1b-rnnt-multilingual-asr';
@@ -26,8 +27,9 @@ export async function transcribeAudio(audioBase64: string): Promise<string> {
 export async function synthesizeSpeech(text: string): Promise<Buffer> {
     // TTS via NIM: the model expects a prompt and returns audio bytes.
     const model = nim.chatModel(TTS_MODEL);
-    const { text: audioBase64 } = await model.generate({
+    const { text: audioBase64 } = await generateText({
+        model,
         prompt: text,
-    });
+    } as any);
     return Buffer.from(audioBase64, 'base64');
 }

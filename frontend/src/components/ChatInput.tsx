@@ -1,26 +1,17 @@
-// ChatInput.tsx
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+// src/components/ChatInput.tsx
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ChevronDown,
-  Compass,
-  FileText,
-  FileCode,
-  FileJson,
+  Globe,
   HardDrive,
-  Mic,
-  MicOff,
-  Paperclip,
   SendHorizontal,
-  Shield,
-  Square,
   X,
+  Plus,
 } from "lucide-react";
-import { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import type { AttachedFile } from "@/types";
+import { marked } from "marked";
 
-// ── TYPES ─────────────────────────────────────
 interface ModelOption {
   id: string;
   label: string;
@@ -31,9 +22,9 @@ interface ModelCategory {
   models: ModelOption[];
 }
 
-export type ChatInputProps = {
+export interface ChatInputProps {
   query: string;
-  setQuery: (value: string) => void;
+  setQuery: React.Dispatch<React.SetStateAction<string>> | ((value: string) => void);
   onSend: (query?: string) => void;
   isLoading: boolean;
   placeholderText: string;
@@ -44,46 +35,128 @@ export type ChatInputProps = {
   models: ModelCategory[];
   currentModelLabel: string;
   modelDropdownOpen: boolean;
-  setModelDropdownOpen: (open: boolean) => void;
+  setModelDropdownOpen: React.Dispatch<React.SetStateAction<boolean>>;
   handleAttachFiles: (files: FileList | null) => Promise<void>;
   onStop?: () => void;
-  safetyEnabled: boolean;
-  setSafetyEnabled: (val: boolean) => void;
-  // New optional props
+  hideModelSelector?: boolean;
+  searchEnabled?: boolean;
+  setSearchEnabled?: React.Dispatch<React.SetStateAction<boolean>>;
   compact?: boolean;
-  toolsSlot?: React.ReactNode; // space for Tools button / canvas pill
-};
+  toolsSlot?: React.ReactNode;
+}
+
+// Fixed SpeechRecognition types
+interface SpeechRecognitionEvent extends Event {
+  readonly resultIndex: number;
+  readonly results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionResultList {
+  readonly length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  readonly length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+  readonly isFinal: boolean;
+}
+
+interface SpeechRecognitionAlternative {
+  readonly transcript: string;
+  readonly confidence: number;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onstart: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any) | null;
+  onerror: ((this: SpeechRecognition, ev: any) => any) | null;
+  onend: ((this: SpeechRecognition, ev: Event) => any) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
 
 declare global {
   interface Window {
-    SpeechRecognition: typeof SpeechRecognition;
-    webkitSpeechRecognition: typeof SpeechRecognition;
+    SpeechRecognition: {
+      new(): SpeechRecognition;
+    };
+    webkitSpeechRecognition: {
+      new(): SpeechRecognition;
+    };
   }
 }
 
-/** Returns a Lucide icon component based on file extension */
-function getFileIcon(name: string) {
-  const ext = name.split(".").pop()?.toLowerCase();
-  switch (ext) {
-    case "py":
-    case "js":
-    case "ts":
-    case "jsx":
-    case "tsx":
-    case "java":
-    case "cpp":
-    case "c":
-    case "go":
-    case "rs":
-    case "rb":
-    case "swift":
-    case "kt":
-      return <FileCode className="size-4" />;
-    case "json":
-      return <FileJson className="size-4" />;
-    default:
-      return <FileText className="size-4" />;
+const AnimatedAudioLines = ({ isActive }: { isActive: boolean }) => {
+  const delays = [0, 0.1, 0.2, 0.1, 0];
+  return (
+    <div className="flex items-center gap-[2px] h-4">
+      {[4, 10, 14, 10, 4].map((height, i) => (
+        <motion.div
+          key={i}
+          className="w-[2px] rounded-full bg-current"
+          initial={{ height: 2 }}
+          animate={isActive ? { height: height } : { height: 2 }}
+          transition={
+            isActive
+              ? {
+                duration: 0.4 + Math.random() * 0.2,
+                repeat: Infinity,
+                repeatType: "reverse",
+                delay: (delays[i % delays.length] ?? 0) + Math.random() * 0.1,
+              }
+              : {
+                duration: 0.2,
+                ease: "easeOut",
+              }
+          }
+        />
+      ))}
+    </div>
+  );
+};
+
+// ─── Cursor preservation helpers ──────────────────────────────
+function saveCursor(el: HTMLElement): number {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return 0;
+  const range = sel.getRangeAt(0);
+  const preCaret = range.cloneRange();
+  preCaret.selectNodeContents(el);
+  preCaret.setEnd(range.endContainer, range.endOffset);
+  return preCaret.toString().length;
+}
+
+function restoreCursor(el: HTMLElement, offset: number) {
+  const sel = window.getSelection();
+  if (!sel) return;
+  const treeWalker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  let charCount = 0;
+  let node: Text | null;
+  while ((node = treeWalker.nextNode() as Text | null)) {
+    const next = charCount + node.length;
+    if (next >= offset) {
+      const range = document.createRange();
+      range.setStart(node, offset - charCount);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      return;
+    }
+    charCount = next;
   }
+  // fallback: end of content
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(range);
 }
 
 export function ChatInput({
@@ -102,23 +175,82 @@ export function ChatInput({
   setModelDropdownOpen,
   handleAttachFiles,
   onStop,
-  safetyEnabled,
-  setSafetyEnabled,
+  hideModelSelector = false,
+  searchEnabled = true,
+  setSearchEnabled,
   compact = false,
-  toolsSlot,
 }: ChatInputProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const recognitionRef = useRef<InstanceType<typeof SpeechRecognition> | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const isComposing = useRef(false);
 
-  // ── Auto‑resize textarea ───────────────────────
+  // ─── Render markdown to HTML ──────────────────────────────
+  const renderMarkdown = useCallback(async (text: string): Promise<string> => {
+    if (!text.trim()) return "";
+    try {
+      const result = await marked.parse(text, { async: true, breaks: true });
+      return result as string;
+    } catch {
+      return text;
+    }
+  }, []);
+
+  // ─── Sync contenteditable from external query changes ────
   useEffect(() => {
-    if (!textareaRef.current) return;
-    textareaRef.current.style.height = "auto";
-    textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
-  }, [query]);
+    const el = editorRef.current;
+    if (!el) return;
+    const text = el.innerText || "";
+    if (text === query) return;
+    renderMarkdown(query).then((html) => {
+      if (el.innerHTML !== html) el.innerHTML = html;
+    });
+  }, [query, renderMarkdown]);
+
+  // ─── Handle user input ────────────────────────────────────
+  const handleInput = useCallback(async () => {
+    const el = editorRef.current;
+    if (!el) return;
+    const text = el.innerText || "";
+    (setQuery as any)(text);
+    const cursor = saveCursor(el);
+    const html = await renderMarkdown(text);
+    if (el.innerHTML !== html) {
+      el.innerHTML = html;
+      restoreCursor(el, cursor);
+    }
+  }, [setQuery, renderMarkdown]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey && !isComposing.current) {
+      e.preventDefault();
+      onSend();
+    }
+  }, [onSend]);
+
+  const handleCompositionStart = useCallback(() => { isComposing.current = true; }, []);
+  const handleCompositionEnd = useCallback(() => { isComposing.current = false; }, []);
+
+  // ─── Paste: handle images/files from clipboard ────────────
+  const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
+    const items = Array.from(e.clipboardData.items);
+    const fileItems = items.filter(item => item.kind === 'file');
+    if (fileItems.length === 0) return;
+    e.preventDefault();
+    const dt = new DataTransfer();
+    for (const item of fileItems) {
+      const file = item.getAsFile();
+      if (file) {
+        const named = new File([file], file.name || `pasted-${Date.now()}`, { type: file.type });
+        dt.items.add(named);
+      }
+    }
+    if (dt.files.length > 0) {
+      await handleAttachFiles(dt.files);
+    }
+  }, [handleAttachFiles]);
 
   const handleLocalFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -127,248 +259,255 @@ export function ChatInput({
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const toggleRecording = () => {
+  const handleButtonClick = () => {
+    if (isLoading) {
+      onStop?.();
+      return;
+    }
+    const hasText = query.trim().length > 0;
+    if (hasText) {
+      onSend();
+      return;
+    }
+    startVoiceRecording();
+  };
+
+  const startVoiceRecording = () => {
     if (isRecording) {
       recognitionRef.current?.stop();
       setIsRecording(false);
       return;
     }
-
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert("Speech recognition is not supported in this browser. Please use Chrome or Edge.");
+      alert("Speech recognition is not supported in this browser.");
       return;
     }
-
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.lang = 'en-US';
-
     recognition.onstart = () => setIsRecording(true);
-
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const transcript = event.results[0][0].transcript;
-      setQuery((prev) => (prev + ' ' + transcript).trim());
+      const result = event.results[0];
+      const transcript = result?.[0]?.transcript;
+      if (transcript) {
+        if (typeof setQuery === 'function') {
+          (setQuery as any)((prev: string) => (prev + ' ' + transcript).trim());
+        }
+      }
     };
-
-    recognition.onerror = (event) => {
-      console.error('Speech recognition error:', event.error);
-      setIsRecording(false);
-    };
-
-    recognition.onend = () => {
-      setIsRecording(false);
-    };
-
+    recognition.onerror = () => setIsRecording(false);
+    recognition.onend = () => setIsRecording(false);
     recognitionRef.current = recognition;
     recognition.start();
   };
 
+  const hasText = query.trim().length > 0;
+
   return (
-    <div className={`w-full input-container rounded-2xl border border-black/10 dark:border-white/10 bg-white/80 dark:bg-[#191a1a]/90 pointer-events-auto ${compact ? "max-w-full rounded-none" : "max-w-3xl"}`}>
-      {/* Multi‑file chips */}
+    <div
+      className={`
+        w-full rounded-2xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-sm relative transition-colors z-10
+        ${compact ? "rounded-none border-x-0" : "max-w-[740px]"}
+      `}
+    >
+      {/* ─── FILE CARDS ─── */}
       <AnimatePresence>
         {attachedFiles.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
-            className="flex flex-wrap items-center gap-2 px-4 pt-3"
+            className="flex flex-wrap gap-4 px-4 pt-3 pb-1 border-b border-[var(--surface-border)]"
           >
-            {attachedFiles.map((file, idx) => (
-              <div
-                key={file.name + idx}
-                className="flex items-center gap-2 bg-blue-500/10 dark:bg-blue-400/10 border border-blue-500/20 dark:border-blue-400/20 rounded-xl px-3 py-1.5 text-sm"
-              >
-                <div className="text-blue-600 dark:text-blue-400">
-                  {getFileIcon(file.name)}
-                </div>
-                <span className="truncate max-w-[150px] font-medium text-foreground/80">
-                  {file.name}
-                </span>
-                <button
-                  onClick={() =>
-                    setAttachedFiles(attachedFiles.filter((_, i) => i !== idx))
-                  }
-                  className="ml-1 p-0.5 rounded-full hover:bg-blue-500/20 dark:hover:bg-blue-400/20 text-muted-foreground hover:text-foreground transition"
+            {attachedFiles.map((file, idx) => {
+              const ext = file.name.split('.').pop()?.toUpperCase() || 'FILE';
+              const isImage = file.type?.startsWith('image/');
+              const isVideo = file.type?.startsWith('video/');
+              return (
+                <div
+                  key={file.name + idx}
+                  className="flex flex-col bg-[var(--bg-primary)] border border-[var(--surface-border)] rounded-lg p-3 min-w-[160px] max-w-[200px] w-auto hover:border-[var(--accent)]/35 transition-colors group"
                 >
-                  <X className="size-3.5" />
-                </button>
-              </div>
-            ))}
+                  {isImage ? (
+                    <img src={file.content} alt={file.name} className="w-full h-20 object-cover rounded-md mb-2" />
+                  ) : isVideo ? (
+                    <video src={file.content} className="w-full h-20 object-cover rounded-md mb-2" />
+                  ) : (
+                    <>
+                      <div className="font-semibold text-sm text-[var(--text-primary)] truncate">{file.name}</div>
+                      <div className="text-xs text-[var(--text-muted)] mt-0.5">
+                        {file.content ? `${file.content.split('\n').length} lines` : 'Media file'}
+                      </div>
+                    </>
+                  )}
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-[10px] px-2 py-0.5 border border-[var(--surface-border)] rounded bg-[var(--surface-bg)] text-[var(--text-secondary)]">{ext}</span>
+                    <button
+                      onClick={() => setAttachedFiles(attachedFiles.filter((_, i) => i !== idx))}
+                      className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-0.5 rounded hover:bg-[var(--surface-bg)]"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Main input area */}
-      <div className="flex items-end gap-2 p-3">
-        {/* Hide attach & mic in compact mode */}
-        {!compact && (
-          <>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setAttachMenuOpen(!attachMenuOpen)}
-                className="attach-label"
+      {/* ─── CONTENTEDITABLE EDITOR (markdown renders inline) ─── */}
+      <div className="px-4 pt-[14px] pb-1">
+        <div
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          role="textbox"
+          aria-multiline="true"
+          onInput={handleInput}
+          onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
+          data-placeholder={placeholderText}
+          className="w-full min-h-[36px] max-h-[160px] overflow-y-auto text-[14px] text-[var(--text-primary)] leading-relaxed font-sans outline-none [&:empty:before]:content-[attr(data-placeholder)] [&:empty:before]:text-[#a09d96] [&:empty:before]:pointer-events-none [&_p]:my-0 [&_pre]:my-1 [&_pre]:bg-[var(--code-bg)] [&_pre]:rounded-lg [&_pre]:p-2 [&_code]:text-[var(--inline-code-text)] [&_code]:bg-[var(--inline-code-bg)]"
+        />
+      </div>
+
+      {/* ─── BOTTOM CONTROLS — Claude-style clean ─── */}
+      <div className="flex items-center justify-between px-3 pb-2">
+        <div className="relative">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setAttachMenuOpen(!attachMenuOpen)}
+              className="flex items-center justify-center rounded-full text-[var(--text-secondary)]/50 hover:text-[var(--text-primary)] hover:bg-[var(--surface-bg)] transition p-1"
+              title="Attach files"
+            >
+              <Plus className="size-4" />
+            </button>
+
+          </div>
+          <AnimatePresence>
+            {attachMenuOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 4 }}
+                className="absolute bottom-full left-0 mb-2 w-48 rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-xl z-50 overflow-hidden"
               >
-                <Paperclip className="size-5" />
+                <button
+                  onClick={() => {
+                    fileInputRef.current?.click();
+                    setAttachMenuOpen(false);
+                  }}
+                  className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--surface-bg)] transition"
+                >
+                  <HardDrive className="size-4" />
+                  Upload from computer
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            multiple
+            accept="image/*,video/*,.txt,.md,.js,.ts,.tsx,.py,.docx,.pdf,.pptx"
+            onChange={(e) => handleLocalFiles(e.target.files)}
+          />
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          {!hideModelSelector && (
+            <div className="relative model-selector">
+              <button
+                onClick={() => setModelDropdownOpen((prev) => !prev)}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-[var(--text-secondary)]/70 hover:text-[var(--text-primary)] hover:bg-[var(--surface-bg)] transition"
+              >
+                <span className="max-w-[120px] truncate">{currentModelLabel}</span>
+                <ChevronDown className="size-3 opacity-40" />
               </button>
               <AnimatePresence>
-                {attachMenuOpen && (
+                {modelDropdownOpen && (
                   <motion.div
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 4 }}
-                    className="absolute bottom-full left-0 mb-2 w-44 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1a1a1a] shadow-lg z-50 overflow-hidden"
+                    initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                    className="absolute bottom-full right-0 mb-2 w-64 max-h-80 overflow-y-auto rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-xl z-[70] p-1.5"
                   >
-                    <button
-                      onClick={() => {
-                        fileInputRef.current?.click();
-                        setAttachMenuOpen(false);
-                      }}
-                      className="flex items-center gap-3 w-full px-3 py-2 text-xs hover:bg-gray-100 dark:hover:bg-white/5 transition text-foreground"
-                    >
-                      <HardDrive className="size-4" />
-                      Upload from computer
-                    </button>
-                    <button
-                      disabled
-                      className="flex items-center gap-3 w-full px-3 py-2 text-xs text-muted-foreground opacity-50 cursor-not-allowed"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M12 22C6.5 22 2 17.5 2 12S6.5 2 12 2s10 4.5 10 10-4.5 10-10 10z" />
-                        <path d="M12 16v-8M12 8l-4 4M12 8l4 4" />
-                      </svg>
-                      Google Drive (soon)
-                    </button>
+                    {models.map((group) => (group.models.length > 0 && (
+                      <div key={group.category} className="mb-1 last:mb-0">
+                        <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] select-none">
+                          {group.category}
+                        </div>
+                        {group.models.map((model) => (
+                          <button
+                            key={model.id}
+                            onClick={() => {
+                              setSelectedModel(model.id);
+                              setModelDropdownOpen(false);
+                            }}
+                            className={`w-full text-left px-3 py-2 text-xs rounded-lg transition flex items-center justify-between ${selectedModel === model.id
+                              ? "text-[var(--accent)] bg-[var(--accent)]/8"
+                              : "text-[var(--text-primary)]/70 hover:bg-[var(--surface-bg)]"
+                              }`}
+                          >
+                            <span>{model.label}</span>
+                            {selectedModel === model.id && <span className="text-[var(--accent)]">●</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )))}
                   </motion.div>
                 )}
               </AnimatePresence>
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                multiple
-                onChange={(e) => handleLocalFiles(e.target.files)}
-              />
             </div>
+          )}
 
-            {/* Mic button */}
+          {setSearchEnabled && (
             <button
-              type="button"
-              onClick={toggleRecording}
-              className={`attach-label ${isRecording ? "text-red-500" : ""}`}
-              title={isRecording ? "Stop recording" : "Start recording"}
+              onClick={() => setSearchEnabled((prev) => !prev)}
+              className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium transition ${
+                searchEnabled
+                  ? "bg-[var(--accent)]/12 border border-[var(--accent)]/25 text-[var(--accent)]"
+                  : "text-[var(--text-secondary)]/60 hover:text-[var(--text-primary)] hover:bg-[var(--surface-bg)] border border-transparent"
+              }`}
             >
-              {isRecording ? <MicOff className="size-5" /> : <Mic className="size-5" />}
+              <Globe className="size-3.5" />
+              Web
             </button>
-          </>
-        )}
+          )}
 
-        <Textarea
-          ref={textareaRef}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              onSend();
-            }
-          }}
-          placeholder={placeholderText}
-          className="flex-1 min-h-[44px] resize-none border-none bg-transparent px-2 py-2.5 text-[15px] focus-visible:ring-0 shadow-none overflow-hidden"
-          rows={1}
-        />
-
-        {/* Stop button while loading, otherwise Send */}
-        {isLoading ? (
-          <Button
-            onClick={onStop}
-            className="mb-1 size-9 rounded-full bg-red-500 hover:bg-red-600 text-white transition"
-          >
-            <Square className="size-4" />
-          </Button>
-        ) : (
-          <Button
-            onClick={() => onSend()}
-            disabled={isLoading || !query.trim()}
-            className="mb-1 size-9 rounded-full bg-black dark:bg-[#343536] text-white hover:opacity-80 transition"
-          >
-            <SendHorizontal className="size-4" />
-          </Button>
-        )}
-      </div>
-
-      {/* Bottom bar: tools slot + model selector + safety toggle */}
-      <div className="flex items-center justify-between border-t border-black/5 dark:border-white/5 px-4 py-2">
-        <div className="flex items-center gap-3">
-          {/* Tools slot – rendered by parent */}
-          {toolsSlot}
-
-          {!compact && (
-            <>
-              <div className="relative model-selector">
-                <button
-                  onClick={() => setModelDropdownOpen((prev) => !prev)}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
-                >
-                  <Compass className="size-3.5" />
-                  <span>{currentModelLabel}</span>
-                  <ChevronDown className="size-3" />
-                </button>
-
-                <AnimatePresence>
-                  {modelDropdownOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                      className="absolute bottom-full left-0 mb-2 w-72 max-h-80 overflow-y-auto rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1a1a1a] shadow-lg z-50 p-1"
-                    >
-                      {models.map((group) => (
-                        <div key={group.category} className="mb-1 last:mb-0">
-                          <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 select-none">
-                            {group.category}
-                          </div>
-                          {group.models.map((model) => (
-                            <button
-                              key={model.id}
-                              onClick={() => {
-                                setSelectedModel(model.id);
-                                setModelDropdownOpen(false);
-                              }}
-                              className={`w-full text-left px-4 py-2 text-xs rounded-lg transition flex items-center justify-between ${
-                                selectedModel === model.id
-                                  ? "text-[#40E0FF] bg-blue-50 dark:bg-blue-900/20"
-                                  : "text-foreground hover:bg-gray-100 dark:hover:bg-white/5"
-                              }`}
-                            >
-                              <span>{model.label}</span>
-                              {selectedModel === model.id && (
-                                <span className="text-[#40E0FF] text-[10px]">●</span>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Safety toggle */}
-              <button
-                onClick={() => setSafetyEnabled(!safetyEnabled)}
-                className={`flex items-center gap-1 text-xs transition ${
-                  safetyEnabled ? "text-green-500" : "text-muted-foreground"
-                }`}
-                title={safetyEnabled ? "Safety filter on" : "Raw mode (no filter)"}
-              >
-                <Shield className="size-3.5" />
-                {safetyEnabled ? "Safe" : "Raw"}
-              </button>
-            </>
+          {isLoading ? (
+            <button
+              onClick={onStop}
+              className="h-6 w-6 rounded-full bg-[var(--accent)] hover:bg-[var(--accent)]/90 flex items-center justify-center shadow transition-colors"
+              aria-label="Stop generating"
+            >
+              <div className="w-2 h-2 rounded-sm bg-white" />
+            </button>
+          ) : (
+            <button
+              onClick={handleButtonClick}
+              disabled={isLoading}
+              className={`h-6 w-6 rounded-full flex items-center justify-center transition-all ${
+                hasText
+                  ? "bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 shadow-sm"
+                  : "bg-transparent text-[var(--text-secondary)]/50 hover:text-[var(--text-primary)] hover:bg-[var(--surface-bg)]"
+              }`}
+            >
+              {hasText ? (
+                <SendHorizontal className="size-3" />
+              ) : (
+                <div className="flex items-center justify-center h-3 w-3">
+                  <AnimatedAudioLines isActive={isRecording} />
+                </div>
+              )}
+            </button>
           )}
         </div>
       </div>
