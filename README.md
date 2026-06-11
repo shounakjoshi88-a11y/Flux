@@ -227,23 +227,32 @@ Multi-source news reader built right in:
 
 ### Prerequisites
 
-- [Bun](https://bun.sh) v1.2+
-- A PostgreSQL database (or [Supabase](https://supabase.com) project)
-- API keys (see configuration below)
+- [Bun](https://bun.sh) v1.2+ (or Node.js 18+)
+- PostgreSQL 14+ (or [Supabase](https://supabase.com) project)
+- **NVIDIA NIM API Key** — Get from [NVIDIA NIM](https://build.nvidia.com/nim)
+- **Tavily API Key** — Web search (get from [Tavily](https://tavily.com))
+- **Supabase Project** — Auth + PostgreSQL (get from [Supabase](https://supabase.com))
+- Optional: OpenWeatherMap API key, Bonsai setup for image generation
 
 ### Installation
 
 ```bash
-# Clone the repository
+# Clone and navigate
 git clone https://github.com/shounakjoshi88-a11y/Flux.git
 cd Flux
 
-# Install all dependencies
+# Install backend dependencies
 cd backend && bun install
+
+# Set up database
+bunx prisma migrate dev --name init  # Creates database schema
+bunx prisma generate                  # Generates Prisma client
+
+# Install frontend dependencies
 cd ../frontend && bun install
 
-# Generate Prisma client
-cd ../backend && bunx prisma generate
+# You're ready!
+cd ../
 ```
 
 ### Environment Variables
@@ -251,25 +260,40 @@ cd ../backend && bunx prisma generate
 Create `backend/.env`:
 
 ```env
-# Database
-DATABASE_URL=postgresql://postgres:password@host:5432/postgres
+# ===== DATABASE =====
+DATABASE_URL=postgresql://postgres:password@localhost:5432/flux
 
-# Auth
+# ===== SUPABASE (Auth) =====
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_API_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# ===== OAUTH (GitHub + Google) =====
 GITHUB_OAUTH_CLIENT_ID=your_github_oauth_client_id
-SUPABASE_API_SECRET=your_supabase_service_role_key
+GITHUB_OAUTH_CLIENT_SECRET=your_github_oauth_client_secret
+GOOGLE_OAUTH_CLIENT_ID=your_google_oauth_client_id
+GOOGLE_OAUTH_CLIENT_SECRET=your_google_oauth_client_secret
 
-# AI Providers
-GOOGLE_GENERATIVE_AI_API_KEY=your_google_ai_key
-NIM_API_KEY=your_nvidia_nim_api_key
+# ===== LLM & AI PROVIDERS =====
+NIM_API_KEY=your_nvidia_nim_api_key              # Required
+NIM_BASE_URL=https://integrate.api.nvidia.com/v1 # Default NIM endpoint
 
-# Search & Data
+# ===== WEB SEARCH =====
 TAVILY_API_KEY=your_tavily_api_key
+
+# ===== WEATHER (Optional) =====
 OPENWEATHER_API_KEY=your_openweathermap_api_key
 
-# Image Generation
-IMAGE_SERVICE_URL=http://127.0.0.1:8001
+# ===== IMAGE GENERATION (Optional) =====
+IMAGE_SERVICE_URL=http://127.0.0.1:8001          # Local Bonsai service
 BONSAI_MODELS_DIR=./image_generation_backend/models
+
+# ===== FRONTEND CONFIG =====
+BACKEND_URL=http://localhost:3001
+UNSPLASH_ACCESS_KEY=your_unsplash_api_key        # Optional, for image previews
 ```
+
+**Note:** Supabase provides both authentication and PostgreSQL database.
 
 ### Run Locally
 
@@ -558,30 +582,30 @@ flux/
 
 ---
 
-<h2 id="design">🎨 Design System</h2>
+<h2 id="design">🎨 Design & UX</h2>
 
-Flux uses a warm, humanist design language inspired by Anthropic's Claude interface:
+Flux uses a **warm, minimal design language** inspired by Anthropic's Claude:
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| Canvas | `#faf9f5` | Tinted cream background — deliberately warm |
-| Primary | `#cc785c` | Coral accent — CTAs, links, key highlights |
-| Ink | `#141413` | Near-black for headings |
-| Body | `#3d3d3a` | Warm dark gray for body text |
-| Surface | `#efe9de` | Card and panel backgrounds |
-| Surface Dark | `#181715` | Dark mode surfaces |
+**Color Palette:**
+- **Canvas:** `#faf9f5` — Warm cream background (primary surface)
+- **Primary:** `#cc785c` — Coral accents for CTAs and highlights
+- **Ink:** `#141413` — Near-black text for maximum readability
+- **Muted:** `#6c6a64` — Secondary text and borders
+- **Surface Dark:** `#181715` — Dark mode backgrounds
 
 **Typography:**
-- **Display:** Copernicus / Tiempos Headline (slab-serif) for headings
-- **Body:** Inter / StyreneB (humanist sans) for UI text
-- **Code:** JetBrains Mono for code blocks
-- **Chat:** Newsreader (serif) for conversation messages
+- **Headings:** Inter (humanist sans-serif, 400–600 weight)
+- **Body:** Inter (14–16px, 400 weight)
+- **Code:** JetBrains Mono (syntax highlighting)
+- **Chat:** Newsreader serif (conversation messages)
 
-**Principles:**
-- Cream canvas is mandatory — never use cool grays
-- Coral is scarce and intentional
-- Color-block layouts over box-shadows
-- Spring animations with purposeful micro-interactions
+**Design Principles:**
+- Warm cream canvas — never pure white or cool grays
+- Minimal shadows — color-blocking creates depth
+- Responsive typography scaling
+- Spring animations (framer-motion) for smooth interactions
+- Accessible contrast ratios (WCAG AA+)
+- Dark mode support with automatic theme detection
 
 ---
 
@@ -603,6 +627,102 @@ Flux uses a warm, humanist design language inspired by Anthropic's Claude interf
 | **RAG** | NVIDIA Nemo Retriever | Embed + rerank for retrieval-augmented generation |
 | **Safety** | NVIDIA Nemotron | Content safety classification |
 | **Deployment** | Vercel | Serverless functions + static hosting |
+
+---
+
+## 🔧 Troubleshooting
+
+### Database Connection Error
+```bash
+# Test PostgreSQL connection
+psql $DATABASE_URL -c "SELECT 1"
+
+# If pgvector is missing
+psql $DATABASE_URL -c "CREATE EXTENSION IF NOT EXISTS vector"
+```
+
+### NVIDIA NIM Not Responding
+- Verify `NIM_API_KEY` is set and valid
+- Check `NIM_BASE_URL` is correct
+- Fallback uses `OpenAI()` client with NIM models
+
+### Frontend Not Loading
+```bash
+# Clear cache and reinstall
+cd frontend
+rm -rf node_modules dist
+bun install
+bun dev
+```
+
+### Prisma Migration Issues
+```bash
+# Reset database (⚠️ deletes all data)
+cd backend
+bunx prisma migrate reset
+
+# Or push schema directly
+bunx prisma db push
+```
+
+## 📖 Development Guide
+
+### Local Development
+
+**Terminal 1 — Backend**
+```bash
+cd backend
+bun index.ts
+# Server running on http://localhost:3001
+```
+
+**Terminal 2 — Frontend**
+```bash
+cd frontend
+bun dev
+# Vite dev server on http://localhost:3000
+```
+
+### Adding a New Tool
+
+1. Create tool handler in `backend/index.ts` (search for `web_search` example)
+2. Add tool definition to LLM system prompt (`prompt.ts`)
+3. Handle tool execution in the agentic loop
+4. Stream results via SSE to frontend
+
+### Debugging SSE Stream
+
+```bash
+# Monitor backend logs
+tail -f backend/backend.log | grep -E "status|error"
+
+# Check frontend hook
+# See frontend/src/hooks/useChat.ts for SSE parsing
+```
+
+### Testing Document Generation
+
+```bash
+# Send test request
+curl -X POST http://localhost:3001/flux_ask \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "Generate a PDF report on Q3 sales",
+    "model_id": "llama-3.2-90b-vision-instruct",
+    "conversation_id": "test"
+  }'
+```
+
+### Environment Variables Reference
+
+| Variable | Required | Example |
+|----------|----------|---------|
+| `DATABASE_URL` | ✅ Yes | `postgresql://...` |
+| `NIM_API_KEY` | ✅ Yes | `nvapi-...` |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ Yes | `eyJhbGc...` |
+| `TAVILY_API_KEY` | ✅ Yes | `tvly-...` |
+| `IMAGE_SERVICE_URL` | ❌ No | `http://localhost:8001` |
+| `OPENWEATHER_API_KEY` | ❌ No | For weather tool |
 
 ---
 
@@ -629,7 +749,9 @@ This is a personal project, but contributions are welcome!
 ---
 
 <p align="center">
-  <sub>Built with Bun · React · PostgreSQL · NVIDIA NIM · Supabase · Tailwind CSS</sub>
+  <sub>🚀 Built with Bun · React 19 · PostgreSQL · NVIDIA NIM · Supabase · Tailwind CSS</sub>
   <br>
-  <sub>Design language inspired by Anthropic's warm cream + coral palette</sub>
+  <sub>📍 Flux is a personal AI assistant app — open source contributions welcome</sub>
+  <br>
+  <sub><strong>Status:</strong> Active Development | <strong>License:</strong> MIT (coming soon)</sub>
 </p>
