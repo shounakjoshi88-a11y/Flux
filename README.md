@@ -323,51 +323,133 @@ The `vercel.json` configuration handles Bun installation, frontend build with Ta
 
 ```
 flux/
+├── api/
+│   └── index.ts                        # Vercel serverless entry (wraps backend)
+│
 ├── backend/
-│   ├── index.ts                    # Express server, routes, model map, tool system
-│   ├── agent-tools.ts              # Document generation builders (PDF, DOCX, PPTX, XLSX, etc.)
-│   ├── prompt.ts                   # System prompt templates
-│   ├── generationPrompt.ts         # Document generation prompt schemas
-│   ├── memory.ts                   # Vector memory extraction, retrieval, pruning
-│   ├── retriever.ts                # NVIDIA Nemo RAG (embed + rerank)
-│   ├── safety.ts                   # NVIDIA Nemotron content safety
-│   ├── voice-client.ts             # NVIDIA ASR + Microsoft Edge TTS
-│   ├── local-embedder.ts           # BGE-M3 local embeddings (Xenova Transformers)
-│   ├── middleware.ts               # Auth middleware (Supabase JWT verification)
-│   ├── client.ts / db.ts           # Supabase admin client + Prisma client
-│   ├── nim-client.ts               # NVIDIA NIM OpenAI-compatible client
+│   ├── index.ts                        # Express 5 server — all routes, tool system, SSE (3034 lines)
+│   ├── agent-tools.ts                  # Document builders (PDF, DOCX, PPTX, XLSX, CSV, TSV, MD, JSON, SQL, HTML)
+│   ├── prompt.ts                       # System prompt templates with placeholders
+│   ├── generationPrompt.ts             # Document gen prompt schemas
+│   ├── memory.ts                       # Vector memory extraction, retrieval, pruning
+│   ├── retriever.ts                    # NVIDIA Nemo RAG (embed + rerank)
+│   ├── safety.ts                       # NVIDIA Nemotron content safety classifier
+│   ├── voice-client.ts                 # NVIDIA ASR (Parakeet) + Edge TTS
+│   ├── local-embedder.ts               # BGE-M3 local embeddings (Xenova Transformers)
+│   ├── middleware.ts                    # Supabase JWT verification + user upsert
+│   ├── client.ts                       # Supabase admin client (service_role)
+│   ├── db.ts                           # Prisma client singleton
+│   ├── nim-client.ts                   # NVIDIA NIM OpenAI-compatible client
+│   ├── nim-openai-client.ts            # Raw OpenAI client for NIM (fallback)
+│   ├── orchestrator/
+│   │   ├── index.ts                    # Re-exports
+│   │   ├── orchestrator.ts             # Plan-execute-verify agentic loop
+│   │   ├── planner.ts                  # Intent analysis + execution plans
+│   │   ├── verifier.ts                 # Phase result verification
+│   │   └── types.ts                    # Phase, ExecutionPlan, StreamWriter types
+│   ├── skills/                         # 16 doc-gen skill markdown files
+│   │   ├── SKILL.md                    # Master skill file
+│   │   ├── pdf-skill.md, docx-skill.md, pptx-skill.md, xlsx-skill.md
+│   │   ├── csv-skill.md, tsv-skill.md, md-skill.md, json-skill.md
+│   │   ├── sql-skill.md, html-skill.md, tech-writer-skill.md
+│   │   └── finance-skill.md, coder-skill.md, creative-skill.md, legal-skill.md
 │   ├── prisma/
-│   │   ├── schema.prisma           # Database schema (User, Conversation, Message, Memory)
-│   │   ├── migrations/             # Migration history
-│   │   └── generated/              # Prisma client output
-│   ├── skills/                     # Document generation skill prompts (16 files)
-│   └── image_generation_backend/   # Local Bonsai image inference service
+│   │   ├── schema.prisma                # 4 models: User, Conversation, Message, Memory (vector)
+│   │   ├── migrations/                  # SQL migration history
+│   │   ├── add_artifacts_indexes.sql
+│   │   └── apply_indexes_now.sql
+│   ├── fonts/
+│   │   └── NotoSansSC-Regular.ttf       # CJK font for PDF generation
+│   ├── image_generation_backend/        # Local Bonsai diffusion service (Python/Flask)
+│   │   ├── image_service.py
+│   │   └── setup_image_models.py
+│   ├── package.json, tsconfig.json, Dockerfile, prisma.config.ts
+│   └── express.d.ts, .npmrc
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── frontend.tsx            # React entry point
-│   │   ├── App.tsx                 # Router setup
+│   │   ├── frontend.tsx                 # React entry point (createRoot + HMR)
+│   │   ├── App.tsx                      # Router: "/" Dashboard, "/auth" Auth
+│   │   ├── index.ts                     # Bun dev server (static serve + SPA catch-all)
+│   │   ├── index.html                   # HTML shell (Inter, Newsreader, theme script)
+│   │   ├── index.css                    # Base CSS + Tailwind import
+│   │   ├── types.ts                     # TS definitions (Message, Source, ConversationListItem, etc.)
+│   │   ├── APITester.tsx                # Dev/debug API testing tool
 │   │   ├── pages/
-│   │   │   ├── Dashboard.tsx       # Main chat interface (832 lines)
-│   │   │   └── Auth.tsx            # Login page (Google + GitHub)
+│   │   │   ├── Dashboard.tsx            # Main chat (832 lines — auth, CRUD, SSE, tabs, previews)
+│   │   │   └── Auth.tsx                 # Login (Google + GitHub OAuth)
 │   │   ├── hooks/
-│   │   │   ├── useChat.ts          # SSE streaming + optimistic updates
-│   │   │   └── useSessionRevocationListener.ts
-│   │   ├── components/             # 20+ React components
-│   │   │   ├── ChatInput.tsx       # Markdown editor, file attach, voice, model selector
-│   │   │   ├── MessageList.tsx     # Streaming messages, thoughts, sources, tabs
-│   │   │   ├── Sidebar.tsx         # Animated sidebar, search, conversation groups
-│   │   │   └── ...                 # Settings, NewsModal, ArtifactsModal, PeekPanel, etc.
-│   │   ├── types.ts                # TypeScript type definitions
-│   │   └── index.html              # HTML shell with font loading + theme detection
-│   └── styles/
-│       ├── globals.css             # Base styles + Tailwind
-│       └── dashboard.css           # Dashboard-specific styles
+│   │   │   ├── useChat.ts               # SSE stream handler (537 lines)
+│   │   │   ├── useTheme.ts              # Dark/light theme detection + toggle
+│   │   │   └── useSessionRevocationListener.ts  # Auto-redirect on session revoke
+│   │   ├── components/
+│   │   │   ├── ChatInput.tsx            # Markdown editor, model selector, file attach, voice, search toggle
+│   │   │   ├── MessageList.tsx          # Streaming messages with Answer/Links/Images tabs
+│   │   │   ├── MessageItem.tsx          # Single message — typewriter, thoughts, sources, files (1202 lines)
+│   │   │   ├── MessageRenderer.tsx      # Rich renderer — markdown, code, math, mermaid, charts
+│   │   │   ├── Sidebar.tsx              # Animated sidebar — search, conv groups, settings, news
+│   │   │   ├── SidebarThread.tsx        # Individual conversation thread item
+│   │   │   ├── Settings.tsx             # Account, Preferences, TTS, Sessions tabs
+│   │   │   ├── ArtifactsModal.tsx       # File gallery with cache, prefetch, pagination
+│   │   │   ├── NewsModal.tsx            # Multi-source news reader (1784 lines)
+│   │   │   ├── PeekPanel.tsx            # URL/PDF/DOCX/PPTX/XLSX/MD preview panel
+│   │   │   ├── PptxPreview.tsx          # In-browser PPTX renderer (JSZip)
+│   │   │   ├── XlsxPreview.tsx          # In-browser XLSX renderer
+│   │   │   ├── MarkdownPreview.tsx       # Markdown file preview
+│   │   │   ├── FileDownloadButton.tsx    # Download + preview for generated files
+│   │   │   ├── SourceCard.tsx            # Source citation with trust score
+│   │   │   ├── StatusMessage.tsx         # Tool status (searching, generating…)
+│   │   │   ├── SuggestedActions.tsx      # Category-based suggestion prompts
+│   │   │   ├── TodoList.tsx              # Dynamic todo list component
+│   │   │   ├── PromptHistoryCard.tsx     # Scrollable user prompt history
+│   │   │   ├── ToolsDropdown.tsx         # Answer/Links/Images dropdown
+│   │   │   ├── ChartBlock.tsx            # Recharts bar, line, pie, doughnut charts
+│   │   │   ├── InputSeparator.tsx        # "Flux can make mistakes" divider
+│   │   │   └── ui/                      # Shadcn-style primitives
+│   │   │       ├── button.tsx, card.tsx, input.tsx, label.tsx
+│   │   │       ├── select.tsx, textarea.tsx
+│   │   ├── lib/
+│   │   │   ├── config.ts                # BACKEND_URL, UNSPLASH_ACCESS_KEY
+│   │   │   ├── client.ts                # Supabase browser client
+│   │   │   ├── server.ts                # Supabase SSR client (Vite)
+│   │   │   ├── chat-utils.ts            # Parse assistant content (sources, follow-ups)
+│   │   │   └── utils.ts                 # cn() helper (clsx + tailwind-merge)
+│   │   ├── data/
+│   │   │   └── suggestions.ts           # Categorized prompts (5 categories, 10 each)
+│   │   ├── utils/
+│   │   │   ├── TrustScore.ts            # Domain-based URL trust scoring
+│   │   │   └── MathRenderer.tsx         # KaTeX inline/display math components
+│   │   ├── manifest.json                 # PWA manifest
+│   │   ├── sw.js                         # Service worker (network-first)
+│   │   └── icon-*.svg / *.png            # PWA icons (192, 512, maskable)
+│   ├── styles/
+│   │   ├── globals.css                  # Tailwind v4 + CSS custom properties
+│   │   └── dashboard.css                # Dashboard-specific dark/light styles
+│   ├── scripts/
+│   │   └── generate-icons.ts            # PWA icon generation script
+│   ├── dist/                            # Built output (deployed)
+│   ├── package.json, tsconfig.json, build.ts, bunfig.toml
+│   └── components.json, tailwind.config.js
 │
-├── data/skills/                    # Reusable skill definitions (8 skills from various sources)
-├── api/index.ts                    # Vercel serverless entry point
-├── vercel.json                     # Vercel deployment configuration
-└── DESIGN.md                       # Brand design system reference
+├── .agents/skills/                      # AI assistant skills (8 skill sets)
+│   ├── analyze-bundle/                  # Bundle analysis
+│   ├── bun/ + bun-development/ + bun-runtime/  # Bun-specific skills
+│   ├── copilotkit/                      # CopilotKit integration suite (8 sub-skills)
+│   ├── frontend-design/                 # Frontend design system
+│   ├── logo-creator/                    # Logo design workflow
+│   ├── multi-agent-orchestration/       # Multi-agent coordination
+│   └── web-design-guidelines/           # Web UI audit guidelines
+├── data/skills/                         # Duplicate skill set (cross-platform)
+│   └── (same structure as .agents/)
+├── api/index.ts                         # Vercel serverless entry
+├── vercel.json                          # Vercel deployment config
+├── DESIGN.md                            # Brand design system reference (589 lines)
+├── AGENTS.md                            # Required skills manifest
+├── CLAUDE.md / GEMINI.md                # Placeholder configs for AI assistants
+├── skills-lock.json                     # Locked skill definitions with hashes
+├── flux.bat / flux.ps1                  # Dev launcher scripts (both servers)
+├── dashboard.txt                        # Dashboard.tsx snapshot reference
+└── .gitignore
 ```
 
 ---
