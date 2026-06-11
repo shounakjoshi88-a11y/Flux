@@ -4,7 +4,7 @@ import { flushSync } from "react-dom";
 import { createClient } from "@/lib/client";
 import { BACKEND_URL } from "@/lib/config";
 import { extractLiveContent } from "@/lib/chat-utils";
-import type { Message, AttachedFile, Source, GeneratedFile } from "@/types";
+import type { Message, AttachedFile, Source, GeneratedFile, MessagePart } from "@/types";
 
 const supabase = createClient();
 
@@ -17,7 +17,6 @@ type UseChatCallbacks = {
   onNewConversationId?: (id: string) => void;
   onStreamUpdate?: (parsed: { content: string; sources: Source[] }) => void;
   onComplete?: () => void;
-  onThought?: (thought: { type: string; content: string }) => void;
   onMessageId?: (id: string) => void;
   fileContent?: string;
   attachedFiles?: { name: string; content?: string }[];
@@ -28,8 +27,6 @@ let nextId = 1;
 export function useChat(user: any) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [statusMessages, setStatusMessages] = useState<any[]>([]);
-  const [thoughtProcessHistory, setThoughtProcessHistory] = useState<any[]>([]);
   const [activeGenerationStatus, setActiveGenerationStatus] = useState<{
     subtype: string;
     message: string;
@@ -51,9 +48,9 @@ export function useChat(user: any) {
   const latestGeneratedFilesRef = useRef<GeneratedFile[]>([]);
 
   // ── Track the assistant raw buffer ──
-  const assistantRawRef = useRef<string>("");
-  const statusMessagesRef = useRef<any[]>([]);
-  const thoughtHistoryRef = useRef<any[]>([]);
+  const assistantRawRef = useRef<string>("");   // full text — for backward compat `content` field
+  const streamingPartsRef = useRef<MessagePart[]>([]); // finalized parts (non-text + flushed text segments)
+  const textAccumRef = useRef<string>("");      // current in-progress text segment
 
   useEffect(() => {
     return () => {
@@ -63,8 +60,6 @@ export function useChat(user: any) {
 
   const resetMessages = useCallback(() => {
     setMessages([]);
-    setStatusMessages([]);
-    setThoughtProcessHistory([]);
     setIsLoading(false);
     isLoadingRef.current = false;
     abortControllerRef.current?.abort();
@@ -76,6 +71,8 @@ export function useChat(user: any) {
     latestGeneratedFilesRef.current = [];
     setActiveGenerationStatus(null);
     assistantRawRef.current = "";
+    streamingPartsRef.current = [];
+    textAccumRef.current = "";
   }, []);
 
   // ── Clean thought tags ──
@@ -116,6 +113,15 @@ export function useChat(user: any) {
       .trim();
   }
 
+  // ── Flush current textAccum segment into streamingPartsRef ──
+  function flushPendingText() {
+    const clean = cleanAnswerText(textAccumRef.current);
+    if (clean) {
+      streamingPartsRef.current = [...streamingPartsRef.current, { type: "text", text: clean }];
+    }
+    textAccumRef.current = "";
+  }
+
   const handleSubmit = useCallback(
     async (
       prompt: string,
@@ -132,10 +138,8 @@ export function useChat(user: any) {
 
       setIsLoading(true);
       isLoadingRef.current = true;
-      statusMessagesRef.current = [];
-      thoughtHistoryRef.current = [];
-      setStatusMessages([]);
-      setThoughtProcessHistory([]);
+      streamingPartsRef.current = [];
+      textAccumRef.current = "";
       setActiveGenerationStatus(null);
       realMessageIdRef.current = null;
       latestFollowUpsRef.current = [];
@@ -250,7 +254,7 @@ export function useChat(user: any) {
               try {
                 const parsed = JSON.parse(data);
                 errorMessage = parsed.message || "Server error";
-              } catch {}
+              } catch { }
               streamErrorRef.current = errorMessage;
               await reader.cancel();
               break;
@@ -258,18 +262,34 @@ export function useChat(user: any) {
 
             // ─── SOURCES ───────────────────────────────
             if (eventType === "sources") {
-              try { latestSources = JSON.parse(data) as Source[]; } catch {}
+              try { latestSources = JSON.parse(data) as Source[]; } catch { }
             }
             // ─── FOLLOW_UPS ────────────────────────────
             else if (eventType === "follow_ups") {
-              try { latestFollowUpsRef.current = JSON.parse(data) as string[]; } catch {}
+              try { latestFollowUpsRef.current = JSON.parse(data) as string[]; } catch { }
             }
             // ─── STATUS ─────────────────────────────────
             else if (eventType === "status") {
               try {
                 const parsed = JSON.parse(data);
-                statusMessagesRef.current = [...statusMessagesRef.current, parsed];
-                setStatusMessages([...statusMessagesRef.current]);
+                // Flush any pending text segment before adding the tool_call part
+                flushPendingText();
+                const statusPart: MessagePart = {
+                  type: "tool_call",
+                  name: parsed.subtype,
+                  input: parsed.data,
+                  output: parsed.message,
+                  status: "running",
+                };
+                streamingPartsRef.current = [...streamingPartsRef.current, statusPart];
+                const targetId = realMessageIdRef.current ?? assistantMsgId;
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    String(m.id) === String(targetId) || String(m.id) === String(assistantMsgId) || String(m.id) === "-1"
+                      ? { ...m, parts: [...streamingPartsRef.current] }
+                      : m
+                  )
+                );
                 if (
                   parsed.subtype === 'generating_file' ||
                   parsed.subtype === 'generating_chart' ||
@@ -278,7 +298,7 @@ export function useChat(user: any) {
                 ) {
                   setActiveGenerationStatus({ subtype: parsed.subtype, message: parsed.message });
                 }
-              } catch {}
+              } catch { }
             }
             // ─── THOUGHT ───────────────────────────────
             else if (eventType === "thought") {
@@ -286,11 +306,23 @@ export function useChat(user: any) {
                 const parsed = JSON.parse(data);
                 const cleanContent = cleanThoughtText(parsed.content || "");
                 if (cleanContent) {
-                  const entry = { type: "thought", content: cleanContent };
-                  thoughtHistoryRef.current = [...thoughtHistoryRef.current, entry];
-                  setThoughtProcessHistory([...thoughtHistoryRef.current]);
+                  // Flush any pending text segment before adding the thought part
+                  flushPendingText();
+                  const thoughtPart: MessagePart = {
+                    type: "thought",
+                    content: cleanContent,
+                  };
+                  streamingPartsRef.current = [...streamingPartsRef.current, thoughtPart];
+                  const targetId = realMessageIdRef.current ?? assistantMsgId;
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      String(m.id) === String(targetId) || String(m.id) === String(assistantMsgId) || String(m.id) === "-1"
+                        ? { ...m, parts: [...streamingPartsRef.current] }
+                        : m
+                    )
+                  );
                 }
-              } catch {}
+              } catch { }
             }
             // ─── FILE ──────────────────────────────────
             else if (eventType === "file") {
@@ -302,15 +334,21 @@ export function useChat(user: any) {
                 if (!alreadyExists) {
                   latestGeneratedFilesRef.current.push(parsed);
                 }
+                // Flush any pending text segment before adding the file part
+                flushPendingText();
                 const targetId = realMessageIdRef.current ?? assistantMsgId;
-                // ✅ Update the assistant message with the generated file
+                const filePart: MessagePart = parsed.mime?.startsWith("image/")
+                  ? { type: "image", url: parsed.base64 || "", filename: parsed.filename, mime: parsed.mime }
+                  : { type: "file", filename: parsed.filename, mime: parsed.mime, base64: parsed.base64 };
+                streamingPartsRef.current = [...streamingPartsRef.current, filePart];
                 setMessages((prev) =>
                   prev.map((m) =>
                     String(m.id) === String(targetId) || String(m.id) === String(assistantMsgId) || String(m.id) === "-1"
-                      ? { 
-                          ...m, 
-                          generatedFiles: [...latestGeneratedFilesRef.current],
-                        }
+                      ? {
+                        ...m,
+                        generatedFiles: [...latestGeneratedFilesRef.current],
+                        parts: [...streamingPartsRef.current],
+                      }
                       : m
                   )
                 );
@@ -327,34 +365,69 @@ export function useChat(user: any) {
                 realMessageIdRef.current = parsed.id;
                 finalAssistantId = parsed.id;
                 callbacks?.onMessageId?.(parsed.id);
-              } catch {}
+              } catch { }
+            }
+            // ─── TODOS ─────────────────────────────────
+            else if (eventType === "todos") {
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed?.items) {
+                  flushPendingText();
+                  const existingIdx = streamingPartsRef.current.findIndex(p => p.type === "todos");
+                  const todosPart: MessagePart = { type: "todos", items: parsed.items };
+                  if (existingIdx >= 0) {
+                    streamingPartsRef.current = [
+                      ...streamingPartsRef.current.slice(0, existingIdx),
+                      todosPart,
+                      ...streamingPartsRef.current.slice(existingIdx + 1),
+                    ];
+                  } else {
+                    streamingPartsRef.current = [...streamingPartsRef.current, todosPart];
+                  }
+                  const targetId = realMessageIdRef.current ?? assistantMsgId;
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      String(m.id) === String(targetId) || String(m.id) === String(assistantMsgId) || String(m.id) === "-1"
+                        ? { ...m, parts: [...streamingPartsRef.current] }
+                        : m
+                    )
+                  );
+                }
+              } catch { }
             }
             // ─── TEXT ANSWER (default) ─────────────────
             else {
               if (data === "[DONE]") continue;
               assistantRawRef.current += data;
+              textAccumRef.current += data;
             }
 
             // ─── Update assistant message with partial answer ──
             try {
               const cleanAns = cleanAnswerText(assistantRawRef.current);
-              if (cleanAns) {
+              const cleanCurrentText = cleanAnswerText(textAccumRef.current);
+              // Build parts: finalized parts + current text segment (if any)
+              const allParts: MessagePart[] = cleanCurrentText
+                ? [...streamingPartsRef.current, { type: "text", text: cleanCurrentText }]
+                : streamingPartsRef.current;
+              const hasEffectiveContent = cleanAns || streamingPartsRef.current.length > 0;
+              if (hasEffectiveContent) {
                 hasReceivedFinalAnswer = true;
                 const targetId = realMessageIdRef.current ?? assistantMsgId;
                 setMessages((prev) =>
                   prev.map((m) =>
                     String(m.id) === String(targetId) || String(m.id) === String(assistantMsgId) || String(m.id) === "-1"
                       ? {
-                          ...m,
-                          id: realMessageIdRef.current ?? m.id,
-                          content: cleanAns,
-                          sources: latestSources.length > 0 ? latestSources : m.sources,
-                          followUps: latestFollowUpsRef.current,
-                          generatedFiles: latestGeneratedFilesRef.current.length > 0
-                            ? [...latestGeneratedFilesRef.current]
-                            : m.generatedFiles,
-                          thoughtProcess: [...statusMessagesRef.current, ...thoughtHistoryRef.current],
-                        }
+                        ...m,
+                        id: realMessageIdRef.current ?? m.id,
+                        content: cleanAns,
+                        sources: latestSources.length > 0 ? latestSources : m.sources,
+                        followUps: latestFollowUpsRef.current,
+                        generatedFiles: latestGeneratedFilesRef.current.length > 0
+                          ? [...latestGeneratedFilesRef.current]
+                          : m.generatedFiles,
+                        parts: allParts,
+                      }
                       : m
                   )
                 );
@@ -368,19 +441,6 @@ export function useChat(user: any) {
         // ─── If the server sent an error event, surface it ──────────────────
         if (streamErrorRef.current) {
           throw new Error(streamErrorRef.current);
-        }
-
-        // ─── Attach thought process to the assistant message ──
-        const finalTP = [...statusMessagesRef.current, ...thoughtHistoryRef.current];
-        if (finalTP.length > 0) {
-          const targetId = realMessageIdRef.current ?? assistantMsgId;
-          setMessages((prev) =>
-            prev.map((m) =>
-              String(m.id) === String(targetId) || String(m.id) === String(assistantMsgId) || String(m.id) === "-1"
-                ? { ...m, thoughtProcess: finalTP }
-                : m
-            )
-          );
         }
 
         // ─── Final cleanup ──────────────────────────────
@@ -472,10 +532,6 @@ export function useChat(user: any) {
     resetMessages,
     retry,
     stop,
-    statusMessages,
-    setStatusMessages,
-    thoughtProcessHistory,
-    setThoughtProcessHistory,
     activeGenerationStatus,
   };
 }

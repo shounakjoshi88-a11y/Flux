@@ -33,6 +33,7 @@ import type {
   ConversationDetail,
   Source,
   AttachedFile,
+  MessagePart,
 } from "@/types";
 import { parseAssistantContent, extractLiveContent } from "@/lib/chat-utils";
 import { BACKEND_URL, UNSPLASH_ACCESS_KEY } from "@/lib/config";
@@ -104,7 +105,7 @@ export default function Dashboard() {
   const isInitialMountRef = useRef(true);
 
   // ─── Conversation cache (avoids re-fetching recently opened threads) ──────
-  type ConvCacheEntry = { enriched: Message[]; thoughtMap: Record<string, any[]>; ts: number };
+  type ConvCacheEntry = { enriched: Message[]; ts: number };
   const conversationCacheRef = useRef<Map<string, ConvCacheEntry>>(new Map());
   const CONV_CACHE_TTL = 45_000; // 45 s – stale after this; background-refreshed on next open
 
@@ -153,17 +154,10 @@ export default function Dashboard() {
     resetMessages,
     retry,
     stop,
-    statusMessages,
-    setStatusMessages,
-    thoughtProcessHistory,
-    setThoughtProcessHistory,
     activeGenerationStatus,
   } = useChat(user);
 
   const previousSidebarOpen = useRef(isSidebarOpen);
-
-  // Persisted thought processes map: messageId -> steps[]
-  const [thoughtProcessesMap, setThoughtProcessesMap] = useState<Record<string, any[]>>({});
 
   const currentModelLabel = useMemo(
     () => ALL_MODELS.find((m) => m.id === selectedModel)?.label ?? "Kimi K2.6 (Moonshot AI)",
@@ -245,7 +239,6 @@ export default function Dashboard() {
     setAttachedFiles([]);
     setActiveTab("answer");
     setActiveImages([]);
-    setThoughtProcessesMap({});
     setPeekPdf(null);
     setPeekUrl(null);
   }, [resetMessages]);
@@ -290,11 +283,48 @@ export default function Dashboard() {
           const { answer, followUps: parsedFollowUps } = extractLiveContent(msg.content);
           const finalFollowUps =
             storedFollowUps && storedFollowUps.length > 0 ? storedFollowUps : parsedFollowUps;
+
+          // Reconstruct parts from thoughtProcess for backward compatibility
+          if (!(msg as any).parts && storedThoughtProcess?.length) {
+            const parts: MessagePart[] = [];
+            if (answer.trim()) {
+              parts.push({ type: "text", text: answer });
+            }
+            let lastTodosIdx = -1;
+            for (let tpi = 0; tpi < storedThoughtProcess.length; tpi++) {
+              const tp = storedThoughtProcess[tpi];
+              if (tp.type === "status") {
+                parts.push({
+                  type: "tool_call",
+                  name: tp.subtype,
+                  input: tp.data,
+                  output: tp.message,
+                  status: "completed",
+                });
+              } else if (tp.type === "thought" && tp.content?.trim()) {
+                parts.push({ type: "thought", content: tp.content });
+              } else if (tp.type === "todos" && tp.items?.length) {
+                lastTodosIdx = parts.length; // will be overwritten by later events
+                parts.push({ type: "todos", items: tp.items });
+              }
+            }
+            // Only keep the last todos entry (replaces in-place like SSE does)
+            if (lastTodosIdx >= 0) {
+              const lastEntry = parts.splice(lastTodosIdx, 1)[0] as any;
+              // Remove any earlier todos entries
+              for (let pi = parts.length - 1; pi >= 0; pi--) {
+                if (parts[pi]?.type === "todos") parts.splice(pi, 1);
+              }
+              parts.push(lastEntry);
+            }
+            (msg as any).parts = parts;
+          }
+
           if (storedSources && storedSources.length > 0) {
-            return { ...msg, content: answer, sources: storedSources, followUps: finalFollowUps, thoughtProcess: storedThoughtProcess ?? [] } as Message;
+            return { ...msg, content: answer, sources: storedSources, followUps: finalFollowUps } as Message;
           }
           const { sources: parsedSources } = parseAssistantContent(msg.content);
-          return { ...msg, content: answer, sources: parsedSources.length > 0 ? parsedSources : (msg.sources ?? []), followUps: finalFollowUps, thoughtProcess: storedThoughtProcess ?? [] } as Message;
+          return { ...msg, content: answer, sources: parsedSources.length > 0 ? parsedSources : (msg.sources ?? []), followUps: finalFollowUps } as Message;
         }
         if (msg.role === "User") {
           const fileAttachment = (msg as any).fileAttachment as { name: string; content?: string }[] | undefined;
@@ -302,13 +332,7 @@ export default function Dashboard() {
         }
         return msg;
       }) as Message[];
-      const thoughtMap: Record<string, any[]> = {};
-      enriched.forEach((m) => {
-        if (m.role === "Assistant" && (m as any).thoughtProcess?.length) {
-          thoughtMap[m.id] = (m as any).thoughtProcess;
-        }
-      });
-      return { enriched, thoughtMap, ts: Date.now() };
+      return { enriched, ts: Date.now() };
     },
     []
   );
@@ -323,33 +347,16 @@ export default function Dashboard() {
       setActiveImages([]);
 
       // ── 1. Serve instantly from cache if still fresh ───────────────────────
-      const restoreThoughtProcess = (messages: Message[]) => {
-        const last = [...messages].reverse().find((m) => m.role === "Assistant");
-        const tp = last && (last as any).thoughtProcess;
-        if (tp?.length) {
-          setStatusMessages(tp.filter((t: any) => t.type === "status"));
-          setThoughtProcessHistory(tp.filter((t: any) => t.type === "thought"));
-        } else {
-          setStatusMessages([]);
-          setThoughtProcessHistory([]);
-        }
-        return last;
-      };
-
-      // ── 1. Serve instantly from cache if still fresh ───────────────────────
       const cached = conversationCacheRef.current.get(id);
       if (cached && Date.now() - cached.ts < CONV_CACHE_TTL) {
         setMessages(cached.enriched);
-        setThoughtProcessesMap(cached.thoughtMap);
-        const last = restoreThoughtProcess(cached.enriched);
+        const last = [...cached.enriched].reverse().find((m) => m.role === "Assistant");
         setActiveSources(last?.sources ?? []);
         return;
       }
 
       // ── 2. Cache miss – show empty state immediately, fetch in background ──
       setMessages([]);
-      setStatusMessages([]);
-      setThoughtProcessHistory([]);
       const token = await getAccessToken();
       if (!token) return;
       const res = await fetch(`${BACKEND_URL}/conversation/${id}`, {
@@ -374,12 +381,11 @@ export default function Dashboard() {
       // Only apply if the user hasn't navigated away while we were fetching
       if (activeConversationIdRef.current === id) {
         setMessages(entry.enriched);
-        setThoughtProcessesMap(entry.thoughtMap);
-        const last = restoreThoughtProcess(entry.enriched);
+        const last = [...entry.enriched].reverse().find((m) => m.role === "Assistant");
         setActiveSources(last?.sources ?? []);
       }
     },
-    [getAccessToken, setMessages, setStatusMessages, setThoughtProcessHistory, enrichConversationMessages, createNewThread]
+    [getAccessToken, setMessages, enrichConversationMessages, createNewThread]
   );
 
   // ── Prefetch on hover (best-effort, fires before the user clicks) ─────────
@@ -523,22 +529,6 @@ export default function Dashboard() {
             if (id) conversationCacheRef.current.delete(id);
             // Refresh sidebar thread list once
             loadConversations();
-          },
-          onThought: (thought) => {
-            setThoughtProcessesMap((prev) => ({
-              ...prev,
-              "-1": [...(prev["-1"] || []), thought],
-            }));
-          },
-          onMessageId: (realId) => {
-            setThoughtProcessesMap((prev) => {
-              const steps = prev["-1"] || [];
-              if (steps.length === 0) return prev;
-              const newMap = { ...prev };
-              delete newMap["-1"];
-              newMap[realId] = steps;
-              return newMap;
-            });
           },
           fileContent: filesToSend.filter((f) => !f.type?.startsWith('image/') && !f.type?.startsWith('video/')).map((f) => f.content).join("\n\n---\n\n"),
           attachedFiles: filesToSend,
@@ -908,13 +898,10 @@ export default function Dashboard() {
                   onFollowUpClick={(q) => handleSend(q)}
                   setPeekUrl={setPeekUrl}
                   onRetry={retry}
-                  statusMessages={statusMessages}
-                  thoughtProcessHistory={thoughtProcessHistory}
                   onFileClick={(file) => setPeekFile(file)}
                   onPreview={handlePreview}
                   showPromptHistory={hasStarted}
                   onJumpToPrompt={handleJumpToPrompt}
-                  thoughtProcessesMap={thoughtProcessesMap}
                   onFileDelete={handleDeleteFile}
                   activeGenerationStatus={activeGenerationStatus}
                 />

@@ -1,10 +1,12 @@
 // src/components/MessageItem.tsx
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import TodoList from "./TodoList";
 
 // ─── Typewriter hook ────────────────────────────────────────
 function useTypewriter(fullText: string, messageId: string | number): string {
   const [displayedLength, setDisplayedLength] = useState(fullText.length);
   const fullTextRef = useRef(fullText);
+  const prevFullTextRef = useRef(fullText);
   fullTextRef.current = fullText;
   const stateRef = useRef({ msgId: messageId, streaming: String(messageId).startsWith("temp-") });
 
@@ -22,6 +24,14 @@ function useTypewriter(fullText: string, messageId: string | number): string {
       if (displayedLength !== fullText.length) setDisplayedLength(fullText.length);
     }
     // prevStreaming → !nowStreaming: stream just ended, typewriter keeps catching up
+  }
+
+  // Detect when text is NOT a continuation (new segment after tool/thought)
+  if (fullText !== prevFullTextRef.current) {
+    if (!prevFullTextRef.current || !fullText.startsWith(prevFullTextRef.current)) {
+      setDisplayedLength(0);
+    }
+    prevFullTextRef.current = fullText;
   }
 
   useEffect(() => {
@@ -52,7 +62,7 @@ import {
 import { MessageRenderer, InlineMath } from "./MessageRenderer";
 import { FileDownloadButton } from "./FileDownloadButton";
 import { getDomain } from "@/lib/chat-utils";
-import type { Message, Source } from "@/types";
+import type { Message, MessagePart, Source } from "@/types";
 
 type MessageItemProps = {
   message: Message & {
@@ -499,6 +509,238 @@ function InlineGenerationIndicator({
   );
 }
 
+/* ─── Search steps group (searching → found_sources → reading) ────── */
+const SEARCH_SUBTYPES = new Set(['searching', 'found_sources', 'reading']);
+
+function isSearchStep(part: MessagePart): boolean {
+  return part.type === 'tool_call' && SEARCH_SUBTYPES.has(part.name);
+}
+
+function SearchStepsGroup({
+  parts: groupParts,
+  groupStartIndex,
+  allParts,
+  isStreaming,
+  onSourceClick,
+}: {
+  parts: MessagePart[];
+  groupStartIndex: number;
+  allParts: MessagePart[];
+  isStreaming: boolean;
+  onSourceClick?: (url: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const actualIsFirst = groupStartIndex === 0 || allParts[groupStartIndex - 1]?.type !== 'tool_call';
+  const groupEndIndex = groupStartIndex + groupParts.length - 1;
+  const actualIsLast = groupEndIndex === allParts.length - 1 || allParts[groupEndIndex + 1]?.type !== 'tool_call';
+
+  return (
+    <div className="mb-0.5">
+      <div className="cursor-pointer" onClick={() => setOpen(v => !v)}>
+        <StatusMessage
+          status={{
+            type: groupParts[0].name,
+            subtype: groupParts[0].name,
+            message: groupParts[0].output || '',
+            data: groupParts[0].input,
+          }}
+          isFirst={actualIsFirst}
+          isLast={!open ? actualIsLast : false}
+          isActive={isStreaming && groupParts[0].status === 'running'}
+          showRail={true}
+          onSourceClick={onSourceClick}
+          rightSlot={
+            <ChevronDown className={`size-3 text-[var(--text-muted)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+          }
+        />
+      </div>
+
+{open && groupParts.slice(1).map((part, idx) => (
+        <StatusMessage
+          key={idx}
+          status={{
+            type: part.name,
+            subtype: part.name,
+            message: part.output || '',
+            data: part.input,
+          }}
+          isFirst={idx === 0}
+          isLast={idx === groupParts.length - 2}
+          isActive={isStreaming && part.status === 'running'}
+          showRail={true}
+          onSourceClick={onSourceClick}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  PartsRenderer — renders MessagePart[] in arrival order             */
+/* ------------------------------------------------------------------ */
+function PartsRenderer({
+  parts,
+  isStreaming,
+  typewriterContent,
+  messageId,
+  onCitationClick,
+  sources,
+  onFileClick,
+  onPreview,
+  onFileDelete,
+  onSourceClick,
+}: {
+  parts: MessagePart[];
+  isStreaming: boolean;
+  typewriterContent: string;
+  messageId: string | number;
+  onCitationClick: (index: number) => void;
+  sources: Source[];
+  onFileClick?: (file: { name: string; content: string }) => void;
+  onPreview?: (data: { type: 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'md'; base64?: string; html?: string; filename: string }) => void;
+  onFileDelete?: (messageId: string | number, filename: string, type: 'fileAttachment' | 'generatedFiles') => void;
+  onSourceClick?: (url: string | null) => void;
+}) {
+  // Find the last text part index for typewriter treatment
+  const lastTextPartIndex = (() => {
+    let lastIdx = -1;
+    for (let i = parts.length - 1; i >= 0; i--) {
+      if (parts[i]?.type === "text") {
+        lastIdx = i;
+        break;
+      }
+    }
+    return lastIdx;
+  })();
+
+  const renderedParts: React.ReactNode[] = [];
+
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (!part) continue;
+
+    switch (part.type) {
+      case "text": {
+        const text = i === lastTextPartIndex ? typewriterContent : part.text;
+        if (text.trim()) {
+          renderedParts.push(
+            <div key={`text-${i}`} className="max-w-none text-foreground/90">
+              <MessageRenderer content={text} onCitationClick={onCitationClick} sources={sources} />
+            </div>
+          );
+        }
+        break;
+      }
+      case "tool_call": {
+        // Group consecutive search steps into collapsible section
+        if (isSearchStep(part)) {
+          const groupParts: MessagePart[] = [part];
+          let j = i + 1;
+          while (j < parts.length && isSearchStep(parts[j])) {
+            groupParts.push(parts[j]);
+            j++;
+          }
+          i = j - 1;
+
+          renderedParts.push(
+            <SearchStepsGroup
+              key={`search-${i}`}
+              parts={groupParts}
+              groupStartIndex={i - (groupParts.length - 1)}
+              allParts={parts}
+              isStreaming={isStreaming}
+              onSourceClick={onSourceClick}
+            />
+          );
+          break;
+        }
+
+        renderedParts.push(
+          <div key={`tool-${i}`} className="mb-0.5">
+            <StatusMessage
+              status={{
+                type: part.name,
+                subtype: part.name,
+                message: part.output || "",
+                data: part.input,
+              }}
+              isFirst={i === 0 || parts[i - 1]?.type !== "tool_call" || parts[i - 1]?.name === 'reading_skill'}
+              isLast={i === parts.length - 1 || parts[i + 1]?.type !== "tool_call"}
+              isActive={isStreaming && part.status === "running"}
+              showRail={true}
+            />
+          </div>
+        );
+        break;
+      }
+      case "thought": {
+        if (part.content?.trim()) {
+          renderedParts.push(
+            <div key={`thought-${i}`} className="mb-0.5">
+              <StatusMessage
+                status={{
+                  type: "thought",
+                  subtype: "thought",
+                  message: "Thinking…",
+                  content: part.content,
+                }}
+                isFirst={i === 0 || parts[i - 1]?.type !== "thought"}
+                isLast={i === parts.length - 1 || parts[i + 1]?.type !== "thought"}
+                isActive={isStreaming && i === parts.length - 1}
+                showRail={true}
+              />
+            </div>
+          );
+        }
+        break;
+      }
+      case "image": {
+        renderedParts.push(
+          <div key={`img-${i}`} className="mt-2">
+            <InlineImageDisplay
+              file={{
+                base64: part.url?.startsWith("data:") ? part.url.replace(/^data:[^;]+;base64,/, "") : part.url,
+                filename: part.filename,
+                mime: part.mime,
+              }}
+              messageId={messageId}
+              index={i}
+            />
+          </div>
+        );
+        break;
+      }
+      case "file": {
+        renderedParts.push(
+          <div key={`file-${i}`} className="mt-2">
+            <FileDownloadButton
+              file={{
+                base64: part.base64 || "",
+                filename: part.filename,
+                mime: part.mime,
+              }}
+              onPreview={onPreview}
+              onDelete={onFileDelete ? () => onFileDelete(messageId, part.filename, 'generatedFiles') : undefined}
+            />
+          </div>
+        );
+        break;
+      }
+      case "todos": {
+        renderedParts.push(
+          <div key={`todos-${i}`} className="mb-0.5 ml-1">
+            <TodoList items={part.items} />
+          </div>
+        );
+        break;
+      }
+    }
+  }
+
+  return <>{renderedParts}</>;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Scrollable source cascade (overlapping favicons)                   */
 /* ------------------------------------------------------------------ */
@@ -806,11 +1048,19 @@ export function MessageItem({
   // Detect live streaming: optimistic assistant messages use IDs like "temp-assistant-N"
   const isStreaming = String(message.id).startsWith("temp-");
   const cleanContent = parsedContentBundle.cleanDisplayAnswer;
-  const typewriterContent = useTypewriter(cleanContent, message.id);
 
   // ── For image-only responses, we still render the image even if content is empty ──
   const hasImages = generatedFiles.some(f => f.mime?.startsWith("image/"));
   const shouldShowMessageItem = cleanContent.trim() !== "" || hasImages || generatedFiles.length > 0;
+
+  const hasParts = !!(message.parts && message.parts.length > 0);
+
+  // When parts are present, typewriter animates the last text segment only
+  const lastTextPart = hasParts
+    ? [...message.parts!].reverse().find((p): p is MessagePart & { type: "text" } => p.type === "text")
+    : null;
+  const typewriterText = lastTextPart ? lastTextPart.text : cleanContent;
+  const typewriterContent = useTypewriter(typewriterText, message.id);
 
   return (
     <div className="assistant-section">
@@ -822,42 +1072,67 @@ export function MessageItem({
         />
       )}
 
-      {/* ─── RENDER ANSWER TEXT ─── */}
-      {typewriterContent.trim() !== "" && (
-        <div className="max-w-none text-foreground/90">
-          <MessageRenderer content={typewriterContent} onCitationClick={onCitationClick} sources={sources} />
-        </div>
-      )}
-
-      {/* ─── EMPTY STREAMING PLACEHOLDER (before typewriter starts revealing) ─── */}
-      {isStreaming && !activeGenerationStatus && typewriterContent.trim() === "" && (
-        <div className="max-w-none text-foreground/90">
-          <span className="inline-block w-2 h-4 bg-current/40 rounded-sm align-text-bottom" />
-        </div>
-      )}
-
-      {/* ─── GENERATED FILES & IMAGES ─── */}
-      {generatedFiles.length > 0 && (
-        <div className="mt-0 space-y-2">
-          {generatedFiles.map((file, idx) =>
-            file.mime?.startsWith("image/") ? (
-              <InlineImageDisplay
-                key={idx}
-                file={file}
-                messageId={message.id}
-                index={idx}
-                onDelete={onFileDelete ? () => onFileDelete(message.id, file.filename, 'generatedFiles') : undefined}
-              />
-            ) : (
-              <FileDownloadButton
-                key={idx}
-                file={file}
-                onPreview={onPreview}
-                onDelete={onFileDelete ? () => onFileDelete(message.id, file.filename, 'generatedFiles') : undefined}
-              />
-            )
+      {hasParts ? (
+        <>
+          <PartsRenderer
+            parts={message.parts!}
+            isStreaming={isStreaming}
+            typewriterContent={typewriterContent}
+            messageId={message.id}
+            onCitationClick={onCitationClick}
+            sources={sources}
+            onFileClick={onFileClick}
+            onPreview={onPreview}
+            onFileDelete={onFileDelete}
+            onSourceClick={onSourceClick}
+          />
+          {/* ─── EMPTY STREAMING PLACEHOLDER (before any parts arrive) ─── */}
+          {isStreaming && !activeGenerationStatus && typewriterContent.trim() === "" && (
+            <div className="max-w-none text-foreground/90">
+              <span className="inline-block w-2 h-4 bg-current/40 rounded-sm align-text-bottom" />
+            </div>
           )}
-        </div>
+        </>
+      ) : (
+        <>
+          {/* ─── RENDER ANSWER TEXT (backward compat) ─── */}
+          {typewriterContent.trim() !== "" && (
+            <div className="max-w-none text-foreground/90">
+              <MessageRenderer content={typewriterContent} onCitationClick={onCitationClick} sources={sources} />
+            </div>
+          )}
+
+          {/* ─── EMPTY STREAMING PLACEHOLDER (before typewriter starts) ─── */}
+          {isStreaming && !activeGenerationStatus && typewriterContent.trim() === "" && (
+            <div className="max-w-none text-foreground/90">
+              <span className="inline-block w-2 h-4 bg-current/40 rounded-sm align-text-bottom" />
+            </div>
+          )}
+
+          {/* ─── GENERATED FILES & IMAGES (backward compat) ─── */}
+          {generatedFiles.length > 0 && (
+            <div className="mt-0 space-y-2">
+              {generatedFiles.map((file, idx) =>
+                file.mime?.startsWith("image/") ? (
+                  <InlineImageDisplay
+                    key={idx}
+                    file={file}
+                    messageId={message.id}
+                    index={idx}
+                    onDelete={onFileDelete ? () => onFileDelete(message.id, file.filename, 'generatedFiles') : undefined}
+                  />
+                ) : (
+                  <FileDownloadButton
+                    key={idx}
+                    file={file}
+                    onPreview={onPreview}
+                    onDelete={onFileDelete ? () => onFileDelete(message.id, file.filename, 'generatedFiles') : undefined}
+                  />
+                )
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {/* Footer: source cascade + actions — Claude-style minimal bar */}

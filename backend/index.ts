@@ -9,6 +9,8 @@ import * as fs from "fs";
 import * as path from "path";
 import { streamText, generateText, tool } from 'ai';
 import { z } from 'zod';
+import { OrchestratorEngine } from './orchestrator';
+import type { StreamWriter } from './orchestrator';
 import { SYSTEM_PROMPT } from './prompt';
 import { prisma } from "./db";
 import { Prisma } from "./prisma/generated/client";
@@ -292,19 +294,8 @@ function sanitizeThought(text: string): string {
 const AGENT_SYSTEM_EXTENSION = `
 You are Flux — a powerful AI assistant with real tools.
 
-TOOL RULES (read carefully):
-• web_search       → Use for current events, news, live data, prices, recent facts.
-                     Write a SPECIFIC targeted query, not the user's raw words.
-                     Do NOT use for general knowledge, greetings, math, or coding questions.
-• read_skill       → ALWAYS call this FIRST before generate_document.
-                     It loads the generation rules for the document type.
-• generate_document → Call AFTER read_skill. Pass the skill_content you received.
-• get_weather      → Use when the user asks about weather in a specific place.
-• generate_image   → Use when the user asks to create, draw, or generate an image.
-
 RESPONSE STYLE:
 • Write naturally — no <THOUGHT> or <ANSWER> tags ever.
-• You may call tools at any point, then continue writing your response.
 • After tools complete, seamlessly integrate their results into your answer.
 • End EVERY response with exactly 3 follow-up questions in this exact format:
 
@@ -313,6 +304,34 @@ RESPONSE STYLE:
 <question>Question two here</question>
 <question>Question three here</question>
 </FOLLOW_UPS>
+
+TOOL RULES:
+• web_search     → Search for current info, news, facts. Write SPECIFIC targeted queries.
+                   CRITICAL: IGNORE your training data — answer ONLY from search results.
+                   Include the current year in your query.
+• get_weather    → Use when the user asks about weather in a specific place.
+• generate_image → Use when the user asks to create, draw, or generate an image.
+• read_skill     → Load generation rules for a document type (pdf/pptx/docx/xlsx/csv).
+• generate_document → Create a downloadable document file.
+
+DOCUMENT GENERATION WORKFLOW (follow this EXACT multi-step process):
+When the user asks to create a document (PDF, Word, PowerPoint, etc.):
+
+Step 1 — RESEARCH: Call web_search to find relevant information about the topic.
+   After the search results return, EXPLAIN to the user what you found.
+   Summarize the key information conversationally ("Based on my research...").
+
+Step 2 — LOAD SKILLS: Call read_skill with the document type (e.g., doc_type="pdf").
+   After the skill content loads, tell the user what rules/format you'll be following.
+   Be specific about the document type's guidelines.
+
+Step 3 — GENERATE: Call generate_document with the doc_type and topic.
+   Pass the skill_content from read_skill so the builder follows the correct rules.
+   After generation, announce the file to the user.
+
+IMPORTANT: After each tool call, WAIT for the result, then write your explanation
+before proceeding to the next step. This creates a conversational agentic flow.
+Search multiple times if the first results are insufficient — verify your findings.
 `;
 
 const VISUAL_INSTRUCTIONS = `
@@ -480,7 +499,7 @@ function extractTopicFromQuery(query: string): string {
     return query
         .replace(/\b(generate|create|make|build|write|give|produce|prepare)\s*(me\s+)?(a\s+|an\s+)?/gi, '')
         .replace(/\b(docx?|pdf|pptx?|powerpoint|word\s+doc(?:ument)?|presentation|slide\s*deck|slides?|file|document|xlsx?|excel|spreadsheet|csv|tsv|markdown|md)\b/gi, '')
-        .replace(/\b(about|with\s+topic|with\s+the\s+topic\s+of|on\s+the\s+topic\s+of|on|regarding|for|covering)\b/gi, '')
+        .replace(/\b(about|with\s+topic|with\s+the\s+topic\s+of|on\s+the\s+topic\s+of|on|regarding|for|covering|with)\b/gi, '')
         .replace(/\s+/g, ' ')
         .trim()
         || query.trim().slice(0, 80);
@@ -1191,7 +1210,7 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                     return 'No search query was provided. Answer from training knowledge instead.';
                 }
                 sendStatus(res, 'searching',
-                    `Searching "${safeQuery.slice(0, 40)}${safeQuery.length > 40 ? '…' : ''}"...`,
+                    `Searching "${safeQuery}"...`,
                     undefined, state.thoughtProcess);
                 try {
                     const results = await (client as any).search(safeQuery, {
@@ -1284,7 +1303,7 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                 }
                 sendStatus(res, 'generating_file',
                     `Building your ${safeDocType.toUpperCase()} on "${safeTopic.slice(0, 30)}"...`,
-                    undefined, state.thoughtProcess);
+                    { docType: safeDocType, topic: safeTopic }, state.thoughtProcess);
                 const fakeQuery = `Create a ${safeDocType} about: ${safeTopic}`;
 
                 // Map persona types to md if needed for the builder
@@ -1400,6 +1419,29 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                 } catch (e: any) {
                     return `Image generation failed: ${e.message}`;
                 }
+            },
+        }),
+
+        // ── update_todos ─────────────────────────────────────────────────
+        update_todos: (tool as any)({
+            description: 'Display or update a dynamic todo list visible to the user. ' +
+                'Call this at the start of a multi-step task to show your plan with all steps as "pending", ' +
+                'then call it again as you complete each step — update the current step to "in_progress" ' +
+                'and finished steps to "completed". Each call replaces the entire list.',
+            parameters: z.object({
+                items: z.array(z.object({
+                    id: z.string().describe('Unique identifier (e.g. "1", "2", "search", "analyze")'),
+                    content: z.string().describe('Description of what needs to be done (e.g. "Search for recent papers")'),
+                    status: z.enum(['pending', 'in_progress', 'completed']).describe('Current status'),
+                })).describe('Full todo list — replaces any previous list'),
+            }),
+            execute: async ({ items }: any) => {
+                const event = { type: "todos", items };
+                if (!res.writableEnded) {
+                    res.write(`event: todos\ndata: ${JSON.stringify({ items })}\n\n`);
+                }
+                if (state?.thoughtProcess) state.thoughtProcess.push(event);
+                return `Todo list updated with ${items.length} items.`;
             },
         }),
     };
@@ -1744,7 +1786,7 @@ async function generateContextualStatusMessages(
         reading: "Reading through sources...",
         generating: "Composing response...",
         generatingFile: dt ? `Generating your ${dt.toUpperCase()}...` : "Generating document...",
-        readingSkill: dt ? `Loading ${dt.toUpperCase()} formatting rules...` : "Applying specialized rules...",
+        readingSkill: dt ? `Reading the ${dt.toUpperCase()} skill` : "Reading the skill rules...",
     };
 
     try {
@@ -1780,7 +1822,7 @@ RULES:
    "reading"        → what is being analysed          e.g. "Scanning hardware reviews and specs..."
    "generating"     → what answer/text is being built e.g. "Writing your detailed analysis now..."
    "generatingFile" → what ${dt ? dt.toUpperCase() + " file" : "file"} is being built e.g. "${dt ? `Assembling your ${dt.toUpperCase()} now...` : "Building your document now..."}"
-   "readingSkill"   → loading format rules for type   e.g. "${dt ? `Loading ${dt.toUpperCase()} template guidelines...` : "Loading document layout rules..."}"
+    "readingSkill"   → loading format rules for type   e.g. "${dt ? `Reading the ${dt.toUpperCase()} skill` : "Reading the skill rules..."}"
 
 FORBIDDEN (too generic — never write these):
   "Searching the web...", "Reading results...", "Generating document...", "Applying rules..."
@@ -1790,7 +1832,7 @@ GOOD examples (specific — write like these):
   reading:        "Scanning research papers and studies...", "Analysing benchmark comparisons..."
   generating:     "Writing your analysis now...", "Composing the explanation step by step..."
   generatingFile: "Building your climate policy PDF...", "Assembling slides on machine learning..."
-  readingSkill:   "Loading PDF corporate template rules...", "Applying PPTX slide design guidelines..."`,
+  readingSkill:   "Reading the PDF skill...", "Reading the PPTX skill..."`,
             }],
             maxTokens: 200,
         } as any);
@@ -1848,15 +1890,14 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
             return res.status(400).json({ error: 'Too many attachments' });
         const safeAtt = (attachedFiles ?? [])
             .filter(f => f && typeof f.name === 'string')
-            .map(f => ({
-                name: f.name.slice(0, 200),
-                content: typeof f.content === 'string'
-                    ? (f.type?.startsWith('image/') || f.type?.startsWith('video/')
-                        ? f.content.slice(0, 2_000_000)
-                        : f.content.slice(0, 200_000))
-                    : '',
-                type: f.type || 'text/plain',
-            }));
+            .map(f => {
+                const isMedia = f.type?.startsWith('image/') || f.type?.startsWith('video/');
+                return {
+                    name: f.name.slice(0, 200),
+                    content: typeof f.content === 'string' ? f.content.slice(0, isMedia ? 2_000_000 : 200_000) : '',
+                    type: f.type || 'text/plain',
+                };
+            });
 
         const memEnabled = req.authUser?.user_metadata?.enable_memory ?? true;
 
@@ -1931,10 +1972,84 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
         const agentState: AgentState = { sources: [], generatedFiles: [], thoughtProcess: [] };
         const tools = createFluxTools(res, model, agentState, nq);
 
+        // ── StreamWriter adapter for orchestrator ──────────────────────────
+        const orchStream: StreamWriter = {
+            writeStatus: (subtype, message, data) => sendStatus(res, subtype, message, data, agentState.thoughtProcess),
+            writeText: (text) => writeSafeSSE(res, text),
+            writeFile: (file) => { if (!res.writableEnded) res.write(`event: file\ndata: ${JSON.stringify(file)}\n\n`); },
+            writeThought: (content) => {
+                const ev = { type: 'thought', content };
+                agentState.thoughtProcess.push(ev);
+                if (!res.writableEnded) res.write(`event: thought\ndata: ${JSON.stringify(ev)}\n\n`);
+            },
+            get writableEnded() { return res.writableEnded; },
+            writeTodos: (items) => {
+                const ev = { type: 'todos', items };
+                agentState.thoughtProcess.push(ev);
+                if (!res.writableEnded) res.write(`event: todos\ndata: ${JSON.stringify({ items })}\n\n`);
+            },
+        };
+
+        // ── Run orchestrator for complex workflows ─────────────────────────
+        const orchestrator = new OrchestratorEngine();
+        const orchResult = await orchestrator.process({
+            query: nq,
+            tools,
+            agentState,
+            stream: orchStream,
+            model,
+            skillRegistry: SKILL_REGISTRY,
+            fetchSkillFile,
+            generateDocumentWithSkill: generateDocumentWithSkill as any,
+        });
+
+        let fullText = '';
+        let charsSent = 0;
+        let streamBuf = '';
+        let dbBuf = '';
+        let hasToolCall = false;
+        let toolResultSeen = false;
+        const collectedToolResults: Array<{ name: string; result: string }> = [];
+        const orchestratorHandled = orchResult.executedPlan;
+
+        if (orchestratorHandled) {
+            fullText = (orchResult.text ?? '').trim();
+
+            // If orchestrator produced no visible text, synthesize a minimal
+            // user-facing answer so UI doesn't fall back to “sources only”.
+            if (!fullText) {
+                const hasSources = agentState.sources.length > 0;
+                const hasFiles = agentState.generatedFiles.length > 0;
+                const topic = extractTopicFromQuery(query ?? '') || 'your requested document';
+
+                if (hasFiles) {
+                    fullText = `I've created your document about "${topic}" based on the research. You can download it below.`;
+                } else if (hasSources) {
+                    fullText = `I researched "${topic}" and found relevant sources. Please review them in the Sources tab above.`;
+                } else {
+                    fullText = `I couldn't complete the requested workflow for "${topic}".`;
+                }
+            }
+
+            // Stream the answer text to the frontend (until now it was only
+            // set in fullText but never written to the SSE stream).
+            if (fullText && !res.writableEnded) {
+                writeSafeSSE(res, fullText);
+                if (typeof (res as any).flush === 'function') (res as any).flush();
+            }
+
+            charsSent = fullText.length;
+            dbBuf = fullText;
+            // hasToolCall and toolResultSeen intentionally NOT set to true here:
+            // they are only meaningful in the AI SDK streaming path, and setting
+            // them would trigger the `hasToolCall && !closedRef.v` answer-synthesis
+            // fallback block (line 2274), which writes extra/surplus text to the client.
+        }
+
         // ── Build user message (with optional image/video attachments) ──
         const imageAttachments = safeAtt.filter(f => f.type?.startsWith('image/'));
         const videoAttachments = safeAtt.filter(f => f.type?.startsWith('video/'));
-        const isVisionModel = VISION_MODELS.has(pref);
+        const isVisionModel = pref ? VISION_MODELS.has(pref) : false;
         const hasImages = imageAttachments.length > 0 && isVisionModel;
 
         const videoNotice = videoAttachments.length > 0
@@ -1949,7 +2064,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
             ? [
                 ...imageAttachments.map(f => ({
                     type: 'image',
-                    image: f.content,
+                    image: f.content,   // data URL string: 'data:image/png;base64,...'
                     mimeType: f.type,
                 })),
                 { type: 'text', text: userText },
@@ -1962,145 +2077,325 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
         const closedRef = { v: false };
         req.on('close', () => { closedRef.v = true; });
 
-        const agentStream = streamText({
-            model,
-            system: dynSys,
-            messages,
-            tools,
-            maxSteps: 8,
-            toolChoice: 'auto',
-            temperature: 0.35,
-            providerOptions: getProviderOptions(pref),
-            onStepFinish: (step: any) => {
-                if (step.toolCalls?.length) {
-                    step.toolCalls.forEach((tc: any) => {
-                        // tc.args is the parsed object in AI SDK; tc.input is used in some versions
-                        const args = tc.args ?? tc.input ?? '(no args)';
-                        console.log(`[TOOL-CALL] ${tc.toolName}`, args);
-                    });
-                }
-            }
-        } as any);
-
-        let fullText = '';
-        let charsSent = 0;
-        let streamBuf = '';
-        let dbBuf = '';
-        let hasToolCall = false;
-        let toolResultSeen = false;
-
-        const collectedToolResults: Array<{ name: string; result: string }> = [];
-
-        for await (const event of agentStream.fullStream) {
-            if (res.writableEnded || closedRef.v) break;
-
-            if (event.type === 'tool-call') {
-                hasToolCall = true;
-            }
-
-            if (event.type === 'tool-result') {
-                toolResultSeen = true;
-                streamBuf = '';
-                dbBuf = '';
-                try {
-                    const name = (event as any).toolName ?? 'tool';
-                    const result = (event as any).result;
-                    let txt = '';
-                    if (typeof result === 'string') {
-                        txt = result;
-                    } else if (result != null) {
-                        try {
-                            const serialized = JSON.stringify(result);
-                            txt = typeof serialized === 'string' ? serialized : String(result);
-                        } catch {
-                            txt = String(result);
-                        }
+        // ── LLM streaming (skipped when orchestrator handled the workflow) ──
+        if (!orchestratorHandled) {
+            const agentStream = streamText({
+                model,
+                system: dynSys,
+                messages,
+                tools,
+                maxSteps: 8,
+                toolChoice: 'auto',
+                temperature: 0.35,
+                providerOptions: getProviderOptions(pref),
+                onStepFinish: (step: any) => {
+                    if (step.toolCalls?.length) {
+                        step.toolCalls.forEach((tc: any) => {
+                            // tc.args is the parsed object in AI SDK; tc.input is used in some versions
+                            const args = tc.args ?? tc.input ?? '(no args)';
+                            console.log(`[TOOL-CALL] ${tc.toolName}`, args);
+                        });
                     }
-                    collectedToolResults.push({ name, result: String(txt ?? '').slice(0, 4000) });
-                } catch (toolErr) {
-                    console.warn('[ASK] tool-result handler error:', (toolErr as any)?.message);
                 }
-            }
+            } as any);
 
-            if (event.type === 'text-delta') {
-                const delta = (event as any).textDelta ?? (event as any).text ?? '';
-                const clean = delta
-                    .replace(/<FOLLOW_UPS>[\s\S]*?<\/FOLLOW_UPS>/gi, '')
-                    .replace(/<FOLLOW_UPS>[\s\S]*/gi, '');
-                if (clean) {
-                    if (toolResultSeen) {
-                        writeSafeSSE(res, clean);
-                        charsSent += clean.length;
+            for await (const event of agentStream.fullStream) {
+                if (res.writableEnded || closedRef.v) break;
+
+                if (event.type === 'tool-call') {
+                    hasToolCall = true;
+                    // Flush buffered pre-tool text BEFORE tool.execute() runs,
+                    // so preamble text arrives in SSE before the status events
+                    // that the tool's execute() function writes.
+                    if (streamBuf) {
+                        writeSafeSSE(res, streamBuf);
+                        charsSent += streamBuf.length;
+                        fullText += streamBuf;
                         if (typeof (res as any).flush === 'function') (res as any).flush();
-                    } else {
-                        streamBuf += clean;
                     }
+                    streamBuf = '';
+                    dbBuf = '';
+                    toolResultSeen = true; // Subsequent text-delta flows directly
                 }
-                if (toolResultSeen) {
-                    fullText += delta;
-                } else {
-                    dbBuf += delta;
-                }
-            }
-        }
 
-        if (streamBuf && !toolResultSeen) {
-            writeSafeSSE(res, streamBuf);
-            charsSent += streamBuf.length;
-            fullText = dbBuf;
-            if (typeof (res as any).flush === 'function') (res as any).flush();
-        }
-        // If a tool WAS called, the buffer was already discarded above.
-        // charsSent only counts text streamed AFTER the tool result.
-        // If it's zero, the forced answer will trigger.
-
-        // ── Forced answer: model called tools but produced zero text ────────
-        // Fires a second lightweight streamText call injecting the collected tool
-        // results as context so the model can write a proper answer.
-        if (!charsSent && hasToolCall && !closedRef.v) {
-            if (collectedToolResults.length > 0) {
-                const toolCtx = collectedToolResults
-                    .map(t => `[${t.name} result]\n${t.result}`)
-                    .join('\n\n---\n\n');
-
-                try {
-                    const forcedStream = streamText({
-                        model,
-                        system: dynSys,
-                        messages: [
-                            { role: 'user', content: userContent },
-                            { role: 'assistant', content: `I retrieved the following information:\n\n${toolCtx}` },
-                            { role: 'user', content: 'Now write a clear, detailed answer to my original question using the information above.' },
-                        ],
-                        temperature: 0.35,
-                        maxTokens: 2000,
-                    } as any);
-
-                    for await (const ev of forcedStream.fullStream) {
-                        if (res.writableEnded || closedRef.v) break;
-                        if (ev.type === 'text-delta') {
-                            const delta = (ev as any).textDelta ?? (ev as any).text ?? '';
-                            const clean = delta
-                                .replace(/<FOLLOW_UPS>[\s\S]*?<\/FOLLOW_UPS>/gi, '')
-                                .replace(/<FOLLOW_UPS>[\s\S]*/gi, '');
-                            if (clean) {
-                                writeSafeSSE(res, clean);
-                                charsSent += clean.length;
-                                fullText += clean;
-                                if (typeof (res as any).flush === 'function') (res as any).flush();
+                if (event.type === 'tool-result') {
+                    // streamBuf should already be empty from tool-call flush,
+                    // but keep as safety net for any edge-case text between
+                    // tool-call and tool-result.
+                    if (streamBuf) {
+                        writeSafeSSE(res, streamBuf);
+                        charsSent += streamBuf.length;
+                        fullText += streamBuf;
+                        if (typeof (res as any).flush === 'function') (res as any).flush();
+                    }
+                    streamBuf = '';
+                    dbBuf = '';
+                    toolResultSeen = true;
+                    try {
+                        const name = (event as any).toolName ?? 'tool';
+                        const result = (event as any).result;
+                        let txt = '';
+                        if (typeof result === 'string') {
+                            txt = result;
+                        } else if (result != null) {
+                            try {
+                                const serialized = JSON.stringify(result);
+                                txt = typeof serialized === 'string' ? serialized : String(result);
+                            } catch {
+                                txt = String(result);
                             }
                         }
+                        collectedToolResults.push({ name, result: String(txt ?? '').slice(0, 4000) });
+                    } catch (toolErr) {
+                        console.warn('[ASK] tool-result handler error:', (toolErr as any)?.message);
                     }
-                } catch (e) {
-                    console.warn('[ASK] forced-answer stream failed:', (e as any)?.message);
+                }
+
+                if (event.type === 'text-delta') {
+                    const delta = (event as any).textDelta ?? (event as any).text ?? '';
+                    // Strip only structural tags (not their content) so the answer
+                    // text survives even if the model wraps it in unwanted tags.
+                    // THOUGHT blocks ARE fully removed since they're reasoning-only.
+                    const clean = delta
+                        .replace(/<THOUGHT>[\s\S]*?<\/THOUGHT>/gi, '')
+                        .replace(/<\/?THOUGHT>/gi, '')
+                        .replace(/<\/?ANSWER>/gi, '')
+                        .replace(/<FOLLOW_UPS>[\s\S]*?<\/FOLLOW_UPS>/gi, '')
+                        .replace(/<FOLLOW_UPS>[\s\S]*/gi, '')
+                        .replace(/<\/?FOLLOW_UPS>/gi, '')
+                        .replace(/<\/?question>/gi, '')
+                        .trim();
+                    if (clean) {
+                        if (toolResultSeen) {
+                            writeSafeSSE(res, clean);
+                            charsSent += clean.length;
+                            if (typeof (res as any).flush === 'function') (res as any).flush();
+                        } else {
+                            streamBuf += clean;
+                        }
+                    }
+                    if (toolResultSeen) {
+                        fullText += delta;
+                    } else {
+                        dbBuf += delta;
+                    }
                 }
             }
 
-            // Safety net: both streams produced nothing (model error / empty result)
+            if (streamBuf && !toolResultSeen) {
+                writeSafeSSE(res, streamBuf);
+                charsSent += streamBuf.length;
+                fullText = dbBuf;
+                if (typeof (res as any).flush === 'function') (res as any).flush();
+            }
+
+            // ── Mistral-style inline tool call parser ─────────────────────────────
+            // Some NIM models (e.g. Mistral) output tool calls as raw text in
+            // Mistral format instead of using OpenAI-compatible function calling.
+            // The AI SDK doesn't recognize these — they leak into the text stream.
+            // We parse and execute them here as a fallback.
+            {
+                const mistralBlockRe = /<\|tool_calls_section_begin\|>[\s\S]*?<\|tool_calls_section_end\|>/gi;
+                const toolCallRe = /<\|tool_call_begin\|>\s*functions\.(\w+):\d+\s*<\|tool_call_argument_begin\|>\s*(\{[\s\S]*?\})\s*<\|tool_call_end\|>/gi;
+                const safeQuery = query ?? '';
+                const blocks: Array<{ raw: string; calls: Array<{ name: string; args: Record<string, any> }> }> = [];
+                let bm: RegExpExecArray | null;
+                while ((bm = mistralBlockRe.exec(fullText)) !== null) {
+                    const calls: Array<{ name: string; args: Record<string, any> }> = [];
+                    let cm: RegExpExecArray | null;
+                    while ((cm = toolCallRe.exec(bm[0])) !== null) {
+                        const toolName = cm[1] ?? '';
+                        if (!toolName) continue;
+                        let rawArgs: Record<string, any> = {};
+                        try { rawArgs = JSON.parse(cm[2]!); } catch { /* skip unparseable */ }
+                        const normArgs: Record<string, any> = {};
+                        for (const [k, v] of Object.entries(rawArgs)) {
+                            const key = k
+                                .replace(/^skill_name$/i, 'doc_type')
+                                .replace(/^doc_type$/i, 'doc_type')
+                                .replace(/^document_type$/i, 'doc_type')
+                                .replace(/^file_type$/i, 'doc_type')
+                                .replace(/^search_query$/i, 'query')
+                                .replace(/^search$/i, 'query')
+                                .replace(/^prompt$/i, 'query');
+                            normArgs[key] = v;
+                        }
+                        // Infer doc_type from user query if missing
+                        if (toolName === 'read_skill' && !normArgs.doc_type) {
+                            const q = safeQuery.toLowerCase();
+                            if (q.includes('pdf')) normArgs.doc_type = 'pdf';
+                            else if (q.includes('powerpoint') || q.includes('presentation') || q.includes('slide')) normArgs.doc_type = 'pptx';
+                            else if (q.includes('word') || q.includes('docx')) normArgs.doc_type = 'docx';
+                            else if (q.includes('excel') || q.includes('xlsx') || q.includes('spreadsheet')) normArgs.doc_type = 'xlsx';
+                            else if (q.includes('csv')) normArgs.doc_type = 'csv';
+                            else normArgs.doc_type = 'pdf';
+                        }
+                        calls.push({ name: toolName, args: normArgs });
+                    }
+                    if (calls.length > 0) blocks.push({ raw: bm[0], calls });
+                }
+                // Process collected blocks (iterate in reverse to preserve indices)
+                const mistralDocGen: Array<{ docType: string; topic: string }> = [];
+                for (let bi = blocks.length - 1; bi >= 0; bi--) {
+                    const block = blocks[bi]!;
+                    for (const call of block.calls) {
+                        const toolDef = (tools as any)[call.name];
+                        if (toolDef && typeof toolDef.execute === 'function') {
+                            console.log(`[MISTRAL] Executing ${call.name} with`, call.args);
+                            try {
+                                const result = await toolDef.execute(call.args);
+                                const formatted = `\n\n${result}`;
+                                fullText = fullText.replace(block.raw, formatted);
+                                writeSafeSSE(res, formatted);
+                                charsSent += formatted.length;
+                                hasToolCall = true;
+
+                                if (call.name === 'read_skill') {
+                                    const dt = call.args.doc_type || 'pdf';
+                                    const tp = call.args.topic || safeQuery || 'document';
+                                    mistralDocGen.push({ docType: dt, topic: tp });
+                                }
+                            } catch (e: any) {
+                                console.warn(`[MISTRAL] ${call.name} failed:`, e?.message);
+                                const errMsg = `\n\n[${call.name} failed: ${e?.message ?? 'error'}]`;
+                                fullText = fullText.replace(block.raw, errMsg);
+                                writeSafeSSE(res, errMsg);
+                                charsSent += errMsg.length;
+                            }
+                        } else {
+                            console.warn(`[MISTRAL] Unknown tool: ${call.name}`);
+                            fullText = fullText.replace(block.raw, '');
+                        }
+                        if (typeof (res as any).flush === 'function') (res as any).flush();
+                    }
+                }
+                // Auto-trigger generate_document after read_skill if model didn't
+                for (const gen of mistralDocGen) {
+                    const genDef = (tools as any)['generate_document'];
+                    if (genDef && typeof genDef.execute === 'function') {
+                        console.log(`[MISTRAL] Auto-chaining generate_document(${gen.docType}, ${gen.topic})`);
+                        try {
+                            const result = await genDef.execute({ doc_type: gen.docType, topic: gen.topic });
+                            const formatted = `\n\n${result}`;
+                            fullText += formatted;
+                            writeSafeSSE(res, formatted);
+                            charsSent += formatted.length;
+                            hasToolCall = true;
+                            if (typeof (res as any).flush === 'function') (res as any).flush();
+                        } catch (e: any) {
+                            console.warn(`[MISTRAL] Auto-chain generate_document failed:`, e?.message);
+                        }
+                    }
+                }
+            }
+
+            // ── Auto-document generation ─────────────────────────────────────
+            // When the user asked for a document AND the model searched the web
+            // but didn't chain to read_skill + generate_document, we do it here.
+            if (!closedRef.v) {
+                const safeQ = (query ?? '').toLowerCase();
+                const docIntent = safeQ.includes('pdf') ? 'pdf'
+                    : safeQ.includes('pptx') || safeQ.includes('powerpoint') || safeQ.includes('presentation') || safeQ.includes('slide') ? 'pptx'
+                        : safeQ.includes('docx') || safeQ.includes('word') || safeQ.includes('document') ? 'docx'
+                            : safeQ.includes('xlsx') || safeQ.includes('excel') || safeQ.includes('spreadsheet') || safeQ.includes('sheet') ? 'xlsx'
+                                : safeQ.includes('csv') ? 'csv'
+                                    : null;
+
+                const hasSources = agentState.sources.length > 0;
+                const hasFiles = agentState.generatedFiles.length > 0;
+
+                if (docIntent && hasSources && !hasFiles && !res.writableEnded) {
+                    const topic = extractTopicFromQuery(query ?? '') || 'document';
+                    const searchUrls = agentState.sources.map((s: any) => s.url).join('\n');
+                    const docQuery = `Create a ${docIntent} about: ${topic}\n\nSearch results for reference:\n${searchUrls}`;
+                    console.log(`[AUTO-DOC] Generating ${docIntent} for "${topic}" with ${agentState.sources.length} sources`);
+                    const skillFile = SKILL_REGISTRY[docIntent]?.fileName;
+                    const skillContent = skillFile ? await fetchSkillFile(skillFile) : '';
+                    sendStatus(res, 'reading_skill', `Reading the ${docIntent.toUpperCase()} skill`, { docType: docIntent, loaded: !!skillContent }, agentState.thoughtProcess);
+                    sendStatus(res, 'generating_file', `Building your ${docIntent.toUpperCase()} on "${topic.slice(0, 30)}"...`, { docType: docIntent, topic }, agentState.thoughtProcess);
+                    try {
+                        const file = await generateDocumentWithSkill(docIntent as any, docQuery, model, skillContent);
+                        if (file) {
+                            agentState.generatedFiles.push(file);
+                            if (!res.writableEnded) {
+                                res.write(`event: file\ndata: ${JSON.stringify(file)}\n\n`);
+                            }
+                            const msg = `\n\nI've created a ${docIntent.toUpperCase()} document about "${topic}" based on the search results. You can download it below.`;
+                            writeSafeSSE(res, msg);
+                            charsSent += msg.length;
+                            fullText += msg;
+                            if (typeof (res as any).flush === 'function') (res as any).flush();
+                        }
+                    } catch (e: any) {
+                        console.warn('[AUTO-DOC] generation failed:', e?.message);
+                    }
+                }
+            }
+        } // end if (!orchestratorHandled)
+
+        // ── Fallback: model called tools but produced little/no visible text ──
+        if (hasToolCall && !closedRef.v) {
+            const hadSources = agentState.sources.length > 0;
+            const hadFiles = agentState.generatedFiles.length > 0;
+
+            if (!charsSent && hadSources && !res.writableEnded) {
+                console.log('[ASK] charsSent=0 with sources — attempting answer synthesis');
+                console.log('[ASK] collectedToolResults length:', collectedToolResults.length);
+
+                const searchResults = collectedToolResults
+                    .filter(r => r.name === 'web_search');
+
+                let synthesized = '';
+                const sourceText = searchResults.length > 0
+                    ? searchResults.map(r => r.result).join('\n\n---\n\n')
+                    : agentState.sources.map((s: any) => s.url).join('\n');
+
+                if (sourceText.trim()) {
+                    try {
+                        const synthRes = await generateText({
+                            model,
+                            system: 'Answer the user question based ONLY on the provided information. Write a comprehensive, well-structured answer with paragraphs. Include relevant numbers, dates, and facts. Do NOT mention sources or search results. Answer naturally as if you already knew this.',
+                            messages: [
+                                { role: 'user', content: `Information:\n${sourceText.slice(0, 15000)}\n\nQuestion: ${nq}` },
+                            ],
+                            maxTokens: 2000,
+                        } as any);
+                        synthesized = (synthRes?.text ?? '').trim();
+                        console.log(`[ASK] synthesis result length: ${synthesized.length}`);
+                    } catch (synthErr: any) {
+                        console.warn('[ASK] Answer synthesis failed:', synthErr?.message);
+                    }
+                } else {
+                    console.warn('[ASK] No search text available for synthesis');
+                }
+
+                if (synthesized) {
+                    writeSafeSSE(res, synthesized);
+                    console.log(`[ASK] synthesized answer (${synthesized.length} chars) — sent to client`);
+                    charsSent += synthesized.length;
+                    fullText = synthesized;
+                } else {
+                    const formattedSources = agentState.sources
+                        .map((s: any, i: number) => `${i + 1}. ${s.url}`)
+                        .join('\n');
+                    const msg = `I found the following sources with information related to your query:\n\n${formattedSources}\n\nYou can view the full sources in the Sources tab above.`;
+                    console.log('[ASK] direct-source fallback sent (charsSent=0, sources=' + agentState.sources.length + ')');
+                    writeSafeSSE(res, msg);
+                    charsSent += msg.length;
+                    fullText += msg;
+                }
+            }
+
+            if (hadFiles && charsSent < 50 && !res.writableEnded) {
+                const msg = 'Your file has been generated — see below for download.';
+                writeSafeSSE(res, msg);
+                charsSent += msg.length;
+                fullText += msg;
+            }
+
             if (!charsSent && !res.writableEnded) {
-                const msg = agentState.generatedFiles.length
-                    ? 'Your file is ready — see below.'
-                    : 'I found relevant sources — see the Sources tab for details.';
+                const msg = 'Received results. Please try rephrasing your question for a more detailed answer.';
+                console.log('[ASK] last-resort safety net fired');
                 writeSafeSSE(res, msg);
                 fullText += msg;
             }
@@ -2182,6 +2477,84 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
         if (!res.writableEnded) {
             res.write(`event: error\ndata: ${JSON.stringify({ message: err?.message || 'Request failed' })}\n\n`);
             res.end();
+        }
+    }
+});
+
+// ─── Standard AI SDK endpoint (assistant-ui compatible) ──────
+// This endpoint uses streamText + toDataStreamResponse() so the
+// output is in the standard AI SDK data-stream format that
+// assistant-ui's Thread component expects natively.
+// Uses the same models and tools as /flux_ask but without
+// custom SSE events (sendStatus writes are no-op'd).
+app.post('/api/chat-sdk', middleware, async (req: any, res: any) => {
+    try {
+        const uid = req.appUserId!;
+        const { query, model: pref, location } = req.body as { query?: string; model?: string; location?: string; };
+        if (!query?.trim()) return res.status(400).json({ error: 'Query is required' });
+        const nq = query.trim().slice(0, 10_000);
+        const nowStr = new Date().toISOString().replace('T', ' ').slice(0, 16);
+        const locInfo = sanitizeLocation(location ?? '');
+        const model = selectModel(pref);
+
+        // Noop res so tool execute functions can run without side effects
+        const noopRes: any = {
+            writableEnded: false,
+            write: () => true,
+            end: () => {},
+            flush: () => {},
+            on: () => {},
+        };
+        const agentState: AgentState = { sources: [], generatedFiles: [], thoughtProcess: [] };
+        const tools = createFluxTools(noopRes, model, agentState, nq);
+
+        const memCtx = '';
+        const dynSys = [
+            SYSTEM_PROMPT.replaceAll('{{CURRENT_DATETIME}}', nowStr).replaceAll('{{LOCATION_INFO}}', locInfo).replaceAll('{{MEMORY_CONTEXT}}', memCtx),
+            AGENT_SYSTEM_EXTENSION,
+        ].join('\n\n');
+
+        const messages: any[] = [{ role: 'user', content: nq }];
+
+        const result = streamText({
+            model,
+            system: dynSys,
+            messages,
+            tools,
+            maxSteps: 8,
+            toolChoice: 'auto',
+            temperature: 0.35,
+            providerOptions: getProviderOptions(pref),
+        } as any);
+
+        // Stream the standard AI SDK data-stream response
+        res.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+        });
+
+        const response = result.toDataStreamResponse();
+        const reader = response.body!.getReader();
+
+        const pump = async () => {
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) { if (!res.writableEnded) res.end(); break; }
+                    res.write(value);
+                }
+            } catch (e: any) {
+                console.error('[SDK] Stream error:', e?.message);
+                if (!res.writableEnded) res.end();
+            }
+        };
+        pump();
+    } catch (err: any) {
+        console.error('[SDK] Error:', err?.message ?? err);
+        if (!res.writableEnded) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err?.message || 'Internal error' }));
         }
     }
 });
@@ -2658,12 +3031,4 @@ app.get("/proxy", middleware, async (req: any, res: any) => {
 });
 
 // ── SERVER START ─────────────────────────────────────────────
-// ✅ Local development only: start the server
-if (process.env.NODE_ENV !== 'production') {
-    app.listen(3001, () => {
-        console.log("Flux backend running on port 3001");
-    });
-}
-
-// ✅ Export for serverless environments (Vercel)
-export default app;
+app.listen(3001, () => { console.log("Flux backend running on port 3001"); });

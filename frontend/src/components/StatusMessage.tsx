@@ -21,15 +21,17 @@ const SearchIcon = ({ cls = "" }: IProps) => (
   </S>
 );
 
-// Globe — sphere with equator, tropic lines, and two meridian curves
+// Globe — sphere with equator, tropic lines, and two meridian curves (tilted left)
 const GlobeIcon = ({ cls = "" }: IProps) => (
   <S cls={cls}>
-    <circle cx="10" cy="10" r="7.5" />
-    <line x1="2.5" y1="10" x2="17.5" y2="10" />
-    <line x1="4" y1="6.5" x2="16" y2="6.5" strokeWidth="1" opacity="0.5" />
-    <line x1="4" y1="13.5" x2="16" y2="13.5" strokeWidth="1" opacity="0.5" />
-    <path d="M10 2.5c-3 2.5-4 4.8-4 7.5s1 5 4 7.5" />
-    <path d="M10 2.5c3 2.5 4 4.8 4 7.5s-1 5-4 7.5" />
+    <g transform="rotate(-20 10 10)">
+      <circle cx="10" cy="10" r="7.5" />
+      <line x1="2.5" y1="10" x2="17.5" y2="10" />
+      <line x1="4" y1="6.5" x2="16" y2="6.5" strokeWidth="1" opacity="0.5" />
+      <line x1="4" y1="13.5" x2="16" y2="13.5" strokeWidth="1" opacity="0.5" />
+      <path d="M10 2.5c-3 2.5-4 4.8-4 7.5s1 5 4 7.5" />
+      <path d="M10 2.5c3 2.5 4 4.8 4 7.5s-1 5-4 7.5" />
+    </g>
   </S>
 );
 
@@ -108,20 +110,6 @@ const WeatherIcon = ({ state, cls = "" }: { state: "fetching" | "success" | "err
   );
 };
 
-// ── NEW: Skill/rules scroll icon ──────────────────────────
-const SkillIcon = ({ cls = "" }: IProps) => (
-  <S cls={cls}>
-    {/* Scroll body */}
-    <path d="M6 2.5h9a1.5 1.5 0 0 1 1.5 1.5v12A1.5 1.5 0 0 1 15 17.5H6A1.5 1.5 0 0 1 4.5 16V4a1.5 1.5 0 0 1 1.5-1.5z" />
-    {/* Left curl tabs */}
-    <path d="M4.5 4a1.5 1.5 0 0 1-1.5 1.5A1.5 1.5 0 0 1 1.5 4 1.5 1.5 0 0 1 3 2.5h3" />
-    <path d="M4.5 16a1.5 1.5 0 0 0-1.5 1.5A1.5 1.5 0 0 0 4.5 19H6V17.5" />
-    {/* Text lines */}
-    <line x1="7.5" y1="7.5" x2="14" y2="7.5" strokeWidth="1.2" />
-    <line x1="7.5" y1="10.5" x2="14" y2="10.5" strokeWidth="1.2" />
-    <line x1="7.5" y1="13.5" x2="11" y2="13.5" strokeWidth="1.2" />
-  </S>
-);
 
 // ── NEW: Wand/sparkle icon for image enhancing ────────────
 const WandIcon = ({ cls = "" }: IProps) => (
@@ -159,6 +147,7 @@ interface StatusMessageProps {
   showRail?: boolean;
   onSourceClick?: (url: string | null) => void;
   elapsedSeconds?: number;
+  rightSlot?: React.ReactNode;
 }
 
 // ── Strip thought-only content; remove ANSWER/FOLLOW_UPS blocks entirely ──
@@ -247,7 +236,7 @@ export function TimelineNode({
   isLast?: boolean;
   showRail?: boolean;
 }) {
-  const lineColor = "bg-stone-700/50";
+  const lineColor = "bg-[var(--text-muted)]/15";
   const lineWidth = "w-px";
 
   if (!showRail) {
@@ -263,7 +252,7 @@ export function TimelineNode({
   return (
     <div className="flex flex-col items-center w-4 shrink-0 self-stretch">
       <div
-        className={`${lineWidth} h-[8px] shrink-0 transition-opacity duration-300 ${!isFirst ? "opacity-100" : "opacity-0"} ${lineColor}`}
+        className={`${lineWidth} h-[12px] shrink-0 transition-opacity duration-300 ${!isFirst ? "opacity-100" : "opacity-0"} ${lineColor}`}
       />
 
       <div className="flex items-center justify-center h-4 w-4 shrink-0 relative">
@@ -278,16 +267,26 @@ export function TimelineNode({
         </div>
       </div>
 
-      <div
-        className={`${lineWidth} flex-1 mt-px transition-opacity duration-300 ${!isLast ? "opacity-100" : "opacity-0"} ${lineColor}`}
-      />
+      {isLast ? (
+        <>
+          <div className={`${lineWidth} flex-1 ${lineColor}`} />
+          <div className="flex items-center justify-center h-4 w-4 shrink-0 mb-2">
+            <svg viewBox="0 0 14 14" className="size-3.5 text-[var(--text-secondary)]" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="7" cy="7" r="5.5" strokeWidth="1.5" />
+              <polyline points="3,7 6,10 11,4" />
+            </svg>
+          </div>
+        </>
+      ) : (
+        <div className={`${lineWidth} flex-1 mt-px transition-opacity duration-300 opacity-100 ${lineColor}`} />
+      )}
     </div>
   );
 }
 
 // ── Generic step row — Claude-style: compact, muted ─────────────────────
 function StepRow({
-  icon, message, children, isFirst = false, isLast = false, pulse = false, showRail = true,
+  icon, message, children, isFirst = false, isLast = false, pulse = false, showRail = true, rightSlot,
 }: {
   icon: React.ReactNode;
   message: string;
@@ -296,13 +295,20 @@ function StepRow({
   isLast?: boolean;
   pulse?: boolean;
   showRail?: boolean;
+  rightSlot?: React.ReactNode;
 }) {
   return (
     <div className="flex gap-2.5">
       <TimelineNode icon={icon} isFirst={isFirst} isLast={isLast} showRail={showRail} />
       <div className="py-2 min-w-0 flex-1">
-        <span className="text-[13px] text-stone-400 leading-snug">{message}</span>
+        <span className="text-[13px] text-[var(--text-secondary)] leading-snug font-medium">{message}</span>
+        {rightSlot && <span className="inline-flex shrink-0 align-middle ml-1">{rightSlot}</span>}
         {children && <div className="mt-1.5 text-[13px]">{children}</div>}
+        {isLast && (
+          <div className="flex items-center h-4 mt-1">
+            <span className="text-[13px] text-[var(--text-secondary)] leading-snug font-medium">Done</span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -352,12 +358,12 @@ function ThoughtBlock({
   const railIcon = isThinking ? (
     <span className="size-4 flex items-center justify-center">
       <span className="relative size-3">
-        <span className="absolute inset-0 rounded-full border border-stone-500/40 border-t-stone-400 animate-spin" />
+        <span className="absolute inset-0 rounded-full border border-[var(--accent)]/25 border-t-[var(--accent)] animate-spin" />
       </span>
     </span>
   ) : (
     <span className="size-4 flex items-center justify-center">
-      <span className="size-1.5 rounded-full bg-stone-600/60" />
+      <span className="size-1.5 rounded-full bg-[var(--text-secondary)]/40" />
     </span>
   );
 
@@ -370,17 +376,17 @@ function ThoughtBlock({
         <button
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="flex items-center gap-1.5 text-[13px] text-stone-500 hover:text-stone-300 transition-colors select-none"
+          className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors select-none"
         >
           {isThinking ? (
-            <span className="text-stone-400">Thinking…</span>
+            <span className="text-[var(--text-secondary)]">Thinking…</span>
           ) : (
             <>
-              <span className="text-stone-400">
+              <span className="text-[var(--text-secondary)]">
                 Thinking{elapsedSeconds != null ? ` · ${elapsedSeconds}s` : ""}
               </span>
               <ChevronDown
-                className={`size-3.5 text-stone-600 transition-transform duration-200 ${
+                className={`size-3.5 text-[var(--text-muted)] transition-transform duration-200 ${
                   open ? "rotate-180" : "rotate-0"
                 }`}
               />
@@ -410,23 +416,23 @@ function ThoughtBlock({
                   <div className="flex flex-col items-center shrink-0 w-2.5 self-stretch">
                     <span
                       className={`mt-[5px] size-[4px] rounded-full shrink-0 ${
-                        isAnimating ? "bg-stone-500" : "bg-stone-600/50"
+                        isAnimating ? "bg-[var(--accent)]" : "bg-[var(--text-secondary)]/40"
                       }`}
                     />
                     {hasLineBelow && (
-                      <div className="w-px flex-1 mt-1 min-h-[10px] bg-stone-700/30" />
+                      <div className="w-px flex-1 mt-1 min-h-[10px] bg-[var(--text-muted)]/15" />
                     )}
                   </div>
 
                   <div
                     className={`text-[13px] leading-relaxed pb-2.5 min-w-0 flex-1 ${
-                      isAnimating ? "text-stone-300" : "text-stone-400/80"
+                      isAnimating ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]/80"
                     }`}
                   >
                     <MessageRenderer content={text || ""} onCitationClick={() => {}} sources={[]} />
                     {isAnimating && (
                       <span
-                        className="inline-block w-px h-[13px] bg-stone-400 ml-0.5 align-middle"
+                        className="inline-block w-px h-[13px] bg-[var(--text-secondary)] ml-0.5 align-middle"
                         style={{ animation: "blink 1s step-end infinite" }}
                       />
                     )}
@@ -452,19 +458,18 @@ function ThoughtBlock({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function StatusMessage({
-  status, isFirst = false, isLast = false, isActive, onSourceClick, elapsedSeconds,
+  status, isFirst = false, isLast = false, isActive, onSourceClick, elapsedSeconds, rightSlot,
 }: StatusMessageProps) {
   const getDomain = (url: string) => {
     try { return new URL(url).hostname.replace(/^www\./, ""); }
     catch { return url || "unknown"; }
   };
 
-  const trustColor = (url: string) => {
-    const { score } = calculateTrustScore(url);
-    if (score >= 90) return "border-stone-600/40 bg-stone-700/20 text-stone-400";
-    if (score >= 70) return "border-stone-600/30 bg-stone-700/15 text-stone-400/80";
-    if (score >= 50) return "border-stone-600/20 bg-stone-700/10 text-stone-400/60";
-    return "border-stone-600/15 bg-stone-700/5 text-stone-400/50";
+  const trustColor = (score: number) => {
+    if (score >= 90) return "text-[var(--text-secondary)]";
+    if (score >= 70) return "text-[var(--text-secondary)]/80";
+    if (score >= 50) return "text-[var(--text-secondary)]/60";
+    return "text-[var(--text-secondary)]/40";
   };
 
   if (status.subtype === "complete") return null;
@@ -476,8 +481,8 @@ export function StatusMessage({
   if (status.subtype === "weather") {
     const apiLabel = status.data?.hasKey ? "OpenWeatherMap" : "Open-Meteo";
     return (
-      <StepRow
-        icon={<WeatherIcon state="fetching" cls={isActive ? "text-stone-400" : "text-stone-500/60"} />}
+      <StepRow rightSlot={rightSlot}
+        icon={<WeatherIcon state="fetching" cls={isActive ? "text-[var(--accent)]" : "text-[var(--text-secondary)]/40"} />}
         message={`${status.message} (via ${apiLabel})`} isFirst={isFirst} isLast={isLast} pulse={isActive}
       />
     );
@@ -487,16 +492,16 @@ export function StatusMessage({
     const source: string = status.data?.source ?? "";
     const isOWM = source === "OpenWeatherMap";
     return (
-      <StepRow
-        icon={<WeatherIcon state="success" cls="text-stone-400" />}
+      <StepRow rightSlot={rightSlot}
+        icon={<WeatherIcon state="success" cls="text-[var(--text-secondary)]" />}
         message={status.message} isFirst={isFirst} isLast={isLast} pulse={false}
       >
         {source && (
           <span
             className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium mt-1 ${
               isOWM
-                ? "border-orange-500/30 bg-orange-500/8 text-orange-400/80"
-                : "border-sky-500/30 bg-sky-500/8 text-sky-400/80"
+                ? "border-[var(--accent)]/20 bg-[var(--accent)]/8 text-[var(--accent)]/80"
+                : "border-teal-500/30 bg-teal-500/8 text-teal-400/80"
             }`}
           >
             <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className="size-3 shrink-0">
@@ -512,8 +517,8 @@ export function StatusMessage({
 
   if (status.subtype === "weather_error") {
     return (
-      <StepRow
-        icon={<WeatherIcon state="error" cls="text-stone-500" />}
+      <StepRow rightSlot={rightSlot}
+        icon={<WeatherIcon state="error" cls="text-[var(--text-muted)]" />}
         message={status.message} isFirst={isFirst} isLast={isLast} pulse={false}
       />
     );
@@ -521,10 +526,10 @@ export function StatusMessage({
 
   if (status.subtype === "searching") {
     return (
-      <StepRow
-        icon={<SearchIcon cls={isActive ? "text-stone-400" : "text-stone-500/60"} />}
-        message={status.message} isFirst={isFirst} isLast={isLast} pulse={isActive}
-      />
+      <div className="py-2 flex items-start gap-1 w-full">
+        <div className="min-w-0 flex-1 text-[13px] text-[var(--text-secondary)] leading-snug font-medium break-words">{status.message}</div>
+        {rightSlot && <div className="shrink-0 mt-0.5">{rightSlot}</div>}
+      </div>
     );
   }
 
@@ -532,22 +537,25 @@ export function StatusMessage({
     const sources: string[] = status.data?.sources ?? [];
     if (sources.length === 0) return null;
     return (
-      <StepRow
-        icon={<GlobeIcon cls="text-stone-500" />}
+      <StepRow rightSlot={rightSlot}
+        icon={<GlobeIcon cls="text-[var(--text-muted)]" />}
         message={status.message} isFirst={isFirst} isLast={isLast} pulse={false}
       >
         <div className="flex flex-wrap gap-1.5">
-          {sources.map((url, idx) => (
-            <button
-              key={`${url}-${idx}`}
-              onClick={() => onSourceClick?.(url)}
-              aria-label={`Open ${getDomain(url)}`}
-              className={`group flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] transition-all duration-150 hover:scale-[1.02] hover:text-stone-200 border-l-2 ${trustColor(url)}`}
-            >
-              <span className="truncate max-w-[130px]">{getDomain(url)}</span>
-              <LinkIcon cls="size-2.5 opacity-0 group-hover:opacity-60 transition-opacity" />
-            </button>
-          ))}
+          {sources.map((url, idx) => {
+            const { score } = calculateTrustScore(url);
+            return (
+              <button
+                key={`${url}-${idx}`}
+                onClick={() => onSourceClick?.(url)}
+                aria-label={`Open ${getDomain(url)}`}
+                className={`group flex items-center gap-1 rounded-md border border-[var(--surface-border)] bg-[var(--surface-bg)] px-2 py-0.5 text-[11px] font-medium transition-all duration-150 hover:border-[var(--accent)]/20 hover:text-[var(--text-primary)] border-l-2 ${trustColor(score)}`}
+              >
+                <span className="truncate max-w-[130px]">{getDomain(url)}</span>
+                <LinkIcon cls="size-2.5 opacity-0 group-hover:opacity-60 transition-opacity" />
+              </button>
+            );
+          })}
         </div>
       </StepRow>
     );
@@ -557,8 +565,8 @@ export function StatusMessage({
     const titles: string[] = status.data?.titles ?? [];
     const urls: string[] = status.data?.urls ?? [];
     return (
-      <StepRow
-        icon={<BookIcon cls={isActive ? "text-stone-400" : "text-stone-500/60"} />}
+      <StepRow rightSlot={rightSlot}
+        icon={<BookIcon cls={isActive ? "text-[var(--accent)]" : "text-[var(--text-secondary)]/40"} />}
         message={status.message} isFirst={isFirst} isLast={isLast} pulse={isActive}
       >
         {titles.length > 0 && (
@@ -568,7 +576,7 @@ export function StatusMessage({
                 key={`${urls[idx] ?? idx}`}
                 onClick={() => urls[idx] && onSourceClick?.(urls[idx])}
                 aria-label={`View source: ${title}`}
-                className="group flex items-center gap-1 rounded-md border border-stone-700/40 bg-stone-800/10 px-2 py-0.5 text-[11px] text-stone-500/80 transition-all duration-150 hover:border-stone-500/50 hover:bg-stone-700/20 hover:text-stone-300"
+                className="group flex items-center gap-1 rounded-md border border-[var(--surface-border)] bg-[var(--surface-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-muted)]/80 transition-all duration-150 hover:border-[var(--accent)]/20 hover:bg-[var(--surface-bg)] hover:text-[var(--text-primary)]"
               >
                 <span className="truncate max-w-[180px]">{title}</span>
                 <LinkIcon cls="size-2.5 opacity-0 group-hover:opacity-60 transition-opacity" />
@@ -582,11 +590,11 @@ export function StatusMessage({
 
   if (status.subtype === 'generating_chart') {
     return (
-      <StepRow
+      <StepRow rightSlot={rightSlot}
         icon={
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"
                strokeLinecap="round" strokeLinejoin="round"
-               className={`size-5 shrink-0 ${isActive ? 'text-violet-400' : 'text-stone-500/60'}`}>
+               className={`size-5 shrink-0 ${isActive ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]/40'}`}>
             <rect x="2.5" y="10" width="3" height="7.5" rx="0.5" />
             <rect x="8.5" y="6"  width="3" height="11.5" rx="0.5" />
             <rect x="14.5" y="2.5" width="3" height="15" rx="0.5" />
@@ -601,59 +609,106 @@ export function StatusMessage({
     );
   }
 
+  // ─── Collapsible detail row (used by generating_file and reading_skill) ───
+  const [detailOpen, setDetailOpen] = useState(false);
+
   if (status.subtype === 'generating_file') {
+    const docType: string = status.data?.docType ?? '';
+    const topic: string = status.data?.topic ?? '';
     return (
-      <StepRow
-        icon={
-          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"
-               strokeLinecap="round" strokeLinejoin="round"
-               className={`size-5 shrink-0 ${isActive ? 'text-sky-400' : 'text-stone-500/60'}`}>
-            <path d="M5 2.5h7l3.5 3.5V17a1 1 0 0 1-1-1H5a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1z" />
-            <polyline points="12,2.5 12,6 15.5,6" />
-            <line x1="7" y1="9.5"  x2="13" y2="9.5"  strokeWidth="1.2" />
-            <line x1="7" y1="12.5" x2="11" y2="12.5" strokeWidth="1.2" />
-            <line x1="15.5" y1="12"   x2="15.5" y2="14"   strokeWidth="1.3" />
-            <line x1="14.5" y1="13"   x2="16.5" y2="13"   strokeWidth="1.3" />
-          </svg>
-        }
-        message={status.message}
-        isFirst={isFirst}
-        isLast={isLast}
-        pulse={isActive}
-      />
+      <div className="relative overflow-hidden">
+        {/* Flare sweep across this line during generation */}
+        {isActive && (
+          <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-md">
+            <div className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/6 to-transparent
+                            animate-flare-sweep" />
+          </div>
+        )}
+        <StepRow rightSlot={rightSlot}
+          icon={
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"
+                 strokeLinecap="round" strokeLinejoin="round"
+                 className={`size-5 shrink-0 ${isActive ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]/40'}`}>
+              <path d="M5 2.5h7l3.5 3.5V17a1 1 0 0 1-1-1H5a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1z" />
+              <polyline points="12,2.5 12,6 15.5,6" />
+              <line x1="7" y1="9.5"  x2="13" y2="9.5"  strokeWidth="1.2" />
+              <line x1="7" y1="12.5" x2="11" y2="12.5" strokeWidth="1.2" />
+              <line x1="15.5" y1="12"   x2="15.5" y2="14"   strokeWidth="1.3" />
+              <line x1="14.5" y1="13"   x2="16.5" y2="13"   strokeWidth="1.3" />
+            </svg>
+          }
+          message={status.message}
+          isFirst={isFirst}
+          isLast={isLast}
+          pulse={isActive}
+        >
+          <button
+            onClick={() => setDetailOpen(v => !v)}
+            className="flex items-center gap-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors mt-1"
+          >
+            <ChevronDown className={`size-3 transition-transform duration-200 ${detailOpen ? 'rotate-180' : ''}`} />
+            {detailOpen ? 'Hide build details' : 'Build details'}
+          </button>
+          {detailOpen && (docType || topic) && (
+            <div className="mt-1.5 space-y-1 text-[12px] text-[var(--text-muted)]">
+              {docType && <div className="flex items-center gap-1.5"><span className="text-[var(--text-muted)]">Type:</span> <span className="text-[var(--text-secondary)] font-medium">{docType.toUpperCase()}</span></div>}
+              {topic && <div className="flex items-center gap-1.5"><span className="text-[var(--text-muted)]">Topic:</span> <span className="text-[var(--text-secondary)]">{topic}</span></div>}
+            </div>
+          )}
+        </StepRow>
+      </div>
     );
   }
 
   // ─── reading_skill — model is loading generation rules for a doc type ───
   if (status.subtype === 'reading_skill') {
     const docType: string = status.data?.docType ?? '';
+    const loaded: boolean = status.data?.loaded ?? false;
     return (
-      <StepRow
-        icon={<SkillIcon cls={isActive ? 'text-violet-400' : 'text-stone-500/60'} />}
-        message={status.message}
-        isFirst={isFirst}
-        isLast={isLast}
-        pulse={isActive}
-      >
-        {docType && (
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-violet-500/30 bg-violet-500/5 text-violet-400/70 px-2 py-0.5 text-[11px] font-medium mt-1">
-            <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.4"
-                 strokeLinecap="round" className="size-2.5 shrink-0">
-              <path d="M2 1h6v8H2z" /><line x1="3.5" y1="3.5" x2="6.5" y2="3.5" strokeWidth="1" />
-              <line x1="3.5" y1="5.5" x2="5.5" y2="5.5" strokeWidth="1" />
-            </svg>
-            {docType.toUpperCase()} rules
-          </span>
+      <div className="py-2 w-full">
+        <div className="flex items-start gap-1 w-full">
+          <div className="min-w-0 flex-1 text-[13px] text-[var(--text-secondary)] leading-snug font-medium break-words">
+            {status.message}
+            {rightSlot && <span className="inline-flex shrink-0 align-middle ml-1">{rightSlot}</span>}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 mt-1.5">
+          {docType && (
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--accent)]/20 bg-[var(--accent)]/5 text-[var(--accent)]/80 px-2 py-0.5 text-[11px] font-medium">
+              <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.4"
+                   strokeLinecap="round" className="size-2.5 shrink-0">
+                <path d="M2 1h6v8H2z" /><line x1="3.5" y1="3.5" x2="6.5" y2="3.5" strokeWidth="1" />
+                <line x1="3.5" y1="5.5" x2="5.5" y2="5.5" strokeWidth="1" />
+              </svg>
+              {docType.toUpperCase()} rules
+            </span>
+          )}
+          <button
+            onClick={() => setDetailOpen(v => !v)}
+            className="flex items-center gap-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+          >
+            <ChevronDown className={`size-3 transition-transform duration-200 ${detailOpen ? 'rotate-180' : ''}`} />
+          </button>
+        </div>
+        {detailOpen && docType && (
+          <div className="mt-1.5 text-[12px] text-[var(--text-muted)] leading-relaxed">
+            Loaded <span className="text-[var(--text-secondary)] font-medium">{docType.toUpperCase()}</span> generation rules{loaded ? '' : ' (from cache)'} — templates, layout guidelines, and content structure for building the document.
+          </div>
         )}
-      </StepRow>
+        {isLast && (
+          <div className="flex items-center h-4 mt-1">
+            <span className="text-[13px] text-[var(--text-secondary)] leading-snug font-medium">Done</span>
+          </div>
+        )}
+      </div>
     );
   }
 
   // ─── image_enhancing — AI is rewriting the prompt for higher quality ────
   if (status.subtype === 'image_enhancing') {
     return (
-      <StepRow
-        icon={<WandIcon cls={isActive ? 'text-amber-400' : 'text-stone-500/60'} />}
+      <StepRow rightSlot={rightSlot}
+        icon={<WandIcon cls={isActive ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]/40'} />}
         message={status.message}
         isFirst={isFirst}
         isLast={isLast}
@@ -665,8 +720,8 @@ export function StatusMessage({
   // ─── image_generating — diffusion model is running ───────────────────────
   if (status.subtype === 'image_generating') {
     return (
-      <StepRow
-        icon={<ImageIcon cls={isActive ? 'text-rose-400' : 'text-stone-500/60'} />}
+      <StepRow rightSlot={rightSlot}
+        icon={<ImageIcon cls={isActive ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]/40'} />}
         message={status.message}
         isFirst={isFirst}
         isLast={isLast}
@@ -677,8 +732,8 @@ export function StatusMessage({
 
   if (status.subtype === "error" || status.subtype === "no_results") {
     return (
-      <StepRow
-        icon={<WarnIcon cls="text-stone-400" />}
+      <StepRow rightSlot={rightSlot}
+        icon={<WarnIcon cls="text-[var(--text-secondary)]" />}
         message={status.message} isFirst={isFirst} isLast={isLast} pulse={false}
       />
     );
@@ -686,16 +741,16 @@ export function StatusMessage({
 
   if (status.subtype === "done") {
     return (
-      <StepRow
-        icon={<DoneIcon cls="text-stone-400" />}
+      <StepRow rightSlot={rightSlot}
+        icon={<DoneIcon cls="text-[var(--text-secondary)]" />}
         message={status.message} isFirst={isFirst} isLast={isLast} pulse={false}
       />
     );
   }
 
   return (
-    <StepRow
-      icon={<span className="size-4 flex items-center justify-center"><span className="size-1.5 rounded-full bg-stone-600" /></span>}
+    <StepRow rightSlot={rightSlot}
+      icon={<span className="size-4 flex items-center justify-center"><span className="size-1.5 rounded-full bg-[var(--text-muted)]" /></span>}
       message={status.message} isFirst={isFirst} isLast={isLast} pulse={isActive}
     />
   );

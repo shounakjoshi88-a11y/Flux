@@ -22,6 +22,21 @@ export type GeneratedFile = {
   md?: string;
 };
 
+export type TodoItem = {
+  id: string;
+  content: string;
+  status: "pending" | "in_progress" | "completed";
+};
+
+export type MessagePart =
+  | { type: "text"; text: string }
+  | { type: "tool_call"; name: string; input?: any; output?: any; status: "pending" | "running" | "completed" | "error" }
+  | { type: "thought"; content: string }
+  | { type: "image"; url: string; filename: string; mime: string }
+  | { type: "file"; filename: string; mime: string; base64?: string }
+  | { type: "source"; url: string; title?: string }
+  | { type: "todos"; items: TodoItem[] };
+
 export type Message = {
   id: string | number;
   role: "User" | "Assistant";
@@ -34,6 +49,7 @@ export type Message = {
   error?: boolean;
   errorMessage?: string;
   thoughtProcess?: any[]; // For persistence
+  parts?: MessagePart[]; // Interleaved message parts for Claude-style rendering
 };
 
 export type ConversationDetail = {

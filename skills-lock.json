@@ -24,6 +24,12 @@
       "skillPath": "skills/bun-runtime/SKILL.md",
       "computedHash": "5e8627ece37efa7f9ea4fdd7360ef95ad8bce4ce92ae8afd90a27347df1b6f9c"
     },
+    "copilotkit": {
+      "source": "copilotkit/skills",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "ea266ce95f3b5a080794b757121086247955708e7effe73461ed33ad29301643"
+    },
     "frontend-design": {
       "source": "anthropics/skills",
       "sourceType": "github",
