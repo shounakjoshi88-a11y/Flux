@@ -340,6 +340,24 @@ The `vercel.json` configuration handles Bun installation, frontend build with Ta
 5. After up to 8 agentic steps, the final answer streams to the frontend with sources, thought process, follow-up questions, and any generated files
 6. Messages and metadata are persisted to PostgreSQL; memories are extracted asynchronously
 
+### Agentic Loop Details
+
+The `/flux_ask` endpoint orchestrates up to 8 reasoning steps:
+
+1. **Plan** — Analyze user intent and select tools
+2. **Execute** — Run web search, document generation, weather, image gen, or read skills
+3. **Verify** — Check if results meet criteria (has sources, files, or sufficient content)
+4. **Iterate** — If verification fails, retry the same tool or try alternatives
+5. **Finalize** — Stream final answer with sources, follow-up questions, and artifacts
+
+**SSE Events Streamed:**
+- `status` — Tool execution status (`searching`, `generating_document`, etc.)
+- `thought` — Visible reasoning process
+- `message` — Text chunks (streamed character-by-character)
+- `sources` — URLs with trust scores
+- `file` — Generated artifacts (PDF, PPTX, XLSX, etc.)
+- `follow_ups` — Suggested follow-up questions
+
 ---
 
 <h2 id="api-reference">📡 API Reference</h2>
