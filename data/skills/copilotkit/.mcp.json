@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "copilotkit-docs": {
-      "type": "http",
-      "url": "https://mcp.copilotkit.ai/mcp"
-    }
-  }
-}
