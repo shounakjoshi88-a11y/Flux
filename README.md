@@ -420,12 +420,16 @@ flux/
 │   │   ├── planner.ts                  # Intent analysis + execution plans
 │   │   ├── verifier.ts                 # Phase result verification
 │   │   └── types.ts                    # Phase, ExecutionPlan, StreamWriter types
-│   ├── skills/                         # 16 doc-gen skill markdown files
-│   │   ├── SKILL.md                    # Master skill file
-│   │   ├── pdf-skill.md, docx-skill.md, pptx-skill.md, xlsx-skill.md
-│   │   ├── csv-skill.md, tsv-skill.md, md-skill.md, json-skill.md
-│   │   ├── sql-skill.md, html-skill.md, tech-writer-skill.md
-│   │   └── finance-skill.md, coder-skill.md, creative-skill.md, legal-skill.md
+│   ├── skills/                         # LLM skill prompts for document generation
+│   │   ├── SKILL.md                    # Master prompt with all skills
+│   │   ├── pdf-skill.md                # PDF generation prompt (layout, fonts, colors)
+│   │   ├── docx-skill.md               # DOCX generation prompt
+│   │   ├── pptx-skill.md               # PowerPoint generation prompt
+│   │   ├── xlsx-skill.md               # Excel spreadsheet generation prompt
+│   │   ├── csv-skill.md, tsv-skill.md  # Delimited data generation
+│   │   ├── md-skill.md, json-skill.md, sql-skill.md, html-skill.md
+│   │   └── tech-writer-skill.md, finance-skill.md, coder-skill.md, creative-skill.md, legal-skill.md
+│   │       # Domain-specific prompts for specialized document generation
 │   ├── prisma/
 │   │   ├── schema.prisma                # 4 models: User, Conversation, Message, Memory (vector)
 │   │   ├── migrations/                  # SQL migration history
