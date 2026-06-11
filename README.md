@@ -292,6 +292,29 @@ vercel --prod
 
 The `vercel.json` configuration handles Bun installation, frontend build with Tailwind, serverless function routing, and static file serving.
 
+### Database Setup
+
+Flux requires PostgreSQL with `pgvector` extension for embeddings:
+
+**Option A: Supabase (Recommended)**
+1. Create a project on [Supabase](https://supabase.com)
+2. Copy the connection string to `DATABASE_URL` in `backend/.env`
+3. Run `bunx prisma migrate dev --name init`
+
+**Option B: Local PostgreSQL**
+```bash
+# Install PostgreSQL 14+
+# Enable pgvector extension
+createdb flux
+psql flux -c "CREATE EXTENSION IF NOT EXISTS vector"
+
+# Set DATABASE_URL
+export DATABASE_URL="postgresql://postgres:password@localhost:5432/flux"
+
+# Run migrations
+bunx prisma migrate dev --name init
+```
+
 ---
 
 <h2 id="architecture">🏗️ Architecture</h2>
