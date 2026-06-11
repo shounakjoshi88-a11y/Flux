@@ -45,8 +45,8 @@
   </tr>
   <tr>
     <td width="50%" align="center">
-      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/image%20generation%20capability.png" alt="Flux Image Generation" width="100%">
-      <br><em>AI-powered image generation capability</em>
+      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20162914.png" alt="Flux News" width="100%">
+      <br><em>Live News section with AI summary on article click</em>
     </td>
     <td width="50%" align="center">
       <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/AI%20news%20Summary.png" alt="Flux AI News Summary" width="100%">
@@ -55,8 +55,8 @@
   </tr>
   <tr>
     <td width="50%" align="center">
-      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20162914.png" alt="Flux News" width="100%">
-      <br><em>Live News section with AI summary on article click</em>
+      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/image%20generation%20capability.png" alt="Flux Image Generation" width="100%">
+      <br><em>AI-powered image generation capability</em>
     </td>
     <td width="50%" align="center">
       <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20162856.png" alt="Flux Artifacts" width="100%">
@@ -64,12 +64,8 @@
     </td>
   </tr>
   <tr>
-    <td width="50%" align="center">
-      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163335.png" alt="Flux Prompt History" width="100%">
-      <br><em>Prompt History — jump to any prompt in one click</em>
-    </td>
-    <td width="50%" align="center">
-      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163321.png" alt="Flux Links" width="100%">
+    <td width="50%" align="center" colspan="2">
+      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163321.png" alt="Flux Links" width="50%">
       <br><em>Links stored per prompt within a thread</em>
     </td>
   </tr>
