@@ -32,60 +32,78 @@
 
 <h2 id="preview">📸 Preview</h2>
 
-<p align="center">
-  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20162613.png" alt="Flux Dashboard" width="800"><br>
-  <em>Main chat interface with warm design system</em>
-</p>
-
-<p align="center">
-  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20162856.png" alt="Flux Dark Mode" width="800"><br>
-  <em>Artifacts Section - user can see all the uploded and genrated files easily </em>
-</p>
-
-<p align="center">
-  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20162914.png" alt="Flux Sidebar" width="800"><br>
-  <em>Live News section with AI summary if clicked on the particular Article </em>
-</p>
-
-<p align="center">
-  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163312.png" alt="Flux Model Selector" width="800"><br>
-  <em>Smooth Chat UI </em>
-</p>
-
-<p align="center">
-  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163321.png" alt="Flux Document Generation" width="800"><br>
-  <em>Links stored per pormpt in the particular thread</em>
-</p>
-
-<p align="center">
-  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163412.png" alt="Flux News" width="800"><br>
-  <em>Showcase of the promptHistory - user can just go to a particular prompt in one click instead of endless scrolling !</em>
-</p>
-
-<p align="center">
-  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163423.png" alt="Flux Settings" width="800"><br>
-  <em>Prompt History card closed Minimal UI </em>
-</p>
-
-<p align="center">
-  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163449.png" alt="Flux Voice" width="800"><br>
-  <em>Settings Panel </em>
-</p>
-
-<p align="center">
-  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163459.png" alt="Flux Search" width="800"><br>
-  <em>Proper session management implementation </em>
-</p>
-
-<p align="center">
-  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163511.png" alt="Flux Memory" width="800"><br>
-  <em>Memory management - user can see all the memories thats stored </em>
-</p>
-
-<p align="center">
-  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163527.png" alt="Flux Mobile" width="400"><br>
-  <em>can see each memory stored by types</em>
-</p>
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20162613.png" alt="Flux Dashboard" width="100%">
+      <br><em>Main chat interface with warm design system</em>
+    </td>
+    <td width="50%" align="center">
+      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163312.png" alt="Flux Chat UI" width="100%">
+      <br><em>Smooth Chat UI</em>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/image%20generation%20capability.png" alt="Flux Image Generation" width="100%">
+      <br><em>AI-powered image generation capability</em>
+    </td>
+    <td width="50%" align="center">
+      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/AI%20news%20Summary.png" alt="Flux AI News Summary" width="100%">
+      <br><em>AI news summary for any article</em>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20162914.png" alt="Flux News" width="100%">
+      <br><em>Live News section with AI summary on article click</em>
+    </td>
+    <td width="50%" align="center">
+      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20162856.png" alt="Flux Artifacts" width="100%">
+      <br><em>Artifacts Section — browse all uploaded & generated files</em>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163335.png" alt="Flux Prompt History" width="100%">
+      <br><em>Prompt History — jump to any prompt in one click</em>
+    </td>
+    <td width="50%" align="center">
+      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163321.png" alt="Flux Links" width="100%">
+      <br><em>Links stored per prompt within a thread</em>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163412.png" alt="Flux Prompt History Card Open" width="100%">
+      <br><em>Prompt History card — quick access to past prompts</em>
+    </td>
+    <td width="50%" align="center">
+      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163423.png" alt="Flux Prompt History Closed" width="100%">
+      <br><em>Prompt History card closed — minimal UI</em>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163449.png" alt="Flux Settings" width="100%">
+      <br><em>Settings Panel — theme, model prefs & more</em>
+    </td>
+    <td width="50%" align="center">
+      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163459.png" alt="Flux Session Management" width="100%">
+      <br><em>Session management implementation</em>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163511.png" alt="Flux Memory" width="100%">
+      <br><em>Memory management — view all stored memories</em>
+    </td>
+    <td width="50%" align="center">
+      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163527.png" alt="Flux Memory Types" width="100%">
+      <br><em>Memories grouped by type</em>
+    </td>
+  </tr>
+</table>
 
 ---
 
