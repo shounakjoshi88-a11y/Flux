@@ -30,6 +30,70 @@
 
 ---
 
+<h2 id="preview">📸 Preview</h2>
+
+<p align="center">
+  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20162613.png" alt="Flux Dashboard" width="800"><br>
+  <em>Main chat interface with warm design system</em>
+</p>
+
+<p align="center">
+  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20162856.png" alt="Flux Dark Mode" width="800"><br>
+  <em>Dark mode with navy surfaces</em>
+</p>
+
+<p align="center">
+  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20162914.png" alt="Flux Sidebar" width="800"><br>
+  <em>Animated sidebar with conversation history</em>
+</p>
+
+<p align="center">
+  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163312.png" alt="Flux Model Selector" width="800"><br>
+  <em>20+ model selection with categories</em>
+</p>
+
+<p align="center">
+  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163321.png" alt="Flux Document Generation" width="800"><br>
+  <em>Document generation (PDF, DOCX, PPTX, XLSX, etc.)</em>
+</p>
+
+<p align="center">
+  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163335.png" alt="Flux Artifacts" width="800"><br>
+  <em>Artifacts gallery for generated files</em>
+</p>
+
+<p align="center">
+  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163412.png" alt="Flux News" width="800"><br>
+  <em>Multi-source news aggregation</em>
+</p>
+
+<p align="center">
+  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163423.png" alt="Flux Settings" width="800"><br>
+  <em>Settings panel with preferences</em>
+</p>
+
+<p align="center">
+  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163449.png" alt="Flux Voice" width="800"><br>
+  <em>Voice I/O with TTS voices</em>
+</p>
+
+<p align="center">
+  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163459.png" alt="Flux Search" width="800"><br>
+  <em>Full-text conversation search</em>
+</p>
+
+<p align="center">
+  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163511.png" alt="Flux Memory" width="800"><br>
+  <em>Long-term memory management</em>
+</p>
+
+<p align="center">
+  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163527.png" alt="Flux Mobile" width="400"><br>
+  <em>Responsive mobile layout</em>
+</p>
+
+---
+
 **Flux** is a full-stack AI chat application that connects you to 20+ large language models via NVIDIA NIM, with built-in document generation, real-time web search, long-term memory, voice I/O, news aggregation, and image generation — all wrapped in a warm, responsive interface inspired by Anthropic's design language.
 
 Whether you need a quick answer, a polished presentation deck, an Excel spreadsheet, a code review, or a deep research brief, Flux orchestrates tool use across multiple AI models to get it done.
