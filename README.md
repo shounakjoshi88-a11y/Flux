@@ -563,7 +563,23 @@ Flux uses a warm, humanist design language inspired by Anthropic's Claude interf
 
 ## 🤝 Contributing
 
-This is a private project. For issues or suggestions, please contact the repository owner.
+This is a personal project, but contributions are welcome!
+
+**Contribution Guidelines:**
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to your branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+**Areas for contribution:**
+- New LLM tools (e.g., code execution, file analysis)
+- Document format generators (e.g., Markdown → PDF templates)
+- UI/UX improvements
+- Performance optimizations
+- Bug fixes and tests
+
+**Questions?** Open an issue or reach out to [@shounakjoshi88-a11y](https://github.com/shounakjoshi88-a11y)
 
 ---
 
