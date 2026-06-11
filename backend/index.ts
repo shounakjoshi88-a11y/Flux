@@ -2869,7 +2869,7 @@ app.get("/news/search", middleware, async (req: any, res: any) => {
 });
 
 // ── AI ARTICLE SUMMARY ──────────────────────────────────────
-app.post("/summarize", middleware, async (req: any, res: any) => {
+app.post("/summarize", middleware, aiLimiter, async (req: any, res: any) => {
     const { url, title, content } = req.body ?? {};
     if (!title && !content) {
         return res.status(400).json({ error: "title or content required" });
@@ -2900,7 +2900,7 @@ app.post("/summarize", middleware, async (req: any, res: any) => {
             }
         }
 
-        const system = `... (system prompt) ...`;
+        const system = "You are a skilled news summarizer. Given a news article title, source URL, and full text, produce a concise, well-structured bilingual summary in Markdown. Write the summary in the user's language (default English). Use ### section headings, bullet points for key takeaways, and short paragraphs. Keep it factual, objective, and cover the core claims, evidence, and context. Do not editorialize.";
 
         const userMsg = [
             `Title: ${title}`,
