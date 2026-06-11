@@ -39,57 +39,52 @@
 
 <p align="center">
   <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20162856.png" alt="Flux Dark Mode" width="800"><br>
-  <em>Dark mode with navy surfaces</em>
+  <em>Artifacts Section - user can see all the uploded and genrated files easily </em>
 </p>
 
 <p align="center">
   <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20162914.png" alt="Flux Sidebar" width="800"><br>
-  <em>Animated sidebar with conversation history</em>
+  <em>Live News section with AI summary if clicked on the particular Article </em>
 </p>
 
 <p align="center">
   <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163312.png" alt="Flux Model Selector" width="800"><br>
-  <em>20+ model selection with categories</em>
+  <em>Smooth Chat UI </em>
 </p>
 
 <p align="center">
   <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163321.png" alt="Flux Document Generation" width="800"><br>
-  <em>Document generation (PDF, DOCX, PPTX, XLSX, etc.)</em>
-</p>
-
-<p align="center">
-  <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163335.png" alt="Flux Artifacts" width="800"><br>
-  <em>Artifacts gallery for generated files</em>
+  <em>Links stored per pormpt in the particular thread</em>
 </p>
 
 <p align="center">
   <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163412.png" alt="Flux News" width="800"><br>
-  <em>Multi-source news aggregation</em>
+  <em>Showcase of the promptHistory - user can just go to a particular prompt in one click instead of endless scrolling !</em>
 </p>
 
 <p align="center">
   <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163423.png" alt="Flux Settings" width="800"><br>
-  <em>Settings panel with preferences</em>
+  <em>Prompt History card closed Minimal UI </em>
 </p>
 
 <p align="center">
   <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163449.png" alt="Flux Voice" width="800"><br>
-  <em>Voice I/O with TTS voices</em>
+  <em>Settings Panel </em>
 </p>
 
 <p align="center">
   <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163459.png" alt="Flux Search" width="800"><br>
-  <em>Full-text conversation search</em>
+  <em>Proper session management implementation </em>
 </p>
 
 <p align="center">
   <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163511.png" alt="Flux Memory" width="800"><br>
-  <em>Long-term memory management</em>
+  <em>Memory management - user can see all the memories thats stored </em>
 </p>
 
 <p align="center">
   <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163527.png" alt="Flux Mobile" width="400"><br>
-  <em>Responsive mobile layout</em>
+  <em>can see each memory stored by types</em>
 </p>
 
 ---
