@@ -504,22 +504,8 @@ flux/
 │   ├── package.json, tsconfig.json, build.ts, bunfig.toml
 │   └── components.json, tailwind.config.js
 │
-├── .agents/skills/                      # AI assistant skills (8 skill sets)
-│   ├── analyze-bundle/                  # Bundle analysis
-│   ├── bun/ + bun-development/ + bun-runtime/  # Bun-specific skills
-│   ├── copilotkit/                      # CopilotKit integration suite (8 sub-skills)
-│   ├── frontend-design/                 # Frontend design system
-│   ├── logo-creator/                    # Logo design workflow
-│   ├── multi-agent-orchestration/       # Multi-agent coordination
-│   └── web-design-guidelines/           # Web UI audit guidelines
-├── data/skills/                         # Duplicate skill set (cross-platform)
-│   └── (same structure as .agents/)
 ├── api/index.ts                         # Vercel serverless entry
 ├── vercel.json                          # Vercel deployment config
-├── DESIGN.md                            # Brand design system reference (589 lines)
-├── AGENTS.md                            # Required skills manifest
-├── CLAUDE.md / GEMINI.md                # Placeholder configs for AI assistants
-├── skills-lock.json                     # Locked skill definitions with hashes
 ├── flux.bat / flux.ps1                  # Dev launcher scripts (both servers)
 ├── dashboard.txt                        # Dashboard.tsx snapshot reference
 └── .gitignore
