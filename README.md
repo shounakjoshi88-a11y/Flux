@@ -345,41 +345,53 @@ bunx prisma migrate dev --name init
 
 ```mermaid
 flowchart LR
-    user[Analyst / User] --> frontend[React 19 SPA<br/>Dashboard · Chat · Sidebar · Settings]
-
-    subgraph backend[Express 5 + Bun]
-        api[POST /flux_ask<br/>SSE streaming endpoint]
-        agentic[Agentic Loop<br/>Plan → Execute → Verify → Iterate → Finalize]
-        api --- agentic
+    subgraph frontend["React 19 SPA"]
+        Dashboard["Dashboard · Chat · Sources · Tabs"]
+        Sidebar["Sidebar · Search · History · News"]
+        Auth["Auth · Google / GitHub OAuth"]
+        Settings["Settings · Theme · Models"]
+        Artifacts["Artifacts · Generated files gallery"]
     end
 
-    subgraph storage[PostgreSQL + pgvector]
-        prisma[Prisma ORM<br/>Users · Conversations · Messages]
-        memory[Memories · 1024-dim embeddings<br/>HNSW index · Similarity search]
+    subgraph backend["Express 5 (Bun)"]
+        FluxAsk["POST /flux_ask · SSE streaming"]
+        Conv["GET /conversations · POST /conversation/:id"]
+        Memory["GET /memories · DELETE /memories/:id"]
+        News["GET /news · POST /summarize"]
+        Voice["POST /api/tts · GET /api/tts/voices"]
     end
 
-    subgraph ai[NVIDIA NIM]
-        llm[20+ LLMs<br/>Llama 4 · Mistral · DeepSeek ·<br/>Qwen · Nemotron · GLM · Kimi]
-        retriever[Nemo Retriever · Embed + Rerank]
-        safety[Nemotron · Content Safety]
+    subgraph agentic["Agentic Loop (max 8 steps)"]
+        direction LR
+        Plan["Plan · Intent analysis"] --> Execute["Execute · Tool calls"]
+        Execute --> Verify["Verify · Check results"]
+        Verify --> Iterate["Iterate · Retry / fallback"]
+        Iterate --> Finalize["Finalize · Stream answer"]
     end
 
-    subgraph services[External Services]
-        tavily[Tavily · Web Search]
-        supabase[Supabase · Auth OAuth]
-        bonsai[Bonsai · Image Generation]
-        weather[OpenWeatherMap · Open-Meteo]
+    subgraph nim["NVIDIA NIM"]
+        LLM["20+ LLMs · Llama 4 · Mistral · DeepSeek · Qwen · Nemotron · GLM · Kimi"]
+        RAG["Nemo Retriever · Embed + Rerank"]
+        Safety["Nemotron · Content safety"]
     end
 
-    frontend -->|chat request + JWT| api
-    api -->|verify user| supabase
-    api -->|persist + retrieve| prisma
-    api -->|search memories| memory
-    api -->|stream LLM| llm
-    api -->|execute tools| tavily
-    api -->|execute tools| bonsai
-    api -->|execute tools| weather
-    api -->|stream answer + sources + files| frontend
+    subgraph storage["PostgreSQL + pgvector"]
+        PrismaDB["Prisma ORM · Users · Conversations · Messages"]
+        Vector["pgvector · 1024-dim embeddings · HNSW index"]
+    end
+
+    subgraph services["External Services"]
+        Tavily["Tavily · Web search"]
+        Supabase["Supabase · Auth OAuth"]
+        Bonsai["Bonsai · Image generation"]
+        Weather["OpenWeatherMap · Open-Meteo"]
+    end
+
+    frontend -->|chat request + JWT| backend
+    backend -->|up to 8 reasoning steps| agentic
+    backend -->|stream LLM calls| nim
+    backend -->|persist + vector search| storage
+    backend -->|tool execution| services
 ```
 
 **Request flow:**
