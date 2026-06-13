@@ -343,49 +343,86 @@ bunx prisma migrate dev --name init
 
 <h2 id="architecture">🏗️ Architecture</h2>
 
-```
-                    ┌─────────────────────────┐
-                    │      React 19 SPA       │
-                    │  Dashboard · Auth ·      │
-                    │  Sidebar · Settings ·    │
-                    │  Artifacts · News        │
-                    └───────────┬─────────────┘
-                                │ HTTP / SSE
-                    ┌───────────┴─────────────┐
-                    │     Express 5 (Bun)     │
-                    │                         │
-                    │  POST /flux_ask ◄───────┼── Agentic loop (max 8 steps)
-                    │  GET  /conversations    │     ├ web_search (Tavily)
-                    │  POST /conversations/new│     ├ generate_document
-                    │  GET  /news             │     ├ get_weather
-                    │  GET  /memories         │     ├ generate_image (Bonsai)
-                    │  GET  /artifacts        │     └ read_skill
-                    │  POST /summarize        │
-                    │  POST /api/tts          │
-                    └───────┬─────────────────┘
-                            │
-          ┌─────────────────┼─────────────────────┐
-          │                 │                     │
-   ┌──────┴──────┐  ┌──────┴──────┐  ┌───────────┴───────┐
-   │  PostgreSQL  │  │ NVIDIA NIM │  │     Tavily        │
-   │  + pgvector  │  │ 20+ models │  │   Web Search API  │
-   │  + Prisma    │  │ + RAG/Safe │  │                   │
-   └──────┬───────┘  └────────────┘  └───────────────────┘
-          │
-   ┌──────┴───────┐
-   │   Supabase   │
-   │  Auth (OAuth)│
-   └──────────────┘
+```mermaid
+flowchart TB
+    subgraph frontend["React 19 SPA"]
+        Dashboard["Dashboard<br/>Chat · Sources · Tabs"]
+        Sidebar["Sidebar<br/>Search · History · News"]
+        Auth["Auth<br/>Google / GitHub OAuth"]
+        Settings["Settings<br/>Theme · Models"]
+        Artifacts["Artifacts<br/>Generated files gallery"]
+    end
+
+    subgraph backend["Express 5 (Bun)"]
+        FluxAsk["POST /flux_ask<br/>SSE streaming"]
+        Conv["GET /conversations<br/>POST /conversation/:id"]
+        Memory["GET /memories<br/>DELETE /memories/:id"]
+        News["GET /news<br/>POST /summarize"]
+        Voice["POST /api/tts<br/>GET /api/tts/voices"]
+    end
+
+    subgraph agentic["Agentic Loop (max 8 steps)"]
+        direction LR
+        Plan["Plan<br/>Intent analysis"] --> Execute["Execute<br/>Tool calls"]
+        Execute --> Verify["Verify<br/>Check results"]
+        Verify --> Iterate["Iterate<br/>Retry / fallback"]
+        Iterate --> Finalize["Finalize<br/>Stream answer"]
+    end
+
+    subgraph nim["NVIDIA NIM"]
+        LLM["20+ LLMs<br/>Llama 4 · Mistral ·<br/>DeepSeek · Qwen ·<br/>Nemotron · GLM · Kimi"]
+        RAG["Nemo Retriever<br/>Embed + Rerank"]
+        Safety["Nemotron<br/>Content safety"]
+    end
+
+    subgraph storage["PostgreSQL + pgvector"]
+        PrismaDB["Prisma ORM<br/>Users · Conversations ·<br/>Messages · Memories"]
+        Vector["pgvector<br/>1024-dim embeddings<br/>HNSW index"]
+    end
+
+    subgraph services["External Services"]
+        Tavily["Tavily API<br/>Web search"]
+        Supabase["Supabase<br/>Auth · OAuth"]
+        Bonsai["Bonsai<br/>Image generation"]
+        Weather["OpenWeatherMap<br/>Open-Meteo"]
+    end
+
+    frontend -->|"HTTP / SSE"| backend
+    backend --> agentic
+    backend --> nim
+    backend --> storage
+    backend --> services
 ```
 
 **Request flow:**
 
-1. User types a message → frontend sends `POST /flux_ask` with query, model ID, conversation history, and optional attachments
-2. Server constructs a system prompt with memory context, datetime, location, and relevant skill files
-3. The LLM (via NVIDIA NIM) responds with streaming text, interleaved with tool call requests
-4. The server executes tool calls (web search, document generation, weather, image gen) and feeds results back to the model
-5. After up to 8 agentic steps, the final answer streams to the frontend with sources, thought process, follow-up questions, and any generated files
-6. Messages and metadata are persisted to PostgreSQL; memories are extracted asynchronously
+```mermaid
+sequenceDiagram
+    participant User as User
+    participant FE as React 19 SPA
+    participant BE as Express 5 (Bun)
+    participant LLM as NVIDIA NIM
+    participant Tools as Tools<br/>Tavily · Bonsai ·<br/>Weather · Skills
+    participant DB as PostgreSQL
+
+    User->>FE: Type message
+    FE->>BE: POST /flux_ask<br/>(query + model + files)
+    BE->>BE: Build system prompt<br/>(memory + datetime + location)
+    BE->>LLM: Stream LLM response
+    LLM-->>BE: Text chunks + tool calls
+
+    loop Up to 8 agentic steps
+        BE->>Tools: Execute tool
+        Tools-->>BE: Tool result
+        BE->>LLM: Feed result back
+        LLM-->>BE: More text + next tool call
+    end
+
+    BE-->>FE: SSE events<br/>(text · sources · files · thoughts)
+    BE->>DB: Persist messages
+    BE->>DB: Extract memories (async)
+    FE-->>User: Render answer + sources
+```
 
 ### Agentic Loop Details
 
