@@ -344,72 +344,42 @@ bunx prisma migrate dev --name init
 <h2 id="architecture">🏗️ Architecture</h2>
 
 ```mermaid
-%%{init: {
-  'theme': 'base',
-  'themeVariables': {
-    'background': '#faf9f5',
-    'primaryColor': '#f5f0e8',
-    'primaryBorderColor': '#e6dfd8',
-    'primaryTextColor': '#141413',
-    'secondaryColor': '#efe9de',
-    'secondaryBorderColor': '#e6dfd8',
-    'secondaryTextColor': '#141413',
-    'tertiaryColor': '#faf9f5',
-    'tertiaryBorderColor': '#e6dfd8',
-    'tertiaryTextColor': '#141413',
-    'lineColor': '#8e8b82',
-    'fontFamily': 'Inter, sans-serif',
-    'fontSize': '13px'
-  }
-}}%%
 flowchart LR
-    subgraph frontend["React 19 SPA"]
-        Dashboard["Dashboard · Chat · Sources"]
-        Sidebar["Sidebar · Search · History"]
-        Auth["Google / GitHub OAuth"]
-        Settings["Settings · Theme · Models"]
-        Artifacts["Artifacts Gallery"]
+    user[Analyst / User] --> frontend[React 19 SPA<br/>Dashboard · Chat · Sidebar · Settings]
+
+    subgraph backend[Express 5 + Bun]
+        api[POST /flux_ask<br/>SSE streaming endpoint]
+        agentic[Agentic Loop<br/>Plan → Execute → Verify → Iterate → Finalize]
+        api --- agentic
     end
 
-    subgraph backend["Express 5 (Bun)"]
-        FluxAsk["POST /flux_ask · SSE streaming"]
-        Conv["Conversations CRUD"]
-        Memory["Memories · Vector search"]
-        News["News · Summarize · Proxy"]
-        Voice["TTS · ASR"]
+    subgraph storage[PostgreSQL + pgvector]
+        prisma[Prisma ORM<br/>Users · Conversations · Messages]
+        memory[Memories · 1024-dim embeddings<br/>HNSW index · Similarity search]
     end
 
-    subgraph agents["Agentic Loop (max 8 steps)"]
-        direction LR
-        Plan["Plan"] --> Execute["Execute"]
-        Execute --> Verify["Verify"]
-        Verify --> Iterate["Iterate"]
-        Iterate --> Finalize["Finalize"]
+    subgraph ai[NVIDIA NIM]
+        llm[20+ LLMs<br/>Llama 4 · Mistral · DeepSeek ·<br/>Qwen · Nemotron · GLM · Kimi]
+        retriever[Nemo Retriever · Embed + Rerank]
+        safety[Nemotron · Content Safety]
     end
 
-    subgraph nim["NVIDIA NIM"]
-        LLM["20+ LLMs"]
-        RAG["Nemo Retriever"]
-        Safety["Content Safety"]
+    subgraph services[External Services]
+        tavily[Tavily · Web Search]
+        supabase[Supabase · Auth OAuth]
+        bonsai[Bonsai · Image Generation]
+        weather[OpenWeatherMap · Open-Meteo]
     end
 
-    subgraph storage["PostgreSQL + pgvector"]
-        PrismaDB["Prisma ORM"]
-        Vector["Vector Search"]
-    end
-
-    subgraph services["External"]
-        Tavily["Web Search"]
-        Supabase["Auth"]
-        Bonsai["Images"]
-        Weather["Weather"]
-    end
-
-    frontend -->|HTTP / SSE| backend
-    backend --> agents
-    backend --> nim
-    backend --> storage
-    backend --> services
+    frontend -->|chat request + JWT| api
+    api -->|verify user| supabase
+    api -->|persist + retrieve| prisma
+    api -->|search memories| memory
+    api -->|stream LLM| llm
+    api -->|execute tools| tavily
+    api -->|execute tools| bonsai
+    api -->|execute tools| weather
+    api -->|stream answer + sources + files| frontend
 ```
 
 **Request flow:**
