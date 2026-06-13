@@ -384,51 +384,12 @@ flowchart LR
 
 **Request flow:**
 
-```mermaid
-%%{init: {
-  'theme': 'base',
-  'themeVariables': {
-    'background': '#faf9f5',
-    'primaryColor': '#f5f0e8',
-    'primaryBorderColor': '#e6dfd8',
-    'primaryTextColor': '#141413',
-    'secondaryColor': '#efe9de',
-    'secondaryBorderColor': '#e6dfd8',
-    'secondaryTextColor': '#141413',
-    'tertiaryColor': '#faf9f5',
-    'tertiaryBorderColor': '#e6dfd8',
-    'tertiaryTextColor': '#141413',
-    'lineColor': '#8e8b82',
-    'fontFamily': 'Inter, sans-serif',
-    'fontSize': '13px'
-  }
-}}%%
-sequenceDiagram
-    participant User as User
-    participant FE as React 19 SPA
-    participant BE as Express 5 (Bun)
-    participant LLM as NVIDIA NIM
-    participant Tools as Tools<br/>Tavily · Bonsai ·<br/>Weather · Skills
-    participant DB as PostgreSQL
-
-    User->>FE: Type message
-    FE->>BE: POST /flux_ask<br/>(query + model + files)
-    BE->>BE: Build system prompt<br/>(memory + datetime + location)
-    BE->>LLM: Stream LLM response
-    LLM-->>BE: Text chunks + tool calls
-
-    loop Up to 8 agentic steps
-        BE->>Tools: Execute tool
-        Tools-->>BE: Tool result
-        BE->>LLM: Feed result back
-        LLM-->>BE: More text + next tool call
-    end
-
-    BE-->>FE: SSE events<br/>(text · sources · files · thoughts)
-    BE->>DB: Persist messages
-    BE->>DB: Extract memories (async)
-    FE-->>User: Render answer + sources
-```
+1. User types a message → frontend sends `POST /flux_ask` with query, model ID, conversation history, and optional attachments
+2. Server constructs a system prompt with memory context, datetime, location, and relevant skill files
+3. The LLM (via NVIDIA NIM) responds with streaming text, interleaved with tool call requests
+4. The server executes tool calls (web search, document generation, weather, image gen) and feeds results back to the model
+5. After up to 8 agentic steps, the final answer streams to the frontend with sources, thought process, follow-up questions, and any generated files
+6. Messages and metadata are persisted to PostgreSQL; memories are extracted asynchronously
 
 ### Agentic Loop Details
 
