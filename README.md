@@ -344,6 +344,24 @@ bunx prisma migrate dev --name init
 <h2 id="architecture">🏗️ Architecture</h2>
 
 ```mermaid
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'background': '#faf9f5',
+    'primaryColor': '#cc785c',
+    'primaryBorderColor': '#a9583e',
+    'primaryTextColor': '#ffffff',
+    'secondaryColor': '#efe9de',
+    'secondaryBorderColor': '#e6dfd8',
+    'secondaryTextColor': '#141413',
+    'tertiaryColor': '#181715',
+    'tertiaryBorderColor': '#252320',
+    'tertiaryTextColor': '#faf9f5',
+    'lineColor': '#6c6a64',
+    'fontFamily': 'Inter, sans-serif',
+    'fontSize': '13px'
+  }
+}}%%
 flowchart TB
     subgraph frontend["React 19 SPA"]
         Dashboard["Dashboard<br/>Chat · Sources · Tabs"]
@@ -397,6 +415,24 @@ flowchart TB
 **Request flow:**
 
 ```mermaid
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'background': '#faf9f5',
+    'primaryColor': '#cc785c',
+    'primaryBorderColor': '#a9583e',
+    'primaryTextColor': '#ffffff',
+    'secondaryColor': '#efe9de',
+    'secondaryBorderColor': '#e6dfd8',
+    'secondaryTextColor': '#141413',
+    'tertiaryColor': '#181715',
+    'tertiaryBorderColor': '#252320',
+    'tertiaryTextColor': '#faf9f5',
+    'lineColor': '#6c6a64',
+    'fontFamily': 'Inter, sans-serif',
+    'fontSize': '13px'
+  }
+}}%%
 sequenceDiagram
     participant User as User
     participant FE as React 19 SPA
