@@ -1421,29 +1421,6 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                 }
             },
         }),
-
-        // ── update_todos ─────────────────────────────────────────────────
-        update_todos: (tool as any)({
-            description: 'Display or update a dynamic todo list visible to the user. ' +
-                'Call this at the start of a multi-step task to show your plan with all steps as "pending", ' +
-                'then call it again as you complete each step — update the current step to "in_progress" ' +
-                'and finished steps to "completed". Each call replaces the entire list.',
-            parameters: z.object({
-                items: z.array(z.object({
-                    id: z.string().describe('Unique identifier (e.g. "1", "2", "search", "analyze")'),
-                    content: z.string().describe('Description of what needs to be done (e.g. "Search for recent papers")'),
-                    status: z.enum(['pending', 'in_progress', 'completed']).describe('Current status'),
-                })).describe('Full todo list — replaces any previous list'),
-            }),
-            execute: async ({ items }: any) => {
-                const event = { type: "todos", items };
-                if (!res.writableEnded) {
-                    res.write(`event: todos\ndata: ${JSON.stringify({ items })}\n\n`);
-                }
-                if (state?.thoughtProcess) state.thoughtProcess.push(event);
-                return `Todo list updated with ${items.length} items.`;
-            },
-        }),
     };
 }
 
@@ -1983,11 +1960,6 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                 if (!res.writableEnded) res.write(`event: thought\ndata: ${JSON.stringify(ev)}\n\n`);
             },
             get writableEnded() { return res.writableEnded; },
-            writeTodos: (items) => {
-                const ev = { type: 'todos', items };
-                agentState.thoughtProcess.push(ev);
-                if (!res.writableEnded) res.write(`event: todos\ndata: ${JSON.stringify({ items })}\n\n`);
-            },
         };
 
         // ── Run orchestrator for complex workflows ─────────────────────────
@@ -2164,7 +2136,6 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                         .replace(/<FOLLOW_UPS>[\s\S]*/gi, '')
                         .replace(/<\/?FOLLOW_UPS>/gi, '')
                         .replace(/<\/?question>/gi, '')
-                        .trim();
                     if (clean) {
                         if (toolResultSeen) {
                             writeSafeSSE(res, clean);
@@ -2309,10 +2280,10 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                     const searchUrls = agentState.sources.map((s: any) => s.url).join('\n');
                     const docQuery = `Create a ${docIntent} about: ${topic}\n\nSearch results for reference:\n${searchUrls}`;
                     console.log(`[AUTO-DOC] Generating ${docIntent} for "${topic}" with ${agentState.sources.length} sources`);
+                    sendStatus(res, 'reading_skill', `Reading the ${docIntent.toUpperCase()} skill`, undefined, agentState.thoughtProcess);
                     const skillFile = SKILL_REGISTRY[docIntent]?.fileName;
                     const skillContent = skillFile ? await fetchSkillFile(skillFile) : '';
-                    sendStatus(res, 'reading_skill', `Reading the ${docIntent.toUpperCase()} skill`, { docType: docIntent, loaded: !!skillContent }, agentState.thoughtProcess);
-                    sendStatus(res, 'generating_file', `Building your ${docIntent.toUpperCase()} on "${topic.slice(0, 30)}"...`, { docType: docIntent, topic }, agentState.thoughtProcess);
+                    sendStatus(res, 'generating_file', `Building your ${docIntent.toUpperCase()} on "${topic.slice(0, 30)}"...`, undefined, agentState.thoughtProcess);
                     try {
                         const file = await generateDocumentWithSkill(docIntent as any, docQuery, model, skillContent);
                         if (file) {
@@ -2501,9 +2472,9 @@ app.post('/api/chat-sdk', middleware, async (req: any, res: any) => {
         const noopRes: any = {
             writableEnded: false,
             write: () => true,
-            end: () => {},
-            flush: () => {},
-            on: () => {},
+            end: () => { },
+            flush: () => { },
+            on: () => { },
         };
         const agentState: AgentState = { sources: [], generatedFiles: [], thoughtProcess: [] };
         const tools = createFluxTools(noopRes, model, agentState, nq);
@@ -2869,7 +2840,7 @@ app.get("/news/search", middleware, async (req: any, res: any) => {
 });
 
 // ── AI ARTICLE SUMMARY ──────────────────────────────────────
-app.post("/summarize", middleware, aiLimiter, async (req: any, res: any) => {
+app.post("/summarize", middleware, async (req: any, res: any) => {
     const { url, title, content } = req.body ?? {};
     if (!title && !content) {
         return res.status(400).json({ error: "title or content required" });
@@ -2900,7 +2871,7 @@ app.post("/summarize", middleware, aiLimiter, async (req: any, res: any) => {
             }
         }
 
-        const system = "You are a skilled news summarizer. Given a news article title, source URL, and full text, produce a concise, well-structured bilingual summary in Markdown. Write the summary in the user's language (default English). Use ### section headings, bullet points for key takeaways, and short paragraphs. Keep it factual, objective, and cover the core claims, evidence, and context. Do not editorialize.";
+        const system = `... (system prompt) ...`;
 
         const userMsg = [
             `Title: ${title}`,

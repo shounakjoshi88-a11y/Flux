@@ -9,8 +9,8 @@ import { calculateTrustScore } from "@/utils/TrustScore";
 type IProps = { cls?: string };
 const S = ({ cls = "", children }: { cls?: string; children: React.ReactNode }) => (
   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"
-       strokeLinecap="round" strokeLinejoin="round"
-       className={`size-4 shrink-0 ${cls}`}>{children}</svg>
+    strokeLinecap="round" strokeLinejoin="round"
+    className={`size-4 shrink-0 ${cls}`}>{children}</svg>
 );
 
 // Search — offset circle for visual weight, thick angled handle
@@ -272,7 +272,7 @@ export function TimelineNode({
           <div className={`${lineWidth} flex-1 ${lineColor}`} />
           <div className="flex items-center justify-center h-4 w-4 shrink-0 mb-2">
             <svg viewBox="0 0 14 14" className="size-3.5 text-[var(--text-secondary)]" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="7" cy="7" r="5.5" strokeWidth="1.5" />
+              <circle cx="7" cy="7" r="5.5" strokeWidth="1" />
               <polyline points="3,7 6,10 11,4" />
             </svg>
           </div>
@@ -386,9 +386,8 @@ function ThoughtBlock({
                 Thinking{elapsedSeconds != null ? ` · ${elapsedSeconds}s` : ""}
               </span>
               <ChevronDown
-                className={`size-3.5 text-[var(--text-muted)] transition-transform duration-200 ${
-                  open ? "rotate-180" : "rotate-0"
-                }`}
+                className={`size-3.5 text-[var(--text-muted)] transition-transform duration-200 ${open ? "rotate-180" : "rotate-0"
+                  }`}
               />
             </>
           )}
@@ -415,9 +414,8 @@ function ThoughtBlock({
                 >
                   <div className="flex flex-col items-center shrink-0 w-2.5 self-stretch">
                     <span
-                      className={`mt-[5px] size-[4px] rounded-full shrink-0 ${
-                        isAnimating ? "bg-[var(--accent)]" : "bg-[var(--text-secondary)]/40"
-                      }`}
+                      className={`mt-[5px] size-[4px] rounded-full shrink-0 ${isAnimating ? "bg-[var(--accent)]" : "bg-[var(--text-secondary)]/40"
+                        }`}
                     />
                     {hasLineBelow && (
                       <div className="w-px flex-1 mt-1 min-h-[10px] bg-[var(--text-muted)]/15" />
@@ -425,11 +423,10 @@ function ThoughtBlock({
                   </div>
 
                   <div
-                    className={`text-[13px] leading-relaxed pb-2.5 min-w-0 flex-1 ${
-                      isAnimating ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]/80"
-                    }`}
+                    className={`text-[13px] leading-relaxed pb-2.5 min-w-0 flex-1 ${isAnimating ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]/80"
+                      }`}
                   >
-                    <MessageRenderer content={text || ""} onCitationClick={() => {}} sources={[]} />
+                    <MessageRenderer content={text || ""} onCitationClick={() => { }} sources={[]} />
                     {isAnimating && (
                       <span
                         className="inline-block w-px h-[13px] bg-[var(--text-secondary)] ml-0.5 align-middle"
@@ -498,11 +495,10 @@ export function StatusMessage({
       >
         {source && (
           <span
-            className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium mt-1 ${
-              isOWM
-                ? "border-[var(--accent)]/20 bg-[var(--accent)]/8 text-[var(--accent)]/80"
-                : "border-teal-500/30 bg-teal-500/8 text-teal-400/80"
-            }`}
+            className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium mt-1 ${isOWM
+              ? "border-[var(--accent)]/20 bg-[var(--accent)]/8 text-[var(--accent)]/80"
+              : "border-teal-500/30 bg-teal-500/8 text-teal-400/80"
+              }`}
           >
             <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className="size-3 shrink-0">
               <circle cx="6" cy="4.5" r="2" />
@@ -593,10 +589,10 @@ export function StatusMessage({
       <StepRow rightSlot={rightSlot}
         icon={
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"
-               strokeLinecap="round" strokeLinejoin="round"
-               className={`size-5 shrink-0 ${isActive ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]/40'}`}>
+            strokeLinecap="round" strokeLinejoin="round"
+            className={`size-5 shrink-0 ${isActive ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]/40'}`}>
             <rect x="2.5" y="10" width="3" height="7.5" rx="0.5" />
-            <rect x="8.5" y="6"  width="3" height="11.5" rx="0.5" />
+            <rect x="8.5" y="6" width="3" height="11.5" rx="0.5" />
             <rect x="14.5" y="2.5" width="3" height="15" rx="0.5" />
             <line x1="1.5" y1="18" x2="18.5" y2="18" strokeWidth="1.2" />
           </svg>
@@ -627,14 +623,14 @@ export function StatusMessage({
         <StepRow rightSlot={rightSlot}
           icon={
             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"
-                 strokeLinecap="round" strokeLinejoin="round"
-                 className={`size-5 shrink-0 ${isActive ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]/40'}`}>
+              strokeLinecap="round" strokeLinejoin="round"
+              className={`size-5 shrink-0 ${isActive ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]/40'}`}>
               <path d="M5 2.5h7l3.5 3.5V17a1 1 0 0 1-1-1H5a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1z" />
               <polyline points="12,2.5 12,6 15.5,6" />
-              <line x1="7" y1="9.5"  x2="13" y2="9.5"  strokeWidth="1.2" />
+              <line x1="7" y1="9.5" x2="13" y2="9.5" strokeWidth="1.2" />
               <line x1="7" y1="12.5" x2="11" y2="12.5" strokeWidth="1.2" />
-              <line x1="15.5" y1="12"   x2="15.5" y2="14"   strokeWidth="1.3" />
-              <line x1="14.5" y1="13"   x2="16.5" y2="13"   strokeWidth="1.3" />
+              <line x1="15.5" y1="12" x2="15.5" y2="14" strokeWidth="1.3" />
+              <line x1="14.5" y1="13" x2="16.5" y2="13" strokeWidth="1.3" />
             </svg>
           }
           message={status.message}
@@ -663,7 +659,6 @@ export function StatusMessage({
   // ─── reading_skill — model is loading generation rules for a doc type ───
   if (status.subtype === 'reading_skill') {
     const docType: string = status.data?.docType ?? '';
-    const loaded: boolean = status.data?.loaded ?? false;
     return (
       <div className="py-2 w-full">
         <div className="flex items-start gap-1 w-full">
@@ -676,7 +671,7 @@ export function StatusMessage({
           {docType && (
             <span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--accent)]/20 bg-[var(--accent)]/5 text-[var(--accent)]/80 px-2 py-0.5 text-[11px] font-medium">
               <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.4"
-                   strokeLinecap="round" className="size-2.5 shrink-0">
+                strokeLinecap="round" className="size-2.5 shrink-0">
                 <path d="M2 1h6v8H2z" /><line x1="3.5" y1="3.5" x2="6.5" y2="3.5" strokeWidth="1" />
                 <line x1="3.5" y1="5.5" x2="5.5" y2="5.5" strokeWidth="1" />
               </svg>
@@ -692,7 +687,7 @@ export function StatusMessage({
         </div>
         {detailOpen && docType && (
           <div className="mt-1.5 text-[12px] text-[var(--text-muted)] leading-relaxed">
-            Loaded <span className="text-[var(--text-secondary)] font-medium">{docType.toUpperCase()}</span> generation rules{loaded ? '' : ' (from cache)'} — templates, layout guidelines, and content structure for building the document.
+            Loaded <span className="text-[var(--text-secondary)] font-medium">{docType.toUpperCase()}</span> generation rules — the model will follow these formatting guidelines when building the document.
           </div>
         )}
         {isLast && (
