@@ -362,7 +362,7 @@ bunx prisma migrate dev --name init
     'fontSize': '13px'
   }
 }}%%
-flowchart TB
+flowchart LR
     subgraph frontend["React 19 SPA"]
         Dashboard["Dashboard<br/>Chat · Sources · Tabs"]
         Sidebar["Sidebar<br/>Search · History · News"]
@@ -379,34 +379,34 @@ flowchart TB
         Voice["POST /api/tts<br/>GET /api/tts/voices"]
     end
 
-    subgraph agentic["Agentic Loop (max 8 steps)"]
-        direction LR
-        Plan["Plan<br/>Intent analysis"] --> Execute["Execute<br/>Tool calls"]
-        Execute --> Verify["Verify<br/>Check results"]
-        Verify --> Iterate["Iterate<br/>Retry / fallback"]
-        Iterate --> Finalize["Finalize<br/>Stream answer"]
+    subgraph agents["Agentic Loop<br/>(max 8 steps)"]
+        direction TB
+        Plan["Plan"] --> Execute["Execute"]
+        Execute --> Verify["Verify"]
+        Verify --> Iterate["Iterate"]
+        Iterate --> Finalize["Finalize"]
     end
 
     subgraph nim["NVIDIA NIM"]
-        LLM["20+ LLMs<br/>Llama 4 · Mistral ·<br/>DeepSeek · Qwen ·<br/>Nemotron · GLM · Kimi"]
-        RAG["Nemo Retriever<br/>Embed + Rerank"]
-        Safety["Nemotron<br/>Content safety"]
+        LLM["20+ LLMs"]
+        RAG["Nemo Retriever"]
+        Safety["Nemotron Safety"]
     end
 
     subgraph storage["PostgreSQL + pgvector"]
-        PrismaDB["Prisma ORM<br/>Users · Conversations ·<br/>Messages · Memories"]
-        Vector["pgvector<br/>1024-dim embeddings<br/>HNSW index"]
+        PrismaDB["Prisma ORM"]
+        Vector["Vector Search"]
     end
 
     subgraph services["External Services"]
-        Tavily["Tavily API<br/>Web search"]
-        Supabase["Supabase<br/>Auth · OAuth"]
-        Bonsai["Bonsai<br/>Image generation"]
-        Weather["OpenWeatherMap<br/>Open-Meteo"]
+        Tavily["Tavily Search"]
+        Supabase["Supabase Auth"]
+        Bonsai["Image Gen"]
+        Weather["Weather"]
     end
 
-    frontend -->|"HTTP / SSE"| backend
-    backend --> agentic
+    frontend -->|HTTP / SSE| backend
+    backend --> agents
     backend --> nim
     backend --> storage
     backend --> services
