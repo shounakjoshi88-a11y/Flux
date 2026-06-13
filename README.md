@@ -348,39 +348,39 @@ bunx prisma migrate dev --name init
   'theme': 'base',
   'themeVariables': {
     'background': '#faf9f5',
-    'primaryColor': '#cc785c',
-    'primaryBorderColor': '#a9583e',
-    'primaryTextColor': '#ffffff',
+    'primaryColor': '#f5f0e8',
+    'primaryBorderColor': '#e6dfd8',
+    'primaryTextColor': '#141413',
     'secondaryColor': '#efe9de',
     'secondaryBorderColor': '#e6dfd8',
     'secondaryTextColor': '#141413',
-    'tertiaryColor': '#181715',
-    'tertiaryBorderColor': '#252320',
-    'tertiaryTextColor': '#faf9f5',
-    'lineColor': '#6c6a64',
+    'tertiaryColor': '#faf9f5',
+    'tertiaryBorderColor': '#e6dfd8',
+    'tertiaryTextColor': '#141413',
+    'lineColor': '#8e8b82',
     'fontFamily': 'Inter, sans-serif',
     'fontSize': '13px'
   }
 }}%%
 flowchart LR
     subgraph frontend["React 19 SPA"]
-        Dashboard["Dashboard<br/>Chat · Sources · Tabs"]
-        Sidebar["Sidebar<br/>Search · History · News"]
-        Auth["Auth<br/>Google / GitHub OAuth"]
-        Settings["Settings<br/>Theme · Models"]
-        Artifacts["Artifacts<br/>Generated files gallery"]
+        Dashboard["Dashboard · Chat · Sources"]
+        Sidebar["Sidebar · Search · History"]
+        Auth["Google / GitHub OAuth"]
+        Settings["Settings · Theme · Models"]
+        Artifacts["Artifacts Gallery"]
     end
 
     subgraph backend["Express 5 (Bun)"]
-        FluxAsk["POST /flux_ask<br/>SSE streaming"]
-        Conv["GET /conversations<br/>POST /conversation/:id"]
-        Memory["GET /memories<br/>DELETE /memories/:id"]
-        News["GET /news<br/>POST /summarize"]
-        Voice["POST /api/tts<br/>GET /api/tts/voices"]
+        FluxAsk["POST /flux_ask · SSE streaming"]
+        Conv["Conversations CRUD"]
+        Memory["Memories · Vector search"]
+        News["News · Summarize · Proxy"]
+        Voice["TTS · ASR"]
     end
 
-    subgraph agents["Agentic Loop<br/>(max 8 steps)"]
-        direction TB
+    subgraph agents["Agentic Loop (max 8 steps)"]
+        direction LR
         Plan["Plan"] --> Execute["Execute"]
         Execute --> Verify["Verify"]
         Verify --> Iterate["Iterate"]
@@ -390,7 +390,7 @@ flowchart LR
     subgraph nim["NVIDIA NIM"]
         LLM["20+ LLMs"]
         RAG["Nemo Retriever"]
-        Safety["Nemotron Safety"]
+        Safety["Content Safety"]
     end
 
     subgraph storage["PostgreSQL + pgvector"]
@@ -398,10 +398,10 @@ flowchart LR
         Vector["Vector Search"]
     end
 
-    subgraph services["External Services"]
-        Tavily["Tavily Search"]
-        Supabase["Supabase Auth"]
-        Bonsai["Image Gen"]
+    subgraph services["External"]
+        Tavily["Web Search"]
+        Supabase["Auth"]
+        Bonsai["Images"]
         Weather["Weather"]
     end
 
@@ -419,16 +419,16 @@ flowchart LR
   'theme': 'base',
   'themeVariables': {
     'background': '#faf9f5',
-    'primaryColor': '#cc785c',
-    'primaryBorderColor': '#a9583e',
-    'primaryTextColor': '#ffffff',
+    'primaryColor': '#f5f0e8',
+    'primaryBorderColor': '#e6dfd8',
+    'primaryTextColor': '#141413',
     'secondaryColor': '#efe9de',
     'secondaryBorderColor': '#e6dfd8',
     'secondaryTextColor': '#141413',
-    'tertiaryColor': '#181715',
-    'tertiaryBorderColor': '#252320',
-    'tertiaryTextColor': '#faf9f5',
-    'lineColor': '#6c6a64',
+    'tertiaryColor': '#faf9f5',
+    'tertiaryBorderColor': '#e6dfd8',
+    'tertiaryTextColor': '#141413',
+    'lineColor': '#8e8b82',
     'fontFamily': 'Inter, sans-serif',
     'fontSize': '13px'
   }
