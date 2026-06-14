@@ -392,7 +392,7 @@ export class OrchestratorEngine {
 function detectSimpleDocType(query: string): string | null {
   const q = query.toLowerCase();
   if (/\bpptx\b|\bpowerpoint\b|\bpresentation\b|\bslide\b/.test(q)) return "pptx";
-  if (/\bdocx\b|\bword\b|\bdocument\b/.test(q)) return "docx";
+  if (/\bdocx\b|\bword document\b/.test(q)) return "docx";
   if (/\bxlsx\b|\bexcel\b|\bspreadsheet\b|\bsheet\b/.test(q)) return "xlsx";
   if (/\bcsv\b/.test(q)) return "csv";
   if (/\btsv\b/.test(q)) return "tsv";
@@ -400,7 +400,7 @@ function detectSimpleDocType(query: string): string | null {
   if (/\bjson\b/.test(q)) return "json";
   if (/\bsql\b/.test(q)) return "sql";
   if (/\bhtml\b/.test(q)) return "html";
-  if (/\bpdf\b/.test(q)) return "pdf";
+  if (/\bpdf\b|\bpdf document\b/.test(q)) return "pdf";
   return null;
 }
 
@@ -410,7 +410,7 @@ function extractTopicFromQuery(query: string): string {
   );
   if (match) return match[1]!.trim();
   const docPhrase = query.match(
-    /(?:create|generate|make|build|write|produce)\s+(?:a|an|the|some|me)\s+(?:pdf|pptx|docx|xlsx|csv|tsv|md|json|sql|html|powerpoint|presentation|slide|word|excel|spreadsheet|document)\s+(.+)/i
+    /(?:create|generate|make|build|write|produce)\s+(?:a|an|the|some|me)\s+(?:pdf|pptx|docx|xlsx|csv|tsv|md|json|sql|html|powerpoint|presentation|slide|word|excel|spreadsheet|pdf document|word document)\s+(.+)/i
   );
   if (docPhrase) {
     return docPhrase[1]!.trim().replace(/^(?:about|on|for|of|covering|titled|called|with)\s+/i, "").slice(0, 100);
