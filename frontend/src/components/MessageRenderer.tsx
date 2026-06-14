@@ -23,53 +23,116 @@ const loadMermaid = async () => {
 /**
  * Advanced LaTeX Repair Engine
  * Transforms common LLM "noisy" or "dirty" LaTeX into production-grade KaTeX.
+ *
+ * Fixed issues:
+ *  1.  \[-2pt] → \\[-2pt]           (dimension-adjusted newlines)
+ *  2.  \Biggl{ → \Biggl\{           (unescaped big delimiters)
+ *  3.  \substack{\\[-2pt]…} → matrix (KaTeX-safe, strips unsupported dim args)
+ *  4.  \int{0} / \sum{n} / \prod{j} → \int_{0} / \sum_{n} / \prod_{j}
+ *  5.  \text{lim}; → \lim
+ *  6a. ^{,n} → ^{n}                 (leading comma in exponent/subscript)
+ *  6b. i,n_j → i\,n_j              (comma → thin space in math)
+ *  7.  \operatorname{Li}{,n} → \operatorname{Li}_{n}  (missing _ on operatorname)
+ *      X{,n} → X_{n}               (general missing-_ subscript)
+ *  8.  \sin! / \Gamma! / \exp! → \sin / \Gamma / \exp
+ *      (function-application ! on operators, only when followed by delimiter)
+ *  9.  !!!!! → \!\!\!\!\!           (noisy negative spacing)
+ * 10.  bare lim/sin/… → \lim/\sin/… (missing leading backslash)
+ * 11.  |{F}^2 → |_{F}^2            (Frobenius-norm subscript)
+ *      ||T|| → \|T\|               (double-pipe norm)
+ * 12.  ;dx → \,dx                  (semicolon before differential)
+ *      -;\frac → -\frac            (semicolon as space after sign)
+ *      ; before major cmds → \;
+ *      ; before \\ or at end → strip
  */
 function repairLatex(formula: string): string {
   if (!formula) return "";
 
-  let repaired = formula
-    // 1. Fix malformed newlines: \[-2pt] -> \\[-2pt]
+  let s = formula
+
+    // ── 1. Dimension-adjusted newlines: \[-2pt] → \\[-2pt] ─────────────────
     .replace(/(?<!\\)\\\[(-?\d+(?:pt|em|ex|cm|mm|in|pc|px|vh|vw|vmin|vmax))\]/g, "\\\\\[$1\]")
 
-    // 2. Fix unescaped Big braces: \Biggl{ -> \Biggl\{
+    // ── 2. Unescaped Big delimiters: \Biggl{ → \Biggl\{  ───────────────────
     .replace(/\\(big|Big|bigg|Bigg)(l|r)\{/g, "\\$1$2\\{")
     .replace(/\\(big|Big|bigg|Bigg)(l|r)\}/g, "\\$1$2\\}")
 
-    // 3. Fix substack stability: convert to matrix if vertical spacing is used
-    .replace(/\\substack\{([\s\S]*?)\}/g, (m, content) => {
+    // ── 3. Substack with spacing args → matrix (KaTeX-safe) ─────────────────
+    //    Also strips unsupported \\[-2pt] dimension args from row breaks.
+    .replace(/\\substack\{([\s\S]*?)\}/g, (_, content) => {
       if (content.includes("\\\\")) {
-        return `\\begin{matrix} ${content} \\end{matrix}`;
+        const cleaned = content.replace(
+          /\\\\(\[-?\d+(?:pt|em|ex|cm|mm|in|pc|px)\])/g,
+          "\\\\"
+        );
+        return `\\begin{matrix} ${cleaned} \\end{matrix}`;
       }
-      return m;
+      return `\\substack{${content}}`;
     })
 
-    // 4. Fix naked integral limits: \int{0}^{\infty} -> \int_{0}^{\infty}
-    .replace(/\\int\{/g, "\\int_{")
+    // ── 4. Naked subscript-less limits ──────────────────────────────────────
+    //    \int{0} → \int_{0},  \sum{n} → \sum_{n},  \prod{j} → \prod_{j}
+    .replace(/\\(int|oint|iint|iiint|sum|prod)\{/g, "\\$1_{")
 
-    // 5. Fix common operator hallucinations: \text{lim}; -> \lim
-    .replace(/\\text\{lim\};/g, "\\lim")
+    // ── 5. Operator text-form with stray semicolon: \text{lim}; → \lim ─────
+    .replace(/\\text\{lim\}\s*;?/g, "\\lim")
     .replace(/\\lim\s*;/g, "\\lim")
 
-    // 6. Fix spacing commas: i,n_j -> i\,n_j (Support },)
+    // ── 6a. Leading comma in exponent/subscript: ^{,n} → ^{n} ───────────────
+    .replace(/([_^])\{,\s*/g, "$1{")
+
+    // ── 6b. Comma used as thin space: i,n_j → i\,n_j ────────────────────────
     .replace(/([a-zA-Z0-9}])\s*,\s*([a-zA-Z\\{])/g, "$1\\, $2")
 
-    // 7. Fix specific polylog/function hallucination: Li{,n_j} -> Li_{n_j}
-    .replace(/Li\{,([a-zA-Z0-9_]+)\}/g, "Li_{$1}")
+    // ── 7. Missing _ after operatorname / general X{,n} → X_{n} ─────────────
+    .replace(/(\\operatorname\{[^}]+\})\{,\s*([^}]+)\}/g, "$1_{$2}")
+    .replace(/([A-Za-z])\{,\s*([^}]+)\}/g, "$1_{$2}")
 
-    // 8. Fix "noisy" spacing: !!!!! -> \! \! \! \! \!
+    // ── 8. Function-application ! on Greek letters & operators ───────────────
+    //    \Gamma!\Bigl → \Gamma\Bigl  (only strip ! when followed by a delimiter)
+    .replace(
+      /\\(Gamma|Delta|Theta|Lambda|Xi|Pi|Sigma|Upsilon|Phi|Psi|Omega|alpha|beta|gamma|delta|epsilon|varepsilon|zeta|eta|theta|iota|kappa|lambda|mu|nu|xi|pi|rho|sigma|tau|upsilon|phi|varphi|chi|psi|omega|sin|cos|tan|cot|sec|csc|arcsin|arccos|arctan|sinh|cosh|tanh|log|ln|exp|det|deg|gcd|min|max|lim|sup|inf)!(?=\s*[\\({\[])/g,
+      "\\$1"
+    )
+
+    // ── 9. Multiple ! → negative thin space: !!!!! → \!\!\!\!\! ─────────────
     .replace(/!{2,}/g, (m) => m.split("").map(() => "\\!").join(" "))
-    .replace(/exp!/g, "exp\\!")
+    // bare exp! (no backslash) → exp\!
+    .replace(/(?<!\\)exp!/g, "exp\\!")
 
-    // 9. Fix missing backslashes on math operators
-    .replace(/(?<!\\)\b(lim|sin|cos|tan|log|exp|det|deg|gcd|min|max|inf|sup)\b(?=\s*[_^{])/g, "\\$1")
+    // ── 10. Missing backslashes on bare operators ─────────────────────────────
+    .replace(
+      /(?<!\\)\b(lim|sin|cos|tan|log|exp|det|deg|gcd|min|max|inf|sup)\b(?=\s*[_^{(])/g,
+      "\\$1"
+    )
 
-    // 10. Fix unescaped Frobenius/Norm typos: ||T|| -> \| T \|
+    // ── 11. Frobenius / subscript after pipe: |{F}^2 → |_{F}^2 ─────────────
+    .replace(/(\|)\{([A-Za-z0-9]+)\}/g, "$1_{$2}")
+    // Unescaped double-pipe norm: ||T|| → \|T\|
     .replace(/(?<!\\)\|\|/g, "\\|")
 
-    // 11. Clean up weird semicolons before newlines
+    // ── 12. Semicolons used as LaTeX spacing ──────────────────────────────────
+    // ;dx → \,dx  (standard thin space before differential)
+    .replace(/;\s*(d[a-zA-Z]\b)/g, "\\,$1")
+    // -;expr or +;expr → just the operator  (spurious thick space after sign)
+    .replace(/([-+])\s*;/g, "$1")
+    // ; before major math commands → thick space \;
+    .replace(
+      /;\s*(\\frac|\\sum|\\prod|\\int|\\lim|\\exp|\\bigg|\\Big|\\left|\\right)/g,
+      "\\; $1"
+    )
+    // ; immediately before LaTeX newline or at end of expression → strip
     .replace(/;(\s*\\\\|\s*$)/g, "$1");
 
-  return repaired.trim();
+  // ── 13. Strip bare dimension arguments (LLM hallucinations) ────────────────
+  // Removes things like [-2pt], [12pt] that are not preceded by a backslash.
+  // Rule 1 already turned \[-2pt] into \\[-2pt], so what remains is garbage.
+  s = s.replace(
+    /(?<!\\)\[(-?\d+(?:pt|em|ex|cm|mm|in|pc|px|vh|vw|vmin|vmax))\s*\]/g,
+    ""
+  );
+
+  return s.trim();
 }
 
 // ─── Math Components ──────────────────────────────────────
@@ -480,7 +543,7 @@ function renderBlocks(text: string, onCitationClick: any, sources: Source[]) {
 
   // Identify indestructible blocks globally first
   // Note: Negative lookahead (?!-?\d+pt) protects \[ dimensions from being treated as math blocks
-  const indestructibleRegex = /(<(CHART|MERMAID|svg)(?:\s+[^>]*)?>[\s\S]*?<\/\2>|```[a-z]*[\s\S]*?```|\\begin\{([a-z*]+)\}[\s\S]*?\\end\{\3\}|\$\$[\s\S]+?\$\$|(?<!\\)\\\[(?!-?\d+pt)[\s\S]+?\\\])/gi;
+  const indestructibleRegex = /(<(CHART|MERMAID|svg)(?:\s+[^>]*)?>[\s\S]*?<\/\2>|```[a-z]*[\s\S]*?```|\\begin\{([a-z*]+)\}[\s\S]*?\\end\{\3\}|\$\$[\s\S]+?\$\!|(?<!\\)\\\[(?!-?\d+pt)[\s\S]+?\\\])/gi;
 
   const parts = splitWithDelimiters(text, indestructibleRegex);
 
