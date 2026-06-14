@@ -465,7 +465,7 @@ function InlineGenerationIndicator({
   }
 
   return (
-    <div className="mt-3 group/gen border-l-2 border-stone-700/50 ml-2 pl-4 py-1">
+    <div className="mt-3 group/gen ml-2 pl-4 py-1">
       <div
         className="flex items-center gap-2 cursor-pointer select-none py-1"
         onClick={() => setIsOpen(!isOpen)}

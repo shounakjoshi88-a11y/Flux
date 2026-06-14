@@ -146,13 +146,13 @@ Documents are built server-side by LLM-driven generation with format-specific sk
 <br>
 The AI autonomously orchestrates tool calls to answer your queries:
 
-- **Web Search** — Real-time search via Tavily with source attribution
+- **Web Search** — Real-time search via Tavily with full-page content extraction and source attribution
 - **Document Generation** — Create files in 10 formats from natural language
 - **Weather Lookup** — Current conditions via OpenWeatherMap + Open-Meteo
 - **Image Generation** — Produce images via local Bonsai inference service
 - **Skill Reading** — Load format-specific skill prompts for better output quality
 
-Up to 8 autonomous reasoning steps per query, with dynamic system prompting and forced answer fallback.
+Up to 8 autonomous reasoning steps per query, with plan-verify-iterate agentic loop, dynamic system prompting, forced answer fallback, and search guardrails to prevent spurious queries.
 </details>
 
 <details>
@@ -203,7 +203,7 @@ Multi-source news reader built right in:
 <br>
 
 - **Searchable History** — Full-text search across all conversations with PostgreSQL FTS + trigram fuzzy matching
-- **Auto-Titling** — Conversations are automatically renamed based on content
+- **Auto-Titling** — Conversations automatically renamed via dedicated small LLM (Nemotron Mini 4B) with 5–10 word titles
 - **Time Grouping** — Sidebar groups conversations by Today, Yesterday, This Week, etc.
 - **Undo Delete** — Deleted conversations can be restored via toast notification
 - **Artifacts Gallery** — Browse every generated file across all conversations in one place
@@ -345,46 +345,45 @@ bunx prisma migrate dev --name init
 
 ```mermaid
 flowchart LR
-    subgraph frontend["React 19 SPA"]
-        Dashboard["Dashboard · Chat · Sources · Tabs"]
-        Sidebar["Sidebar · Search · History · News"]
-        Auth["Auth · Google / GitHub OAuth"]
-        Settings["Settings · Theme · Models"]
-        Artifacts["Artifacts · Generated files gallery"]
+    subgraph frontend[React 19 SPA]
+        Dashboard[Dashboard - Chat - Sources - Tabs]
+        Sidebar[Sidebar - Search - History - News]
+        Auth[Auth - Google / GitHub OAuth]
+        Settings[Settings - Theme - Models]
+        Artifacts[Artifacts - Generated files gallery]
     end
 
-    subgraph backend["Express 5 (Bun)"]
-        FluxAsk["POST /flux_ask · SSE streaming"]
-        Conv["GET /conversations · POST /conversation/:id"]
-        Memory["GET /memories · DELETE /memories/:id"]
-        News["GET /news · POST /summarize"]
-        Voice["POST /api/tts · GET /api/tts/voices"]
+    subgraph backend[Express 5 - Bun]
+        FluxAsk[POST /flux_ask - SSE streaming]
+        Conv[REST - Conversations CRUD]
+        Memory[REST - Memories]
+        News[REST - News + Summarize]
+        Voice[POST /api/tts - GET /api/tts/voices]
     end
 
-    subgraph agentic["Agentic Loop (max 8 steps)"]
-        direction LR
-        Plan["Plan · Intent analysis"] --> Execute["Execute · Tool calls"]
-        Execute --> Verify["Verify · Check results"]
-        Verify --> Iterate["Iterate · Retry / fallback"]
-        Iterate --> Finalize["Finalize · Stream answer"]
+    subgraph agentic[Agentic Loop - max 8 steps]
+        Plan[Plan - Intent analysis] --> Execute[Execute - Tool calls]
+        Execute --> Verify[Verify - Check results]
+        Verify --> Iterate[Iterate - Retry or fallback]
+        Iterate --> Finalize[Finalize - Stream answer]
     end
 
-    subgraph nim["NVIDIA NIM"]
-        LLM["20+ LLMs · Llama 4 · Mistral · DeepSeek · Qwen · Nemotron · GLM · Kimi"]
-        RAG["Nemo Retriever · Embed + Rerank"]
-        Safety["Nemotron · Content safety"]
+    subgraph nim[NVIDIA NIM]
+        LLM[20+ LLMs - Llama 4 - Mistral - DeepSeek - Qwen - Nemotron - GLM - Kimi]
+        RAG[Nemo Retriever - Embed + Rerank]
+        Safety[Nemotron - Content safety]
     end
 
-    subgraph storage["PostgreSQL + pgvector"]
-        PrismaDB["Prisma ORM · Users · Conversations · Messages"]
-        Vector["pgvector · 1024-dim embeddings · HNSW index"]
+    subgraph storage[PostgreSQL + pgvector]
+        PrismaDB[Prisma ORM - Users - Conversations - Messages]
+        Vector[pgvector - 1024-dim embeddings - HNSW index]
     end
 
-    subgraph services["External Services"]
-        Tavily["Tavily · Web search"]
-        Supabase["Supabase · Auth OAuth"]
-        Bonsai["Bonsai · Image generation"]
-        Weather["OpenWeatherMap · Open-Meteo"]
+    subgraph services[External Services]
+        Tavily[Tavily - Web search]
+        Supabase[Supabase - Auth OAuth]
+        Bonsai[Bonsai - Image generation]
+        Weather[OpenWeatherMap - Open-Meteo]
     end
 
     frontend -->|chat request + JWT| backend
@@ -407,10 +406,10 @@ flowchart LR
 
 The `/flux_ask` endpoint orchestrates up to 8 reasoning steps:
 
-1. **Plan** — Analyze user intent and select tools
-2. **Execute** — Run web search, document generation, weather, image gen, or read skills
-3. **Verify** — Check if results meet criteria (has sources, files, or sufficient content)
-4. **Iterate** — If verification fails, retry the same tool or try alternatives
+1. **Plan** — Analyze user intent via regex intent patterns and select appropriate workflow (code, analysis, weather, document, image, or simple QA)
+2. **Execute** — Run web search with Tavily, full-page content extraction via extract API, document generation, weather, image gen, or read skills
+3. **Verify** — Independent verification phase that synthesizes search results into a cited answer; checks for URL-only output and retries with synthesis if needed
+4. **Iterate** — If verification fails, retry the same tool or try alternatives (up to 3 retries per phase)
 5. **Finalize** — Stream final answer with sources, follow-up questions, and artifacts
 
 **SSE Events Streamed:**
@@ -604,7 +603,7 @@ Flux uses a **warm, minimal design language** inspired by Anthropic's Claude:
 
 **Color Palette:**
 - **Canvas:** `#faf9f5` — Warm cream background (primary surface)
-- **Primary:** `#cc785c` — Coral accents for CTAs and highlights
+- **Primary:** `#cc785c` — Coral brand accent used on CTAs, highlights, tab underlines, and links
 - **Ink:** `#141413` — Near-black text for maximum readability
 - **Muted:** `#6c6a64` — Secondary text and borders
 - **Surface Dark:** `#181715` — Dark mode backgrounds
