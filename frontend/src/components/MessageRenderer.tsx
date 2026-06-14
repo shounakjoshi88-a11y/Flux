@@ -202,74 +202,74 @@ function formatInlineText(
   sources: Source[],
   parentKey: string
 ): React.ReactNode[] {
-  const codeSegments = text.split(/(`[^`]+`)/g);
-  return codeSegments.map((seg, segIdx) => {
-    const keyBase = `${parentKey}-s${segIdx}`;
+  // Combined regex for all inline tokens. Order of alternation defines priority.
+  // We use non-greedy matches (+?) and [\s\S] to support multi-line content if needed.
+  const inlineRegex = /(`[^`]+`|\*\*[\s\S]+?\*\*|__[\s\S]+?__|\*(?!\*)[\s\S]+?\*|_(?!_)[\s\S]+?_|\\\(.+?\\\)|\\\[.+?\\\]|\$\$.+?\$\$|\$.+?\$|\[\d+\])/g;
+  const parts = splitWithDelimiters(text, inlineRegex);
 
-    if (seg.startsWith("`") && seg.endsWith("`")) {
-      return <InlineCode key={`${keyBase}-code`}>{seg.slice(1, -1)}</InlineCode>;
+  return parts.flatMap((part, partIdx) => {
+    const key = `${parentKey}-p${partIdx}`;
+    if (part.type === "text") {
+      return linkifyUrls(part.value, key);
     }
 
-    const mathParts = splitWithDelimiters(seg, /\\\((.+?)\\\)|\$(.+?)\$/gs);
-    return mathParts.map((part, partIdx) => {
-      if (part.type === "delimiter") {
-        const inner = part.value
-          .replace(/^\\\(/, "")
-          .replace(/\\\)$/, "")
-          .replace(/^\$/, "")
-          .replace(/\$$/, "");
-        return <InlineMath key={`${keyBase}-m${partIdx}`} formula={inner} />;
-      }
+    const val = part.value;
 
-      const boldSegments = part.value.split(/(\*\*.*?\*\*)/g);
-      return boldSegments.map((boldSeg, boldIdx) => {
-        if (boldSeg.startsWith("**") && boldSeg.endsWith("**")) {
-          return (
-            <strong key={`${keyBase}-b${boldIdx}`}>
-              {formatInlineText(boldSeg.slice(2, -2), onCitationClick, sources, `${keyBase}-b${boldIdx}`)}
-            </strong>
-          );
-        }
+    // 1. Inline Code
+    if (val.startsWith("`") && val.endsWith("`")) {
+      return <InlineCode key={key}>{val.slice(1, -1)}</InlineCode>;
+    }
 
-        // Support italics (*text*) inside non-bold segments
-        const italicSegments = boldSeg.split(/(\*(?!\*)[^*]+\*)/g);
-        return italicSegments.map((italicSeg, italicIdx) => {
-          const italicKey = `${keyBase}-b${boldIdx}-i${italicIdx}`;
-          if (italicSeg.startsWith("*") && italicSeg.endsWith("*")) {
-            return (
-              <em key={`${italicKey}-em`}>
-                {formatInlineText(italicSeg.slice(1, -1), onCitationClick, sources, italicKey)}
-              </em>
-            );
-          }
+    // 2. Bold
+    if ((val.startsWith("**") && val.endsWith("**")) || (val.startsWith("__") && val.endsWith("__"))) {
+      return (
+        <strong key={key} className="font-bold text-[var(--text-primary)]">
+          {formatInlineText(val.slice(2, -2), onCitationClick, sources, key)}
+        </strong>
+      );
+    }
 
-          const citationParts = italicSeg.split(/(\[\d+\])/g);
-          return citationParts.map((cPart, cIdx) => {
-            const match = cPart.match(/^\[(\d+)\]$/);
-            if (match) {
-              const num = Number(match[1]);
-              const index = num - 1;
-              const valid = index >= 0 && index < sources.length;
-              return (
-                <button
-                  key={`${keyBase}-c${cIdx}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onCitationClick(index);
-                    if (valid && sources[index]) window.open(sources[index].url, "_blank");
-                  }}
-                  className="citation-btn text-[0.7em] align-super ml-0.5"
-                >
-                  {num}
-                </button>
-              );
-            }
-            const linkKey = `${keyBase}-c${cIdx}`;
-            return linkifyUrls(cPart, linkKey);
-          });
-        });
-      });
-    });
+    // 3. Italics
+    if ((val.startsWith("*") && val.endsWith("*")) || (val.startsWith("_") && val.endsWith("_"))) {
+      return (
+        <em key={key} className="italic">
+          {formatInlineText(val.slice(1, -1), onCitationClick, sources, key)}
+        </em>
+      );
+    }
+
+    // 4. Math
+    if (val.startsWith("\\(") || val.startsWith("$") || val.startsWith("\\[")) {
+      const inner = val
+        .replace(/^\\\(/, "").replace(/\\\)$/, "")
+        .replace(/^\\\[/, "").replace(/\\\]$/, "")
+        .replace(/^\$\$/, "").replace(/\$\$$/, "")
+        .replace(/^\$/, "").replace(/\$$/, "");
+      return <InlineMath key={key} formula={inner} />;
+    }
+
+    // 5. Citations
+    const cMatch = val.match(/^\[(\d+)\]$/);
+    if (cMatch) {
+      const num = Number(cMatch[1]);
+      const index = num - 1;
+      const valid = index >= 0 && index < sources.length;
+      return (
+        <button
+          key={key}
+          onClick={(e) => {
+            e.stopPropagation();
+            onCitationClick(index);
+            if (valid && sources[index]) window.open(sources[index].url, "_blank");
+          }}
+          className="citation-btn text-[0.7em] align-super ml-0.5"
+        >
+          {num}
+        </button>
+      );
+    }
+
+    return <span key={key}>{val}</span>;
   });
 }
 
@@ -375,78 +375,57 @@ type Segment =
 
 function extractSpecialBlocks(rawText: string): Segment[] {
   const segments: Segment[] = [];
-  let remaining = rawText;
+  // Updated regex to find balanced tags: <TAG>content</TAG>
+  // Supports <svg>...</svg>, <MERMAID>...</MERMAID>, <CHART>...</CHART>
+  const blockRegex = /<(svg|MERMAID|CHART)(?:\s+[^>]*)?>([\s\S]*?)<\/\1>/gi;
+  
+  let lastIdx = 0;
+  let match: RegExpExecArray | null;
 
-  // Helper to extract the first occurrence of a block
-  const extractBlock = (openTag: string, closeTag: string, type: Segment["type"]) => {
-    const openIdx = remaining.indexOf(openTag);
-    if (openIdx === -1) return null;
-    const closeIdx = remaining.indexOf(closeTag, openIdx + openTag.length);
-    if (closeIdx === -1) return null;
-    const content = remaining.slice(openIdx + openTag.length, closeIdx).trim();
-    const before = remaining.slice(0, openIdx);
-    const after = remaining.slice(closeIdx + closeTag.length);
-    return { before, content, after };
-  };
-
-  // Loop until no more special blocks
-  let loopGuard = 0;
-  while (loopGuard < 1000) {
-    loopGuard++;
-    const svgBlock = extractBlock("<svg", "</svg>", "svg");
-    const mermaidBlock = extractBlock("<MERMAID>", "</MERMAID>", "mermaid");
-    const chartBlock = extractBlock("<CHART>", "</CHART>", "chart");
-
-    // Find the earliest block
-    let earliest: { type: Segment["type"]; before: string; content: string; after: string } | null = null;
-    let earliestIdx = Infinity;
-
-    if (svgBlock) {
-      const idx = remaining.indexOf("<svg");
-      if (idx < earliestIdx) {
-        earliestIdx = idx;
-        earliest = { type: "svg", ...svgBlock };
-      }
-    }
-    if (mermaidBlock) {
-      const idx = remaining.indexOf("<MERMAID>");
-      if (idx < earliestIdx) {
-        earliestIdx = idx;
-        earliest = { type: "mermaid", ...mermaidBlock };
-      }
-    }
-    if (chartBlock) {
-      const idx = remaining.indexOf("<CHART>");
-      if (idx < earliestIdx) {
-        earliestIdx = idx;
-        earliest = { type: "chart", ...chartBlock };
+  while ((match = blockRegex.exec(rawText)) !== null) {
+    // 1. Add text before the match
+    if (match.index > lastIdx) {
+      const textBefore = rawText.slice(lastIdx, match.index);
+      if (textBefore.trim()) {
+        segments.push({ type: "text", value: textBefore });
       }
     }
 
-    if (!earliest) break;
+    // 2. Add the special block
+    const tagName = match[1]!.toLowerCase();
+    const content = match[2]!.trim();
 
-    // Add text before the block
-    if (earliest.before.trim()) {
-      segments.push({ type: "text", value: earliest.before });
+    if (tagName === "svg") {
+      segments.push({ type: "svg", content: match[0] }); // include tags for svg
+    } else if (tagName === "mermaid") {
+      segments.push({ type: "mermaid", content });
+    } else if (tagName === "chart") {
+      segments.push({ type: "chart", content });
     }
-    // Add the special block
-    if (earliest.type === "code") {
-        // This should not happen based on logic but for completeness
-    } else {
-        segments.push({ type: earliest.type, content: earliest.content } as Segment);
-    }
-    // Continue with the remaining text
-    remaining = earliest.after;
+
+    lastIdx = blockRegex.lastIndex;
   }
 
-  // After extracting all special blocks, process the remaining text for code blocks and plain text
-  if (remaining.trim()) {
-    // Now extract standard code blocks from remaining
-    const codeSegments = extractCodeBlocks(remaining);
-    segments.push(...codeSegments);
+  // 3. Add remaining text
+  if (lastIdx < rawText.length) {
+    const remaining = rawText.slice(lastIdx);
+    if (remaining.trim()) {
+      // Now extract standard code blocks from remaining
+      const codeSegments = extractCodeBlocks(remaining);
+      segments.push(...codeSegments);
+    }
   }
 
   return segments;
+}
+
+// ─── Strip JS-style comments from JSON ────────────────────────
+// LLMs like to emit "// comment" inside JSON. We strip them.
+function stripJsonComments(raw: string): string {
+  return raw
+    .replace(/\/\/[^\n]*/g, "")     // single-line // comments
+    .replace(/\/\*[\s\S]*?\*\//g, "") // block /* */ comments
+    .trim();
 }
 
 // ─── Original code-block extractor ────────────────────────
@@ -709,7 +688,8 @@ function renderContent(
 
       case "chart":
         try {
-          const chartData = JSON.parse(segment.content) as ChartData;
+          const cleaned = stripJsonComments(segment.content);
+          const chartData = JSON.parse(cleaned) as ChartData;
           elements.push(
             <ChartRenderer key={`chart-${segIdx}`} data={chartData} />
           );

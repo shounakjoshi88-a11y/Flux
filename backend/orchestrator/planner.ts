@@ -11,6 +11,14 @@ const CODE_RE = /\b(?:code|script|program|function|implement|deploy|debug|refact
 
 const ANALYSIS_RE = /\b(?:analyze|compare|contrast|evaluate|summarize|break down|research|investigate|deep dive)\b/i;
 
+// Diagram/chart requests with user-provided content → no search needed
+const DIAGRAM_RE = /\b(?:mermaid|diagram|flowchart|chart|graph|visualize|visualise|draw.*flow|pipeline|architecture)\b/i;
+
+// Detects that the query already has file context → skip web search
+function hasFileContext(query: string, fileContent?: string): boolean {
+  return !!(fileContent && fileContent.trim().length > 0);
+}
+
 function detectDocType(query: string): string | null {
   const q = query.toLowerCase();
   if (/\bpptx\b|\bpowerpoint\b|\bpresentation\b|\bslide\b/.test(q)) return "pptx";
@@ -43,8 +51,9 @@ function detectTopic(query: string): string {
 }
 
 export class Planner {
-  analyze(query: string, _history?: any[]): { plan: ExecutionPlan; workflow: WorkflowKind } {
+  analyze(query: string, _history?: any[], fileContent?: string): { plan: ExecutionPlan; workflow: WorkflowKind } {
     const docType = detectDocType(query);
+    const withFile = hasFileContext(query, fileContent);
 
     if (docType) {
       const topic = detectTopic(query);
@@ -111,6 +120,32 @@ export class Planner {
           userIntent: "Image generation",
           reasoning: "Two-step: enhance prompt then generate image.",
           estimatedSteps: 2,
+        },
+      };
+    }
+
+    // If user uploaded a file and asks for a diagram/chart/analysis → work from the file directly
+    if (withFile && (DIAGRAM_RE.test(query) || ANALYSIS_RE.test(query) || CODE_RE.test(query))) {
+      return {
+        workflow: "simple_qa",
+        plan: {
+          steps: [],
+          userIntent: "Analyze uploaded file",
+          reasoning: "User provided file content — analyze it directly without web search.",
+          estimatedSteps: 0,
+        },
+      };
+    }
+
+    // Diagram/chart requests without a file (the model generates from knowledge)
+    if (DIAGRAM_RE.test(query)) {
+      return {
+        workflow: "simple_qa",
+        plan: {
+          steps: [],
+          userIntent: "Generate diagram or chart",
+          reasoning: "Diagram/chart request — generate inline using CHART or MERMAID blocks.",
+          estimatedSteps: 0,
         },
       };
     }

@@ -158,6 +158,9 @@ const NIM_MODELS: Record<string, string> = {
     "qwen3.5-397b-a17b": "qwen/qwen3.5-397b-a17b",
     "step-3.5-flash": "stepfun-ai/step-3.5-flash",
     "minimax-m2.7": "minimaxai/minimax-m2.7",
+    "minimax-m3": "minimaxai/minimax-m3",
+    "deepseek-v4-pro": "deepseek-ai/deepseek-v4-pro",
+    "sarvam-m": "sarvamai/sarvam-m",
     "stockmark-2-100b-instruct": "stockmark/stockmark-2-100b-instruct",
     "nemotron-nano-12b-v2-vl": "nvidia/nemotron-nano-12b-v2-vl",
 };
@@ -166,6 +169,8 @@ const NIM_MODELS: Record<string, string> = {
 const VISION_MODELS = new Set([
     "nemotron-nano-12b-v2-vl",
     "kimi-k2.6",
+    "minimax-m3",
+    "deepseek-v4-pro",
 ]);
 
 // ── selectModel returns a proper AI SDK model instance ──
@@ -173,7 +178,7 @@ function selectModel(preferredModel: string | undefined): any {
     if (preferredModel && NIM_MODELS[preferredModel]) {
         return nim.chatModel(NIM_MODELS[preferredModel]);
     }
-    return nim.chatModel('moonshotai/kimi-k2.6');
+    return nim.chatModel('deepseek-ai/deepseek-v4-pro');
 }
 
 // ── getProviderOptions – used only for thinking stream ──
@@ -442,21 +447,81 @@ VISUAL STYLE RULES:
 - Use markdown for structure (headings, lists, bold).
 - For math, use LaTeX wrapped in $ or $$.
 - Use emojis to make the response engaging.
-- For charts (bar, line, pie, doughnut), do NOT call generate_image or generate_document. Instead, embed an interactive chart directly in your text response using this exact JSON schema:
+- For charts/graphs/plots, ALWAYS embed an interactive <CHART> block. Never call generate_image or generate_document for charts.
+
+═══════════════════════════════════════
+  CHART BLOCK RULES — READ CAREFULLY
+═══════════════════════════════════════
+
+MANDATORY: Every chart you produce MUST:
+  1. Have a descriptive "title" (never omit this)
+  2. Have at least 8 labels/data points (never produce a 3- or 4-bar demo)
+  3. Use real, domain-appropriate numbers — NEVER round placeholders (100/200/300)
+  4. Include "xLabel" and "yLabel" for bar/line/area charts
+  5. Assign a distinct "color" hex to EVERY dataset
+  6. Pick the most insightful chart type for the data
+
+DO NOT:
+  ✗ Produce a chart with fewer than 6 data points unless the domain truly has fewer
+  ✗ Use generic values like 10, 20, 30, 40 or 100, 200, 300
+  ✗ Omit "title", "xLabel", or "yLabel" on bar/line/area charts
+  ✗ Default to "bar" when "area" or "line" would be more insightful
+  ✗ Produce a single-dataset chart when multiple datasets would be more informative
+
+CHART TYPES → "bar" | "line" | "area" | "pie" | "doughnut" | "scatter"
+  Pick based on the data:
+  • Trend over time          → "area" (shows volume) or "line"
+  • Comparing categories     → "bar" (few cats) or "bar" with layout:"horizontal" (many/long names)
+  • Multiple trends together → "line" with multiple datasets
+  • Part of a whole (≤6)    → "doughnut"
+  • Distribution / correlation → "scatter"
+  • Bar + trend overlay      → "bar" with one dataset having type:"line"
+
+FULL SCHEMA — use all relevant fields:
   <CHART>
   {
-    "type": "bar", // can be "bar", "line", "pie", or "doughnut"
-    "title": "Chart Title",
-    "labels": ["Label 1", "Label 2", ...],
+    "type": "area",
+    "title": "Global EV Sales by Region (2019–2024)",
+    "subtitle": "Cumulative annual sales in thousands of units",
+    "labels": ["2019","2020","2021","2022","2023","2024"],
+    "xLabel": "Year",
+    "yLabel": "Units Sold (thousands)",
+    "valueFormat": "number",
+    "showValues": false,
+    "stacked": true,
+    "referenceLine": { "value": 5000, "label": "5M milestone", "color": "#fbbf24" },
     "datasets": [
-      {
-        "label": "Dataset Label",
-        "data": [10, 20, ...]
-      }
+      { "label": "China",  "data": [1206,1367,3521,5890,8200,11400], "color": "#6366f1" },
+      { "label": "Europe", "data": [561, 1367,2290,2700,3200,3800],  "color": "#10b981" },
+      { "label": "USA",    "data": [328, 295, 631, 924, 1400,1800],  "color": "#f59e0b" },
+      { "label": "Others", "data": [105, 171, 358, 686, 900, 1200],  "color": "#ec4899" }
     ]
   }
   </CHART>
-- For diagrams and flowcharts, do NOT call generate_image or generate_document. Instead, use Mermaid syntax wrapped in <MERMAID>...</MERMAID> tags:
+
+FIELD REFERENCE:
+  • type          — chart type (see above guide)
+  • title         — REQUIRED: descriptive heading
+  • subtitle      — secondary description (use for units, source, or timeframe)
+  • labels        — X-axis category labels for bar/line/area
+  • xLabel/yLabel — REQUIRED for bar/line/area: axis titles
+  • valueFormat   — "number" | "currency" (adds $) | "percent" (adds %)
+                    Numbers auto-abbreviate: 1500 → 1.5k, 2300000 → 2.3M
+  • showValues    — true = show data labels on bars/points (use for small datasets)
+  • stacked       — true = stack bars/areas cumulatively
+  • layout        — "horizontal" flips bars (use for long category names like country names)
+  • referenceLine — { value, label?, color? } draws a dashed horizontal guide
+  • datasets[].type  — per-dataset type override: "bar" | "line" | "area"
+                       (allows mixing e.g. bars for actuals + line for a target/trend)
+  • datasets[].color — REQUIRED: hex color for each series (choose harmonious palette)
+  • datasets[].points — scatter only: [{ x: 1.2, y: 4.5 }, ...] instead of data[]
+
+WHEN ASKED FOR "a demo chart" or "any chart" or "show me a chart":
+  Do not ask what kind — instead pick the most interesting one you know, use real-world
+  data (e.g. market share, population, revenue trends, climate data), and make it rich:
+  multiple datasets, a reference line, axis labels, and at least 8 data points.
+
+- For diagrams, flowcharts, and architecture, use Mermaid syntax in <MERMAID>...</MERMAID> tags:
   <MERMAID>
   graph TD
     A --> B
@@ -1448,7 +1513,7 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
         // ── generate_document ─────────────────────────────────────────────
         generate_document: (tool as any)({
             description:
-                'Generate a downloadable document file. ' +
+                'Generate a downloadable document file. Do NOT use this tool for requests to create charts, graphs, diagrams, or flowcharts, unless the user explicitly requested a document file format (like "create a chart PDF" or "put the chart in a Word document"). For standard chart/diagram requests, render them inline instead. ' +
                 'Always call read_skill first and pass the content here.',
             parameters: z.object({
                 doc_type: z.enum(['pdf', 'pptx', 'docx', 'xlsx', 'csv', 'tsv', 'md', 'json', 'sql', 'html', 'tech', 'finance', 'coder', 'creative', 'legal']),
@@ -2061,6 +2126,9 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                     type: f.type || 'text/plain',
                 };
             });
+        // True if user attached any text/code file (via either channel)
+        const hasAnyFile = !!(safeFile || safeAtt.some(f => f.content && !f.type?.startsWith('image/') && !f.type?.startsWith('video/')));
+        console.log("[DEBUG /flux_ask] hasAnyFile:", hasAnyFile, "safeFile.length:", safeFile.length, "safeAtt:", safeAtt.map(f => ({ name: f.name, type: f.type, length: f.content.length })));
 
         const memEnabled = req.authUser?.user_metadata?.enable_memory ?? true;
 
@@ -2122,11 +2190,17 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
         const memCtx = memEnabled
             ? await retrieveMemories(uid, nq).then(buildMemoryContext).catch(() => '')
             : '';
+        // When the user provides a file, prepend a hard instruction to stop the model searching
+        const fileGuard = hasAnyFile
+            ? `\n⚠️ FILE ATTACHED: The user has provided file content in this message. You MUST NOT call web_search or any search tool. Analyze the provided file content directly and answer from it. Searching the web for user-provided code or documents is forbidden.\n`
+            : '';
+
         const dynSys = [
             SYSTEM_PROMPT
                 .replaceAll('{{CURRENT_DATETIME}}', nowStr)
                 .replaceAll('{{LOCATION_INFO}}', locInfo)
                 .replaceAll('{{MEMORY_CONTEXT}}', memCtx),
+            fileGuard,
             VISUAL_INSTRUCTIONS,
             AGENT_SYSTEM_EXTENSION,
         ].join('\n\n');
@@ -2134,6 +2208,9 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
         // ── Per-request agent state ──────────────────────────────────────
         const agentState: AgentState = { sources: [], generatedFiles: [], thoughtProcess: [] };
         const tools = createFluxTools(res, model, agentState, nq);
+        if (hasAnyFile) {
+            delete (tools as any).web_search;
+        }
 
         // ── StreamWriter adapter for orchestrator ──────────────────────────
         const orchStream: StreamWriter = {
@@ -2167,6 +2244,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
             skillRegistry: SKILL_REGISTRY,
             fetchSkillFile,
             generateDocumentWithSkill: generateDocumentWithSkill as any,
+            fileContent: hasAnyFile ? 'attached' : undefined,
         });
 
         let fullText = '';
@@ -2222,9 +2300,18 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
             ? `[The user attached ${videoAttachments.length} video(s)]\n\n`
             : '';
 
+        let attachedFilesText = '';
+        if (safeFile) {
+            attachedFilesText += `[File content]\n${safeFile.slice(0, 100_000)}\n\n`;
+        }
+        const textAttachments = safeAtt.filter(f => f.content && !f.type?.startsWith('image/') && !f.type?.startsWith('video/'));
+        if (textAttachments.length > 0) {
+            attachedFilesText += textAttachments.map(f => `[File content: ${f.name}]\n${f.content.slice(0, 80_000)}`).join('\n\n') + '\n\n';
+        }
+
         const userText = !isVisionModel && imageAttachments.length > 0
-            ? `[The user attached ${imageAttachments.length} image(s)]\n\n${videoNotice}${safeFile ? `[File content]\n${safeFile.slice(0, 100_000)}\n\n` : ''}${contextQuery}`
-            : `${videoNotice}${safeFile ? `[File content]\n${safeFile.slice(0, 100_000)}\n\n` : ''}${contextQuery}`;
+            ? `[The user attached ${imageAttachments.length} image(s)]\n\n${videoNotice}${attachedFilesText}${contextQuery}`
+            : `${videoNotice}${attachedFilesText}${contextQuery}`;
 
         const userContent: any = hasImages
             ? [
@@ -2538,19 +2625,35 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                     .filter(r => r.name === 'web_search');
 
                 let synthesized = '';
-                const sourceText = searchResults.length > 0
-                    ? searchResults.map(r => r.result).join('\n\n---\n\n')
-                    : agentState.sources.map((s: any) => s.url).join('\n');
 
-                if (sourceText.trim()) {
+                // Build context: prefer search result text, fall back to source URLs
+                const searchText = searchResults.length > 0
+                    ? searchResults.map(r => r.result).join('\n\n---\n\n')
+                    : '';
+
+                // Also include the user's file if they attached one (this is the key fix
+                // for "searched user's code then got no answer" situations)
+                const fileCtx = safeFile
+                    ? `\n\nUser's attached file content:\n${safeFile.slice(0, 8000)}`
+                    : safeAtt.filter(f => f.content && !f.type?.startsWith('image/')).length > 0
+                        ? `\n\nUser's attached files:\n${safeAtt.filter(f => f.content && !f.type?.startsWith('image/')).map(f => `[${f.name}]\n${(f.content ?? '').slice(0, 6000)}`).join('\n\n')}`
+                        : '';
+
+                const combinedContext = [searchText, fileCtx].filter(Boolean).join('\n\n');
+
+                if (combinedContext.trim()) {
                     try {
                         const synthRes = await generateText({
                             model,
-                            system: 'Answer the user question based ONLY on the provided information. Write a comprehensive, well-structured answer with paragraphs. Include relevant numbers, dates, and facts. Do NOT mention sources or search results. Answer naturally as if you already knew this.',
+                            system: `You are a helpful AI assistant. Answer the user's question thoroughly and naturally.
+${fileCtx ? 'The user attached a file — analyze it directly and answer from the file content.' : 'Use the search results to answer.'}
+Write a comprehensive, well-structured answer with paragraphs. Be specific and detailed.
+Do NOT say "based on the search results" or "according to the sources". Just answer naturally.
+If the search results are not relevant to the question (e.g. user asked about their own code), ignore the search results and answer from the file content or your own knowledge.`,
                             messages: [
-                                { role: 'user', content: `Information:\n${sourceText.slice(0, 15000)}\n\nQuestion: ${nq}` },
+                                { role: 'user', content: `Context:\n${combinedContext.slice(0, 18000)}\n\nQuestion: ${nq}` },
                             ],
-                            maxTokens: 2000,
+                            maxTokens: 2500,
                         } as any);
                         synthesized = (synthRes?.text ?? '').trim();
                         console.log(`[ASK] synthesis result length: ${synthesized.length}`);
@@ -2558,7 +2661,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                         console.warn('[ASK] Answer synthesis failed:', synthErr?.message);
                     }
                 } else {
-                    console.warn('[ASK] No search text available for synthesis');
+                    console.warn('[ASK] No context available for synthesis');
                 }
 
                 if (synthesized) {
@@ -2567,16 +2670,15 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                     charsSent += synthesized.length;
                     fullText = synthesized;
                 } else {
-                    const formattedSources = agentState.sources
-                        .map((s: any, i: number) => `${i + 1}. ${s.url}`)
-                        .join('\n');
-                    const msg = `I found the following sources with information related to your query:\n\n${formattedSources}\n\nYou can view the full sources in the Sources tab above.`;
+                    // True last resort — only reached if synthesis model itself fails
+                    const msg = `I searched but couldn't generate a complete answer. Here are the sources I found — please check the Sources tab for the full content.`;
                     console.log('[ASK] direct-source fallback sent (charsSent=0, sources=' + agentState.sources.length + ')');
                     writeSafeSSE(res, msg);
                     charsSent += msg.length;
                     fullText += msg;
                 }
             }
+
 
             if (hadFiles && charsSent < 50 && !res.writableEnded) {
                 const msg = 'Your file has been generated — see below for download.';
@@ -3243,6 +3345,9 @@ const AVAILABLE_MODELS = [
     { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash (DeepSeek)" },
     { id: "qwen3.5-397b-a17b", label: "Qwen 3.5 397B (Qwen)" },
     { id: "minimax-m2.7", label: "MiniMax M2.7 (MiniMax)" },
+    { id: "minimax-m3", label: "MiniMax M3 (MiniMax)" },
+    { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro (DeepSeek)" },
+    { id: "sarvam-m", label: "Sarvam-M (Sarvam AI)" },
     { id: "stockmark-2-100b-instruct", label: "Stockmark 2 100B (Stockmark)" },
     { id: "nemotron-nano-12b-v2-vl", label: "Nemotron Nano 12B v2 VL (NVIDIA)" },
     { id: "nemotron-mini-4b", label: "Nemotron Mini 4B (NVIDIA)" },

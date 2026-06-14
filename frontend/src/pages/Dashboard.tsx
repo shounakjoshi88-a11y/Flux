@@ -92,7 +92,7 @@ export default function Dashboard() {
   const [activeCitationIndex, setActiveCitationIndex] = useState<number | null>(null);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [selectedModel, setSelectedModel] = useState<string>("kimi-k2.6");
+  const [selectedModel, setSelectedModel] = useState<string>("deepseek-v4-pro");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [peekUrl, setPeekUrl] = useState<string | null>(null);
   const [peekPdf, setPeekPdf] = useState<{ base64: string; filename: string } | null>(null);
@@ -181,8 +181,8 @@ export default function Dashboard() {
   const previousSidebarOpen = useRef(isSidebarOpen);
 
   const currentModelLabel = useMemo(
-    () => allModels.find((m) => m.id === selectedModel)?.label ?? "Kimi K2.6 (Moonshot AI)",
-    [selectedModel]
+    () => allModels.find((m) => m.id === selectedModel)?.label ?? "DeepSeek V4 Pro (DeepSeek)",
+    [selectedModel, allModels]
   );
 
   // ── Auth & loading effects ──

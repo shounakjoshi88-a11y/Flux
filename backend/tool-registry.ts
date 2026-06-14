@@ -107,7 +107,7 @@ toolRegistry.register('read_skill', {
 
 toolRegistry.register('generate_document', {
   name: 'generate_document',
-  description: 'Generate a downloadable document file (PDF, DOCX, PPTX, XLSX, etc.).',
+  description: 'Generate a downloadable document file (PDF, DOCX, PPTX, XLSX, etc.). Do NOT use this tool for requests to create charts, graphs, diagrams, or flowcharts, unless the user explicitly requested a document file format (like "create a chart PDF" or "put the chart in a Word document"). For standard chart/diagram requests, render them inline instead.',
   parameters: z.object({
     doc_type: z.enum(['pdf', 'pptx', 'docx', 'xlsx', 'csv', 'tsv', 'md', 'json', 'sql', 'html', 'tech', 'finance', 'coder', 'creative', 'legal']),
     topic: z.string().describe('The topic or subject of the document'),

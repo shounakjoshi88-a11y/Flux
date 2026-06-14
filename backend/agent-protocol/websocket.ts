@@ -200,6 +200,7 @@ async function handleUserMessage(ws: AuthenticatedSocket, payload: any) {
     throw new ValidationError("Invalid message payload");
   }
   const { text, attachments } = payload;
+  console.log("[DEBUG WS handleUserMessage] text:", text, "attachments:", attachments ? attachments.map((a: any) => ({ name: a.name, size: a.content?.length, type: a.type })) : null);
   if (!text || typeof text !== "string" || !text.trim()) {
     throw new ValidationError("Message cannot be empty", "empty_message");
   }

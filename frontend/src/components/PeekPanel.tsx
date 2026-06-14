@@ -325,7 +325,7 @@ export function PeekPanel({ url, onClose, pdfData, docxData, pptxData, xlsxData,
                   src={iframeSrc ?? undefined}
                   srcDoc={webSrcDoc ?? (isDocx ? docxHtml : undefined)}
                   className="w-full h-full border-none"
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                  sandbox={isPdf ? undefined : "allow-scripts allow-same-origin allow-forms allow-popups"}
                   title={
                     isPdf ? `Preview of ${pdfData?.filename}` :
                     isDocx ? `Preview of ${docxData?.filename}` :
@@ -353,7 +353,17 @@ export function PeekPanel({ url, onClose, pdfData, docxData, pptxData, xlsxData,
                         : "This site may block embedding or have a restrictive content security policy."}
                     </p>
                   </div>
-                  {!isPdf && url && (
+                  {(isPdf && blobUrl) ? (
+                    <a
+                      href={blobUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-sm font-medium text-white bg-neutral-900 dark:bg-white dark:text-black rounded-full px-5 py-2.5 hover:opacity-90 transition-opacity shadow-sm"
+                    >
+                      Open PDF in new tab
+                      <ExternalLink className="size-3.5" />
+                    </a>
+                  ) : (!isPdf && url) && (
                     <a
                       href={url}
                       target="_blank"

@@ -28,6 +28,7 @@ interface OrchestratorInput {
     skillContent: string
   ) => Promise<any>;
   requestToolApproval?: (toolName: string, args: any) => Promise<boolean>;
+  fileContent?: string;
 }
 
 interface OrchestratorOutput {
@@ -43,7 +44,7 @@ export class OrchestratorEngine {
   private verifier = new Verifier();
 
   async process(input: OrchestratorInput): Promise<OrchestratorOutput> {
-    const { plan, workflow } = this.planner.analyze(input.query);
+    const { plan, workflow } = this.planner.analyze(input.query, undefined, input.fileContent);
 
     // Show the plan for transparency, then let the LLM handle everything agentically
     if (workflow !== "simple_qa") {

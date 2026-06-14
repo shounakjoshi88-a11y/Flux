@@ -195,6 +195,15 @@ body {
   -moz-osx-font-smoothing: grayscale !important;
 }
 
+.assistant-section strong {
+  font-weight: 700 !important;
+  color: var(--text-primary) !important;
+}
+
+.assistant-section em {
+  font-style: italic !important;
+}
+
 /* ---------- FORCE INTER FOR FOLLOW-UPS HEADING ---------- */
 .assistant-section .follow-ups-heading {
   font-family: 'Inter', sans-serif !important;
