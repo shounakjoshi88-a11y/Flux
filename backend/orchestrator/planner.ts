@@ -1,7 +1,7 @@
 import type { ExecutionPlan, Phase, WorkflowKind } from "./types";
 
 const DOC_INTENT_RE =
-  /(?:\b(?:create|generate|make|build|write|produce)\b.*\b(pdf|pptx|docx|xlsx|csv|tsv|md|json|sql|html|powerpoint|presentation|slide|word|excel|spreadsheet)\b)|(?:\b(pdf|pptx|docx|xlsx|csv|tsv|md|json|sql|html)\b.*\b(?:about|on|for|of)\b)|(?:\b(?:create|generate|make|build|write|produce)\b.*\b(pdf|word)\s+document\b)/i;
+  /(?:\b(?:create|generate|make|build|write|produce)\b.*\b(pdf|pptx|docx|xlsx|csv|tsv|md|json|sql|html|powerpoint|presentation|slide|word|excel|spreadsheet|document)\b)|(?:\b(pdf|pptx|docx|xlsx|csv|tsv|md|json|sql|html)\b.*\b(?:about|on|for|of)\b)/i;
 
 const WEATHER_RE = /\bweather\b|\btemperature\b|\bforecast\b|\bhow.*hot\b|\bhow.*cold\b/i;
 
@@ -14,7 +14,7 @@ const ANALYSIS_RE = /\b(?:analyze|compare|contrast|evaluate|summarize|break down
 function detectDocType(query: string): string | null {
   const q = query.toLowerCase();
   if (/\bpptx\b|\bpowerpoint\b|\bpresentation\b|\bslide\b/.test(q)) return "pptx";
-  if (/\bdocx\b|\bword document\b/.test(q)) return "docx";
+  if (/\bdocx\b|\bword\b|\bdocument\b/.test(q)) return "docx";
   if (/\bxlsx\b|\bexcel\b|\bspreadsheet\b|\bsheet\b/.test(q)) return "xlsx";
   if (/\bcsv\b/.test(q)) return "csv";
   if (/\btsv\b/.test(q)) return "tsv";
@@ -22,18 +22,18 @@ function detectDocType(query: string): string | null {
   if (/\bjson\b/.test(q)) return "json";
   if (/\bsql\b/.test(q)) return "sql";
   if (/\bhtml\b/.test(q)) return "html";
-  if (/\bpdf\b|\bpdf document\b/.test(q)) return "pdf";
+  if (/\bpdf\b/.test(q)) return "pdf";
   return null;
 }
 
 function detectTopic(query: string): string {
   const match = query.match(
-    /(?:about|on|for|of|covering|titled|called|with)\s+["""]?([^""".\n]{5,80}?)["""]?(?:\s*(?:\.|$|\b(?:pdf|pptx|docx|xlsx|csv|tsv|md|json|sql|html)\b))/i
+    /(?:about|on|for|of|covering|titled|called|with)\s+["""]?([^""".\n]{5,80}?)["""]?(?:\s*(?:\.|$|\b(?:pdf|pptx|docx|xlsx|csv|tsv|md|json|sql|html|powerpoint|presentation|slide|word|excel|spreadsheet|document)\b))/i
   );
   if (match) return match[1]!.trim();
 
   const docPhrase = query.match(
-    /(?:create|generate|make|build|write|produce)\s+(?:a|an|the|some|me)\s+(?:pdf|pptx|docx|xlsx|csv|tsv|md|json|sql|html|powerpoint|presentation|slide|word|excel|spreadsheet|pdf document|word document)\s+(.+)/i
+    /(?:create|generate|make|build|write|produce)\s+(?:a|an|the|some|me)\s+(?:pdf|pptx|docx|xlsx|csv|tsv|md|json|sql|html|powerpoint|presentation|slide|word|excel|spreadsheet|document)\s+(.+)/i
   );
   if (docPhrase) {
     return docPhrase[1]!.trim().replace(/^(?:about|on|for|of|covering|titled|called|with)\s+/i, "").slice(0, 100);
@@ -49,20 +49,23 @@ export class Planner {
     if (docType) {
       const topic = detectTopic(query);
       const steps: Phase[] = [];
+      const isRefTopic = /^(?:these|those|this|that|the above|the following|the previous|my)\b/i.test(topic);
 
-      steps.push({
-        id: "research",
-        type: "research",
-        description: `Research "${topic}" via web search`,
-        tools: ["web_search"],
-        dependsOn: [],
-        required: true,
-        criteria: [
-          { type: "has_sources", label: "Sources found" },
-          { type: "min_sources", minCount: 1, label: "At least 1 source" },
-        ],
-        maxRetries: 2,
-      });
+      if (!isRefTopic) {
+        steps.push({
+          id: "research",
+          type: "research",
+          description: `Research "${topic}" via web search`,
+          tools: ["web_search"],
+          dependsOn: [],
+          required: true,
+          criteria: [
+            { type: "has_sources", label: "Sources found" },
+            { type: "min_sources", minCount: 1, label: "At least 1 source" },
+          ],
+          maxRetries: 2,
+        });
+      }
 
       steps.push({
         id: "load_skill",
@@ -82,7 +85,7 @@ export class Planner {
         type: "generate_doc",
         description: `Generate ${docType.toUpperCase()} about "${topic}"`,
         tools: ["generate_document"],
-        dependsOn: ["research", "load_skill"],
+        dependsOn: isRefTopic ? ["load_skill"] : ["research", "load_skill"],
         required: true,
         criteria: [
           { type: "has_file", label: "File generated" },
@@ -95,8 +98,10 @@ export class Planner {
         plan: {
           steps,
           userIntent: `Generate ${docType} about ${topic}`,
-          reasoning: "This is a document generation request that requires research, skill loading, and file generation.",
-          estimatedSteps: 3,
+          reasoning: isRefTopic
+            ? "Document generation for existing conversation content — no web search needed, using conversation context directly."
+            : "This is a document generation request that requires research, skill loading, and file generation.",
+          estimatedSteps: isRefTopic ? 2 : 3,
         },
       };
     }
