@@ -226,7 +226,8 @@ export function ChatInput({
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey && !isComposing.current) {
       e.preventDefault();
-      onSend();
+      const text = editorRef.current?.innerText || "";
+      onSend(text);
     }
   }, [onSend]);
 
@@ -264,9 +265,10 @@ export function ChatInput({
       onStop?.();
       return;
     }
-    const hasText = query.trim().length > 0;
+    const text = editorRef.current?.innerText || "";
+    const hasText = text.trim().length > 0;
     if (hasText) {
-      onSend();
+      onSend(text);
       return;
     }
     startVoiceRecording();

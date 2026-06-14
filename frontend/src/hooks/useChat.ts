@@ -1,10 +1,9 @@
-// src/hooks/useChat.ts
 import { useState, useRef, useCallback, useEffect } from "react";
 import { flushSync } from "react-dom";
 import { createClient } from "@/lib/client";
 import { BACKEND_URL } from "@/lib/config";
 import { extractLiveContent } from "@/lib/chat-utils";
-import type { Message, AttachedFile, Source, GeneratedFile, MessagePart } from "@/types";
+import type { Message, AttachedFile, Source, GeneratedFile, MessagePart, ExecutionPlan, PermissionRequest } from "@/types";
 
 const supabase = createClient();
 
@@ -18,6 +17,8 @@ type UseChatCallbacks = {
   onStreamUpdate?: (parsed: { content: string; sources: Source[] }) => void;
   onComplete?: () => void;
   onMessageId?: (id: string) => void;
+  onPermissionRequest?: (request: PermissionRequest) => void;
+  onPlan?: (plan: ExecutionPlan) => void;
   fileContent?: string;
   attachedFiles?: { name: string; content?: string }[];
 };
@@ -47,13 +48,16 @@ export function useChat(user: any) {
   const latestFollowUpsRef = useRef<string[]>([]);
   const latestGeneratedFilesRef = useRef<GeneratedFile[]>([]);
 
-  // ── Track the assistant raw buffer ──
-  const assistantRawRef = useRef<string>("");   // full text — for backward compat `content` field
-  const streamingPartsRef = useRef<MessagePart[]>([]); // finalized parts (non-text + flushed text segments)
-  const textAccumRef = useRef<string>("");      // current in-progress text segment
+  const assistantRawRef = useRef<string>("");
+  const streamingPartsRef = useRef<MessagePart[]>([]);
+  const textAccumRef = useRef<string>("");
+
+  // AionUi pattern: cancelled flag for async hydration safety
+  const cancelledRef = useRef(false);
 
   useEffect(() => {
     return () => {
+      cancelledRef.current = true;
       abortControllerRef.current?.abort();
     };
   }, []);
@@ -75,7 +79,6 @@ export function useChat(user: any) {
     textAccumRef.current = "";
   }, []);
 
-  // ── Clean thought tags ──
   function cleanThoughtText(raw: string): string {
     const closeIdx = raw.indexOf("</THOUGHT>");
     if (closeIdx === -1) return "";
@@ -84,36 +87,26 @@ export function useChat(user: any) {
     return raw.slice(openIdx + 9, closeIdx).trim();
   }
 
-  // ── Clean answer tags ──
-  // The backend strips <ANSWER>...</ANSWER> before SSE-sending chunks, so
-  // assistantRawRef contains plain answer text.  We still handle the rare
-  // case where the tags leak through (e.g. model puts them in mid-stream).
   function cleanAnswerText(raw: string): string {
     if (!raw.trim()) return "";
-
-    // Case A: both tags present — extract the content between them
     const openIdx = raw.indexOf("<ANSWER>");
     const closeIdx = raw.indexOf("</ANSWER>");
     if (openIdx !== -1 && closeIdx !== -1 && closeIdx > openIdx) {
       return raw.slice(openIdx + 8, closeIdx).trim();
     }
-    // Case B: opening tag present but not yet closed (mid-stream) — show what arrived
     if (openIdx !== -1) {
       return raw.slice(openIdx + 8).trim();
     }
-
-    // Case C (normal): backend already stripped the tags — return raw content
-    // but defensively strip any residual structural tags that might have leaked.
     return raw
       .replace(/<THOUGHT>[\s\S]*?<\/THOUGHT>/gi, "")
       .replace(/<\/?THOUGHT>/gi, "")
       .replace(/<\/?ANSWER>/gi, "")
       .replace(/<\/?FOLLOW_UPS>/gi, "")
       .replace(/<\/?question>/gi, "")
+      .replace(/<\/?SEARCH_QUERY>/gi, "")
       .trim();
   }
 
-  // ── Flush current textAccum segment into streamingPartsRef ──
   function flushPendingText() {
     const clean = cleanAnswerText(textAccumRef.current);
     if (clean) {
@@ -121,6 +114,20 @@ export function useChat(user: any) {
     }
     textAccumRef.current = "";
   }
+
+  const addPart = (part: MessagePart) => {
+    streamingPartsRef.current = [...streamingPartsRef.current, part];
+  };
+
+  const updateMessages = (targetId: string, extra?: Partial<Message>) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        String(m.id) === String(targetId) || String(m.id) === String(realMessageIdRef.current ?? "")
+          ? { ...m, parts: [...streamingPartsRef.current], ...extra }
+          : m
+      )
+    );
+  };
 
   const handleSubmit = useCallback(
     async (
@@ -248,7 +255,7 @@ export function useChat(user: any) {
             const data = dataLines.join("\n");
             if (!data) continue;
 
-            // ─── SERVER ERROR ───────────────────────────
+            // ─── ERROR ───────────────────────────────
             if (eventType === "error") {
               let errorMessage = "Server error";
               try {
@@ -260,71 +267,159 @@ export function useChat(user: any) {
               break;
             }
 
-            // ─── SOURCES ───────────────────────────────
+            // ─── SOURCES ─────────────────────────────
             if (eventType === "sources") {
               try { latestSources = JSON.parse(data) as Source[]; } catch { }
             }
-            // ─── FOLLOW_UPS ────────────────────────────
+            // ─── FOLLOW_UPS ──────────────────────────
             else if (eventType === "follow_ups") {
               try { latestFollowUpsRef.current = JSON.parse(data) as string[]; } catch { }
             }
-            // ─── STATUS ─────────────────────────────────
+            // ─── STATUS ──────────────────────────────
             else if (eventType === "status") {
               try {
                 const parsed = JSON.parse(data);
-                // Flush any pending text segment before adding the tool_call part
                 flushPendingText();
-                const statusPart: MessagePart = {
-                  type: "tool_call",
-                  name: parsed.subtype,
-                  input: parsed.data,
-                  output: parsed.message,
-                  status: "running",
-                };
-                streamingPartsRef.current = [...streamingPartsRef.current, statusPart];
+                const sub = parsed.subtype as string;
+                const isTerminal = sub.endsWith('_success') || sub.endsWith('_error') || sub.endsWith('_complete');
+                if (isTerminal) {
+                  const baseSub = sub.replace(/_(?:success|error|complete)$/, '');
+                  const idx = streamingPartsRef.current.findIndex(
+                    p => p.type === 'tool_call' && p.name === baseSub
+                  );
+                  if (idx >= 0) {
+                    const updated = [...streamingPartsRef.current];
+                    (updated[idx] as any).status = sub.endsWith('_error') ? 'error' : 'completed';
+                    (updated[idx] as any).output = parsed.message;
+                    streamingPartsRef.current = updated;
+                  } else {
+                    streamingPartsRef.current = [...streamingPartsRef.current, {
+                      type: "tool_call",
+                      name: baseSub,
+                      input: parsed.data,
+                      output: parsed.message,
+                      status: sub.endsWith('_error') ? 'error' : 'completed',
+                    }];
+                  }
+                } else {
+                  streamingPartsRef.current = [...streamingPartsRef.current, {
+                    type: "tool_call",
+                    name: sub,
+                    input: parsed.data,
+                    output: parsed.message,
+                    status: "running",
+                  }];
+                }
                 const targetId = realMessageIdRef.current ?? assistantMsgId;
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    String(m.id) === String(targetId) || String(m.id) === String(assistantMsgId) || String(m.id) === "-1"
-                      ? { ...m, parts: [...streamingPartsRef.current] }
-                      : m
-                  )
-                );
+                updateMessages(targetId);
                 if (
-                  parsed.subtype === 'generating_file' ||
-                  parsed.subtype === 'generating_chart' ||
-                  parsed.subtype === 'image_enhancing' ||
-                  parsed.subtype === 'image_generating'
+                  sub === 'generating_file' ||
+                  sub === 'generating_chart' ||
+                  sub === 'image_enhancing' ||
+                  sub === 'image_generating'
                 ) {
-                  setActiveGenerationStatus({ subtype: parsed.subtype, message: parsed.message });
+                  setActiveGenerationStatus({ subtype: sub, message: parsed.message });
                 }
               } catch { }
             }
-            // ─── THOUGHT ───────────────────────────────
+            // ─── THOUGHT ─────────────────────────────
             else if (eventType === "thought") {
               try {
                 const parsed = JSON.parse(data);
                 const cleanContent = cleanThoughtText(parsed.content || "");
                 if (cleanContent) {
-                  // Flush any pending text segment before adding the thought part
                   flushPendingText();
                   const thoughtPart: MessagePart = {
                     type: "thought",
                     content: cleanContent,
                   };
-                  streamingPartsRef.current = [...streamingPartsRef.current, thoughtPart];
+                  addPart(thoughtPart);
                   const targetId = realMessageIdRef.current ?? assistantMsgId;
-                  setMessages((prev) =>
-                    prev.map((m) =>
-                      String(m.id) === String(targetId) || String(m.id) === String(assistantMsgId) || String(m.id) === "-1"
-                        ? { ...m, parts: [...streamingPartsRef.current] }
-                        : m
-                    )
-                  );
+                  updateMessages(targetId);
                 }
               } catch { }
             }
-            // ─── FILE ──────────────────────────────────
+            // ─── PLAN ────────────────────────────────
+            else if (eventType === "plan") {
+              try {
+                const parsed = JSON.parse(data);
+                flushPendingText();
+                const planPart: MessagePart = {
+                  type: "plan",
+                  steps: parsed.steps || [],
+                  userIntent: parsed.userIntent || "",
+                  reasoning: parsed.reasoning || "",
+                };
+                addPart(planPart);
+                const targetId = realMessageIdRef.current ?? assistantMsgId;
+                updateMessages(targetId);
+                callbacks?.onPlan?.(parsed);
+              } catch { }
+            }
+            // ─── PERMISSION ──────────────────────────
+            else if (eventType === "permission") {
+              try {
+                const parsed = JSON.parse(data);
+                const permPart: MessagePart = {
+                  type: "permission",
+                  id: parsed.id,
+                  toolName: parsed.toolName,
+                  args: parsed.args,
+                  description: parsed.description,
+                  status: "pending",
+                };
+                addPart(permPart);
+                const targetId = realMessageIdRef.current ?? assistantMsgId;
+                updateMessages(targetId);
+                callbacks?.onPermissionRequest?.(parsed);
+              } catch { }
+            }
+            // ─── TOOL_GROUP ──────────────────────────
+            else if (eventType === "tool_group") {
+              try {
+                const parsed = JSON.parse(data);
+                flushPendingText();
+                const toolGroupPart: MessagePart = {
+                  type: "tool_group",
+                  tools: parsed.tools || [],
+                };
+                addPart(toolGroupPart);
+                const targetId = realMessageIdRef.current ?? assistantMsgId;
+                updateMessages(targetId);
+              } catch { }
+            }
+            // ─── AGENT_STATUS ────────────────────────
+            else if (eventType === "agent_status") {
+              try {
+                const parsed = JSON.parse(data);
+                flushPendingText();
+                const statusPart: MessagePart = {
+                  type: "agent_status",
+                  status: parsed.status,
+                  message: parsed.message,
+                };
+                addPart(statusPart);
+                const targetId = realMessageIdRef.current ?? assistantMsgId;
+                updateMessages(targetId);
+              } catch { }
+            }
+            // ─── TOOL_CALL ────────────────────────────
+            else if (eventType === "tool_call") {
+              try {
+                const parsed = JSON.parse(data);
+                const toolCallPart: MessagePart = {
+                  type: "tool_call",
+                  name: parsed.toolName,
+                  input: parsed.args,
+                  output: parsed.result,
+                  status: parsed.status || "running",
+                };
+                addPart(toolCallPart);
+                const targetId = realMessageIdRef.current ?? assistantMsgId;
+                updateMessages(targetId);
+              } catch { }
+            }
+            // ─── FILE ────────────────────────────────
             else if (eventType === "file") {
               try {
                 const parsed = JSON.parse(data) as GeneratedFile;
@@ -334,31 +429,21 @@ export function useChat(user: any) {
                 if (!alreadyExists) {
                   latestGeneratedFilesRef.current.push(parsed);
                 }
-                // Flush any pending text segment before adding the file part
                 flushPendingText();
                 const targetId = realMessageIdRef.current ?? assistantMsgId;
                 const filePart: MessagePart = parsed.mime?.startsWith("image/")
                   ? { type: "image", url: parsed.base64 || "", filename: parsed.filename, mime: parsed.mime }
                   : { type: "file", filename: parsed.filename, mime: parsed.mime, base64: parsed.base64 };
-                streamingPartsRef.current = [...streamingPartsRef.current, filePart];
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    String(m.id) === String(targetId) || String(m.id) === String(assistantMsgId) || String(m.id) === "-1"
-                      ? {
-                        ...m,
-                        generatedFiles: [...latestGeneratedFilesRef.current],
-                        parts: [...streamingPartsRef.current],
-                      }
-                      : m
-                  )
-                );
-                // Clear inline generation indicator once file arrives
+                addPart(filePart);
+                updateMessages(targetId, {
+                  generatedFiles: [...latestGeneratedFilesRef.current],
+                });
                 setActiveGenerationStatus(null);
               } catch (e) {
                 console.error("Failed to parse file event:", e);
               }
             }
-            // ─── MESSAGE_ID ────────────────────────────
+            // ─── MESSAGE_ID ──────────────────────────
             else if (eventType === "message_id") {
               try {
                 const parsed = JSON.parse(data);
@@ -367,7 +452,7 @@ export function useChat(user: any) {
                 callbacks?.onMessageId?.(parsed.id);
               } catch { }
             }
-            // ─── TODOS ─────────────────────────────────
+            // ─── TODOS ───────────────────────────────
             else if (eventType === "todos") {
               try {
                 const parsed = JSON.parse(data);
@@ -382,31 +467,24 @@ export function useChat(user: any) {
                       ...streamingPartsRef.current.slice(existingIdx + 1),
                     ];
                   } else {
-                    streamingPartsRef.current = [...streamingPartsRef.current, todosPart];
+                    addPart(todosPart);
                   }
                   const targetId = realMessageIdRef.current ?? assistantMsgId;
-                  setMessages((prev) =>
-                    prev.map((m) =>
-                      String(m.id) === String(targetId) || String(m.id) === String(assistantMsgId) || String(m.id) === "-1"
-                        ? { ...m, parts: [...streamingPartsRef.current] }
-                        : m
-                    )
-                  );
+                  updateMessages(targetId);
                 }
               } catch { }
             }
-            // ─── TEXT ANSWER (default) ─────────────────
+            // ─── TEXT ANSWER (default) ───────────────
             else {
               if (data === "[DONE]") continue;
               assistantRawRef.current += data;
               textAccumRef.current += data;
             }
 
-            // ─── Update assistant message with partial answer ──
+            // ─── Update assistant message ──
             try {
               const cleanAns = cleanAnswerText(assistantRawRef.current);
               const cleanCurrentText = cleanAnswerText(textAccumRef.current);
-              // Build parts: finalized parts + current text segment (if any)
               const allParts: MessagePart[] = cleanCurrentText
                 ? [...streamingPartsRef.current, { type: "text", text: cleanCurrentText }]
                 : streamingPartsRef.current;
@@ -438,17 +516,13 @@ export function useChat(user: any) {
           }
         }
 
-        // ─── If the server sent an error event, surface it ──────────────────
         if (streamErrorRef.current) {
           throw new Error(streamErrorRef.current);
         }
 
-        // ─── Final cleanup ──────────────────────────────
         const finalAnswer = cleanAnswerText(assistantRawRef.current);
         const hasGeneratedFiles = latestGeneratedFilesRef.current.length > 0;
-        const hasImageFiles = latestGeneratedFilesRef.current.some(f => f.mime?.startsWith("image/"));
 
-        // ✅ If we have generated files, don't show an error even if answer is empty
         if ((!finalAnswer || finalAnswer.startsWith("[Error")) && !hasGeneratedFiles) {
           setMessages((prev) => {
             const withoutLast = prev.slice(0, -1);
@@ -506,15 +580,12 @@ export function useChat(user: any) {
   const retry = useCallback(() => {
     const last = lastRequestRef.current;
     if (!last || isLoading) return;
-
     setMessages((prev) => prev.filter((m) => !m.error));
-
     const originalCallbacks = lastCallbacksRef.current;
     const callbacksForRetry: UseChatCallbacks = {
       ...(originalCallbacks || {}),
       fileContent: last.fileContent,
     };
-
     handleSubmit(
       last.prompt,
       last.activeConversationId,

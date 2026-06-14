@@ -469,6 +469,8 @@ export function StatusMessage({
     return "text-[var(--text-secondary)]/40";
   };
 
+  const [detailOpen, setDetailOpen] = useState(false);
+
   if (status.subtype === "complete") return null;
 
   if (status.subtype === "thought") {
@@ -606,7 +608,6 @@ export function StatusMessage({
   }
 
   // ─── Collapsible detail row (used by generating_file and reading_skill) ───
-  const [detailOpen, setDetailOpen] = useState(false);
 
   if (status.subtype === 'generating_file') {
     const docType: string = status.data?.docType ?? '';

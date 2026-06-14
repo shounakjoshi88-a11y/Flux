@@ -197,7 +197,7 @@ export function MessageList({
                   sources={
                     message.sources && message.sources.length > 0
                       ? message.sources
-                      : activeSources
+                      : String(message.id).startsWith("temp-") ? activeSources : []
                   }
                   onCitationClick={(index) => setActiveCitationIndex(index)}
                   onFollowUpClick={onFollowUpClick}

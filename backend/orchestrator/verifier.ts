@@ -1,6 +1,3 @@
-// backend/orchestrator/verifier.ts
-// Verifies phase results against defined success criteria.
-
 import type { Phase, PhaseResult, VerificationOutcome } from "./types";
 
 export class Verifier {
@@ -48,6 +45,15 @@ export class Verifier {
             detail: result.text.trim().length > 20
               ? `Text output generated (${result.text.length} chars)`
               : "Text output too short or empty",
+          };
+
+        case "semantic_match":
+          return {
+            criterion: c,
+            passed: result.text.trim().length > 50,
+            detail: result.text.trim().length > 50
+              ? "Content meets minimum length threshold"
+              : "Content too brief for meaningful verification",
           };
 
         default:

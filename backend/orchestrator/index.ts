@@ -1,4 +1,3 @@
-// backend/orchestrator/index.ts
 export { OrchestratorEngine } from "./orchestrator";
 export { Planner } from "./planner";
 export { Verifier } from "./verifier";
@@ -10,4 +9,5 @@ export type {
   WorkflowKind,
   VerificationCriterion,
   VerificationOutcome,
+  PhaseType,
 } from "./types";

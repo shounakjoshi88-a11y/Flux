@@ -1,40 +1,28 @@
 // src/components/MessageItem.tsx
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import TodoList from "./TodoList";
+import ToolSummaryComponent from "./ToolSummary";
 
-// ─── Typewriter hook ────────────────────────────────────────
+// ─── Typewriter hook — only for streaming messages ──────────
 function useTypewriter(fullText: string, messageId: string | number): string {
-  const [displayedLength, setDisplayedLength] = useState(fullText.length);
+  const isStreaming = String(messageId).startsWith("temp-");
+  const [displayedLength, setDisplayedLength] = useState(() =>
+    isStreaming ? 0 : fullText.length
+  );
+
+  // Non-streaming: show full text immediately
+  const showFull = !isStreaming;
+  const prevShowFull = useRef(showFull);
+  if (showFull && !prevShowFull.current) {
+    setDisplayedLength(fullText.length);
+  }
+  prevShowFull.current = showFull;
+
   const fullTextRef = useRef(fullText);
-  const prevFullTextRef = useRef(fullText);
   fullTextRef.current = fullText;
-  const stateRef = useRef({ msgId: messageId, streaming: String(messageId).startsWith("temp-") });
-
-  // Handle message identity transitions
-  if (stateRef.current.msgId !== messageId) {
-    const prevStreaming = stateRef.current.streaming;
-    const nowStreaming = String(messageId).startsWith("temp-");
-    stateRef.current = { msgId: messageId, streaming: nowStreaming };
-
-    if (nowStreaming) {
-      // New streaming message — start typewriter from 0
-      if (displayedLength !== 0) setDisplayedLength(0);
-    } else if (!prevStreaming) {
-      // Loaded a different finished message — show full text
-      if (displayedLength !== fullText.length) setDisplayedLength(fullText.length);
-    }
-    // prevStreaming → !nowStreaming: stream just ended, typewriter keeps catching up
-  }
-
-  // Detect when text is NOT a continuation (new segment after tool/thought)
-  if (fullText !== prevFullTextRef.current) {
-    if (!prevFullTextRef.current || !fullText.startsWith(prevFullTextRef.current)) {
-      setDisplayedLength(0);
-    }
-    prevFullTextRef.current = fullText;
-  }
 
   useEffect(() => {
+    if (!isStreaming) return;
     const interval = setInterval(() => {
       setDisplayedLength(prev => {
         if (prev < fullTextRef.current.length) {
@@ -44,7 +32,8 @@ function useTypewriter(fullText: string, messageId: string | number): string {
       });
     }, 25);
     return () => clearInterval(interval);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStreaming]);
 
   return fullText.slice(0, displayedLength);
 }
@@ -99,6 +88,8 @@ type MessageItemProps = {
 };
 
 import { StatusMessage } from "./StatusMessage";
+import PlanDisplayComponent from "./PlanDisplay";
+import PermissionDialogComponent from "./PermissionDialog";
 import { BACKEND_URL } from "@/lib/config";
 import { createClient } from "@/lib/client";
 
@@ -656,22 +647,39 @@ function PartsRenderer({
           break;
         }
 
-        renderedParts.push(
-          <div key={`tool-${i}`} className="mb-0.5">
-            <StatusMessage
-              status={{
-                type: part.name,
-                subtype: part.name,
-                message: part.output || "",
-                data: part.input,
-              }}
-              isFirst={i === 0 || parts[i - 1]?.type !== "tool_call" || parts[i - 1]?.name === 'reading_skill'}
-              isLast={i === parts.length - 1 || parts[i + 1]?.type !== "tool_call"}
-              isActive={isStreaming && part.status === "running"}
-              showRail={true}
-            />
-          </div>
-        );
+        // Group consecutive non-search tool calls into a ToolSummary
+        const toolParts: MessagePart[] = [part];
+        let j = i + 1;
+        while (j < parts.length && parts[j]?.type === "tool_call" && !isSearchStep(parts[j])) {
+          toolParts.push(parts[j]);
+          j++;
+        }
+        i = j - 1;
+
+        if (toolParts.length > 1) {
+          renderedParts.push(
+            <div key={`tool-summary-${i}`} className="mb-2">
+              <ToolSummaryComponent tools={toolParts} />
+            </div>
+          );
+        } else {
+          renderedParts.push(
+            <div key={`tool-${i}`} className="mb-0.5">
+              <StatusMessage
+                status={{
+                  type: part.name,
+                  subtype: part.name,
+                  message: part.output || "",
+                  data: part.input,
+                }}
+                isFirst={i === 0 || parts[i - 1]?.type !== "tool_call"}
+                isLast={i === parts.length - 1 || parts[i + 1]?.type !== "tool_call"}
+                isActive={isStreaming && part.status === "running"}
+                showRail={true}
+              />
+            </div>
+          );
+        }
         break;
       }
       case "thought": {
@@ -731,6 +739,71 @@ function PartsRenderer({
         renderedParts.push(
           <div key={`todos-${i}`} className="mb-0.5 ml-1">
             <TodoList items={part.items} />
+          </div>
+        );
+        break;
+      }
+      case "plan": {
+        renderedParts.push(
+          <div key={`plan-${i}`} className="mb-0.5">
+            <PlanDisplayComponent
+              steps={part.steps}
+              userIntent={part.userIntent}
+              reasoning={part.reasoning}
+            />
+          </div>
+        );
+        break;
+      }
+      case "permission": {
+        if (part.status === "pending") {
+          renderedParts.push(
+            <div key={`perm-${i}`} className="mb-0.5">
+              <PermissionDialogComponent
+                request={{
+                  id: part.id,
+                  toolName: part.toolName,
+                  args: part.args,
+                  description: part.description,
+                }}
+                onRespond={(id, approved) => {
+                  const targetId = typeof messageId === 'number' ? String(messageId) : messageId;
+                }}
+              />
+            </div>
+          );
+        }
+        break;
+      }
+      case "tool_group": {
+        renderedParts.push(
+          <div key={`toolgrp-${i}`} className="mb-0.5">
+            <div className="mt-2 rounded-lg border border-zinc-700/50 bg-zinc-800/20 px-3 py-2">
+              <div className="text-xs text-zinc-400 font-medium mb-1">Running {part.tools.length} tool(s)...</div>
+              <div className="space-y-1">
+                {part.tools.map((tool, ti) => (
+                  <div key={ti} className="flex items-center gap-2 text-xs text-zinc-500">
+                    <span className="size-1.5 rounded-full bg-amber-500/50 animate-pulse" />
+                    <span className="font-mono">{tool.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+        break;
+      }
+      case "agent_status": {
+        renderedParts.push(
+          <div key={`astatus-${i}`} className="mb-0.5">
+            <div className="mt-2 flex items-center gap-2 text-xs text-zinc-500 border-l-2 border-zinc-700/30 pl-3 py-1">
+              <span className={`size-1.5 rounded-full ${
+                part.status === "connected" ? "bg-emerald-500" :
+                part.status === "processing" ? "bg-amber-500 animate-pulse" :
+                part.status === "error" ? "bg-red-500" : "bg-zinc-500"
+              }`} />
+              {part.message}
+            </div>
           </div>
         );
         break;
@@ -844,6 +917,96 @@ function ScrollableSourceCascade({
 }
 
 /* ------------------------------------------------------------------ */
+/*  UserFileAttachment — lazy-loads content for historical messages   */
+/* ------------------------------------------------------------------ */
+function UserFileAttachment({
+  file,
+  messageId,
+  index,
+  onFileClick,
+  onFileDelete,
+}: {
+  file: { name: string; content?: string; type?: string };
+  messageId: string | number;
+  index: number;
+  onFileClick?: (file: { name: string; content: string }) => void;
+  onFileDelete?: (name: string) => void;
+}) {
+  const [content, setContent] = useState<string | null>(file.content ?? null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (content) return;
+    const isOptimistic = typeof messageId !== 'number' || messageId < 0;
+    if (isOptimistic) return;
+
+    const fetchContent = async () => {
+      setLoading(true);
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (!token) return;
+
+        const res = await fetch(`${BACKEND_URL}/api/assets/${messageId}/upload/${index}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.base64) setContent(data.base64);
+        }
+      } catch (e) {
+        console.error("Failed to load attachment:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchContent();
+  }, [content, messageId, index]);
+
+  const ext = file.name.split('.').pop()?.toUpperCase() || 'FILE';
+  const lineCount = content ? content.split('\n').length : 0;
+  const isImage = file.type?.startsWith('image/');
+
+  return (
+    <div
+      className="group/file relative flex flex-col bg-[var(--surface-bg)] border border-[var(--surface-border)] rounded-xl p-3 min-w-[140px] max-w-[200px] w-auto hover:border-[var(--accent)]/30 transition-all cursor-pointer"
+      onClick={() => onFileClick?.({ name: file.name, content: content ?? "" })}
+    >
+      {loading ? (
+        <div className="flex items-center justify-center h-20 mb-2">
+          <div className="size-4 border-2 border-[var(--border-border)] border-t-[var(--text-primary)] rounded-full animate-spin" />
+        </div>
+      ) : isImage && content ? (
+        <img src={content.startsWith('data:') ? content : `data:image/png;base64,${content}`} alt={file.name} className="w-full h-20 object-cover rounded-lg mb-2" />
+      ) : isImage && !content ? (
+        <div className="flex items-center justify-center h-20 mb-2 text-[var(--text-muted)] text-xs">Image unavailable</div>
+      ) : (
+        <>
+          <div className="font-medium text-sm text-[var(--text-primary)] truncate tracking-tight">{file.name}</div>
+          <div className="text-[11px] text-[var(--text-muted)] mt-1">{lineCount > 0 ? `${lineCount} lines` : 'Text file'}</div>
+        </>
+      )}
+      <div className="mt-2 flex items-center justify-between">
+        <span className="text-[9px] px-2 py-0.5 border border-[var(--surface-border)] rounded bg-[var(--bg-primary)] text-[var(--text-muted)] font-medium">{ext}</span>
+        {onFileDelete && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onFileDelete(file.name);
+            }}
+            className="opacity-0 group-hover/file:opacity-100 p-1 rounded hover:bg-red-500/15 text-red-400 transition-all"
+            title="Delete attachment"
+          >
+            <Trash2 className="size-3" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Math helpers                                                      */
 /* ------------------------------------------------------------------ */
 function tokenizeInlineMath(text: string): { type: "text" | "math"; value: string }[] {
@@ -925,13 +1088,23 @@ export function MessageItem({
     return { reasoningText, cleanDisplayAnswer };
   }, [message.content]);
 
+  // ── Unconditional hooks (moved up to avoid conditional hook count violations) ──
+  const [userCopied, setUserCopied] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const _hasParts = !!(message.parts && message.parts.length > 0);
+  const _lastTextPart = _hasParts
+    ? [...message.parts!].reverse().find((p): p is MessagePart & { type: "text" } => p.type === "text")
+    : null;
+  const _typewriterText = _lastTextPart ? _lastTextPart.text : parsedContentBundle.cleanDisplayAnswer;
+  const typewriterContent = useTypewriter(_typewriterText, message.id);
+
   // ── USER MESSAGE ──
   if (message.role === "User") {
     const content = message.content;
     const fileAttachments = message.fileAttachment;
     const cleanContent = content.replace(/\s*\[attached: [^\]]+\]\s*/g, "").trim();
 
-    const [userCopied, setUserCopied] = useState(false);
+    
 
     const handleUserCopy = async () => {
       try {
@@ -947,43 +1120,16 @@ export function MessageItem({
       <div className="flex flex-col items-end gap-2 mt-8 max-w-[85%] ml-auto">
         {fileAttachments && fileAttachments.length > 0 && (
           <div className="flex flex-wrap justify-end gap-2 mb-2 w-full">
-            {fileAttachments.map((file, idx) => {
-              const ext = file.name.split('.').pop()?.toUpperCase() || 'FILE';
-              const lineCount = file.content ? file.content.split('\n').length : 0;
-              const isImage = file.type?.startsWith('image/');
-
-              return (
-                <div
-                  key={file.name + idx}
-                  className="group/file relative flex flex-col bg-[var(--surface-bg)] border border-[var(--surface-border)] rounded-xl p-3 min-w-[140px] max-w-[200px] w-auto hover:border-[var(--accent)]/30 transition-all cursor-pointer"
-                  onClick={() => onFileClick?.({ name: file.name, content: file.content ?? "" })}
-                >
-                  {isImage ? (
-                    <img src={file.content} alt={file.name} className="w-full h-20 object-cover rounded-lg mb-2" />
-                  ) : (
-                    <>
-                      <div className="font-medium text-sm text-[var(--text-primary)] truncate tracking-tight">{file.name}</div>
-                      <div className="text-[11px] text-[var(--text-muted)] mt-1">{lineCount > 0 ? `${lineCount} lines` : 'Text file'}</div>
-                    </>
-                  )}
-                  <div className="mt-2 flex items-center justify-between">
-                    <span className="text-[9px] px-2 py-0.5 border border-[var(--surface-border)] rounded bg-[var(--bg-primary)] text-[var(--text-muted)] font-medium">{ext}</span>
-                    {onFileDelete && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onFileDelete(message.id, file.name, 'fileAttachment');
-                        }}
-                        className="opacity-0 group-hover/file:opacity-100 p-1 rounded hover:bg-red-500/15 text-red-400 transition-all"
-                        title="Delete attachment"
-                      >
-                        <Trash2 className="size-3" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            {fileAttachments.map((file, idx) => (
+              <UserFileAttachment
+                key={file.name + idx}
+                file={file}
+                messageId={message.id}
+                index={idx}
+                onFileClick={onFileClick}
+                onFileDelete={onFileDelete ? (name) => onFileDelete(message.id, name, 'fileAttachment') : undefined}
+              />
+            ))}
           </div>
         )}
 
@@ -1033,8 +1179,6 @@ export function MessageItem({
       ? message.sources
       : externalSources ?? [];
 
-  const [copied, setCopied] = useState(false);
-
   const handleCopyAnswer = async () => {
     try {
       await navigator.clipboard.writeText(parsedContentBundle.cleanDisplayAnswer);
@@ -1053,15 +1197,6 @@ export function MessageItem({
   const hasImages = generatedFiles.some(f => f.mime?.startsWith("image/"));
   const shouldShowMessageItem = cleanContent.trim() !== "" || hasImages || generatedFiles.length > 0;
 
-  const hasParts = !!(message.parts && message.parts.length > 0);
-
-  // When parts are present, typewriter animates the last text segment only
-  const lastTextPart = hasParts
-    ? [...message.parts!].reverse().find((p): p is MessagePart & { type: "text" } => p.type === "text")
-    : null;
-  const typewriterText = lastTextPart ? lastTextPart.text : cleanContent;
-  const typewriterContent = useTypewriter(typewriterText, message.id);
-
   return (
     <div className="assistant-section">
       {/* ─── INLINE GENERATION INDICATOR ─── */}
@@ -1072,7 +1207,7 @@ export function MessageItem({
         />
       )}
 
-      {hasParts ? (
+      {_hasParts ? (
         <>
           <PartsRenderer
             parts={message.parts!}

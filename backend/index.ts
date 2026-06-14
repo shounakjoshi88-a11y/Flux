@@ -19,6 +19,9 @@ import { nim } from './nim-client';
 import { buildPPTX, buildDOCX, buildPDF, buildXLSX, buildCSV, buildTSV, buildMD, buildJSON, buildSQL, buildHTML } from './agent-tools';
 import type { GeneratedFileResult } from './agent-tools';
 import { retrieveMemories, extractMemories, buildMemoryContext, pruneMemories } from './memory';
+import { toolRegistry } from './tool-registry';
+import http from "http";
+import { createAgentWebSocket } from './agent-protocol';
 
 const client = tavily({ apiKey: process.env.TAVILY_API_KEY });
 const app = express();
@@ -125,6 +128,11 @@ app.get("/health", async (req, res) => {
     }
 });
 
+// ── Tool registry API ──────────────────────────────────────
+app.get('/api/tools', (req, res) => {
+    res.json({ tools: toolRegistry.getToolList() });
+});
+
 // ── Sanitisation helpers ───────────────────────────────────
 function sanitizeLocation(input: string): string {
     return input.replace(/[^a-zA-Z0-9\s,.'-]/g, '').slice(0, 100);
@@ -188,29 +196,42 @@ function slugify(input: string) {
 }
 
 // ── Auto‑rename ─────────────────────────────────────────────
+const TITLE_MODEL = nim.chatModel('nvidia/nemotron-mini-4b-instruct');
+
 async function autoRenameConversation(
     conversationId: string,
     firstQuery: string,
-    model: any,
     docIntent?: string | null
 ) {
     try {
-        const safeQuery = firstQuery.replace(/"/g, '\\"').slice(0, 200);
+        const safeQuery = firstQuery.replace(/["\n\r]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+        if (!safeQuery) return;
 
         let context = "";
         if (docIntent === "image") context = "The user created an image. ";
         else if (docIntent) context = `The user created a ${docIntent.toUpperCase()} document. `;
 
-        const titlePrompt = `Create a short, descriptive title (max 6 words, no quotes) for a conversation.
-${context}Initial request: "${safeQuery}"
+        const { text } = await generateText({
+            model: TITLE_MODEL,
+            messages: [
+                {
+                    role: 'system',
+                    content: 'You are a title generator. Respond with ONLY a short title (5-10 words). No quotes, no punctuation, no explanation.',
+                },
+                {
+                    role: 'user',
+                    content: `${context}Generate a title for a conversation that starts with: ${safeQuery}`,
+                },
+            ],
+            maxTokens: 30,
+            temperature: 0.1,
+            signal: AbortSignal.timeout(6000),
+        } as any);
 
-Respond with ONLY the title text.
-Title:`;
-
-        const { text } = await generateText({ model, prompt: titlePrompt, maxTokens: 40, signal: AbortSignal.timeout(8000) } as any);
         let clean = sanitizeTitle((text ?? '').trim());
 
-        // Force prefix if model forgot and we have an intent
+        if (!clean || clean.length > 80) clean = safeQuery.slice(0, 80);
+
         if (docIntent === "image" && !clean.toLowerCase().includes("image")) clean = `Image: ${clean}`;
         else if (docIntent && docIntent !== "image" && !clean.toLowerCase().includes(docIntent.toLowerCase())) {
             clean = `${docIntent.toUpperCase()}: ${clean}`;
@@ -254,6 +275,88 @@ function sendStatus(res: any, subtype: string, message: string, data?: any, trac
 function sendProgress(res: any, subtype: string, progress: number, message: string, data?: any) {
     if (res.writableEnded) return;
     res.write(`event: status\ndata: ${JSON.stringify({ type: "status", subtype, message, data: data || null, progress })}\n\n`);
+}
+
+// ── Enhanced SSE events (AionUi-style) ─────────────────────
+
+function sendPlan(res: any, plan: any) {
+    if (res.writableEnded) return;
+    res.write(`event: plan\ndata: ${JSON.stringify({ type: "plan", steps: plan.steps, userIntent: plan.userIntent, reasoning: plan.reasoning, estimatedSteps: plan.estimatedSteps })}\n\n`);
+}
+
+function sendAgentStatus(res: any, status: string, message: string, data?: any) {
+    if (res.writableEnded) return;
+    res.write(`event: agent_status\ndata: ${JSON.stringify({ type: "agent_status", status, message, data: data || null })}\n\n`);
+}
+
+function sendPermissionRequest(res: any, id: string, toolName: string, args: any, description: string) {
+    if (res.writableEnded) return;
+    res.write(`event: permission\ndata: ${JSON.stringify({ type: "permission", id, toolName, args, description })}\n\n`);
+}
+
+function sendToolGroup(res: any, tools: any[]) {
+    if (res.writableEnded) return;
+    res.write(`event: tool_group\ndata: ${JSON.stringify({ type: "tool_group", tools })}\n\n`);
+}
+
+function sendToolCall(res: any, toolName: string, args: any, status: string, result?: any) {
+    if (res.writableEnded) return;
+    res.write(`event: tool_call\ndata: ${JSON.stringify({ type: "tool_call", toolName, args, status, result })}\n\n`);
+}
+
+// ── Permission approval store (in-memory, per-session) ────
+interface PendingPermission {
+    id: string;
+    toolName: string;
+    args: any;
+    description: string;
+    userId: string;
+    resolve: (approved: boolean) => void;
+    timestamp: number;
+}
+const pendingPermissions = new Map<string, PendingPermission>();
+const PERMISSION_TIMEOUT = 60_000; // 1 minute
+
+// Periodic cleanup of expired permissions
+setInterval(() => {
+    const now = Date.now();
+    for (const [id, perm] of pendingPermissions) {
+        if (now - perm.timestamp > PERMISSION_TIMEOUT) {
+            perm.resolve(false);
+            pendingPermissions.delete(id);
+        }
+    }
+}, 30_000);
+
+// Permission approval endpoint
+app.post('/api/permissions/respond', middleware, async (req: any, res: any) => {
+    const uid = req.appUserId!;
+    const { id, approved } = req.body as { id: string; approved: boolean };
+    if (!id) return res.status(400).json({ error: 'Missing permission id' });
+    const perm = pendingPermissions.get(id);
+    if (!perm) return res.status(404).json({ error: 'Permission request not found or expired' });
+    if (perm.userId !== uid) return res.status(403).json({ error: 'Not your permission request' });
+    perm.resolve(!!approved);
+    pendingPermissions.delete(id);
+    res.json({ success: true });
+});
+
+function createPermissionRequest(uid: string, toolName: string, args: any, description: string): Promise<boolean> {
+    return new Promise((resolve) => {
+        const id = `perm_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        pendingPermissions.set(id, {
+            id, toolName, args, description, userId: uid,
+            resolve, timestamp: Date.now(),
+        });
+        // Auto-approve after timeout if no response (safety valve)
+        setTimeout(() => {
+            const perm = pendingPermissions.get(id);
+            if (perm) {
+                perm.resolve(true);
+                pendingPermissions.delete(id);
+            }
+        }, PERMISSION_TIMEOUT);
+    });
 }
 
 function cleanAnswerChunk(text: string): string {
@@ -1182,10 +1285,13 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                 'Your training data is from 2024-2025 — this tool returns FRESH results from the present day. ' +
                 'CRITICAL: After this tool returns, IGNORE what your training data says and answer ONLY from these results. ' +
                 'Always include the current year/month in your query. ' +
-                'Do NOT use for general knowledge, logic, math, or basic greetings.',
+                'Do NOT use for general knowledge, logic, math, or basic greetings. ' +
+                'NEVER search for your own internal thoughts, self-talk, reasoning, or meta-commentary. Only search for what the user explicitly asked about.',
             parameters: z.object({
                 query: z.string().describe(
-                    'A precise, targeted search query — not the user\'s raw words. REQUIRED — always provide a specific query.'
+                    'A precise, targeted search query derived from the user\'s explicit request. ' +
+                    'The query must relate to a real topic the user asked about — never your own thoughts, reasoning, or self-talk. ' +
+                    'REQUIRED — always provide a specific query.'
                 ),
                 queries: z.array(z.string()).describe(
                     'Alternative to query: multiple search queries to run in parallel. ' +
@@ -1246,7 +1352,24 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                         if (c.length > 1500) c = c.slice(0, 1500) + '...';
                         return `[${i + 1}] ${r.url}\n${r.title ? r.title + '\n' : ''}${c}`;
                     }).join('\n\n');
-                    return `[IMPORTANT: These search results are from the CURRENT DATE. You MUST answer using ONLY this data — do NOT rely on your training knowledge. Today is not 2024 or 2025. Ignore any dates in your training data that contradict these results.]\n\n${resultsText}`;
+                    let extraContent = '';
+                    try {
+                        const topUrls = (results.results ?? []).slice(0, 2).map((r: any) => r.url).filter(Boolean);
+                        if (topUrls.length > 0) {
+                            sendStatus(res, 'reading', 'Extracting full content from top sources...', {}, state.thoughtProcess);
+                            const extractResult = await client.extract(topUrls);
+                            const extracted = extractResult?.results?.filter((r: any) => r.rawContent) ?? [];
+                            if (extracted.length > 0) {
+                                extraContent = '\n\n--- Full page content from top sources ---\n' + extracted.map((r: any, i: number) => {
+                                    const txt = r.rawContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                                    return `[SOURCE ${i + 1}] ${r.url || topUrls[i]}\n${txt.slice(0, 4000)}`;
+                                }).join('\n\n');
+                            }
+                        }
+                    } catch (e: any) {
+                        console.warn('[TOOL] web_search extract failed (non-fatal):', e?.message ?? e);
+                    }
+                    return `[IMPORTANT: These search results are from the CURRENT DATE. You MUST answer using ONLY this data — do NOT rely on your training knowledge. Today is not 2024 or 2025. Ignore any dates in your training data that contradict these results.]\n\n${resultsText}${extraContent}`;
                 } catch (e: any) {
                     sendStatus(res, 'error', 'Search failed.', undefined, state.thoughtProcess);
                     return `Search failed: ${e.message}`;
@@ -1959,6 +2082,14 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                 agentState.thoughtProcess.push(ev);
                 if (!res.writableEnded) res.write(`event: thought\ndata: ${JSON.stringify(ev)}\n\n`);
             },
+            writeTodos: (items) => {
+                if (!res.writableEnded) res.write(`event: todos\ndata: ${JSON.stringify({ type: 'todos', items })}\n\n`);
+            },
+            writePlan: (plan) => sendPlan(res, plan),
+            writePermission: (id, toolName, args, description) => sendPermissionRequest(res, id, toolName, args, description),
+            writeToolCall: (toolName, args, status, result) => sendToolCall(res, toolName, args, status, result),
+            writeToolGroup: (tools) => sendToolGroup(res, tools),
+            writeAgentStatus: (status, message) => sendAgentStatus(res, status, message),
             get writableEnded() { return res.writableEnded; },
         };
 
@@ -2117,7 +2248,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                                 txt = String(result);
                             }
                         }
-                        collectedToolResults.push({ name, result: String(txt ?? '').slice(0, 4000) });
+                        collectedToolResults.push({ name, result: String(txt ?? '').slice(0, 20000) });
                     } catch (toolErr) {
                         console.warn('[ASK] tool-result handler error:', (toolErr as any)?.message);
                     }
@@ -2309,8 +2440,24 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
             const hadSources = agentState.sources.length > 0;
             const hadFiles = agentState.generatedFiles.length > 0;
 
-            if (!charsSent && hadSources && !res.writableEnded) {
-                console.log('[ASK] charsSent=0 with sources — attempting answer synthesis');
+            // Check if the model only echoed source URLs without real synthesis
+            let nonUrlLen = charsSent;
+            let containsSources = false;
+            if (hadSources && fullText) {
+                let stripped = fullText;
+                for (const s of agentState.sources) {
+                    if (s?.url && stripped.includes(s.url)) {
+                        containsSources = true;
+                        stripped = stripped.split(s.url).join('');
+                    }
+                }
+                nonUrlLen = stripped.length;
+            }
+            const isUrlOnly = containsSources && charsSent > 0 && (nonUrlLen < 200 || nonUrlLen / fullText.length < 0.3);
+            const shouldSynthesize = (!charsSent || isUrlOnly) && hadSources && !res.writableEnded;
+
+            if (shouldSynthesize) {
+                console.log(`[ASK] ${charsSent ? 'url-only echo detected' : 'charsSent=0'} with sources — attempting answer synthesis`);
                 console.log('[ASK] collectedToolResults length:', collectedToolResults.length);
 
                 const searchResults = collectedToolResults
@@ -2365,10 +2512,19 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
             }
 
             if (!charsSent && !res.writableEnded) {
-                const msg = 'Received results. Please try rephrasing your question for a more detailed answer.';
-                console.log('[ASK] last-resort safety net fired');
-                writeSafeSSE(res, msg);
-                fullText += msg;
+                const nonSearchResults = collectedToolResults.filter(r => r.name !== 'web_search');
+                if (nonSearchResults.length > 0) {
+                    const resultText = nonSearchResults.map(r => r.result).join('\n\n');
+                    console.log(`[ASK] synthesized from ${nonSearchResults.length} non-search tool results`);
+                    writeSafeSSE(res, resultText);
+                    charsSent += resultText.length;
+                    fullText += resultText;
+                } else {
+                    const msg = 'Received results. Please try rephrasing your question for a more detailed answer.';
+                    console.log('[ASK] last-resort safety net fired');
+                    writeSafeSSE(res, msg);
+                    fullText += msg;
+                }
             }
         }
 
@@ -2418,7 +2574,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                         },
                     });
                     savedMid = created.id.toString();
-                    if (!isFollowUp) autoRenameConversation(activeConversationId, nq, model).catch(() => { });
+                    if (!isFollowUp) autoRenameConversation(activeConversationId, nq).catch(() => { });
                     if (memEnabled && cleanAnswer) {
                         extractMemories([{ role: 'user', content: nq }, { role: 'assistant', content: cleanAnswer }], uid, activeConversationId, model)
                             .then(() => pruneMemories(uid))
@@ -2505,7 +2661,7 @@ app.post('/api/chat-sdk', middleware, async (req: any, res: any) => {
             'Connection': 'keep-alive',
         });
 
-        const response = result.toDataStreamResponse();
+        const response = result.toTextStreamResponse();
         const reader = response.body!.getReader();
 
         const pump = async () => {
@@ -3001,5 +3157,115 @@ app.get("/proxy", middleware, async (req: any, res: any) => {
     }
 });
 
+// ── MODEL DISCOVERY ──────────────────────────────────────────
+const AVAILABLE_MODELS = [
+  { category: "General Purpose", models: [
+    { id: "mistral-large-675b", label: "Mistral Large 3 675B (Mistral AI)" },
+    { id: "glm-5.1", label: "GLM 5.1 (Z‑AI)" },
+    { id: "kimi-k2.6", label: "Kimi K2.6 (Moonshot AI)" },
+    { id: "nemotron-3-ultra-550b", label: "Nemotron 3 Ultra 550B (NVIDIA)" },
+    { id: "mistral-medium-3.5-128b", label: "Mistral Medium 3.5 128B (Mistral AI)" },
+    { id: "nemotron-3-super-120b-a12b", label: "Nemotron 3 Super 120B (NVIDIA)" },
+    { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash (DeepSeek)" },
+    { id: "qwen3.5-397b-a17b", label: "Qwen 3.5 397B (Qwen)" },
+    { id: "minimax-m2.7", label: "MiniMax M2.7 (MiniMax)" },
+    { id: "stockmark-2-100b-instruct", label: "Stockmark 2 100B (Stockmark)" },
+    { id: "nemotron-nano-12b-v2-vl", label: "Nemotron Nano 12B v2 VL (NVIDIA)" },
+    { id: "nemotron-mini-4b", label: "Nemotron Mini 4B (NVIDIA)" },
+    { id: "sarvamai", label: "Sarvamai (Sarvamai)" },
+  ]},
+  { category: "Reasoning & Agents", models: [
+    { id: "step-3.7-flash", label: "Step 3.7 Flash (StepFun)" },
+    { id: "step-3.5-flash", label: "Step 3.5 Flash (StepFun)" },
+    { id: "nemotron-3-nano-omni-30b-a3b-reasoning", label: "Nemotron 3 Nano Omni 30B Reasoning (NVIDIA)" },
+  ]},
+];
+
+app.get("/api/models", (_req, res) => {
+  res.json({ categories: AVAILABLE_MODELS, all: AVAILABLE_MODELS.flatMap((c) => c.models) });
+});
+
+// ── ACP HANDSHAKE / CAPABILITIES ───────────────────────────
+app.get("/api/acp/capabilities", (_req, res) => {
+  res.json({
+    protocolVersion: 1,
+    agentInfo: {
+      name: "Flux",
+      version: "1.0.0",
+      description: "Flux AI agent with tool orchestration and team mode",
+    },
+    capabilities: {
+      supportsStreaming: true,
+      supportsVision: true,
+      supportsThinking: true,
+      maxTools: 10,
+      maxSteps: 8,
+      supportedModes: ["default", "plan", "yolo"],
+      availableTools: toolRegistry.getToolList().map((t) => ({
+        name: t.name,
+        description: t.description,
+        category: t.category,
+        requiresApproval: t.requiresApproval,
+      })),
+    },
+    configOptions: {
+      categories: [
+        {
+          name: "mode",
+          options: [
+            { value: "default", label: "Default — ask before tool execution" },
+            { value: "plan", label: "Plan — create execution plan first" },
+            { value: "yolo", label: "YOLO — execute without asking" },
+          ],
+        },
+      ],
+    },
+  });
+});
+
+// ── CUSTOM AGENTS ───────────────────────────────────────────
+interface CustomAgentEntry {
+  id: string;
+  name: string;
+  command: string;
+  args: string[];
+  env?: Array<{ name: string; value: string }>;
+  icon?: string;
+  advanced?: {
+    yolo_id?: string;
+    native_skills_dirs?: string[];
+    description?: string;
+  };
+  createdAt: string;
+}
+
+const customAgents: Map<string, CustomAgentEntry> = new Map();
+
+app.get("/api/agents/custom", (_req, res) => {
+  res.json({ agents: [...customAgents.values()] });
+});
+
+app.post("/api/agents/custom", (req, res) => {
+  const { name, command, args, env, icon, advanced } = req.body || {};
+  if (!name || !command) return res.status(400).json({ error: "name and command required" });
+  const id = `custom_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const entry: CustomAgentEntry = {
+    id, name, command, args: args || [], env, icon, advanced,
+    createdAt: new Date().toISOString(),
+  };
+  customAgents.set(id, entry);
+  res.status(201).json({ agent: entry });
+});
+
+app.delete("/api/agents/custom/:id", (req, res) => {
+  if (!customAgents.delete(req.params.id!)) return res.status(404).json({ error: "not found" });
+  res.json({ ok: true });
+});
+
 // ── SERVER START ─────────────────────────────────────────────
-app.listen(3001, () => { console.log("Flux backend running on port 3001"); });
+const server = http.createServer(app);
+
+// Attach Agent Protocol WebSocket handler
+createAgentWebSocket(server);
+
+server.listen(3001, () => { console.log("Flux backend running on port 3001"); });

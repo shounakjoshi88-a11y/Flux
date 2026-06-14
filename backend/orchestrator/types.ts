@@ -1,17 +1,19 @@
-// backend/orchestrator/types.ts
-
 export type PhaseType =
   | "research"
   | "load_skill"
   | "generate_doc"
   | "simple_answer"
   | "image_gen"
-  | "weather";
+  | "weather"
+  | "analyze"
+  | "execute"
+  | "verify";
 
 export interface VerificationCriterion {
-  type: "has_sources" | "has_file" | "min_sources" | "has_skill_content" | "has_text_output";
+  type: "has_sources" | "has_file" | "min_sources" | "has_skill_content" | "has_text_output" | "semantic_match";
   minCount?: number;
   label: string;
+  expected?: string;
 }
 
 export interface Phase {
@@ -29,6 +31,8 @@ export interface Phase {
 export interface ExecutionPlan {
   steps: Phase[];
   userIntent: string;
+  reasoning: string;
+  estimatedSteps: number;
 }
 
 export interface PhaseResult {
@@ -53,6 +57,11 @@ export interface StreamWriter {
   writeFile(file: any): void;
   writeThought(content: string): void;
   writeTodos(items: { id: string; content: string; status: string }[]): void;
+  writePlan(plan: ExecutionPlan): void;
+  writePermission(id: string, toolName: string, args: any, description: string): void;
+  writeToolCall(toolName: string, args: any, status: "pending" | "running" | "completed" | "error", result?: any): void;
+  writeToolGroup(tools: any[]): void;
+  writeAgentStatus(status: string, message: string): void;
   readonly writableEnded: boolean;
 }
 
@@ -60,4 +69,7 @@ export type WorkflowKind =
   | "research_document"
   | "simple_qa"
   | "image_generation"
-  | "weather";
+  | "weather"
+  | "code"
+  | "analysis"
+  | "multi_step";

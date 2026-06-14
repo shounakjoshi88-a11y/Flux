@@ -1,6 +1,4 @@
-// backend/orchestrator/orchestrator.ts
-// Deterministic plan → execute → verify → revise loop for agentic workflows.
-
+import { generateText } from 'ai';
 import { Planner } from "./planner";
 import { Verifier } from "./verifier";
 import type {
@@ -29,6 +27,7 @@ interface OrchestratorInput {
     model: any,
     skillContent: string
   ) => Promise<any>;
+  requestToolApproval?: (toolName: string, args: any) => Promise<boolean>;
 }
 
 interface OrchestratorOutput {
@@ -44,15 +43,80 @@ export class OrchestratorEngine {
   private verifier = new Verifier();
 
   async process(input: OrchestratorInput): Promise<OrchestratorOutput> {
-    const { query, tools, agentState, stream, model, skillRegistry, fetchSkillFile, generateDocumentWithSkill } = input;
+    const {
+      query, tools, agentState, stream, model,
+      skillRegistry, fetchSkillFile, generateDocumentWithSkill,
+      requestToolApproval,
+    } = input;
 
     const { plan, workflow } = this.planner.analyze(query);
 
-    // For document-generation workflows, let the AI SDK streaming path handle
-    // the multi-step tool calling so the model can explain each step
-    // conversationally (search → explain → read_skill → explain → generate).
-    // The orchestrator only handles quick non-document tasks here.
+    // For research_document workflow, execute the full plan deterministically:
+    // research → load_skill → generate_doc. This is faster and more reliable
+    // than relying on the model to chain tool calls correctly.
     if (workflow === "research_document") {
+      stream.writePlan(plan);
+      stream.writeStatus("orchestrator", "Starting document generation workflow...", {});
+
+      // Execute the full plan
+      const result = await this.executePlan(plan, input, workflow);
+
+      // Generate summary text if document was created
+      const hasFiles = agentState.generatedFiles.length > 0;
+      const topic = extractTopicFromQuery(query) || "document";
+      const summary = hasFiles
+        ? `I've created your document about "${topic}". You can download it below.`
+        : `I researched "${topic}" but couldn't generate the document.`;
+
+      stream.writeText(summary);
+
+      return {
+        text: summary,
+        sources: agentState.sources,
+        files: agentState.generatedFiles,
+        thoughtProcess: agentState.thoughtProcess,
+        executedPlan: true,
+      };
+    }
+
+    // For multi-step workflows, execute the plan fully
+    if (plan.steps.length > 1) {
+      stream.writePlan(plan);
+      const result = await this.executePlan(plan, input, workflow);
+      stream.writeThought(`Finished executing all steps.`);
+      return result;
+    }
+
+    // For single-step weather, execute directly (LLM struggles with city extraction)
+    // Skip executePlan's generic "Executing step"/"Completed" thoughts since
+    // the status events already show progress.
+    if (workflow === "weather") {
+      stream.writePlan(plan);
+      const weatherPhase = plan.steps[0];
+      if (weatherPhase) {
+        const result = await this.executePhase(weatherPhase, input, new Map(), 0);
+        if (result.success) {
+          return {
+            text: result.text,
+            sources: agentState.sources,
+            files: agentState.generatedFiles,
+            thoughtProcess: agentState.thoughtProcess,
+            executedPlan: true,
+          };
+        }
+      }
+      return {
+        text: "",
+        sources: agentState.sources,
+        files: agentState.generatedFiles,
+        thoughtProcess: agentState.thoughtProcess,
+        executedPlan: true,
+      };
+    }
+
+    // For single-step or simple workflows, return control to AI SDK
+    if (workflow === "image_generation") {
+      stream.writePlan(plan);
       return {
         text: "",
         sources: agentState.sources,
@@ -81,25 +145,18 @@ export class OrchestratorEngine {
     const phaseResults = new Map<string, PhaseResult>();
 
     for (const phase of plan.steps) {
-      stream.writeThought(
-        `[PLAN] Executing step: ${phase.description}`
-      );
+      stream.writeThought(`Executing step: ${phase.description}`);
 
       let lastResult: PhaseResult | null = null;
       let retries = 0;
 
       while (retries <= phase.maxRetries) {
-        const result = await this.executePhase(
-          phase,
-          input,
-          phaseResults,
-          retries
-        );
+        const result = await this.executePhase(phase, input, phaseResults, retries);
 
         if (phase.type === "research") {
           agentState.sources.push(...result.sources);
         }
-        if (phase.type === "generate_doc") {
+        if (phase.type === "generate_doc" || phase.type === "image_gen") {
           agentState.generatedFiles.push(...result.files);
         }
 
@@ -108,6 +165,7 @@ export class OrchestratorEngine {
         if (verification.passed) {
           lastResult = result;
           phaseResults.set(phase.id, result);
+          stream.writeThought(`Completed: ${phase.description}`);
           break;
         }
 
@@ -118,15 +176,11 @@ export class OrchestratorEngine {
             .map((r) => r.detail)
             .join("; ");
 
-          stream.writeThought(
-            `[VERIFY] Step "${phase.description}" failed (${issues}). Retry ${retries}/${phase.maxRetries}...`
-          );
+          stream.writeThought(`Step "${phase.description}" failed (${issues}). Retry ${retries}/${phase.maxRetries}...`);
         } else {
           lastResult = result;
           if (phase.required) {
-            stream.writeThought(
-              `[VERIFY] Step "${phase.description}" failed all retries. Proceeding with partial result.`
-            );
+            stream.writeThought(`Step "${phase.description}" failed all retries. Proceeding with partial result.`);
           }
           phaseResults.set(phase.id, result);
         }
@@ -134,13 +188,8 @@ export class OrchestratorEngine {
 
       if (!lastResult) {
         lastResult = {
-          phaseId: phase.id,
-          type: phase.type,
-          success: false,
-          text: "",
-          sources: [],
-          files: [],
-          skillContent: "",
+          phaseId: phase.id, type: phase.type, success: false,
+          text: "", sources: [], files: [], skillContent: "",
           errors: [`Phase ${phase.id} failed after ${phase.maxRetries + 1} attempts`],
         };
         phaseResults.set(phase.id, lastResult);
@@ -156,20 +205,14 @@ export class OrchestratorEngine {
     previousResults: Map<string, PhaseResult>,
     retryIndex: number
   ): Promise<PhaseResult> {
-    const { query, tools, agentState, stream, model, skillRegistry, fetchSkillFile, generateDocumentWithSkill } = input;
+    const { query, tools, agentState, stream, model, skillRegistry, fetchSkillFile, generateDocumentWithSkill, requestToolApproval } = input;
 
     if (phase.type === "research") {
       const searchTool = tools["web_search"];
       if (!searchTool?.execute) {
         return {
-          phaseId: phase.id,
-          type: "research",
-          success: false,
-          text: "Tool web_search not available",
-          sources: [],
-          files: [],
-          skillContent: "",
-          errors: ["web_search tool not found"],
+          phaseId: phase.id, type: "research", success: false,
+          text: "Tool web_search not available", sources: [], files: [], skillContent: "", errors: ["web_search tool not found"],
         };
       }
 
@@ -181,51 +224,30 @@ export class OrchestratorEngine {
       const newSources = agentState.sources.slice(prevSources);
 
       return {
-        phaseId: phase.id,
-        type: "research",
-        success: newSources.length > 0,
+        phaseId: phase.id, type: "research", success: newSources.length > 0,
         text: typeof resultText === "string" ? resultText : JSON.stringify(resultText),
-        sources: newSources,
-        files: [],
-        skillContent: "",
-        errors: [],
+        sources: newSources, files: [], skillContent: "", errors: [],
       };
     }
 
     if (phase.type === "load_skill") {
-      const prevResults = previousResults.get("research");
       let docType = detectSimpleDocType(query);
-
-      if (!docType) {
-        docType = "pdf";
-      }
+      if (!docType) docType = "pdf";
 
       const skillTool = tools["read_skill"];
       if (skillTool?.execute) {
         const skillContent = await skillTool.execute({ doc_type: docType });
         return {
-          phaseId: phase.id,
-          type: "load_skill",
-          success: typeof skillContent === "string" && skillContent.length > 100,
-          text: "",
-          sources: [],
-          files: [],
-          skillContent: typeof skillContent === "string" ? skillContent : "",
-          errors: [],
+          phaseId: phase.id, type: "load_skill", success: typeof skillContent === "string" && skillContent.length > 100,
+          text: "", sources: [], files: [], skillContent: typeof skillContent === "string" ? skillContent : "", errors: [],
         };
       }
 
       const fileName = skillRegistry[docType]?.fileName;
       if (!fileName) {
         return {
-          phaseId: phase.id,
-          type: "load_skill",
-          success: false,
-          text: "",
-          sources: [],
-          files: [],
-          skillContent: "",
-          errors: [`No skill file for ${docType}`],
+          phaseId: phase.id, type: "load_skill", success: false,
+          text: "", sources: [], files: [], skillContent: "", errors: [`No skill file for ${docType}`],
         };
       }
 
@@ -236,78 +258,105 @@ export class OrchestratorEngine {
       }
 
       return {
-        phaseId: phase.id,
-        type: "load_skill",
-        success,
-        text: "",
-        sources: [],
-        files: [],
-        skillContent: content ?? "",
-        errors: success ? [] : [`Failed to load skill ${fileName}`],
+        phaseId: phase.id, type: "load_skill", success,
+        text: "", sources: [], files: [], skillContent: content ?? "", errors: success ? [] : [`Failed to load skill ${fileName}`],
       };
     }
 
     if (phase.type === "generate_doc") {
-      const prevResearch = previousResults.get("research");
       const prevSkill = previousResults.get("load_skill");
       const docType = detectSimpleDocType(query) || "pdf";
-      const topic = extractTopic(query) || "document";
-
-      const docTool = tools["generate_document"];
-      if (docTool?.execute) {
-        const skillContent = prevSkill?.skillContent ?? "";
-        const result = await docTool.execute({
-          doc_type: docType,
-          topic,
-          skill_content: skillContent,
-        });
-
-        const files = [...agentState.generatedFiles];
-        const newFiles = files.slice(0);
-
-        return {
-          phaseId: phase.id,
-          type: "generate_doc",
-          success: agentState.generatedFiles.length > 0,
-          text: typeof result === "string" ? result : JSON.stringify(result),
-          sources: [],
-          files: newFiles,
-          skillContent: "",
-          errors: agentState.generatedFiles.length > 0 ? [] : ["No file generated"],
-        };
-      }
+      const topic = extractTopicFromQuery(query) || "document";
 
       const skillContent = prevSkill?.skillContent ?? "";
       const file = await generateDocumentWithSkill(docType, query, model, skillContent);
       if (file) {
         agentState.generatedFiles.push(file);
         stream.writeFile(file);
-
-        const msg = `\n\nI've created a ${docType.toUpperCase()} document about "${topic}" based on the search results. You can download it below.`;
-        stream.writeText(msg);
+        stream.writeText(`I've created a ${docType.toUpperCase()} document about "${topic}". You can download it below.`);
       }
 
       return {
-        phaseId: phase.id,
-        type: "generate_doc",
-        success: !!file,
+        phaseId: phase.id, type: "generate_doc", success: !!file,
         text: file ? `Generated ${file.filename}` : "Generation failed",
-        sources: [],
-        files: file ? [file] : [],
-        skillContent: "",
-        errors: file ? [] : ["generateDocumentWithSkill returned null"],
+        sources: [], files: file ? [file] : [], skillContent: "", errors: file ? [] : ["generateDocumentWithSkill returned null"],
+      };
+    }
+
+    if (phase.type === "image_gen") {
+      const imgTool = tools["generate_image"];
+      if (imgTool?.execute) {
+        const result = await imgTool.execute({ prompt: query });
+        return {
+          phaseId: phase.id, type: "image_gen", success: agentState.generatedFiles.length > 0,
+          text: typeof result === "string" ? result : JSON.stringify(result),
+          sources: [], files: [...agentState.generatedFiles], skillContent: "", errors: [],
+        };
+      }
+    }
+
+    if (phase.type === "weather") {
+      const weatherTool = tools["get_weather"];
+      if (weatherTool?.execute) {
+        const city = extractCityFromQuery(query);
+        const result = await weatherTool.execute({ city });
+        return {
+          phaseId: phase.id, type: "weather", success: true,
+          text: typeof result === "string" ? result : JSON.stringify(result),
+          sources: [], files: [], skillContent: "", errors: [],
+        };
+      }
+    }
+
+    if (phase.type === "analyze") {
+      return {
+        phaseId: phase.id, type: "analyze", success: true,
+        text: query, sources: [], files: [], skillContent: "", errors: [],
+      };
+    }
+
+    if (phase.type === "verify") {
+      const prevResearch = previousResults.get("research");
+      const researchText = prevResearch?.text ?? "";
+      if (researchText) {
+        stream.writeStatus("analyzing", "Synthesizing answer from research...", {});
+        try {
+          const synthQuery = query.length > 300 ? query.slice(0, 300) + "..." : query;
+          const synthResult = await generateText({
+            model,
+            system: "You are a research analyst. Synthesize a thorough, well-structured answer using ONLY the search results provided. Include specific details, facts, and figures. Cite sources by [1], [2] etc.",
+            prompt: `Question: ${synthQuery}\n\nResearch results:\n${researchText.slice(0, 15000)}\n\nProvide a comprehensive answer based on these sources:`,
+            maxTokens: 2000,
+            temperature: 0.3,
+          } as any);
+          const answer = (synthResult.text ?? "").trim();
+          if (answer) {
+            stream.writeText(answer);
+            return {
+              phaseId: phase.id, type: "verify", success: true,
+              text: answer, sources: prevResearch?.sources ?? [], files: [], skillContent: "", errors: [],
+            };
+          }
+        } catch (e: any) {
+          console.warn("[ORCH] Verify synthesis failed:", e?.message ?? e);
+        }
+      }
+      return {
+        phaseId: phase.id, type: "verify", success: true,
+        text: "", sources: [], files: [], skillContent: "", errors: [],
+      };
+    }
+
+    if (phase.type === "execute") {
+      return {
+        phaseId: phase.id, type: "execute", success: true,
+        text: "", sources: [], files: [], skillContent: "", errors: [],
       };
     }
 
     return {
-      phaseId: phase.id,
-      type: phase.type,
-      success: false,
-      text: "",
-      sources: [],
-      files: [],
-      skillContent: "",
-      errors: [`Unknown phase type: ${phase.type}`],
+      phaseId: phase.id, type: phase.type, success: false,
+      text: "", sources: [], files: [], skillContent: "", errors: [`Unknown phase type: ${phase.type}`],
     };
   }
 
@@ -317,13 +366,19 @@ export class OrchestratorEngine {
     agentState: any,
     workflow: WorkflowKind
   ): OrchestratorOutput {
-    // Only include text from the generate_doc phase — the research phase
-    // text is raw search results, not meant for the answer.
-    const docResult = phaseResults.get("generate_doc");
+    const weatherResult = phaseResults.get("weather_lookup");
+    if (weatherResult?.text) {
+      return {
+        text: weatherResult.text,
+        sources: agentState.sources,
+        files: agentState.generatedFiles,
+        thoughtProcess: agentState.thoughtProcess,
+        executedPlan: true,
+      };
+    }
+    const docResult = phaseResults.get("generate_doc") || phaseResults.get("image_gen") || phaseResults.get("execute");
     const text = docResult?.text ?? "";
 
-    // agentState already has everything — files, sources were pushed during executePlan.
-    // Don't re-collect from phase results to avoid duplication.
     return {
       text,
       sources: agentState.sources,
@@ -349,20 +404,17 @@ function detectSimpleDocType(query: string): string | null {
   return null;
 }
 
-function extractTopic(query: string): string {
+function extractTopicFromQuery(query: string): string {
   const match = query.match(
     /(?:about|on|for|of|covering|titled|called|with)\s+["""]?([^""".\n]{5,80}?)["""]?(?:\s*(?:\.|$|\b(?:pdf|pptx|docx|xlsx|csv|tsv|md|json|sql|html)\b))/i
   );
   if (match) return match[1]!.trim();
-
-  // Fallback: find the doc-intent phrase anywhere, grab everything after (minus connectors)
   const docPhrase = query.match(
     /(?:create|generate|make|build|write|produce)\s+(?:a|an|the|some|me)\s+(?:pdf|pptx|docx|xlsx|csv|tsv|md|json|sql|html|powerpoint|presentation|slide|word|excel|spreadsheet|document)\s+(.+)/i
   );
   if (docPhrase) {
     return docPhrase[1]!.trim().replace(/^(?:about|on|for|of|covering|titled|called|with)\s+/i, "").slice(0, 100);
   }
-
   return "document";
 }
 
@@ -372,7 +424,21 @@ function retryQuery(original: string, attempt: number): string {
     "Search extensively for recent, authoritative information about",
     "Find more specific, detailed data about",
   ];
-  const topic = extractTopic(original) || original;
+  const topic = extractTopicFromQuery(original) || original;
   const prefix = prefixes[Math.min(attempt - 1, prefixes.length - 1)];
   return `${prefix} "${topic}"`;
+}
+
+function extractCityFromQuery(query: string): string {
+  // Find "weather" in the query, take everything after it
+  const idx = query.toLowerCase().indexOf("weather");
+  if (idx < 0) return "unknown";
+  let after = query.slice(idx + 7).trim();
+  // Strip leading noise words
+  after = after.replace(/^(?:(?:info|information|details|data|forecast|report|conditions?)\s+)?(?:in|at|for|of|about|on|regarding|around|near)\s+/i, "").trim();
+  // Strip trailing punctuation and noise
+  after = after.replace(/[?.!;,].*$/, "").trim();
+  // Take up to 3 words (covers "New York City", "Buenos Aires", etc.)
+  const words = after.split(/\s+/).filter(Boolean).slice(0, 3);
+  return words.length > 0 ? words.join(" ") : "unknown";
 }

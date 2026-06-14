@@ -1,6 +1,3 @@
-// backend/orchestrator/planner.ts
-// Analyzes user intent and generates an explicit, structured execution plan.
-
 import type { ExecutionPlan, Phase, WorkflowKind } from "./types";
 
 const DOC_INTENT_RE =
@@ -9,6 +6,10 @@ const DOC_INTENT_RE =
 const WEATHER_RE = /\bweather\b|\btemperature\b|\bforecast\b|\bhow.*hot\b|\bhow.*cold\b/i;
 
 const IMAGE_RE = /\b(?:generate|create|draw|make|render)\b.*\b(?:image|picture|photo|art|illustration|drawing)\b|\b(?:image|picture|photo|art|illustration)\b.*\b(?:of|about|with)\b/i;
+
+const CODE_RE = /\b(?:code|script|program|function|implement|deploy|debug|refactor|fix|write.*code|build.*app)\b/i;
+
+const ANALYSIS_RE = /\b(?:analyze|compare|contrast|evaluate|summarize|break down|research|investigate|deep dive)\b/i;
 
 function detectDocType(query: string): string | null {
   const q = query.toLowerCase();
@@ -91,27 +92,148 @@ export class Planner {
 
       return {
         workflow: "research_document",
-        plan: { steps, userIntent: `Generate ${docType} about ${topic}` },
+        plan: {
+          steps,
+          userIntent: `Generate ${docType} about ${topic}`,
+          reasoning: "This is a document generation request that requires research, skill loading, and file generation.",
+          estimatedSteps: 3,
+        },
       };
     }
 
     if (WEATHER_RE.test(query)) {
       return {
         workflow: "weather",
-        plan: { steps: [], userIntent: "Weather query" },
+        plan: {
+          steps: [
+            {
+              id: "weather_lookup",
+              type: "weather",
+              description: "Fetch weather data",
+              tools: ["get_weather"],
+              dependsOn: [],
+              required: true,
+              criteria: [{ type: "has_text_output", label: "Weather data received" }],
+              maxRetries: 1,
+            },
+          ],
+          userIntent: "Weather query",
+          reasoning: "Simple single-step weather lookup.",
+          estimatedSteps: 1,
+        },
       };
     }
 
     if (IMAGE_RE.test(query)) {
       return {
         workflow: "image_generation",
-        plan: { steps: [], userIntent: "Image generation" },
+        plan: {
+          steps: [
+            {
+              id: "enhance_prompt",
+              type: "analyze",
+              description: "Enhance image prompt",
+              tools: [],
+              dependsOn: [],
+              required: true,
+              criteria: [{ type: "has_text_output", label: "Prompt enhanced" }],
+              maxRetries: 0,
+            },
+            {
+              id: "generate_img",
+              type: "image_gen",
+              description: "Generate image",
+              tools: ["generate_image"],
+              dependsOn: ["enhance_prompt"],
+              required: true,
+              criteria: [{ type: "has_file", label: "Image generated" }],
+              maxRetries: 1,
+            },
+          ],
+          userIntent: "Image generation",
+          reasoning: "Two-step: enhance prompt then generate image.",
+          estimatedSteps: 2,
+        },
+      };
+    }
+
+    if (CODE_RE.test(query)) {
+      return {
+        workflow: "code",
+        plan: {
+          steps: [
+            {
+              id: "research",
+              type: "research",
+              description: "Research code requirements and best practices",
+              tools: ["web_search"],
+              dependsOn: [],
+              required: false,
+              criteria: [{ type: "has_sources", label: "Sources found" }],
+              maxRetries: 1,
+            },
+            {
+              id: "execute",
+              type: "execute",
+              description: "Generate code solution",
+              tools: [],
+              dependsOn: [],
+              required: true,
+              criteria: [{ type: "has_text_output", label: "Code generated" }],
+              maxRetries: 1,
+            },
+          ],
+          userIntent: "Code generation/assistance",
+          reasoning: "Research then generate code solution.",
+          estimatedSteps: 2,
+        },
+      };
+    }
+
+    if (ANALYSIS_RE.test(query)) {
+      return {
+        workflow: "analysis",
+        plan: {
+          steps: [
+            {
+              id: "research",
+              type: "research",
+              description: "Gather information for analysis",
+              tools: ["web_search"],
+              dependsOn: [],
+              required: true,
+              criteria: [
+                { type: "has_sources", label: "Sources found" },
+                { type: "min_sources", minCount: 2, label: "At least 2 sources" },
+              ],
+              maxRetries: 2,
+            },
+            {
+              id: "verify",
+              type: "verify",
+              description: "Analyze and synthesize findings",
+              tools: [],
+              dependsOn: ["research"],
+              required: true,
+              criteria: [{ type: "has_text_output", label: "Analysis complete" }],
+              maxRetries: 1,
+            },
+          ],
+          userIntent: "Deep research/analysis",
+          reasoning: "Multi-source research followed by synthesis.",
+          estimatedSteps: 2,
+        },
       };
     }
 
     return {
       workflow: "simple_qa",
-      plan: { steps: [], userIntent: "General query" },
+      plan: {
+        steps: [],
+        userIntent: "General query",
+        reasoning: "Simple question answering — no structured plan needed.",
+        estimatedSteps: 0,
+      },
     };
   }
 }

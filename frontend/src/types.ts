@@ -1,4 +1,3 @@
-// src/types.ts
 export type Source = { url: string };
 
 export type ConversationListItem = {
@@ -28,6 +27,32 @@ export type TodoItem = {
   status: "pending" | "in_progress" | "completed";
 };
 
+export type PlanStep = {
+  id: string;
+  type: string;
+  description: string;
+  required: boolean;
+  maxRetries: number;
+};
+
+export type ExecutionPlan = {
+  steps: PlanStep[];
+  userIntent: string;
+  reasoning: string;
+  estimatedSteps: number;
+};
+
+export type PermissionRequest = {
+  id: string;
+  toolName: string;
+  args: any;
+  description: string;
+};
+
+export type ToolGroup = {
+  tools: { name: string; args: any }[];
+};
+
 export type MessagePart =
   | { type: "text"; text: string }
   | { type: "tool_call"; name: string; input?: any; output?: any; status: "pending" | "running" | "completed" | "error" }
@@ -35,7 +60,11 @@ export type MessagePart =
   | { type: "image"; url: string; filename: string; mime: string }
   | { type: "file"; filename: string; mime: string; base64?: string }
   | { type: "source"; url: string; title?: string }
-  | { type: "todos"; items: TodoItem[] };
+  | { type: "todos"; items: TodoItem[] }
+  | { type: "plan"; steps: PlanStep[]; userIntent: string; reasoning: string }
+  | { type: "permission"; id: string; toolName: string; args: any; description: string; status: "pending" | "approved" | "denied" }
+  | { type: "tool_group"; tools: { name: string; args: any }[] }
+  | { type: "agent_status"; status: string; message: string };
 
 export type Message = {
   id: string | number;
@@ -48,8 +77,8 @@ export type Message = {
   fileAttachment?: { name: string; content?: string; type?: string }[];
   error?: boolean;
   errorMessage?: string;
-  thoughtProcess?: any[]; // For persistence
-  parts?: MessagePart[]; // Interleaved message parts for Claude-style rendering
+  thoughtProcess?: any[];
+  parts?: MessagePart[];
 };
 
 export type ConversationDetail = {
@@ -62,5 +91,5 @@ export type ConversationDetail = {
 export type AttachedFile = {
   name: string;
   content: string;
-  type?: string; // MIME type
+  type?: string;
 };

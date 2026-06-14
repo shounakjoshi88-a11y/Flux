@@ -16,6 +16,8 @@ import {
   Newspaper,
   Plus,
   ChevronsUpDown,
+  Bot,
+  Users,
 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { SidebarThread } from "./SidebarThread";
@@ -43,6 +45,8 @@ type SidebarProps = {
   onArtifactsOpen: () => void;
   onArtifactsPrefetch?: () => void;
   onNewsOpen: () => void;
+  onCustomAgentsOpen: () => void;
+  onTeamOpen: () => void;
 };
 
 // ─── Shared time grouping logic ──────────────────────────────
@@ -99,6 +103,8 @@ export const Sidebar = memo(function Sidebar({
   onArtifactsOpen,
   onArtifactsPrefetch,
   onNewsOpen,
+  onCustomAgentsOpen,
+  onTeamOpen,
 }: SidebarProps) {
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<ConversationListItem[]>([]);
@@ -635,6 +641,44 @@ export const Sidebar = memo(function Sidebar({
               {isOpen && (
                 <span className="text-sm font-medium whitespace-nowrap overflow-hidden">
                   Live News
+                </span>
+              )}
+            </button>
+
+            {/* Agents */}
+            <button
+              type="button"
+              onClick={onCustomAgentsOpen}
+              className={`flex items-center h-9 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-sidebar-foreground transition-all gap-2.5 cursor-pointer ${
+                isOpen ? "w-[calc(100%-16px)] mx-2 px-2.5 justify-start" : "w-9 mx-1.5 px-0 justify-center"
+              }`}
+              title="Custom Agents"
+            >
+              <span className="flex items-center justify-center size-6 rounded-full bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 shrink-0">
+                <Bot className="size-4 text-emerald-400" />
+              </span>
+              {isOpen && (
+                <span className="text-sm font-medium whitespace-nowrap overflow-hidden">
+                  Agents
+                </span>
+              )}
+            </button>
+
+            {/* Team */}
+            <button
+              type="button"
+              onClick={onTeamOpen}
+              className={`flex items-center h-9 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-sidebar-foreground transition-all gap-2.5 cursor-pointer ${
+                isOpen ? "w-[calc(100%-16px)] mx-2 px-2.5 justify-start" : "w-9 mx-1.5 px-0 justify-center"
+              }`}
+              title="Team Mode"
+            >
+              <span className="flex items-center justify-center size-6 rounded-full bg-gradient-to-br from-indigo-500/20 to-indigo-600/10 shrink-0">
+                <Users className="size-4 text-indigo-400" />
+              </span>
+              {isOpen && (
+                <span className="text-sm font-medium whitespace-nowrap overflow-hidden">
+                  Team
                 </span>
               )}
             </button>

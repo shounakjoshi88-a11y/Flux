@@ -42,6 +42,12 @@
       "skillPath": "skills/logo-creator/SKILL.md",
       "computedHash": "cfb6815ea42686977fb54fe7f6bbd349056a2fcf61f7675fd1becd721029f82b"
     },
+    "mcp-builder": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/mcp-builder/SKILL.md",
+      "computedHash": "6498a736a8dc5c645047c8a875b8ea7417e2ad97146f005200e50d20a9337ada"
+    },
     "multi-agent-orchestration": {
       "source": "qodex-ai/ai-agent-skills",
       "sourceType": "github",
@@ -53,6 +59,18 @@
       "sourceType": "github",
       "skillPath": "skills/web-design-guidelines/SKILL.md",
       "computedHash": "f3bc47f890f42a44db1007ab390709ec368e4b8c089baee6b0007182236ac474"
+    },
+    "websocket-engineer": {
+      "source": "jeffallan/claude-skills",
+      "sourceType": "github",
+      "skillPath": "skills/websocket-engineer/SKILL.md",
+      "computedHash": "0be23b3291c1ad1b58ebf5e9cbd56f6cba4a0a7799ec466660c6ad97fd657b1c"
+    },
+    "websocket-implementation": {
+      "source": "aj-geddes/useful-ai-prompts",
+      "sourceType": "github",
+      "skillPath": "skills/websocket-implementation/SKILL.md",
+      "computedHash": "3a6903011b610fdb1e617a89e7d8a8412853950acd110737179ccc220fbdaf15"
     }
   }
 }

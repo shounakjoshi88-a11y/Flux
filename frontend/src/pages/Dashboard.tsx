@@ -8,6 +8,8 @@ import {
   LoaderCircle,
   X,
   FileText,
+  Users,
+  Bot,
 } from "lucide-react";
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
@@ -25,6 +27,12 @@ import { PromptHistoryCard } from "../components/PromptHistoryCard";
 import { ArtifactsModal, prefetchArtifacts } from "../components/ArtifactsModal";
 import { NewsModal } from "../components/NewsModal";
 import { useChat } from "../hooks/useChat";
+import { useAgentSession } from "../hooks/useAgentSession";
+import { useModels } from "../hooks/useModels";
+import { useCustomAgents } from "../hooks/useCustomAgents";
+import AgentStatusBar from "../components/AgentStatusBar";
+import TeamPanel from "../components/TeamPanel";
+import CustomAgentsPanel from "../components/CustomAgentsPanel";
 import { useTheme } from "../hooks/useTheme";
 import { useSessionRevocationListener } from "../hooks/useSessionRevocationListener";
 import type {
@@ -39,38 +47,6 @@ import { parseAssistantContent, extractLiveContent } from "@/lib/chat-utils";
 import { BACKEND_URL, UNSPLASH_ACCESS_KEY } from "@/lib/config";
 
 const supabase = createClient();
-
-// ── MODEL CATEGORIES ───────────────────────────────────────
-const MODEL_CATEGORIES = [
-  {
-    category: "General Purpose",
-    models: [
-      { id: "mistral-large-675b", label: "Mistral Large 3 675B (Mistral AI)" },
-      { id: "glm-5.1", label: "GLM 5.1 (Z‑AI)" },
-      { id: "kimi-k2.6", label: "Kimi K2.6 (Moonshot AI)" },
-      { id: "nemotron-3-ultra-550b", label: "Nemotron 3 Ultra 550B (NVIDIA)" },
-      { id: "mistral-medium-3.5-128b", label: "Mistral Medium 3.5 128B (Mistral AI)" },
-      { id: "nemotron-3-super-120b-a12b", label: "Nemotron 3 Super 120B (NVIDIA)" },
-      { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash (DeepSeek)" },
-      { id: "qwen3.5-397b-a17b", label: "Qwen 3.5 397B (Qwen)" },
-      { id: "minimax-m2.7", label: "MiniMax M2.7 (MiniMax)" },
-      { id: "stockmark-2-100b-instruct", label: "Stockmark 2 100B (Stockmark)" },
-      { id: "nemotron-nano-12b-v2-vl", label: "Nemotron Nano 12B v2 VL (NVIDIA)" },
-      { id: "nemotron-mini-4b", label: "Nemotron Mini 4B (NVIDIA)" },
-      { id:  "sarvamai", label: "Sarvamai (Sarvamai)" },
-    ],
-  },
-  {
-    category: "Reasoning & Agents",
-    models: [
-      { id: "step-3.7-flash", label: "Step 3.7 Flash (StepFun)" },
-      { id: "step-3.5-flash", label: "Step 3.5 Flash (StepFun)" },
-      { id: "nemotron-3-nano-omni-30b-a3b-reasoning", label: "Nemotron 3 Nano Omni 30B Reasoning (NVIDIA)" },
-    ],
-  },
-];
-// ── END MODEL CATEGORIES ──────────────────────────────────
-const ALL_MODELS = MODEL_CATEGORIES.flatMap((c) => c.models);
 
 type GeneratedFile = {
   filename: string;
@@ -147,9 +123,9 @@ export default function Dashboard() {
   useSessionRevocationListener();
 
   const {
-    messages,
-    setMessages,
-    isLoading,
+    messages: sseMessages,
+    setMessages: setSseMessages,
+    isLoading: sseLoading,
     handleSubmit: chatSubmit,
     resetMessages,
     retry,
@@ -157,10 +133,55 @@ export default function Dashboard() {
     activeGenerationStatus,
   } = useChat(user);
 
+  const ws = useAgentSession(user);
+  const { categories: modelCategories, all: allModels, isLoading: modelsLoading } = useModels();
+  const { agents: customAgents, createAgent: createCustomAgent, deleteAgent: deleteCustomAgent } = useCustomAgents();
+
+  const [isTeamPanelOpen, setIsTeamPanelOpen] = useState(false);
+  const [isCustomAgentsOpen, setIsCustomAgentsOpen] = useState(false);
+  const [activeTransport, setActiveTransport] = useState<"sse" | "ws">("sse");
+
+// ── Auto-detect transport: try WS, fall back to SSE ──
+  const wsAvailableRef = useRef(false);
+  const wsRef = useRef(ws);
+  wsRef.current = ws;
+  useEffect(() => {
+    let cancelled = false;
+    const tryWs = async () => {
+      const instance = wsRef.current;
+      try {
+        instance.connect();
+        // Wait up to 5s for WS to reach "ready"
+        await new Promise<void>((resolve, reject) => {
+          const check = setInterval(() => {
+            if (cancelled) { clearInterval(check); reject(new Error("cancelled")); return; }
+            if (instance.sessionState === "ready" || instance.sessionState === "processing") {
+              clearInterval(check);
+              wsAvailableRef.current = true;
+              if (!cancelled) setActiveTransport("ws");
+              resolve();
+            }
+          }, 200);
+          setTimeout(() => { clearInterval(check); reject(new Error("timeout")); }, 5000);
+        });
+      } catch {
+        wsAvailableRef.current = false;
+        setActiveTransport("sse");
+      }
+    };
+    tryWs();
+    return () => { cancelled = true; };
+  }, []);
+
+  const messages = activeTransport === "ws" ? ws.messages : sseMessages;
+  const setMessages = activeTransport === "ws" ? ws.setMessages : setSseMessages;
+  const isLoading = activeTransport === "ws" ? ws.isLoading : sseLoading;
+  const sessionState = ws.sessionState;
+
   const previousSidebarOpen = useRef(isSidebarOpen);
 
   const currentModelLabel = useMemo(
-    () => ALL_MODELS.find((m) => m.id === selectedModel)?.label ?? "Kimi K2.6 (Moonshot AI)",
+    () => allModels.find((m) => m.id === selectedModel)?.label ?? "Kimi K2.6 (Moonshot AI)",
     [selectedModel]
   );
 
@@ -232,6 +253,7 @@ export default function Dashboard() {
 
   const createNewThread = useCallback(() => {
     resetMessages();
+    ws.clearMessages();
     setActiveConversationId(null);
     setActiveSources([]);
     setActiveCitationIndex(null);
@@ -241,7 +263,7 @@ export default function Dashboard() {
     setActiveImages([]);
     setPeekPdf(null);
     setPeekUrl(null);
-  }, [resetMessages]);
+  }, [resetMessages, ws]);
 
   // ── Search conversations ──
   const searchConversations = useCallback(async (query: string) => {
@@ -502,38 +524,96 @@ export default function Dashboard() {
     setIsArtifactsOpen(false);
   }, []);
 
+  // ── Slash command dispatch ──
+  const dispatchSlashCommand = useCallback(
+    (cmd: string, rest: string) => {
+      switch (cmd) {
+        case "/plan":
+          ws.setMode("plan");
+          ws.connect();
+          setActiveTransport("ws");
+          setTimeout(() => ws.sendMessage(rest || "(plan mode)", activeConversationId, selectedModel, []), 600);
+          return true;
+        case "/yolo":
+          ws.setMode("yolo");
+          ws.connect();
+          setActiveTransport("ws");
+          setTimeout(() => ws.sendMessage(rest || "(yolo mode)", activeConversationId, selectedModel, []), 600);
+          return true;
+        case "/team":
+          setIsTeamPanelOpen(true);
+          setActiveTransport("ws");
+          if (rest) {
+            ws.connect();
+            setTimeout(() => ws.sendMessage(rest, activeConversationId, selectedModel, []), 600);
+          }
+          return true;
+        default:
+          return false;
+      }
+    },
+    [ws, activeConversationId, selectedModel]
+  );
+
   // ── Main send handler ──
   const handleSend = useCallback(
     (nextQuery?: string) => {
       const prompt = (nextQuery ?? query).trim();
       if (!prompt || isLoading) return;
+
+      // Check for slash commands — always use WS
+      const cmdMatch = prompt.match(/^\/(plan|yolo|team)\b\s*(.*)/);
+      if (cmdMatch) {
+        const cmd = cmdMatch[1]!;
+        const rest = (cmdMatch[2] || "").trim();
+        setQuery("");
+        dispatchSlashCommand(cmd, rest);
+        return;
+      }
+
       setQuery("");
 
       const filesToSend = [...attachedFiles];
       setAttachedFiles([]);
       fetchImagesForQuery(prompt);
-      chatSubmit(
-        prompt,
-        activeConversationId,
-        selectedModel,
-        filesToSend,
-        {
-          onNewConversationId: (id) => {
-            setActiveConversationId(id);
-            activeConversationIdRef.current = id;
-          },
-          onStreamUpdate: (parsed) => setActiveSources(parsed.sources),
+
+      // Auto-detect transport: use WS if available, fall back to SSE
+      if (wsAvailableRef.current) {
+        ws.sendMessage(prompt, activeConversationId, selectedModel, filesToSend, {
           onComplete: () => {
-            // ── Invalidate cache so next open re-fetches the saved version ──
             const id = activeConversationIdRef.current;
             if (id) conversationCacheRef.current.delete(id);
-            // Refresh sidebar thread list once
             loadConversations();
           },
-          fileContent: filesToSend.filter((f) => !f.type?.startsWith('image/') && !f.type?.startsWith('video/')).map((f) => f.content).join("\n\n---\n\n"),
-          attachedFiles: filesToSend,
-        }
-      );
+        });
+      } else {
+        chatSubmit(
+          prompt,
+          activeConversationId,
+          selectedModel,
+          filesToSend,
+          {
+            onNewConversationId: (id) => {
+              setActiveConversationId(id);
+              activeConversationIdRef.current = id;
+            },
+            onStreamUpdate: (parsed) => setActiveSources(parsed.sources),
+            onPlan: (plan) => {
+              console.log('[PLAN] Execution plan received:', plan);
+            },
+            onPermissionRequest: (request) => {
+              console.log('[PERMISSION] Tool permission requested:', request);
+            },
+            onComplete: () => {
+              const id = activeConversationIdRef.current;
+              if (id) conversationCacheRef.current.delete(id);
+              loadConversations();
+            },
+            fileContent: filesToSend.filter((f) => !f.type?.startsWith('image/') && !f.type?.startsWith('video/')).map((f) => f.content).join("\n\n---\n\n"),
+            attachedFiles: filesToSend,
+          }
+        );
+      }
     },
     [
       query,
@@ -545,8 +625,23 @@ export default function Dashboard() {
       fetchImagesForQuery,
       chatSubmit,
       activeConversationId,
+      ws,
+      dispatchSlashCommand,
     ]
   );
+
+  // ── Stop / Retry (transport-aware) ──
+  const handleStop = useCallback(() => {
+    if (activeTransport === "ws") {
+      ws.disconnect();
+    } else {
+      stop();
+    }
+  }, [activeTransport, ws, stop]);
+
+  const handleRetry = useCallback(() => {
+    if (activeTransport !== "ws") retry();
+  }, [activeTransport, retry]);
 
   // ── Jump to prompt ──
   const handleJumpToPrompt = useCallback((messageId: string | number) => {
@@ -657,7 +752,7 @@ export default function Dashboard() {
       ? firstName.charAt(0).toUpperCase() + firstName.slice(1)
       : "";
 
-    const greetings: Record<string, string[]> = {
+    const greetings = {
       dawn: [
         "Up with the sun",
         "Early bird",
@@ -690,7 +785,7 @@ export default function Dashboard() {
       ],
     };
 
-    let pool: string[];
+    let pool: string[] = greetings.afternoon;
     if (hr >= 5 && hr < 8) pool = greetings.dawn;
     else if (hr >= 8 && hr < 12) pool = greetings.morning;
     else if (hr >= 12 && hr < 17) pool = greetings.afternoon;
@@ -749,6 +844,8 @@ export default function Dashboard() {
           onSettingsOpen={handleSettingsOpen}
           onArtifactsOpen={() => setIsArtifactsOpen(true)}
           onNewsOpen={() => setIsNewsOpen(true)}
+          onCustomAgentsOpen={() => setIsCustomAgentsOpen((p) => !p)}
+          onTeamOpen={() => setIsTeamPanelOpen((p) => !p)}
         />
       </AnimatePresence>
 
@@ -870,12 +967,12 @@ export default function Dashboard() {
                       setAttachedFiles={setAttachedFiles}
                       selectedModel={selectedModel}
                       setSelectedModel={setSelectedModel}
-                      models={MODEL_CATEGORIES}
+                      models={modelCategories}
                       currentModelLabel={currentModelLabel}
                       modelDropdownOpen={modelDropdownOpen}
                       setModelDropdownOpen={setModelDropdownOpen}
                       handleAttachFiles={handleAttachFiles}
-                      onStop={stop}
+                      onStop={handleStop}
                     />
                   </div>
                 </div>
@@ -887,6 +984,14 @@ export default function Dashboard() {
           ) : (
             <div className="flex-1 flex flex-col min-h-0">
               <div className="flex-1 flex flex-col min-h-0">
+                {activeTransport === "ws" && (
+                  <AgentStatusBar
+                    sessionState={sessionState}
+                    mode={ws.mode}
+                    onModeChange={ws.setMode}
+                    capabilities={ws.capabilities}
+                  />
+                )}
                 <MessageList
                   messages={messages}
                   activeTab={activeTab}
@@ -897,7 +1002,7 @@ export default function Dashboard() {
                   setActiveCitationIndex={setActiveCitationIndex}
                   onFollowUpClick={(q) => handleSend(q)}
                   setPeekUrl={setPeekUrl}
-                  onRetry={retry}
+                  onRetry={handleRetry}
                   onFileClick={(file) => setPeekFile(file)}
                   onPreview={handlePreview}
                   showPromptHistory={hasStarted}
@@ -934,12 +1039,12 @@ export default function Dashboard() {
                 setAttachedFiles={setAttachedFiles}
                 selectedModel={selectedModel}
                 setSelectedModel={setSelectedModel}
-                models={MODEL_CATEGORIES}
+                models={modelCategories}
                 currentModelLabel={currentModelLabel}
                 modelDropdownOpen={modelDropdownOpen}
                 setModelDropdownOpen={setModelDropdownOpen}
                 handleAttachFiles={handleAttachFiles}
-                onStop={stop}
+                onStop={handleStop}
               />
             </div>
             <InputSeparator />
@@ -962,6 +1067,26 @@ export default function Dashboard() {
           pptxData={peekPptx}
           xlsxData={peekXlsx}
           mdData={peekMd}
+        />
+
+        <TeamPanel
+          isOpen={isTeamPanelOpen}
+          onClose={() => setIsTeamPanelOpen(false)}
+          onStartTeam={(query) => {
+            setActiveTransport("ws");
+            ws.connect();
+            // Use a small delay to let the session initialize
+            setTimeout(() => ws.sendMessage(query, null, selectedModel, []), 600);
+          }}
+          isRunning={sessionState === "processing"}
+        />
+
+        <CustomAgentsPanel
+          isOpen={isCustomAgentsOpen}
+          onClose={() => setIsCustomAgentsOpen(false)}
+          agents={customAgents}
+          onCreateAgent={createCustomAgent}
+          onDeleteAgent={deleteCustomAgent}
         />
 
         <AnimatePresence>
