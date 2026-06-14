@@ -47,7 +47,7 @@ export class OrchestratorEngine {
 
     // Show the plan for transparency, then let the LLM handle everything agentically
     if (workflow !== "simple_qa") {
-      stream.writePlan(plan);
+      input.stream.writePlan(plan);
     }
 
     return {
