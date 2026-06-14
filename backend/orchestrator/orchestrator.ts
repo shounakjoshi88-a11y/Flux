@@ -43,94 +43,18 @@ export class OrchestratorEngine {
   private verifier = new Verifier();
 
   async process(input: OrchestratorInput): Promise<OrchestratorOutput> {
-    const {
-      query, tools, agentState, stream, model,
-      skillRegistry, fetchSkillFile, generateDocumentWithSkill,
-      requestToolApproval,
-    } = input;
+    const { plan, workflow } = this.planner.analyze(input.query);
 
-    const { plan, workflow } = this.planner.analyze(query);
-
-    // For research_document workflow, execute the full plan deterministically:
-    // research → load_skill → generate_doc. This is faster and more reliable
-    // than relying on the model to chain tool calls correctly.
-    if (workflow === "research_document") {
+    // Show the plan for transparency, then let the LLM handle everything agentically
+    if (workflow !== "simple_qa") {
       stream.writePlan(plan);
-      stream.writeStatus("orchestrator", "Starting document generation workflow...", {});
-
-      // Execute the full plan
-      const result = await this.executePlan(plan, input, workflow);
-
-      // Generate summary text if document was created
-      const hasFiles = agentState.generatedFiles.length > 0;
-      const topic = extractTopicFromQuery(query) || "document";
-      const summary = hasFiles
-        ? `I've created your document about "${topic}". You can download it below.`
-        : `I researched "${topic}" but couldn't generate the document.`;
-
-      stream.writeText(summary);
-
-      return {
-        text: summary,
-        sources: agentState.sources,
-        files: agentState.generatedFiles,
-        thoughtProcess: agentState.thoughtProcess,
-        executedPlan: true,
-      };
-    }
-
-    // For multi-step workflows, execute the plan fully
-    if (plan.steps.length > 1) {
-      stream.writePlan(plan);
-      const result = await this.executePlan(plan, input, workflow);
-      stream.writeThought(`Finished executing all steps.`);
-      return result;
-    }
-
-    // For single-step weather, execute directly (LLM struggles with city extraction)
-    // Skip executePlan's generic "Executing step"/"Completed" thoughts since
-    // the status events already show progress.
-    if (workflow === "weather") {
-      stream.writePlan(plan);
-      const weatherPhase = plan.steps[0];
-      if (weatherPhase) {
-        const result = await this.executePhase(weatherPhase, input, new Map(), 0);
-        if (result.success) {
-          return {
-            text: result.text,
-            sources: agentState.sources,
-            files: agentState.generatedFiles,
-            thoughtProcess: agentState.thoughtProcess,
-            executedPlan: true,
-          };
-        }
-      }
-      return {
-        text: "",
-        sources: agentState.sources,
-        files: agentState.generatedFiles,
-        thoughtProcess: agentState.thoughtProcess,
-        executedPlan: true,
-      };
-    }
-
-    // For single-step or simple workflows, return control to AI SDK
-    if (workflow === "image_generation") {
-      stream.writePlan(plan);
-      return {
-        text: "",
-        sources: agentState.sources,
-        files: agentState.generatedFiles,
-        thoughtProcess: agentState.thoughtProcess,
-        executedPlan: false,
-      };
     }
 
     return {
       text: "",
-      sources: agentState.sources,
-      files: agentState.generatedFiles,
-      thoughtProcess: agentState.thoughtProcess,
+      sources: input.agentState.sources,
+      files: input.agentState.generatedFiles,
+      thoughtProcess: input.agentState.thoughtProcess,
       executedPlan: false,
     };
   }
