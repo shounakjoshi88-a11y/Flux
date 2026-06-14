@@ -181,7 +181,7 @@ export default function Dashboard() {
   const previousSidebarOpen = useRef(isSidebarOpen);
 
   const currentModelLabel = useMemo(
-    () => allModels.find((m) => m.id === selectedModel)?.label ?? "DeepSeek V4 Pro (DeepSeek)",
+    () => (Array.isArray(allModels) ? allModels.find((m) => m.id === selectedModel)?.label : null) ?? "DeepSeek V4 Pro (DeepSeek)",
     [selectedModel, allModels]
   );
 
@@ -253,7 +253,7 @@ export default function Dashboard() {
 
   const createNewThread = useCallback(() => {
     resetMessages();
-    ws.clearMessages();
+    if (ws && ws.clearMessages) ws.clearMessages();
     setActiveConversationId(null);
     setActiveSources([]);
     setActiveCitationIndex(null);
@@ -296,7 +296,8 @@ export default function Dashboard() {
   // ── Shared enrichment helper ──────────────────────────────────────────────
   const enrichConversationMessages = useCallback(
     (rawMessages: any[]): ConvCacheEntry => {
-      const enriched = rawMessages.map((msg) => {
+      const enriched = (rawMessages || []).map((msg) => {
+        if (!msg) return msg;
         if (msg.role === "Assistant") {
           const storedSources = (msg as any).sources as Source[] | undefined;
           const storedFollowUps = (msg as any).followUps as string[] | undefined;
@@ -307,7 +308,7 @@ export default function Dashboard() {
             storedFollowUps && storedFollowUps.length > 0 ? storedFollowUps : parsedFollowUps;
 
           // Reconstruct parts from thoughtProcess for backward compatibility
-          if (!(msg as any).parts && storedThoughtProcess?.length) {
+          if (!(msg as any).parts && Array.isArray(storedThoughtProcess) && storedThoughtProcess.length) {
             const parts: MessagePart[] = [];
             if (answer.trim()) {
               parts.push({ type: "text", text: answer });
@@ -315,6 +316,7 @@ export default function Dashboard() {
             let lastTodosIdx = -1;
             for (let tpi = 0; tpi < storedThoughtProcess.length; tpi++) {
               const tp = storedThoughtProcess[tpi];
+              if (!tp) continue;
               if (tp.type === "status") {
                 parts.push({
                   type: "tool_call",

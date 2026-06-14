@@ -6,8 +6,6 @@ import { Copy, Check, ChevronDown } from "lucide-react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import type { Source } from "@/types";
-
-// ─── Import ChartRenderer (separate file) ─────────────────
 import { ChartRenderer, type ChartData } from "./ChartBlock";
 
 // ─── Lazy load mermaid ─────────────────────────────────────
@@ -21,30 +19,110 @@ const loadMermaid = async () => {
   return mermaid;
 };
 
+// ─── LaTeX Repair Helper ──────────────────────────────────
+/**
+ * Advanced LaTeX Repair Engine
+ * Transforms common LLM "noisy" or "dirty" LaTeX into production-grade KaTeX.
+ */
+function repairLatex(formula: string): string {
+  if (!formula) return "";
+
+  let repaired = formula
+    // 1. Fix malformed newlines: \[-2pt] -> \\[-2pt]
+    .replace(/(?<!\\)\\\[(-?\d+(?:pt|em|ex|cm|mm|in|pc|px|vh|vw|vmin|vmax))\]/g, "\\\\\[$1\]")
+
+    // 2. Fix unescaped Big braces: \Biggl{ -> \Biggl\{
+    .replace(/\\(big|Big|bigg|Bigg)(l|r)\{/g, "\\$1$2\\{")
+    .replace(/\\(big|Big|bigg|Bigg)(l|r)\}/g, "\\$1$2\\}")
+
+    // 3. Fix substack stability: convert to matrix if vertical spacing is used
+    .replace(/\\substack\{([\s\S]*?)\}/g, (m, content) => {
+      if (content.includes("\\\\")) {
+        return `\\begin{matrix} ${content} \\end{matrix}`;
+      }
+      return m;
+    })
+
+    // 4. Fix naked integral limits: \int{0}^{\infty} -> \int_{0}^{\infty}
+    .replace(/\\int\{/g, "\\int_{")
+
+    // 5. Fix common operator hallucinations: \text{lim}; -> \lim
+    .replace(/\\text\{lim\};/g, "\\lim")
+    .replace(/\\lim\s*;/g, "\\lim")
+
+    // 6. Fix spacing commas: i,n_j -> i\,n_j (Support },)
+    .replace(/([a-zA-Z0-9}])\s*,\s*([a-zA-Z\\{])/g, "$1\\, $2")
+
+    // 7. Fix specific polylog/function hallucination: Li{,n_j} -> Li_{n_j}
+    .replace(/Li\{,([a-zA-Z0-9_]+)\}/g, "Li_{$1}")
+
+    // 8. Fix "noisy" spacing: !!!!! -> \! \! \! \! \!
+    .replace(/!{2,}/g, (m) => m.split("").map(() => "\\!").join(" "))
+    .replace(/exp!/g, "exp\\!")
+
+    // 9. Fix missing backslashes on math operators
+    .replace(/(?<!\\)\b(lim|sin|cos|tan|log|exp|det|deg|gcd|min|max|inf|sup)\b(?=\s*[_^{])/g, "\\$1")
+
+    // 10. Fix unescaped Frobenius/Norm typos: ||T|| -> \| T \|
+    .replace(/(?<!\\)\|\|/g, "\\|")
+
+    // 11. Clean up weird semicolons before newlines
+    .replace(/;(\s*\\\\|\s*$)/g, "$1");
+
+  return repaired.trim();
+}
+
 // ─── Math Components ──────────────────────────────────────
 export function InlineMath({ formula }: { formula: string }) {
-  const html = katex.renderToString(formula, {
-    throwOnError: false,
-    displayMode: false,
-    strict: "ignore",
-  });
+  const html = useMemo(() => {
+    const repaired = repairLatex(formula);
+    try {
+      return katex.renderToString(repaired, {
+        throwOnError: false,
+        displayMode: false,
+        strict: "ignore",
+      });
+    } catch (e) {
+      return formula;
+    }
+  }, [formula]);
+
   return (
     <span
       dangerouslySetInnerHTML={{ __html: html }}
-      className="inline-block align-middle leading-none"
+      className="inline-math-container inline-block align-middle max-w-full overflow-x-auto overflow-y-hidden"
     />
   );
 }
 
 function DisplayMath({ formula }: { formula: string }) {
-  const html = katex.renderToString(formula, {
-    throwOnError: false,
-    displayMode: true,
-    strict: "ignore",
-  });
+  const html = useMemo(() => {
+    // 1. Remove delimiters
+    let clean = formula.trim()
+      .replace(/^(\\\[|\$\$)/, "").replace(/(\\\]|\$\$)$/, "");
+
+    // 2. Repair hallucinations
+    clean = repairLatex(clean);
+
+    try {
+      return katex.renderToString(clean, {
+        throwOnError: false,
+        displayMode: true,
+        strict: "ignore",
+        trust: true,
+        macros: {
+          "\\ce": "\\mhchem" // Fallback for chemistry if needed
+        }
+      });
+    } catch (e) {
+      console.warn("KaTeX Error:", e);
+      return formula;
+    }
+  }, [formula]);
+
   return (
     <div
-      className="my-4 text-center"
+      className="my-4 text-center overflow-x-auto max-w-full py-2"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
@@ -61,7 +139,7 @@ function MermaidRenderer({ code }: { code: string }) {
         const m = await loadMermaid();
         if (ref.current) {
           ref.current.innerHTML = "";
-          const { svg } = await m.render("mermaid-" + Date.now(), code);
+          const { svg } = await m.render("mermaid-" + Math.random().toString(36).substr(2, 9), code);
           ref.current.innerHTML = svg;
         }
       } catch (err) {
@@ -72,7 +150,7 @@ function MermaidRenderer({ code }: { code: string }) {
   }, [code]);
 
   if (error) return <div className="text-red-400 text-sm">{error}</div>;
-  return <div ref={ref} className="mermaid-renderer my-4" />;
+  return <div ref={ref} className="mermaid-renderer my-4 overflow-x-auto" />;
 }
 
 // ─── Code Block ────────────────────────────────────────────
@@ -89,7 +167,7 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
   const langLabel = language || "text";
 
   return (
-    <div className="code-block-wrapper group">
+    <div className="code-block-wrapper group my-4">
       <div className="code-block-header">
         <div className="flex items-center gap-2">
           <span className="rounded-md bg-black/20 dark:bg-white/10 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
@@ -120,9 +198,8 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
         </button>
       </div>
       <div
-        className={`overflow-auto transition-all duration-300 ${
-          collapsed ? "max-h-0" : "max-h-[600px]"
-        }`}
+        className={`overflow-auto transition-all duration-300 ${collapsed ? "max-h-0" : "max-h-[600px]"
+          }`}
       >
         <SyntaxHighlighter
           language={language || "text"}
@@ -148,24 +225,19 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
   );
 }
 
-function InlineCode({ children }: { children: string }) {
-  return <code className="inline-code">{children}</code>;
-}
-
-// ─── Linkify URLs ──────────────────────────────────────────
-function linkifyUrls(text: string, keyPrefix = ""): React.ReactNode[] {
+// ─── Inline Formatting ────────────────────────────────────
+function linkifyUrls(text: string, keyPrefix: string): React.ReactNode[] {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const parts = text.split(urlRegex);
-  const urlTest = /^https?:\/\/[^\s]+$/;
   return parts.map((part, idx) => {
-    if (urlTest.test(part)) {
+    if (part.match(/^https?:\/\/[^\s]+$/)) {
       return (
         <a
           key={`${keyPrefix}url-${idx}`}
           href={part}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[var(--accent)] hover:underline"
+          className="text-[var(--accent)] hover:underline break-all"
         >
           {part}
         </a>
@@ -175,20 +247,19 @@ function linkifyUrls(text: string, keyPrefix = ""): React.ReactNode[] {
   });
 }
 
-// ─── Inline formatting ────────────────────────────────────
-function splitWithDelimiters(
-  text: string,
-  regex: RegExp
-): { type: "delimiter" | "text"; value: string }[] {
+function splitWithDelimiters(text: string, regex: RegExp): { type: "delimiter" | "text"; value: string }[] {
   const parts: { type: "delimiter" | "text"; value: string }[] = [];
+  if (typeof text !== "string") return parts;
   let lastIdx = 0;
   let match;
-  while ((match = regex.exec(text)) !== null) {
+  const safeRegex = new RegExp(regex.source, regex.flags);
+  while ((match = safeRegex.exec(text)) !== null) {
     if (match.index > lastIdx) {
       parts.push({ type: "text", value: text.slice(lastIdx, match.index) });
     }
     parts.push({ type: "delimiter", value: match[0] });
     lastIdx = match.index + match[0].length;
+    if (!safeRegex.global) break;
   }
   if (lastIdx < text.length) {
     parts.push({ type: "text", value: text.slice(lastIdx) });
@@ -202,68 +273,49 @@ function formatInlineText(
   sources: Source[],
   parentKey: string
 ): React.ReactNode[] {
-  // Combined regex for all inline tokens. Order of alternation defines priority.
-  // We use non-greedy matches (+?) and [\s\S] to support multi-line content if needed.
-  const inlineRegex = /(`[^`]+`|\*\*[\s\S]+?\*\*|__[\s\S]+?__|\*(?!\*)[\s\S]+?\*|_(?!_)[\s\S]+?_|\\\(.+?\\\)|\\\[.+?\\\]|\$\$.+?\$\$|\$.+?\$|\[\d+\])/g;
+  if (typeof text !== "string") return [];
+
+  // Prioritized regex for all inline tokens. 
+  // Note: Negative lookahead (?!...) prevents misidentifying dimensions like [-2pt] as math blocks.
+  const inlineRegex = /(\$\$[\s\S]+?\$\$|(?<!\\)\\\[(?!-?\d+pt)[\s\S]+?\\\]|\\begin\{([a-z*]+)\}[\s\S]*?\\end\{\3\}|`[^`]+`|\*\*[\s\S]+?\*\*|__[\s\S]+?__|\*(?!\*)[\s\S]+?\*|_(?!_)[\s\S]+?_|\\\(.+?\\\)|\\\[.+?\\\]|\$.+?\$|\[\d+\])/g;
   const parts = splitWithDelimiters(text, inlineRegex);
 
   return parts.flatMap((part, partIdx) => {
     const key = `${parentKey}-p${partIdx}`;
-    if (part.type === "text") {
-      return linkifyUrls(part.value, key);
-    }
+    if (part.type === "text") return linkifyUrls(part.value, key);
 
     const val = part.value;
-
-    // 1. Inline Code
-    if (val.startsWith("`") && val.endsWith("`")) {
-      return <InlineCode key={key}>{val.slice(1, -1)}</InlineCode>;
+    // 1. Display Math & Environments
+    if (val.startsWith("\\begin{") || val.startsWith("$$") || (val.startsWith("\\[") && val.length > 10)) {
+      return <DisplayMath key={key} formula={val} />;
     }
 
-    // 2. Bold
-    if ((val.startsWith("**") && val.endsWith("**")) || (val.startsWith("__") && val.endsWith("__"))) {
-      return (
-        <strong key={key} className="font-bold text-[var(--text-primary)]">
-          {formatInlineText(val.slice(2, -2), onCitationClick, sources, key)}
-        </strong>
-      );
+    // 2. Inline Code
+    if (val.startsWith("`")) return <code key={key} className="inline-code">{val.slice(1, -1)}</code>;
+
+    // 3. Bold
+    if (val.startsWith("**") || val.startsWith("__")) {
+      return <strong key={key} className="font-bold text-[var(--text-primary)]">{formatInlineText(val.slice(2, -2), onCitationClick, sources, key)}</strong>;
     }
 
-    // 3. Italics
-    if ((val.startsWith("*") && val.endsWith("*")) || (val.startsWith("_") && val.endsWith("_"))) {
-      return (
-        <em key={key} className="italic">
-          {formatInlineText(val.slice(1, -1), onCitationClick, sources, key)}
-        </em>
-      );
+    // 4. Italics
+    if (val.startsWith("*") || val.startsWith("_")) {
+      return <em key={key} className="italic">{formatInlineText(val.slice(1, -1), onCitationClick, sources, key)}</em>;
     }
 
-    // 4. Math
-    if (val.startsWith("\\(") || val.startsWith("$") || val.startsWith("\\[")) {
-      const inner = val
-        .replace(/^\\\(/, "").replace(/\\\)$/, "")
-        .replace(/^\\\[/, "").replace(/\\\]$/, "")
-        .replace(/^\$\$/, "").replace(/\$\$$/, "")
-        .replace(/^\$/, "").replace(/\$$/, "");
+    // 5. Inline Math
+    if (val.startsWith("$") || val.startsWith("\\(")) {
+      const inner = val.replace(/^(\$|\\\()/, "").replace(/(\$|\\\))$/, "");
       return <InlineMath key={key} formula={inner} />;
     }
 
-    // 5. Citations
+    // 6. Citations
     const cMatch = val.match(/^\[(\d+)\]$/);
     if (cMatch) {
       const num = Number(cMatch[1]);
-      const index = num - 1;
-      const valid = index >= 0 && index < sources.length;
+      const idx = num - 1;
       return (
-        <button
-          key={key}
-          onClick={(e) => {
-            e.stopPropagation();
-            onCitationClick(index);
-            if (valid && sources[index]) window.open(sources[index].url, "_blank");
-          }}
-          className="citation-btn text-[0.7em] align-super ml-0.5"
-        >
+        <button key={key} onClick={() => { onCitationClick(idx); if (sources[idx]?.url) window.open(sources[idx].url, "_blank"); }} className="citation-btn text-[0.7em] align-super ml-0.5">
           {num}
         </button>
       );
@@ -273,457 +325,204 @@ function formatInlineText(
   });
 }
 
-// ─── Tokenizer (display math only) ──────────────────────
-type Token =
-  | { type: "text"; value: string }
-  | { type: "display_math"; value: string };
-
-function tokenize(content: string): Token[] {
-  const tokens: Token[] = [];
-  const regex = /\$\$(.+?)\$\$|\\\[(.+?)\\\]/gs;
-  let lastIdx = 0;
-  let match;
-  while ((match = regex.exec(content)) !== null) {
-    if (match.index > lastIdx) {
-      tokens.push({ type: "text", value: content.slice(lastIdx, match.index) });
-    }
-    if (match[1]) {
-      tokens.push({ type: "display_math", value: match[1] });
-    } else if (match[2]) {
-      tokens.push({ type: "display_math", value: match[2] });
-    }
-    lastIdx = match.index + match[0].length;
-  }
-  if (lastIdx < content.length) {
-    tokens.push({ type: "text", value: content.slice(lastIdx) });
-  }
-  return tokens;
-}
-
-// ─── Table helpers ────────────────────────────────────────
-function isTableLine(line: string | undefined): line is string {
-  if (!line) return false;
-  const t = line.trim();
-  return t.startsWith("|") && t.endsWith("|") && t.indexOf("|", 1) > 0;
-}
-
-function isTableSeparator(line: string | undefined): line is string {
-  if (!line) return false;
-  return /^\|[\s:-]+\|(?:\s*[\s:-]+\s*\|)*$/.test(line.trim());
-}
-
-function parseTableRow(line: string) {
-  return line
-    .trim()
-    .replace(/^\|/, "")
-    .replace(/\|$/, "")
-    .split("|")
-    .map((c) => c.trim());
-}
-
-function Table({
-  header,
-  rows,
-  onCitationClick,
-  sources,
-  parentKey,
-}: {
-  header: string[];
-  rows: string[][];
-  onCitationClick: (index: number) => void;
-  sources: Source[];
-  parentKey: string;
-}) {
-  return (
-    <div className="my-4 overflow-x-auto">
-      <table className="min-w-full border-collapse border border-gray-700 text-[15px]">
-        <thead>
-          <tr className="bg-gray-800/50">
-            {header.map((h, hi) => (
-              <th
-                key={`${parentKey}-h-${hi}`}
-                className="border border-gray-700 px-3 py-2 text-left font-semibold text-foreground"
-              >
-                {formatInlineText(h, onCitationClick, sources, `${parentKey}-h${hi}`)}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, ri) => (
-            <tr key={`${parentKey}-r${ri}`} className="odd:bg-gray-900/30 even:bg-transparent">
-              {row.map((cell, ci) => (
-                <td key={`${parentKey}-r${ri}-c${ci}`} className="border border-gray-700 px-3 py-2">
-                  {formatInlineText(cell, onCitationClick, sources, `${parentKey}-r${ri}-c${ci}`)}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// ─── Enhanced segment extraction ──────────────────────────
-type Segment =
-  | { type: "code"; language: string; content: string }
-  | { type: "svg"; content: string }
-  | { type: "mermaid"; content: string }
-  | { type: "chart"; content: string }
-  | { type: "text"; value: string };
-
-function extractSpecialBlocks(rawText: string): Segment[] {
-  const segments: Segment[] = [];
-  // Updated regex to find balanced tags: <TAG>content</TAG>
-  // Supports <svg>...</svg>, <MERMAID>...</MERMAID>, <CHART>...</CHART>
-  const blockRegex = /<(svg|MERMAID|CHART)(?:\s+[^>]*)?>([\s\S]*?)<\/\1>/gi;
-  
-  let lastIdx = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = blockRegex.exec(rawText)) !== null) {
-    // 1. Add text before the match
-    if (match.index > lastIdx) {
-      const textBefore = rawText.slice(lastIdx, match.index);
-      if (textBefore.trim()) {
-        segments.push({ type: "text", value: textBefore });
-      }
-    }
-
-    // 2. Add the special block
-    const tagName = match[1]!.toLowerCase();
-    const content = match[2]!.trim();
-
-    if (tagName === "svg") {
-      segments.push({ type: "svg", content: match[0] }); // include tags for svg
-    } else if (tagName === "mermaid") {
-      segments.push({ type: "mermaid", content });
-    } else if (tagName === "chart") {
-      segments.push({ type: "chart", content });
-    }
-
-    lastIdx = blockRegex.lastIndex;
-  }
-
-  // 3. Add remaining text
-  if (lastIdx < rawText.length) {
-    const remaining = rawText.slice(lastIdx);
-    if (remaining.trim()) {
-      // Now extract standard code blocks from remaining
-      const codeSegments = extractCodeBlocks(remaining);
-      segments.push(...codeSegments);
-    }
-  }
-
-  return segments;
-}
-
-// ─── Strip JS-style comments from JSON ────────────────────────
-// LLMs like to emit "// comment" inside JSON. We strip them.
+// ─── Block Parsers ────────────────────────────────────────
 function stripJsonComments(raw: string): string {
-  return raw
-    .replace(/\/\/[^\n]*/g, "")     // single-line // comments
-    .replace(/\/\*[\s\S]*?\*\//g, "") // block /* */ comments
-    .trim();
+  return raw.replace(/\/\/[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, "").trim();
 }
 
-// ─── Original code-block extractor ────────────────────────
-function extractCodeBlocks(rawText: string): Segment[] {
-  const segments: Segment[] = [];
-  const lines = rawText.split("\n");
-  let i = 0;
-  let currentText: string[] = [];
+function parseTable(lines: string[], startIndex: number) {
+  const rows: string[][] = [];
+  let i = startIndex;
+  const isTableLine = (l: string | undefined) => l?.trim().startsWith("|") && l?.trim().endsWith("|");
+
+  while (i < lines.length && isTableLine(lines[i])) {
+    const line = lines[i]!.trim();
+    const row = line.slice(1, -1).split("|").map(c => c.trim());
+    // Skip separator lines like |---|
+    if (!row.every(c => c.match(/^[:\s-]+$/))) {
+      rows.push(row);
+    }
+    i++;
+  }
+  return { rows, nextIndex: i };
+}
+
+function parseList(lines: string[], startIndex: number) {
+  const items: { level: number; text: string; type: "ol" | "ul" }[] = [];
+  let i = startIndex;
 
   while (i < lines.length) {
-    const line = lines[i];
-    if (line === undefined) { i++; continue; }
+    const line = lines[i]!;
+    const match = line.match(/^(\s*)([-*•]|\d+\.)\s+(.+)$/);
+    if (!match) break;
+
+    items.push({
+      level: match[1]!.length,
+      text: match[3]!,
+      type: match[2]!.match(/\d/) ? "ol" : "ul"
+    });
+    i++;
+  }
+  return { items, nextIndex: i };
+}
+
+function renderList(items: any[], onCitationClick: any, sources: Source[], parentKey: string) {
+  const result: React.ReactNode[] = [];
+  let i = 0;
+
+  while (i < items.length) {
+    const item = items[i];
+    const ListTag = item.type === "ol" ? "ol" : "ul";
+    const currentLevel = item.level;
+
+    // Find nested children
+    const nested: any[] = [];
+    let j = i + 1;
+    while (j < items.length && items[j].level > currentLevel) {
+      nested.push(items[j]);
+      j++;
+    }
+
+    result.push(
+      <ListTag key={`${parentKey}-${i}`} className={`${item.type === "ol" ? "list-decimal" : "list-disc"} pl-6 my-2 space-y-1`}>
+        <li className="pl-1">
+          {formatInlineText(item.text, onCitationClick, sources, `${parentKey}-li-${i}`)}
+          {nested.length > 0 && renderList(nested, onCitationClick, sources, `${parentKey}-nested-${i}`)}
+        </li>
+      </ListTag>
+    );
+    i = j;
+  }
+  return result;
+}
+
+// ─── Plain Block Processor (Headers, Tables, Lists, Paragraphs) ───
+function renderPlainBlocks(text: string, onCitationClick: any, sources: Source[], parentIdx: number) {
+  const lines = text.split("\n");
+  const elements: React.ReactNode[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i]!;
     const trimmed = line.trim();
-    if (trimmed.startsWith("```")) {
-      if (currentText.length > 0) {
-        segments.push({ type: "text", value: currentText.join("\n") });
-        currentText = [];
-      }
-      const lang = trimmed.slice(3).trim();
+    if (!trimmed) { i++; continue; }
+
+    // 1. Headers
+    const hMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
+    if (hMatch) {
+      const level = hMatch[1]!.length;
+      const Tag = `h${level}` as any;
+      elements.push(<Tag key={`h-${parentIdx}-${i}`} className="font-bold text-foreground mt-6 mb-2 tracking-tight">{formatInlineText(hMatch[2]!, onCitationClick, sources, `h-${parentIdx}-${i}`)}</Tag>);
       i++;
-      const codeLines: string[] = [];
-      while (i < lines.length) {
-        const cLine = lines[i];
-        if (cLine === undefined || cLine.trim() === "```") {
-          i++;
-          break;
-        }
-        codeLines.push(cLine);
-        i++;
+      continue;
+    }
+
+    // 2. Tables
+    if (trimmed.startsWith("|")) {
+      const { rows, nextIndex } = parseTable(lines, i);
+      if (rows.length > 1) {
+        elements.push(
+          <div key={`tab-${parentIdx}-${i}`} className="my-6 overflow-x-auto border border-white/10 rounded-lg shadow-sm">
+            <table className="min-w-full divide-y divide-white/10 text-sm">
+              <thead className="bg-white/5 text-left">
+                <tr>
+                  {rows[0]!.map((cell, ci) => (
+                    <th key={ci} className="px-4 py-3 font-semibold">{formatInlineText(cell, onCitationClick, sources, `th-${parentIdx}-${i}-${ci}`)}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {rows.slice(1).map((row, ri) => (
+                  <tr key={ri} className="hover:bg-white/[0.02] transition-colors">
+                    {row.map((cell, ci) => (
+                      <td key={ci} className="px-4 py-3 text-muted-foreground">{formatInlineText(cell, onCitationClick, sources, `td-${parentIdx}-${i}-${ri}-${ci}`)}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+        i = nextIndex;
+        continue;
       }
-      segments.push({ type: "code", language: lang, content: codeLines.join("\n") });
+    }
+
+    // 3. Lists
+    if (trimmed.match(/^([-*•]|\d+\.)\s+/)) {
+      const { items, nextIndex } = parseList(lines, i);
+      elements.push(<div key={`lst-${parentIdx}-${i}`}>{renderList(items, onCitationClick, sources, `lst-${parentIdx}-${i}`)}</div>);
+      i = nextIndex;
+      continue;
+    }
+
+    // 4. Dividers
+    if (trimmed === "---") {
+      elements.push(<hr key={`hr-${parentIdx}-${i}`} className="my-8 border-white/10" />);
+      i++;
+      continue;
+    }
+
+    // 5. Paragraphs
+    elements.push(
+      <p key={`p-${parentIdx}-${i}`} className="leading-relaxed mb-4 last:mb-0 text-[15px] text-foreground/90">
+        {formatInlineText(line, onCitationClick, sources, `p-${parentIdx}-${i}`)}
+      </p>
+    );
+    i++;
+  }
+  return elements;
+}
+
+// ─── Main Block Orchestrator ──────────────────────────────
+function renderBlocks(text: string, onCitationClick: any, sources: Source[]) {
+  if (typeof text !== "string") return [];
+
+  // Identify indestructible blocks globally first
+  // Note: Negative lookahead (?!-?\d+pt) protects \[ dimensions from being treated as math blocks
+  const indestructibleRegex = /(<(CHART|MERMAID|svg)(?:\s+[^>]*)?>[\s\S]*?<\/\2>|```[a-z]*[\s\S]*?```|\\begin\{([a-z*]+)\}[\s\S]*?\\end\{\3\}|\$\$[\s\S]+?\$\$|(?<!\\)\\\[(?!-?\d+pt)[\s\S]+?\\\])/gi;
+
+  const parts = splitWithDelimiters(text, indestructibleRegex);
+
+  return parts.flatMap((part, pi) => {
+    if (part.type === "delimiter") {
+      const val = part.value;
+
+      // Handle Custom Tags
+      const tagMatch = val.match(/<(CHART|MERMAID|svg)/i);
+      if (tagMatch) {
+        const tag = tagMatch[1]!.toUpperCase();
+        const content = val.replace(/<[^>]+>/i, "").replace(/<\/[^>]+>$/i, "").trim();
+        if (tag === "CHART") {
+          try {
+            return <ChartRenderer key={pi} data={JSON.parse(stripJsonComments(content))} />;
+          } catch {
+            return <div key={pi} className="text-red-400 text-xs my-2">Invalid Chart JSON</div>;
+          }
+        }
+        if (tag === "MERMAID") return <MermaidRenderer key={pi} code={content} />;
+        return <div key={pi} className="my-4 overflow-x-auto" dangerouslySetInnerHTML={{ __html: val }} />;
+      }
+
+      // Handle Code Blocks
+      if (val.startsWith("```")) {
+        const match = val.match(/^```([a-z]*)\n?([\s\S]*?)\n?```$/i);
+        return <CodeBlock key={pi} language={match?.[1] || "text"} code={match?.[2] || ""} />;
+      }
+
+      // Handle LaTeX Blocks
+      if (val.startsWith("\\begin{") || val.startsWith("$$") || (val.startsWith("\\[") && val.length > 10)) {
+        return <DisplayMath key={pi} formula={val} />;
+      }
+
+      return <span key={pi}>{val}</span>;
     } else {
-      currentText.push(line);
-      i++;
-    }
-  }
-
-  if (currentText.length > 0) {
-    segments.push({ type: "text", value: currentText.join("\n") });
-  }
-
-  return segments;
-}
-
-// ─── Paragraph processor ──────────────────────────────────
-function processTextSegment(
-  text: string,
-  onCitationClick: (index: number) => void,
-  sources: Source[],
-  parentPrefix: string
-): React.ReactNode[] {
-  const elements: React.ReactNode[] = [];
-  const paragraphs = text.split(/\n\n+/);
-  paragraphs.forEach((block, i) => {
-    const lines = block.split(/\n/);
-    let j = 0;
-    let loopGuard = 0;
-
-    while (j < lines.length && loopGuard < 20000) {
-      loopGuard++;
-      const line = lines[j];
-      if (line === undefined) { j++; continue; }
-      const trimmed = line.trim();
-
-      if (!trimmed) {
-        j++;
-        continue;
-      }
-
-      if (trimmed === "---") {
-        elements.push(
-          <hr
-            key={`divider-${parentPrefix}-${i}-${j}`}
-            className="my-8 border-t border-stone-500/60"
-            style={{ borderTopWidth: "1.5px" }}
-          />
-        );
-        j++;
-        continue;
-      }
-
-      const remainingLines = lines.slice(j);
-      if (
-        remainingLines.length >= 3 &&
-        isTableLine(remainingLines[0]) &&
-        isTableSeparator(remainingLines[1]) &&
-        isTableLine(remainingLines[2])
-      ) {
-        const header = parseTableRow(remainingLines[0]);
-        let consumed = 2;
-        while (
-          consumed < remainingLines.length &&
-          isTableLine(remainingLines[consumed])
-        ) {
-          consumed++;
-        }
-        const rows = remainingLines.slice(2, consumed).map(l => parseTableRow(l!));
-        elements.push(
-          <Table
-            key={`table-${parentPrefix}-${i}-${j}`}
-            header={header}
-            rows={rows}
-            onCitationClick={onCitationClick}
-            sources={sources}
-            parentKey={`table-${parentPrefix}-${i}-${j}`}
-          />
-        );
-        j += consumed;
-        continue;
-      }
-
-      const hMatch = trimmed.match(/^(#{1,3})\s+(.+)/);
-      if (hMatch) {
-        const level = hMatch[1]?.length ?? 1;
-        const Tag = `h${level}` as any;
-        const key = `h-${parentPrefix}-${i}-${j}`;
-        elements.push(
-          <Tag key={key} className="mt-3 mb-2 font-semibold tracking-tight text-foreground">
-            {formatInlineText(hMatch[2] ?? "", onCitationClick, sources, key)}
-          </Tag>
-        );
-        j++;
-        continue;
-      }
-
-      if (/^[-*•]\s+/.test(trimmed)) {
-        const items: string[] = [];
-        while (j < lines.length) {
-          const l = lines[j];
-          if (l === undefined) break;
-          const t = l.trim();
-          if (!/^[-*•]\s+/.test(t)) break;
-          items.push(t.replace(/^[-*•]\s+/, ""));
-          j++;
-        }
-        const key = `ul-${parentPrefix}-${i}-${j}`;
-        elements.push(
-          <ul key={key} className="my-2 list-disc pl-5 space-y-0.5">
-            {items.map((item, itemIdx) => (
-              <li key={`${key}-${itemIdx}`}>
-                {formatInlineText(item, onCitationClick, sources, `${key}-${itemIdx}`)}
-              </li>
-            ))}
-          </ul>
-        );
-        continue;
-      }
-
-      if (/^\d{1,2}\.\s+/.test(trimmed)) {
-        const items: string[] = [];
-        while (j < lines.length) {
-          const l = lines[j];
-          if (l === undefined) break;
-          const t = l.trim();
-          if (!/^\d{1,2}\.\s+/.test(t)) break;
-          items.push(t.replace(/^\d{1,2}\.\s+/, ""));
-          j++;
-        }
-        const key = `ol-${parentPrefix}-${i}-${j}`;
-        elements.push(
-          <ol key={key} className="my-2 list-decimal pl-5 space-y-0.5">
-            {items.map((item, itemIdx) => (
-              <li key={`${key}-${itemIdx}`}>
-                {formatInlineText(item, onCitationClick, sources, `${key}-${itemIdx}`)}
-              </li>
-            ))}
-          </ol>
-        );
-        continue;
-      }
-
-      let paraLines: string[] = [];
-      while (j < lines.length) {
-        const l = lines[j];
-        if (l === undefined) break;
-        const t = l.trim();
-        if (!t || /^(#{1,3}\s+)/.test(t) || /^[-*•]\s+/.test(t) || /^\d{1,2}\.\s+/.test(t) || isTableLine(l)) {
-          break;
-        }
-        paraLines.push(l);
-        j++;
-      }
-
-      if (paraLines.length > 0) {
-        const key = `p-${parentPrefix}-${i}-${j}`;
-        const inlineNodes = paraLines.flatMap((l, lineIdx) => {
-          const hasHardBreak = l.endsWith("  ");
-          const content = hasHardBreak ? l.slice(0, -2) : l;
-          const frag = (
-            <Fragment key={`${key}-l${lineIdx}`}>
-              {formatInlineText(content, onCitationClick, sources, `${key}-l${lineIdx}`)}
-            </Fragment>
-          );
-          const result: React.ReactNode[] = [frag];
-          if (hasHardBreak && lineIdx < paraLines.length - 1) {
-            result.push(<br key={`${key}-br${lineIdx}`} />);
-          } else if (lineIdx < paraLines.length - 1) {
-            result.push(<React.Fragment key={`${key}-sp${lineIdx}`}> </React.Fragment>);
-          }
-          return result;
-        });
-        elements.push(
-          <p key={key} className="mt-1 mb-2 last:mb-0">
-            {inlineNodes}
-          </p>
-        );
-      }
-
-      if (j < lines.length) {
-          const l = lines[j];
-          if (l === undefined || !l.trim()) j++;
-      }
-    }
-
-    if (loopGuard >= 20000) {
-      console.error("Infinite loop prevented in processTextSegment");
+      // Process everything else (headers, tables, lists, paragraphs)
+      return renderPlainBlocks(part.value, onCitationClick, sources, pi);
     }
   });
-
-  return elements;
 }
 
-// ─── Main renderer ─────────────────────────────────────────
-function renderContent(
-  rawText: string,
-  onCitationClick: (index: number) => void,
-  sources: Source[]
-) {
-  if (!rawText) return [];
-  const segments = extractSpecialBlocks(rawText);
-  const elements: React.ReactNode[] = [];
-
-  segments.forEach((segment, segIdx) => {
-    switch (segment.type) {
-      case "code":
-        elements.push(
-          <CodeBlock
-            key={`code-${segIdx}`}
-            language={segment.language}
-            code={segment.content}
-          />
-        );
-        return;
-
-      case "svg":
-        elements.push(
-          <div
-            key={`svg-${segIdx}`}
-            className="svg-renderer my-4"
-            dangerouslySetInnerHTML={{ __html: segment.content }}
-          />
-        );
-        return;
-
-      case "mermaid":
-        elements.push(
-          <MermaidRenderer key={`mermaid-${segIdx}`} code={segment.content} />
-        );
-        return;
-
-      case "chart":
-        try {
-          const cleaned = stripJsonComments(segment.content);
-          const chartData = JSON.parse(cleaned) as ChartData;
-          elements.push(
-            <ChartRenderer key={`chart-${segIdx}`} data={chartData} />
-          );
-        } catch (e) {
-          elements.push(
-            <div key={`chart-${segIdx}`} className="text-red-400 text-sm">
-              Invalid chart JSON: {(e as Error).message}
-            </div>
-          );
-        }
-        return;
-
-      case "text": {
-        const tokens = tokenize(segment.value);
-        tokens.forEach((token, tokIdx) => {
-          const prefix = `seg${segIdx}-tok${tokIdx}`;
-          if (token.type === "display_math") {
-            elements.push(
-              <DisplayMath key={`dm-${prefix}`} formula={token.value} />
-            );
-          } else {
-            const processed = processTextSegment(token.value, onCitationClick, sources, prefix);
-            elements.push(...processed);
-          }
-        });
-        return;
-      }
-    }
-  });
-
-  return elements;
-}
-
-// ─── Public component (memoized) ──────────────────────────
 export const MessageRenderer = React.memo(function MessageRenderer({
   content,
   onCitationClick,
@@ -734,9 +533,6 @@ export const MessageRenderer = React.memo(function MessageRenderer({
   sources: Source[];
 }) {
   const safeContent = content ?? "";
-  const rendered = useMemo(
-    () => renderContent(safeContent, onCitationClick, sources),
-    [safeContent, onCitationClick, sources]
-  );
-  return <>{rendered}</>;
+  const blocks = useMemo(() => renderBlocks(safeContent, onCitationClick, sources), [safeContent, onCitationClick, sources]);
+  return <div className="markdown-body space-y-1">{blocks}</div>;
 });
