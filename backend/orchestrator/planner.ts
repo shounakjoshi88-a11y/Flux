@@ -48,60 +48,13 @@ export class Planner {
 
     if (docType) {
       const topic = detectTopic(query);
-      const steps: Phase[] = [];
-      const isRefTopic = /^(?:these|those|this|that|the above|the following|the previous|my)\b/i.test(topic);
-
-      if (!isRefTopic) {
-        steps.push({
-          id: "research",
-          type: "research",
-          description: `Research "${topic}" via web search`,
-          tools: ["web_search"],
-          dependsOn: [],
-          required: true,
-          criteria: [
-            { type: "has_sources", label: "Sources found" },
-            { type: "min_sources", minCount: 1, label: "At least 1 source" },
-          ],
-          maxRetries: 2,
-        });
-      }
-
-      steps.push({
-        id: "load_skill",
-        type: "load_skill",
-        description: `Load ${docType.toUpperCase()} generation rules`,
-        tools: ["read_skill"],
-        dependsOn: [],
-        required: true,
-        criteria: [
-          { type: "has_skill_content", label: "Skill content loaded" },
-        ],
-        maxRetries: 1,
-      });
-
-      steps.push({
-        id: "generate_doc",
-        type: "generate_doc",
-        description: `Generate ${docType.toUpperCase()} about "${topic}"`,
-        tools: ["generate_document"],
-        dependsOn: isRefTopic ? ["load_skill"] : ["research", "load_skill"],
-        required: true,
-        criteria: [
-          { type: "has_file", label: "File generated" },
-        ],
-        maxRetries: 2,
-      });
-
       return {
         workflow: "research_document",
         plan: {
-          steps,
-          userIntent: `Generate ${docType} about ${topic}`,
-          reasoning: isRefTopic
-            ? "Document generation for existing conversation content — no web search needed, using conversation context directly."
-            : "This is a document generation request that requires research, skill loading, and file generation.",
-          estimatedSteps: isRefTopic ? 2 : 3,
+          steps: [],
+          userIntent: `Document generation: ${topic}`,
+          reasoning: `Flux will automatically research and create a ${docType} document about "${topic}".`,
+          estimatedSteps: 0,
         },
       };
     }
