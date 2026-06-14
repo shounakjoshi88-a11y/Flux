@@ -107,7 +107,7 @@ function repairLatex(formula: string): string {
     )
 
     // ── 11. Frobenius / subscript after pipe: |{F}^2 → |_{F}^2 ─────────────
-    .replace(/(\|)\{([A-Za-z0-9]+)\}/g, "$1_{$2}")
+    .replace(/\|\{([A-Za-z0-9]+)\}\^/g, "|_{$1}^")
     // Unescaped double-pipe norm: ||T|| → \|T\|
     .replace(/(?<!\\)\|\|/g, "\\|")
 
@@ -123,14 +123,6 @@ function repairLatex(formula: string): string {
     )
     // ; immediately before LaTeX newline or at end of expression → strip
     .replace(/;(\s*\\\\|\s*$)/g, "$1");
-
-  // ── 13. Strip bare dimension arguments (LLM hallucinations) ────────────────
-  // Removes things like [-2pt], [12pt] that are not preceded by a backslash.
-  // Rule 1 already turned \[-2pt] into \\[-2pt], so what remains is garbage.
-  s = s.replace(
-    /(?<!\\)\[(-?\d+(?:pt|em|ex|cm|mm|in|pc|px|vh|vw|vmin|vmax))\s*\]/g,
-    ""
-  );
 
   return s.trim();
 }
@@ -543,7 +535,7 @@ function renderBlocks(text: string, onCitationClick: any, sources: Source[]) {
 
   // Identify indestructible blocks globally first
   // Note: Negative lookahead (?!-?\d+pt) protects \[ dimensions from being treated as math blocks
-  const indestructibleRegex = /(<(CHART|MERMAID|svg)(?:\s+[^>]*)?>[\s\S]*?<\/\2>|```[a-z]*[\s\S]*?```|\\begin\{([a-z*]+)\}[\s\S]*?\\end\{\3\}|\$\$[\s\S]+?\$\!|(?<!\\)\\\[(?!-?\d+pt)[\s\S]+?\\\])/gi;
+  const indestructibleRegex = /(<(CHART|MERMAID|svg)(?:\s+[^>]*)?>[\s\S]*?<\/\2>|```[a-z]*[\s\S]*?```|\\begin\{([a-z*]+)\}[\s\S]*?\\end\{\3\}|\$\$[\s\S]+?\$\$|(?<!\\)\\\[(?!-?\d+pt)[\s\S]+?\\\])/gi;
 
   const parts = splitWithDelimiters(text, indestructibleRegex);
 
