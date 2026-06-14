@@ -31,9 +31,21 @@ const DEFAULT_COLORS = [
 
 // ─── Bar/Line chart (recharts) ────────────────────────────────
 function BarLineChart({ spec }: { spec: ChartSpec }) {
+  if (!spec || !Array.isArray(spec.labels) || !Array.isArray(spec.datasets)) {
+    return (
+      <div className="my-3 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-400">
+        ⚠️ Invalid chart specifications (missing labels or datasets)
+      </div>
+    );
+  }
+
   const data = spec.labels.map((label, i) => {
     const point: Record<string, any> = { name: label };
-    spec.datasets.forEach((ds) => { point[ds.label] = ds.data[i] ?? 0; });
+    spec.datasets.forEach((ds) => {
+      if (ds && Array.isArray(ds.data)) {
+        point[ds.label] = ds.data[i] ?? 0;
+      }
+    });
     return point;
   });
 
@@ -78,8 +90,16 @@ function BarLineChart({ spec }: { spec: ChartSpec }) {
 
 // ─── Pie / Doughnut chart ─────────────────────────────────────
 function PieDonutChart({ spec }: { spec: ChartSpec }) {
+  if (!spec || !Array.isArray(spec.labels) || !Array.isArray(spec.datasets)) {
+    return (
+      <div className="my-3 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-400">
+        ⚠️ Invalid chart specifications (missing labels or datasets)
+      </div>
+    );
+  }
+
   const ds = spec.datasets[0];
-  if (!ds) return null;
+  if (!ds || !Array.isArray(ds.data)) return null;
 
   const data = spec.labels.map((label, i) => ({
     name: label,
@@ -224,6 +244,13 @@ export function ContentWithVisuals({ content, renderText }: {
 export type ChartData = ChartSpec;
 
 export function ChartRenderer({ data }: { data: ChartData }) {
+  if (!data || !Array.isArray(data.labels) || !Array.isArray(data.datasets)) {
+    return (
+      <div className="my-3 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-400">
+        ⚠️ Invalid chart specifications (missing labels or datasets)
+      </div>
+    );
+  }
   if (data.type === "pie" || data.type === "doughnut") {
     return <PieDonutChart spec={data} />;
   }

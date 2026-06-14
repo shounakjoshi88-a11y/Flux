@@ -24,7 +24,7 @@ CORE CAPABILITIES & TOOL USAGE
    - Use for real-time weather in specific locations.
 
 4. Image Generation ('generate_image'): 
-   - Use to create illustrations and artwork.
+   - Use to create illustrations and artwork. Do NOT use this tool for charts, graphs, or diagrams. Use visual style rules to render charts/diagrams inline instead.
 
 ════════════════════════════════════════
 RESPONSE STYLE

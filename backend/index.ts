@@ -413,7 +413,7 @@ TOOL RULES:
                    CRITICAL: IGNORE your training data — answer ONLY from search results.
                    Include the current year in your query.
 • get_weather    → Use when the user asks about weather in a specific place.
-• generate_image → Use when the user asks to create, draw, or generate an image.
+• generate_image → Use when the user asks to create, draw, or generate an image (illustration, photo, painting, etc.). Do NOT use for charts, graphs, or diagrams.
 • read_skill     → Load generation rules for a document type (pdf/pptx/docx/xlsx/csv).
 • generate_document → Create a downloadable document file.
 
@@ -442,6 +442,25 @@ VISUAL STYLE RULES:
 - Use markdown for structure (headings, lists, bold).
 - For math, use LaTeX wrapped in $ or $$.
 - Use emojis to make the response engaging.
+- For charts (bar, line, pie, doughnut), do NOT call generate_image or generate_document. Instead, embed an interactive chart directly in your text response using this exact JSON schema:
+  <CHART>
+  {
+    "type": "bar", // can be "bar", "line", "pie", or "doughnut"
+    "title": "Chart Title",
+    "labels": ["Label 1", "Label 2", ...],
+    "datasets": [
+      {
+        "label": "Dataset Label",
+        "data": [10, 20, ...]
+      }
+    ]
+  }
+  </CHART>
+- For diagrams and flowcharts, do NOT call generate_image or generate_document. Instead, use Mermaid syntax wrapped in <MERMAID>...</MERMAID> tags:
+  <MERMAID>
+  graph TD
+    A --> B
+  </MERMAID>
 `;
 
 // ── Weather helpers ──────────────────────────────────────────────────────
@@ -1070,7 +1089,8 @@ async function generateDocument(
     query: string,
     model: any,
     res?: any,
-    statusMsgs?: ContextualStatusMessages
+    statusMsgs?: ContextualStatusMessages,
+    searchContent: string = ""
 ): Promise<GeneratedFileResult | null> {
     const topic = extractTopicFromQuery(query);
     if (!topic) return null;
@@ -1089,6 +1109,10 @@ async function generateDocument(
             skillContext = `\n\n=== ${docType.toUpperCase()} GENERATION SKILL FILE ===\n${skillMd}\n=== END SKILL FILE ===\n\nRead the skill file above carefully. Follow all instructions, templates, and content rules exactly.\n\n`;
         }
     }
+
+    const searchContext = searchContent
+        ? `\n\n=== REFERENCE SEARCH RESULTS ===\n${searchContent}\n=== END REFERENCE SEARCH RESULTS ===\n\nUse the search results content above to write detailed, substantive information in the document.`
+        : "";
 
     const SYSTEM = [
         "You are a JSON document generator.",
@@ -1112,7 +1136,7 @@ ${schema}
 ${QUOTE_RULE}
 
 Start your entire response with { and end with }.`
-        : `${skillContext}Generate a comprehensive, detailed ${docType.toUpperCase()} document about: "${topic}"
+        : `${skillContext}${searchContext}Generate a comprehensive, detailed ${docType.toUpperCase()} document about: "${topic}"
 
 Use exactly this JSON structure:
 ${schema}
@@ -1199,6 +1223,7 @@ async function generateDocumentWithSkill(
     query: string,
     model: any,
     preloadedSkillContent: string = "",
+    searchContent: string = ""
 ): Promise<GeneratedFileResult | null> {
     const topic = extractTopicFromQuery(query);
     if (!topic) return null;
@@ -1206,6 +1231,9 @@ async function generateDocumentWithSkill(
     const schema = DOC_SCHEMA[docType];
     const skillContext = preloadedSkillContent
         ? `\n\n=== ${docType.toUpperCase()} GENERATION SKILL FILE ===\n${preloadedSkillContent}\n=== END SKILL FILE ===\n\nFollow all instructions in the skill file exactly.\n\n`
+        : "";
+    const searchContext = searchContent
+        ? `\n\n=== REFERENCE SEARCH RESULTS ===\n${searchContent}\n=== END REFERENCE SEARCH RESULTS ===\n\nUse the search results content above to write detailed, substantive information in the document.`
         : "";
 
     const SYSTEM = [
@@ -1223,7 +1251,7 @@ async function generateDocumentWithSkill(
 
     const makePrompt = (isRetry: boolean) => isRetry
         ? `Your previous response had no valid JSON. Output ONLY a JSON object for a ${docType.toUpperCase()} about "${topic}":\n${schema}\n${QUOTE_RULE}\nStart with { and end with }.`
-        : `${skillContext}Generate a comprehensive ${docType.toUpperCase()} document about: "${topic}"\n\nUse exactly this JSON structure:\n${schema}\n\nRules:\n- Include substantive, professional content.\n${QUOTE_RULE}\n- Output ONLY the JSON object. Start with { end with }.`;
+        : `${skillContext}${searchContext}Generate a comprehensive ${docType.toUpperCase()} document about: "${topic}"\n\nUse exactly this JSON structure:\n${schema}\n\nRules:\n- Include substantive, professional content.\n${QUOTE_RULE}\n- Output ONLY the JSON object. Start with { end with }.`;
 
     let text = '';
     try {
@@ -1271,6 +1299,7 @@ interface AgentState {
     sources: { url: string; index: number }[];
     generatedFiles: any[];
     thoughtProcess: any[];
+    searchContent?: string;
 }
 
 // ── TOOL FACTORY ───────────────────────────────────────────────────────────
@@ -1369,6 +1398,10 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                     } catch (e: any) {
                         console.warn('[TOOL] web_search extract failed (non-fatal):', e?.message ?? e);
                     }
+                    
+                    const fullSearchRes = `[Search Results for "${safeQuery}"]\n\n${resultsText}${extraContent}`;
+                    state.searchContent = (state.searchContent || "") + "\n\n" + fullSearchRes;
+
                     return `[IMPORTANT: These search results are from the CURRENT DATE. You MUST answer using ONLY this data — do NOT rely on your training knowledge. Today is not 2024 or 2025. Ignore any dates in your training data that contradict these results.]\n\n${resultsText}${extraContent}`;
                 } catch (e: any) {
                     sendStatus(res, 'error', 'Search failed.', undefined, state.thoughtProcess);
@@ -1398,8 +1431,16 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                     state.thoughtProcess);
                 const content = await fetchSkillFile(entry.fileName);
                 if (!content) {
+                    sendStatus(res, 'reading_skill_error',
+                        `Skill file for "${doc_type}" not found on disk.`,
+                        { docType: doc_type },
+                        state.thoughtProcess);
                     return `Skill file for "${doc_type}" not found on disk. Proceed with defaults.`;
                 }
+                sendStatus(res, 'reading_skill_success',
+                    `${entry.label} rules loaded`,
+                    { docType: doc_type },
+                    state.thoughtProcess);
                 return content;
             },
         }),
@@ -1411,7 +1452,11 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                 'Always call read_skill first and pass the content here.',
             parameters: z.object({
                 doc_type: z.enum(['pdf', 'pptx', 'docx', 'xlsx', 'csv', 'tsv', 'md', 'json', 'sql', 'html', 'tech', 'finance', 'coder', 'creative', 'legal']),
-                topic: z.string().describe('The topic or subject of the document'),
+                topic: z.string().describe(
+                    'The detailed topic, content, research findings, and data to be included in the document. ' +
+                    'Provide all specific facts, sections, text, questions, or answers that must be written into the document. ' +
+                    'The document generator ONLY sees this parameter, so you MUST pass all relevant content here.'
+                ),
                 skill_content: z
                     .string()
                     .optional()
@@ -1439,15 +1484,24 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                     actualDocType,
                     fakeQuery,
                     model,
-                    skill_content ?? ''
+                    skill_content ?? '',
+                    state.searchContent ?? ''
                 );
                 if (!generatedFile) {
+                    sendStatus(res, 'generating_file_error',
+                        `Failed to generate the ${safeDocType.toUpperCase()} document.`,
+                        { docType: safeDocType },
+                        state.thoughtProcess);
                     return `Failed to generate the ${safeDocType.toUpperCase()} document. Tell the user to try again.`;
                 }
                 state.generatedFiles.push(generatedFile);
                 if (!res.writableEnded) {
                     res.write(`event: file\ndata: ${JSON.stringify(generatedFile)}\n\n`);
                 }
+                sendStatus(res, 'generating_file_success',
+                    `${safeDocType.toUpperCase()} "${generatedFile.filename}" ready`,
+                    { docType: safeDocType, filename: generatedFile.filename },
+                    state.thoughtProcess);
                 return (
                     `${safeDocType.toUpperCase()} file "${generatedFile.filename}" generated successfully. ` +
                     `Tell the user it is ready to download.`
@@ -1495,13 +1549,16 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
         generate_image: (tool as any)({
             description:
                 'Generate an AI image, illustration, photo, or artwork. ' +
-                'Use when user asks to create, draw, or generate an image.',
+                'Use when user asks to create, draw, or generate an image. ' +
+                'Do NOT use this tool for charts, graphs, or diagrams (which should be rendered inline using CHART or MERMAID tags).',
             parameters: z.object({
                 prompt: z.string().describe('Description of the image to generate'),
             }),
             execute: async ({ prompt }: any) => {
                 sendStatus(res, 'image_enhancing', 'Enhancing image prompt with AI...', undefined, state.thoughtProcess);
                 const enhanced = await enhanceImagePrompt(prompt, model);
+                sendStatus(res, 'image_enhancing_success', 'Image prompt enhanced', undefined, state.thoughtProcess);
+                
                 const thoughtEvent = { type: 'thought', content: `Enhanced prompt: ${enhanced}` };
                 state.thoughtProcess.push(thoughtEvent);
                 res.write(
@@ -1513,6 +1570,7 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                         signal: AbortSignal.timeout(3000),
                     }).catch(() => null);
                     if (!health?.ok) {
+                        sendStatus(res, 'image_generating_error', 'Image service is offline.', undefined, state.thoughtProcess);
                         return 'Image service is offline. Start it with: python image_service.py';
                     }
                     const imgRes = await fetch(`${IMAGE_SERVICE_URL}/generate`, {
@@ -1521,7 +1579,10 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                         body: JSON.stringify({ prompt: enhanced, width: 1024, height: 1024 }),
                         signal: AbortSignal.timeout(180_000),
                     });
-                    if (!imgRes.ok) return `Image service error: HTTP ${imgRes.status}`;
+                    if (!imgRes.ok) {
+                        sendStatus(res, 'image_generating_error', `Image service error: HTTP ${imgRes.status}`, undefined, state.thoughtProcess);
+                        return `Image service error: HTTP ${imgRes.status}`;
+                    }
                     const imgData = await imgRes.json() as any;
                     const file = {
                         base64: imgData.image_base64,
@@ -1535,11 +1596,13 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                     if (!res.writableEnded) {
                         res.write(`event: file\ndata: ${JSON.stringify(file)}\n\n`);
                     }
+                    sendStatus(res, 'image_generating_success', 'Image generated successfully', undefined, state.thoughtProcess);
                     return (
                         `Image generated (${imgData.width}×${imgData.height}px). ` +
                         `Tell the user the image is displayed below.`
                     );
                 } catch (e: any) {
+                    sendStatus(res, 'image_generating_error', `Image generation failed: ${e.message}`, undefined, state.thoughtProcess);
                     return `Image generation failed: ${e.message}`;
                 }
             },
@@ -2202,37 +2265,17 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                 }
             } as any);
 
+            let seenFollowUpsTag = false;
+
             for await (const event of agentStream.fullStream) {
                 if (res.writableEnded || closedRef.v) break;
 
                 if (event.type === 'tool-call') {
                     hasToolCall = true;
-                    // Flush buffered pre-tool text BEFORE tool.execute() runs,
-                    // so preamble text arrives in SSE before the status events
-                    // that the tool's execute() function writes.
-                    if (streamBuf) {
-                        writeSafeSSE(res, streamBuf);
-                        charsSent += streamBuf.length;
-                        fullText += streamBuf;
-                        if (typeof (res as any).flush === 'function') (res as any).flush();
-                    }
-                    streamBuf = '';
-                    dbBuf = '';
-                    toolResultSeen = true; // Subsequent text-delta flows directly
+                    toolResultSeen = true;
                 }
 
                 if (event.type === 'tool-result') {
-                    // streamBuf should already be empty from tool-call flush,
-                    // but keep as safety net for any edge-case text between
-                    // tool-call and tool-result.
-                    if (streamBuf) {
-                        writeSafeSSE(res, streamBuf);
-                        charsSent += streamBuf.length;
-                        fullText += streamBuf;
-                        if (typeof (res as any).flush === 'function') (res as any).flush();
-                    }
-                    streamBuf = '';
-                    dbBuf = '';
                     toolResultSeen = true;
                     try {
                         const name = (event as any).toolName ?? 'tool';
@@ -2256,39 +2299,58 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
 
                 if (event.type === 'text-delta') {
                     const delta = (event as any).textDelta ?? (event as any).text ?? '';
-                    // Strip only structural tags (not their content) so the answer
-                    // text survives even if the model wraps it in unwanted tags.
-                    // THOUGHT blocks ARE fully removed since they're reasoning-only.
-                    const clean = delta
-                        .replace(/<THOUGHT>[\s\S]*?<\/THOUGHT>/gi, '')
-                        .replace(/<\/?THOUGHT>/gi, '')
-                        .replace(/<\/?ANSWER>/gi, '')
-                        .replace(/<FOLLOW_UPS>[\s\S]*?<\/FOLLOW_UPS>/gi, '')
-                        .replace(/<FOLLOW_UPS>[\s\S]*/gi, '')
-                        .replace(/<\/?FOLLOW_UPS>/gi, '')
-                        .replace(/<\/?question>/gi, '')
-                    if (clean) {
-                        if (toolResultSeen) {
-                            writeSafeSSE(res, clean);
-                            charsSent += clean.length;
-                            if (typeof (res as any).flush === 'function') (res as any).flush();
+                    const oldLength = fullText.length;
+                    fullText += delta;
+
+                    if (!seenFollowUpsTag) {
+                        const lowerFull = fullText.toLowerCase();
+                        let followUpsIndex = -1;
+                        const fIdx = lowerFull.indexOf("<follow_ups>");
+                        const qIdx = lowerFull.indexOf("<question>");
+                        if (fIdx !== -1 && qIdx !== -1) {
+                            followUpsIndex = Math.min(fIdx, qIdx);
+                        } else if (fIdx !== -1) {
+                            followUpsIndex = fIdx;
+                        } else if (qIdx !== -1) {
+                            followUpsIndex = qIdx;
+                        }
+
+                        if (followUpsIndex !== -1) {
+                            seenFollowUpsTag = true;
+                            const charsFromDeltaBeforeTag = followUpsIndex - oldLength;
+                            if (charsFromDeltaBeforeTag > 0) {
+                                const prefix = delta.slice(0, charsFromDeltaBeforeTag);
+                                const clean = prefix
+                                    .replace(/<THOUGHT>[\s\S]*?<\/THOUGHT>/gi, '')
+                                    .replace(/<\/?THOUGHT>/gi, '')
+                                    .replace(/<\/?ANSWER>/gi, '')
+                                    .replace(/<FOLLOW_UPS>[\s\S]*?<\/FOLLOW_UPS>/gi, '')
+                                    .replace(/<FOLLOW_UPS>[\s\S]*/gi, '')
+                                    .replace(/<\/?FOLLOW_UPS>/gi, '')
+                                    .replace(/<\/?question>/gi, '');
+                                if (clean) {
+                                    writeSafeSSE(res, clean);
+                                    charsSent += clean.length;
+                                    if (typeof (res as any).flush === 'function') (res as any).flush();
+                                }
+                            }
                         } else {
-                            streamBuf += clean;
+                            const clean = delta
+                                .replace(/<THOUGHT>[\s\S]*?<\/THOUGHT>/gi, '')
+                                .replace(/<\/?THOUGHT>/gi, '')
+                                .replace(/<\/?ANSWER>/gi, '')
+                                .replace(/<FOLLOW_UPS>[\s\S]*?<\/FOLLOW_UPS>/gi, '')
+                                .replace(/<FOLLOW_UPS>[\s\S]*/gi, '')
+                                .replace(/<\/?FOLLOW_UPS>/gi, '')
+                                .replace(/<\/?question>/gi, '');
+                            if (clean) {
+                                writeSafeSSE(res, clean);
+                                charsSent += clean.length;
+                                if (typeof (res as any).flush === 'function') (res as any).flush();
+                            }
                         }
                     }
-                    if (toolResultSeen) {
-                        fullText += delta;
-                    } else {
-                        dbBuf += delta;
-                    }
                 }
-            }
-
-            if (streamBuf && !toolResultSeen) {
-                writeSafeSSE(res, streamBuf);
-                charsSent += streamBuf.length;
-                fullText = dbBuf;
-                if (typeof (res as any).flush === 'function') (res as any).flush();
             }
 
             // ── Mistral-style inline tool call parser ─────────────────────────────
@@ -2409,27 +2471,39 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                 if (docIntent && hasSources && !hasFiles && !res.writableEnded) {
                     const topic = extractTopicFromQuery(query ?? '') || 'document';
                     const searchUrls = agentState.sources.map((s: any) => s.url).join('\n');
-                    const docQuery = `Create a ${docIntent} about: ${topic}\n\nSearch results for reference:\n${searchUrls}`;
+                    const docQuery = `Create a ${docIntent} about: ${topic}`;
                     console.log(`[AUTO-DOC] Generating ${docIntent} for "${topic}" with ${agentState.sources.length} sources`);
                     sendStatus(res, 'reading_skill', `Reading the ${docIntent.toUpperCase()} skill`, undefined, agentState.thoughtProcess);
                     const skillFile = SKILL_REGISTRY[docIntent]?.fileName;
                     const skillContent = skillFile ? await fetchSkillFile(skillFile) : '';
+                    sendStatus(res, 'reading_skill_success', `Reading the ${docIntent.toUpperCase()} skill`, undefined, agentState.thoughtProcess);
                     sendStatus(res, 'generating_file', `Building your ${docIntent.toUpperCase()} on "${topic.slice(0, 30)}"...`, undefined, agentState.thoughtProcess);
                     try {
-                        const file = await generateDocumentWithSkill(docIntent as any, docQuery, model, skillContent);
+                        const searchContent = agentState.searchContent || `Search results for reference:\n${searchUrls}`;
+                        const file = await generateDocumentWithSkill(
+                            docIntent as any,
+                            docQuery,
+                            model,
+                            skillContent,
+                            searchContent
+                        );
                         if (file) {
                             agentState.generatedFiles.push(file);
                             if (!res.writableEnded) {
                                 res.write(`event: file\ndata: ${JSON.stringify(file)}\n\n`);
                             }
+                            sendStatus(res, 'generating_file_success', `Building your ${docIntent.toUpperCase()} on "${topic.slice(0, 30)}"...`, undefined, agentState.thoughtProcess);
                             const msg = `\n\nI've created a ${docIntent.toUpperCase()} document about "${topic}" based on the search results. You can download it below.`;
                             writeSafeSSE(res, msg);
                             charsSent += msg.length;
                             fullText += msg;
                             if (typeof (res as any).flush === 'function') (res as any).flush();
+                        } else {
+                            sendStatus(res, 'generating_file_error', `Failed to build ${docIntent.toUpperCase()}`, undefined, agentState.thoughtProcess);
                         }
                     } catch (e: any) {
                         console.warn('[AUTO-DOC] generation failed:', e?.message);
+                        sendStatus(res, 'generating_file_error', `Failed to build ${docIntent.toUpperCase()}: ${e.message}`, undefined, agentState.thoughtProcess);
                     }
                 }
             }

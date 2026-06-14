@@ -503,8 +503,8 @@ function InlineGenerationIndicator({
 /* ─── Search steps group (searching → found_sources → reading) ────── */
 const SEARCH_SUBTYPES = new Set(['searching', 'found_sources', 'reading']);
 
-function isSearchStep(part: MessagePart): boolean {
-  return part.type === 'tool_call' && SEARCH_SUBTYPES.has(part.name);
+function isSearchStep(part: MessagePart | undefined): boolean {
+  return !!part && part.type === 'tool_call' && SEARCH_SUBTYPES.has(part.name);
 }
 
 function SearchStepsGroup({
@@ -513,32 +513,39 @@ function SearchStepsGroup({
   allParts,
   isStreaming,
   onSourceClick,
+  hasActiveStatus,
 }: {
   parts: MessagePart[];
   groupStartIndex: number;
   allParts: MessagePart[];
   isStreaming: boolean;
   onSourceClick?: (url: string | null) => void;
+  hasActiveStatus?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
+  const typedParts = groupParts as (MessagePart & { type: 'tool_call' })[];
+  const firstPart = typedParts[0];
+
   const actualIsFirst = groupStartIndex === 0 || allParts[groupStartIndex - 1]?.type !== 'tool_call';
   const groupEndIndex = groupStartIndex + groupParts.length - 1;
-  const actualIsLast = groupEndIndex === allParts.length - 1 || allParts[groupEndIndex + 1]?.type !== 'tool_call';
+  const actualIsLast = !hasActiveStatus && (groupEndIndex === allParts.length - 1 || allParts[groupEndIndex + 1]?.type !== 'tool_call');
+
+  if (!firstPart) return null;
 
   return (
     <div className="mb-0.5">
       <div className="cursor-pointer" onClick={() => setOpen(v => !v)}>
         <StatusMessage
           status={{
-            type: groupParts[0].name,
-            subtype: groupParts[0].name,
-            message: groupParts[0].output || '',
-            data: groupParts[0].input,
+            type: firstPart.name,
+            subtype: firstPart.name,
+            message: firstPart.output || '',
+            data: firstPart.input,
           }}
           isFirst={actualIsFirst}
           isLast={!open ? actualIsLast : false}
-          isActive={isStreaming && groupParts[0].status === 'running'}
+          isActive={isStreaming && firstPart.status === 'running'}
           showRail={true}
           onSourceClick={onSourceClick}
           rightSlot={
@@ -547,7 +554,7 @@ function SearchStepsGroup({
         />
       </div>
 
-{open && groupParts.slice(1).map((part, idx) => (
+      {open && typedParts.slice(1).map((part, idx) => (
         <StatusMessage
           key={idx}
           status={{
@@ -557,7 +564,7 @@ function SearchStepsGroup({
             data: part.input,
           }}
           isFirst={idx === 0}
-          isLast={idx === groupParts.length - 2}
+          isLast={idx === typedParts.length - 2}
           isActive={isStreaming && part.status === 'running'}
           showRail={true}
           onSourceClick={onSourceClick}
@@ -581,6 +588,7 @@ function PartsRenderer({
   onPreview,
   onFileDelete,
   onSourceClick,
+  activeGenerationStatus,
 }: {
   parts: MessagePart[];
   isStreaming: boolean;
@@ -592,6 +600,7 @@ function PartsRenderer({
   onPreview?: (data: { type: 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'md'; base64?: string; html?: string; filename: string }) => void;
   onFileDelete?: (messageId: string | number, filename: string, type: 'fileAttachment' | 'generatedFiles') => void;
   onSourceClick?: (url: string | null) => void;
+  activeGenerationStatus?: { subtype: string; message: string } | null;
 }) {
   // Find the last text part index for typewriter treatment
   const lastTextPartIndex = (() => {
@@ -629,7 +638,10 @@ function PartsRenderer({
           const groupParts: MessagePart[] = [part];
           let j = i + 1;
           while (j < parts.length && isSearchStep(parts[j])) {
-            groupParts.push(parts[j]);
+            const nextP = parts[j];
+            if (nextP) {
+              groupParts.push(nextP);
+            }
             j++;
           }
           i = j - 1;
@@ -642,44 +654,49 @@ function PartsRenderer({
               allParts={parts}
               isStreaming={isStreaming}
               onSourceClick={onSourceClick}
+              hasActiveStatus={!!activeGenerationStatus}
             />
           );
           break;
         }
 
-        // Group consecutive non-search tool calls into a ToolSummary
+        // Render consecutive non-search tool calls as individual StatusMessage items
         const toolParts: MessagePart[] = [part];
         let j = i + 1;
-        while (j < parts.length && parts[j]?.type === "tool_call" && !isSearchStep(parts[j])) {
-          toolParts.push(parts[j]);
-          j++;
+        while (j < parts.length) {
+          const nextPart = parts[j];
+          if (nextPart?.type === "tool_call" && !isSearchStep(nextPart)) {
+            toolParts.push(nextPart);
+            j++;
+          } else {
+            break;
+          }
         }
         i = j - 1;
 
-        if (toolParts.length > 1) {
+        toolParts.forEach((tpPart, idx) => {
+          const tp = tpPart as MessagePart & { type: 'tool_call' };
+          const partIndex = i - (toolParts.length - 1) + idx;
+          const actualIsFirst = partIndex === 0 || parts[partIndex - 1]?.type !== "tool_call";
+          const actualIsLast = !activeGenerationStatus && (partIndex === parts.length - 1 || parts[partIndex + 1]?.type !== "tool_call");
+
           renderedParts.push(
-            <div key={`tool-summary-${i}`} className="mb-2">
-              <ToolSummaryComponent tools={toolParts} />
-            </div>
-          );
-        } else {
-          renderedParts.push(
-            <div key={`tool-${i}`} className="mb-0.5">
+            <div key={`tool-${partIndex}`} className="mb-0.5">
               <StatusMessage
                 status={{
-                  type: part.name,
-                  subtype: part.name,
-                  message: part.output || "",
-                  data: part.input,
+                  type: tp.name,
+                  subtype: tp.name,
+                  message: tp.output || "",
+                  data: tp.input,
                 }}
-                isFirst={i === 0 || parts[i - 1]?.type !== "tool_call"}
-                isLast={i === parts.length - 1 || parts[i + 1]?.type !== "tool_call"}
-                isActive={isStreaming && part.status === "running"}
+                isFirst={actualIsFirst}
+                isLast={actualIsLast}
+                isActive={isStreaming && tp.status === "running"}
                 showRail={true}
               />
             </div>
           );
-        }
+        });
         break;
       }
       case "thought": {
@@ -694,7 +711,7 @@ function PartsRenderer({
                   content: part.content,
                 }}
                 isFirst={i === 0 || parts[i - 1]?.type !== "thought"}
-                isLast={i === parts.length - 1 || parts[i + 1]?.type !== "thought"}
+                isLast={!activeGenerationStatus && (i === parts.length - 1 || parts[i + 1]?.type !== "thought")}
                 isActive={isStreaming && i === parts.length - 1}
                 showRail={true}
               />
@@ -809,6 +826,25 @@ function PartsRenderer({
         break;
       }
     }
+  }
+
+  if (activeGenerationStatus) {
+    const isFirst = parts.length === 0;
+    renderedParts.push(
+      <div key="active-gen-status" className="mb-0.5">
+        <StatusMessage
+          status={{
+            type: activeGenerationStatus.subtype,
+            subtype: activeGenerationStatus.subtype,
+            message: activeGenerationStatus.message,
+          }}
+          isFirst={isFirst}
+          isLast={true}
+          isActive={true}
+          showRail={true}
+        />
+      </div>
+    );
   }
 
   return <>{renderedParts}</>;
@@ -1200,11 +1236,20 @@ export function MessageItem({
   return (
     <div className="assistant-section">
       {/* ─── INLINE GENERATION INDICATOR ─── */}
-      {activeGenerationStatus && (
-        <InlineGenerationIndicator 
-          status={activeGenerationStatus} 
-          reasoningText={parsedContentBundle.reasoningText}
-        />
+      {activeGenerationStatus && !_hasParts && (
+        <div className="mb-0.5">
+          <StatusMessage
+            status={{
+              type: activeGenerationStatus.subtype,
+              subtype: activeGenerationStatus.subtype,
+              message: activeGenerationStatus.message,
+            }}
+            isFirst={true}
+            isLast={true}
+            isActive={true}
+            showRail={true}
+          />
+        </div>
       )}
 
       {_hasParts ? (
@@ -1219,14 +1264,9 @@ export function MessageItem({
             onFileClick={onFileClick}
             onPreview={onPreview}
             onFileDelete={onFileDelete}
-            onSourceClick={onSourceClick}
+            onSourceClick={(url) => url && onSourceClick(url)}
+            activeGenerationStatus={activeGenerationStatus}
           />
-          {/* ─── EMPTY STREAMING PLACEHOLDER (before any parts arrive) ─── */}
-          {isStreaming && !activeGenerationStatus && typewriterContent.trim() === "" && (
-            <div className="max-w-none text-foreground/90">
-              <span className="inline-block w-2 h-4 bg-current/40 rounded-sm align-text-bottom" />
-            </div>
-          )}
         </>
       ) : (
         <>
@@ -1234,13 +1274,6 @@ export function MessageItem({
           {typewriterContent.trim() !== "" && (
             <div className="max-w-none text-foreground/90">
               <MessageRenderer content={typewriterContent} onCitationClick={onCitationClick} sources={sources} />
-            </div>
-          )}
-
-          {/* ─── EMPTY STREAMING PLACEHOLDER (before typewriter starts) ─── */}
-          {isStreaming && !activeGenerationStatus && typewriterContent.trim() === "" && (
-            <div className="max-w-none text-foreground/90">
-              <span className="inline-block w-2 h-4 bg-current/40 rounded-sm align-text-bottom" />
             </div>
           )}
 

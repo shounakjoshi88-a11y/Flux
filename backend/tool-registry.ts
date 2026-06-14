@@ -135,7 +135,7 @@ toolRegistry.register('get_weather', {
 
 toolRegistry.register('generate_image', {
   name: 'generate_image',
-  description: 'Generate an AI image, illustration, photo, or artwork using Bonsai diffusion model.',
+  description: 'Generate an AI image, illustration, photo, or artwork using Bonsai diffusion model. Do NOT use this tool for charts, graphs, or diagrams (which should be rendered inline using CHART or MERMAID tags).',
   parameters: z.object({
     prompt: z.string().describe('Description of the image to generate'),
   }),

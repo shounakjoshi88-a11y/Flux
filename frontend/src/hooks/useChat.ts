@@ -283,6 +283,7 @@ export function useChat(user: any) {
                 const sub = parsed.subtype as string;
                 const isTerminal = sub.endsWith('_success') || sub.endsWith('_error') || sub.endsWith('_complete');
                 if (isTerminal) {
+                  setActiveGenerationStatus(null);
                   const baseSub = sub.replace(/_(?:success|error|complete)$/, '');
                   const idx = streamingPartsRef.current.findIndex(
                     p => p.type === 'tool_call' && p.name === baseSub
@@ -316,7 +317,8 @@ export function useChat(user: any) {
                   sub === 'generating_file' ||
                   sub === 'generating_chart' ||
                   sub === 'image_enhancing' ||
-                  sub === 'image_generating'
+                  sub === 'image_generating' ||
+                  sub === 'reading_skill'
                 ) {
                   setActiveGenerationStatus({ subtype: sub, message: parsed.message });
                 }

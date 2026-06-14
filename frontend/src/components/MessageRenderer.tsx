@@ -226,34 +226,47 @@ function formatInlineText(
         if (boldSeg.startsWith("**") && boldSeg.endsWith("**")) {
           return (
             <strong key={`${keyBase}-b${boldIdx}`}>
-              {boldSeg.slice(2, -2)}
+              {formatInlineText(boldSeg.slice(2, -2), onCitationClick, sources, `${keyBase}-b${boldIdx}`)}
             </strong>
           );
         }
 
-        const citationParts = boldSeg.split(/(\[\d+\])/g);
-        return citationParts.map((cPart, cIdx) => {
-          const match = cPart.match(/^\[(\d+)\]$/);
-          if (match) {
-            const num = Number(match[1]);
-            const index = num - 1;
-            const valid = index >= 0 && index < sources.length;
+        // Support italics (*text*) inside non-bold segments
+        const italicSegments = boldSeg.split(/(\*(?!\*)[^*]+\*)/g);
+        return italicSegments.map((italicSeg, italicIdx) => {
+          const italicKey = `${keyBase}-b${boldIdx}-i${italicIdx}`;
+          if (italicSeg.startsWith("*") && italicSeg.endsWith("*")) {
             return (
-              <button
-                key={`${keyBase}-c${cIdx}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCitationClick(index);
-                  if (valid && sources[index]) window.open(sources[index].url, "_blank");
-                }}
-                className="citation-btn text-[0.7em] align-super ml-0.5"
-              >
-                {num}
-              </button>
+              <em key={`${italicKey}-em`}>
+                {formatInlineText(italicSeg.slice(1, -1), onCitationClick, sources, italicKey)}
+              </em>
             );
           }
-          const linkKey = `${keyBase}-c${cIdx}`;
-          return linkifyUrls(cPart, linkKey);
+
+          const citationParts = italicSeg.split(/(\[\d+\])/g);
+          return citationParts.map((cPart, cIdx) => {
+            const match = cPart.match(/^\[(\d+)\]$/);
+            if (match) {
+              const num = Number(match[1]);
+              const index = num - 1;
+              const valid = index >= 0 && index < sources.length;
+              return (
+                <button
+                  key={`${keyBase}-c${cIdx}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCitationClick(index);
+                    if (valid && sources[index]) window.open(sources[index].url, "_blank");
+                  }}
+                  className="citation-btn text-[0.7em] align-super ml-0.5"
+                >
+                  {num}
+                </button>
+              );
+            }
+            const linkKey = `${keyBase}-c${cIdx}`;
+            return linkifyUrls(cPart, linkKey);
+          });
         });
       });
     });
