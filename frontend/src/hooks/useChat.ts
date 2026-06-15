@@ -53,7 +53,7 @@ export function useChat(user: any) {
   const streamingPartsRef = useRef<MessagePart[]>([]);
   const textAccumRef = useRef<string>("");
 
-  // AionUi pattern: cancelled flag for async hydration safety
+  // Flux pattern: cancelled flag for async hydration safety
   const cancelledRef = useRef(false);
 
   useEffect(() => {

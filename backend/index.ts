@@ -287,7 +287,7 @@ import {
     unregisterProcess,
     cleanupRegisteredAgentProcesses,
     resolveAgentProcessRegistryPath,
-} from './aion-host/agent-process-registry';
+} from './flux-host/agent-process-registry';
 
 // ── Workspace & Data Configuration ─────────────────────────
 const WORKSPACE_DIR = path.resolve(process.cwd(), 'workspace');
@@ -318,7 +318,7 @@ function sendProgress(res: any, subtype: string, progress: number, message: stri
     res.write(`event: status\ndata: ${JSON.stringify({ type: "status", subtype, message, data: data || null, progress })}\n\n`);
 }
 
-// ── Enhanced SSE events (AionUi-style) ─────────────────────
+// ── Enhanced SSE events (Flux-style) ─────────────────────
 
 function sendPlan(res: any, plan: any) {
     if (res.writableEnded) return;
