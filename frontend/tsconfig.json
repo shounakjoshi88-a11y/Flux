@@ -23,6 +23,8 @@
     "noImplicitOverride": true,
 
     "paths": {
+      "@renderer/*": ["./src/*"],
+      "@common/*": ["../shared/flux-common/*"],
       "@/*": ["./src/*"]
     },
 
