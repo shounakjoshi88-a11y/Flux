@@ -18,8 +18,8 @@ import {
   Volume2,
   Play,
 } from "lucide-react";
-import { createClient } from "@/lib/client";
-import { BACKEND_URL } from "@/lib/config";
+import { createClient } from "../lib/client";
+import { BACKEND_URL } from "../lib/config";
 
 interface SettingsProps {
   isOpen: boolean;
@@ -447,7 +447,9 @@ export function Settings({
         response_completions: responseCompletions, dispatch_messages: dispatchMessages,
         enable_memory: enableMemory, tool_access_mode: toolAccessMode, connector_discovery: connectorDiscovery,
       };
-      if (overrides) Object.assign(metadata, overrides);
+      if (overrides && typeof overrides === "object") {
+        Object.assign(metadata, overrides);
+      }
       const { data, error } = await supabase.auth.updateUser({ data: metadata });
       if (error) throw error;
       const { data: { session } } = await supabase.auth.getSession();

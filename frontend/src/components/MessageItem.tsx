@@ -1,7 +1,7 @@
 // src/components/MessageItem.tsx
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import TodoList from "./TodoList";
-import ToolSummaryComponent from "./ToolSummary";
+import ToolSummary from "./ToolSummary";
 
 // ─── Typewriter hook — only for streaming messages ──────────
 function useTypewriter(fullText: string, messageId: string | number): string {
@@ -50,8 +50,8 @@ import {
 } from "lucide-react";
 import { MessageRenderer, InlineMath } from "./MessageRenderer";
 import { FileDownloadButton } from "./FileDownloadButton";
-import { getDomain } from "@/lib/chat-utils";
-import type { Message, MessagePart, Source } from "@/types";
+import { getDomain } from "../lib/chat-utils";
+import type { Message, MessagePart, Source } from "../types";
 
 type MessageItemProps = {
   message: Message & {
@@ -88,10 +88,13 @@ type MessageItemProps = {
 };
 
 import { StatusMessage } from "./StatusMessage";
-import PlanDisplayComponent from "./PlanDisplay";
-import PermissionDialogComponent from "./PermissionDialog";
-import { BACKEND_URL } from "@/lib/config";
-import { createClient } from "@/lib/client";
+import PlanDisplay from "./PlanDisplay";
+import PermissionDialog from "./PermissionDialog";
+import { TerminalComponent } from "./TerminalComponent";
+import { ThoughtDisplay } from "./ThoughtDisplay";
+import FileChangesPanel from "./base/FileChangesPanel";
+import { BACKEND_URL } from "../lib/config";
+import { createClient } from "../lib/client";
 
 // ─── Inline image display for AI-generated images ────────────────────────
 function InlineImageDisplay({
@@ -703,17 +706,9 @@ function PartsRenderer({
         if (part.content?.trim()) {
           renderedParts.push(
             <div key={`thought-${i}`} className="mb-0.5">
-              <StatusMessage
-                status={{
-                  type: "thought",
-                  subtype: "thought",
-                  message: "Thinking…",
-                  content: part.content,
-                }}
-                isFirst={i === 0 || parts[i - 1]?.type !== "thought"}
-                isLast={!activeGenerationStatus && (i === parts.length - 1 || parts[i + 1]?.type !== "thought")}
-                isActive={isStreaming && i === parts.length - 1}
-                showRail={true}
+              <ThoughtDisplay
+                thought={{ subject: "Flux Reasoning", description: part.content }}
+                running={isStreaming && i === parts.length - 1}
               />
             </div>
           );
@@ -763,7 +758,7 @@ function PartsRenderer({
       case "plan": {
         renderedParts.push(
           <div key={`plan-${i}`} className="mb-0.5">
-            <PlanDisplayComponent
+            <PlanDisplay
               steps={part.steps}
               userIntent={part.userIntent}
               reasoning={part.reasoning}
@@ -776,7 +771,7 @@ function PartsRenderer({
         if (part.status === "pending") {
           renderedParts.push(
             <div key={`perm-${i}`} className="mb-0.5">
-              <PermissionDialogComponent
+              <PermissionDialog
                 request={{
                   id: part.id,
                   toolName: part.toolName,
@@ -821,6 +816,14 @@ function PartsRenderer({
               }`} />
               {part.message}
             </div>
+          </div>
+        );
+        break;
+      }
+      case "terminal": {
+        renderedParts.push(
+          <div key={`terminal-${i}`} className="mt-2 w-full">
+            <TerminalComponent content={part.content} />
           </div>
         );
         break;
@@ -1127,9 +1130,9 @@ export function MessageItem({
   // ── Unconditional hooks (moved up to avoid conditional hook count violations) ──
   const [userCopied, setUserCopied] = useState(false);
   const [copied, setCopied] = useState(false);
-  const _hasParts = !!(message.parts && message.parts.length > 0);
+  const _hasParts = !!(message.parts && Array.isArray(message.parts) && message.parts.length > 0);
   const _lastTextPart = _hasParts
-    ? [...message.parts!].reverse().find((p): p is MessagePart & { type: "text" } => p.type === "text")
+    ? (message.parts as MessagePart[]).slice().reverse().find((p): p is MessagePart & { type: "text" } => p.type === "text")
     : null;
   const _typewriterText = _lastTextPart ? _lastTextPart.text : parsedContentBundle.cleanDisplayAnswer;
   const typewriterContent = useTypewriter(_typewriterText, message.id);

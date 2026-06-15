@@ -5,8 +5,8 @@ import { useState, useEffect } from "react";
 import { PptxPreview } from "./PptxPreview";
 import { XlsxPreview } from "./XlsxPreview";
 import { MarkdownPreview } from "./MarkdownPreview";
-import { createClient } from "@/lib/client";
-import { BACKEND_URL } from "@/lib/config";
+import { createClient } from "../lib/client";
+import { BACKEND_URL } from "../lib/config";
 
 type PeekPanelProps = {
   url: string | null;

@@ -32,8 +32,10 @@ export class ApprovalStore {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const obj = JSON.parse(raw) as Record<string, boolean>;
-        for (const [k, v] of Object.entries(obj)) {
-          if (v) this.map.set(k, true);
+        if (obj && typeof obj === "object") {
+          for (const [k, v] of Object.entries(obj)) {
+            if (v) this.map.set(k, true);
+          }
         }
       }
     } catch { /* corrupt data, ignore */ }

@@ -1,5 +1,5 @@
 // Dashboard.tsx – fully integrated with normal chat pipeline, PDF preview in PeekPanel
-import { createClient } from "@/lib/client";
+import { createClient } from "../lib/client";
 import { AnimatePresence, motion } from "framer-motion";
 import type { User } from "@supabase/supabase-js";
 import {
@@ -42,9 +42,9 @@ import type {
   Source,
   AttachedFile,
   MessagePart,
-} from "@/types";
-import { parseAssistantContent, extractLiveContent } from "@/lib/chat-utils";
-import { BACKEND_URL, UNSPLASH_ACCESS_KEY } from "@/lib/config";
+} from "../types";
+import { parseAssistantContent, extractLiveContent } from "../lib/chat-utils";
+import { BACKEND_URL, UNSPLASH_ACCESS_KEY } from "../lib/config";
 
 const supabase = createClient();
 
@@ -131,8 +131,9 @@ export default function Dashboard() {
     retry,
     stop,
     activeGenerationStatus,
+    isComputerMode,
+    setIsComputerMode,
   } = useChat(user);
-
   const ws = useAgentSession(user);
   const { categories: modelCategories, all: allModels, isLoading: modelsLoading } = useModels();
   const { agents: customAgents, createAgent: createCustomAgent, deleteAgent: deleteCustomAgent } = useCustomAgents();
@@ -975,6 +976,8 @@ export default function Dashboard() {
                       setModelDropdownOpen={setModelDropdownOpen}
                       handleAttachFiles={handleAttachFiles}
                       onStop={handleStop}
+                      computerModeEnabled={isComputerMode}
+                      setComputerModeEnabled={setIsComputerMode}
                     />
                   </div>
                 </div>
@@ -1047,6 +1050,8 @@ export default function Dashboard() {
                 setModelDropdownOpen={setModelDropdownOpen}
                 handleAttachFiles={handleAttachFiles}
                 onStop={handleStop}
+                computerModeEnabled={isComputerMode}
+                setComputerModeEnabled={setIsComputerMode}
               />
             </div>
             <InputSeparator />

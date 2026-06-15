@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Search, Loader2, ExternalLink, RefreshCw, Clock } from "lucide-react";
-import { BACKEND_URL } from "@/lib/config";
-import { createClient } from "@/lib/client";
+import { BACKEND_URL } from "../lib/config";
+import { createClient } from "../lib/client";
 
 const supabase = createClient();
 

@@ -1,6 +1,6 @@
 // Custom Agents — inspired by AionUi's custom agent system with Hub integration
 import { useState, useCallback, useEffect } from "react";
-import { BACKEND_URL } from "@/lib/config";
+import { BACKEND_URL } from "../lib/config";
 
 export interface CustomAgent {
   id: string;

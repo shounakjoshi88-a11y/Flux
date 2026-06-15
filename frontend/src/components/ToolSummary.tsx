@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, ChevronRight, CheckCircle2, XCircle, LoaderCircle, Clock } from "lucide-react";
-import type { MessagePart } from "@/types";
+import type { MessagePart } from "../types";
 
 type ToolSummaryProps = {
   tools: MessagePart[];

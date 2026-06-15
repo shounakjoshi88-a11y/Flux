@@ -9,7 +9,7 @@ import {
   Palette,
   X,
 } from "lucide-react";
-import { suggestionsByCategory } from "@/data/suggestions";
+import { suggestionsByCategory } from "../data/suggestions";
 
 const categories = [
   { id: "for-you", label: "For you", icon: Sparkles },

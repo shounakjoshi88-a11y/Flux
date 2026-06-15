@@ -15,8 +15,8 @@ import {
   File,
   Table,
 } from "lucide-react";
-import { BACKEND_URL } from "@/lib/config";
-import { createClient } from "@/lib/client";
+import { BACKEND_URL } from "../lib/config";
+import { createClient } from "../lib/client";
 import mammoth from "mammoth";
 
 const supabase = createClient();

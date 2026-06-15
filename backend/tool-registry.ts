@@ -145,3 +145,57 @@ toolRegistry.register('generate_image', {
   maxRetries: 1,
   timeout: 180000,
 });
+
+toolRegistry.register('shell_execute', {
+  name: 'shell_execute',
+  description: 'Execute a shell command in the local workspace. Use this for running code, installing packages, or system tasks.',
+  parameters: z.object({
+    command: z.string().describe('The shell command to execute'),
+  }),
+  execute: async () => 'Implemented in index.ts',
+  category: 'computation',
+  requiresApproval: true,
+  maxRetries: 1,
+  timeout: 60000,
+});
+
+toolRegistry.register('file_list', {
+  name: 'file_list',
+  description: 'List files and directories in the local workspace.',
+  parameters: z.object({
+    path: z.string().default('.').describe('The directory path to list (relative to workspace root)'),
+    recursive: z.boolean().default(false).describe('Whether to list files recursively'),
+  }),
+  execute: async () => 'Implemented in index.ts',
+  category: 'filesystem',
+  requiresApproval: false,
+  maxRetries: 1,
+  timeout: 10000,
+});
+
+toolRegistry.register('file_read', {
+  name: 'file_read',
+  description: 'Read the content of a local file.',
+  parameters: z.object({
+    path: z.string().describe('The path to the file to read (relative to workspace root)'),
+  }),
+  execute: async () => 'Implemented in index.ts',
+  category: 'filesystem',
+  requiresApproval: false,
+  maxRetries: 1,
+  timeout: 10000,
+});
+
+toolRegistry.register('file_write', {
+  name: 'file_write',
+  description: 'Create or update a local file with specific content.',
+  parameters: z.object({
+    path: z.string().describe('The path to the file to write (relative to workspace root)'),
+    content: z.string().describe('The full content to write to the file'),
+  }),
+  execute: async () => 'Implemented in index.ts',
+  category: 'filesystem',
+  requiresApproval: true,
+  maxRetries: 1,
+  timeout: 15000,
+});

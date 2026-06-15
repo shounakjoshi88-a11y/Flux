@@ -7,9 +7,10 @@ import {
   SendHorizontal,
   X,
   Plus,
+  Monitor,
 } from "lucide-react";
 import React, { useRef, useState, useEffect, useCallback } from "react";
-import type { AttachedFile } from "@/types";
+import type { AttachedFile } from "../types";
 import { marked } from "marked";
 
 interface ModelOption {
@@ -41,6 +42,8 @@ export interface ChatInputProps {
   hideModelSelector?: boolean;
   searchEnabled?: boolean;
   setSearchEnabled?: React.Dispatch<React.SetStateAction<boolean>>;
+  computerModeEnabled?: boolean;
+  setComputerModeEnabled?: React.Dispatch<React.SetStateAction<boolean>>;
   compact?: boolean;
   toolsSlot?: React.ReactNode;
 }
@@ -178,6 +181,8 @@ export function ChatInput({
   hideModelSelector = false,
   searchEnabled = true,
   setSearchEnabled,
+  computerModeEnabled = false,
+  setComputerModeEnabled,
   compact = false,
 }: ChatInputProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -481,6 +486,21 @@ export function ChatInput({
             >
               <Globe className="size-3.5" />
               Web
+            </button>
+          )}
+
+          {setComputerModeEnabled && (
+            <button
+              onClick={() => setComputerModeEnabled((prev) => !prev)}
+              className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium transition ${
+                computerModeEnabled
+                  ? "bg-amber-500/12 border border-amber-500/25 text-amber-500"
+                  : "text-[var(--text-secondary)]/60 hover:text-[var(--text-primary)] hover:bg-[var(--surface-bg)] border border-transparent"
+              }`}
+              title="Computer Mode: Shell & Local Files"
+            >
+              <Monitor className="size-3.5" />
+              Computer
             </button>
           )}
 

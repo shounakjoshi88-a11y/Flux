@@ -1,7 +1,7 @@
 // O(1) message index — inspired by AionUi's WeakMap-based message indices
 // Avoids O(n) array scanning for streaming updates
 
-import type { Message } from "@/types";
+import type { Message } from "../types";
 
 export interface MessageIndex {
   msgIdIndex: Map<string | number, number>;

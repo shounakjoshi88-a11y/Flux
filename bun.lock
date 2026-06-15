@@ -1,0 +1,14 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "dependencies": {
+        "abcjs": "^6.6.3",
+      },
+    },
+  },
+  "packages": {
+    "abcjs": ["abcjs@6.6.3", "", {}, "sha512-BerGJCY8+pvJV1+VxZn1Y/VNcuSAk8BysCbBICY0W8fgE5g4W6sA/zB5pKxcgqzY5/gObh8ugl++4ZoaTqUCkw=="],
+  }
+}

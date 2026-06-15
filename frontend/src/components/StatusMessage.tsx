@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { ChevronDown } from "lucide-react";
 import { MessageRenderer } from "./MessageRenderer";
 
-import { calculateTrustScore } from "@/utils/TrustScore";
+import { calculateTrustScore } from "../utils/TrustScore";
 
 // ── Icons — 20×20 viewport, size-5, 1.6px stroke ──────────
 type IProps = { cls?: string };

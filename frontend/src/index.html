@@ -36,6 +36,14 @@
         localStorage.setItem("flux-theme", theme);
       })();
     </script>
+
+    <!-- Advanced Rendering Support -->
+    <!-- TikZ support via TikZJax -->
+    <link rel="stylesheet" type="text/css" href="https://tikzjax.com/v1/fonts.css">
+    <script src="https://tikzjax.com/v1/tikzjax.js" defer></script>
+    <!-- KaTeX extensions (mhchem included via script or build tool) -->
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/mhchem.min.js"></script>
+
     <script type="module" src="./frontend.tsx" async></script>
   </head>
   <body>

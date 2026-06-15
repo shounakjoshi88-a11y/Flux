@@ -11,7 +11,7 @@ import {
   ListChecks,
   Shield,
 } from "lucide-react";
-import type { AgentMode } from "@/hooks/useAgentSession";
+import type { AgentMode } from "../hooks/useAgentSession";
 
 type AgentStatusBarProps = {
   sessionState: string;

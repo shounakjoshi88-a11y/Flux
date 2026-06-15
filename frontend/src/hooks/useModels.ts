@@ -1,7 +1,7 @@
 // Dynamic model discovery — fetches models from backend API
 // Inspired by AionUi's useAcpModelInfo with polling fallback
 import { useState, useEffect, useCallback, useRef } from "react";
-import { BACKEND_URL } from "@/lib/config";
+import { BACKEND_URL } from "../lib/config";
 
 export interface ModelOption {
   id: string;

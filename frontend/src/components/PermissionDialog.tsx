@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, Check, X, AlertTriangle } from "lucide-react";
-import { BACKEND_URL } from "@/lib/config";
-import { createClient } from "@/lib/client";
-import type { PermissionRequest } from "@/types";
+import { BACKEND_URL } from "../lib/config";
+import { createClient } from "../lib/client";
+import type { PermissionRequest } from "../types";
 
 const supabase = createClient();
 
@@ -60,7 +60,7 @@ export default function PermissionDialog({ request, onRespond }: PermissionDialo
               <AlertTriangle className="size-4 text-amber-400/70 mt-0.5 shrink-0" />
               <div>
                 <div className="text-sm text-zinc-200">{request.description}</div>
-                {request.args && Object.keys(request.args).length > 0 && (
+                {request.args && typeof request.args === "object" && Object.keys(request.args).length > 0 && (
                   <div className="mt-2 p-2 rounded-lg bg-black/20">
                     <pre className="text-[11px] text-zinc-400 font-mono whitespace-pre-wrap">
                       {JSON.stringify(request.args, null, 2)}

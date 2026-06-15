@@ -1,9 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { flushSync } from "react-dom";
-import { createClient } from "@/lib/client";
-import { BACKEND_URL } from "@/lib/config";
-import { extractLiveContent } from "@/lib/chat-utils";
-import type { Message, AttachedFile, Source, GeneratedFile, MessagePart, ExecutionPlan, PermissionRequest } from "@/types";
+import { createClient } from "../lib/client";
+import { BACKEND_URL } from "../lib/config";
+import { extractLiveContent } from "../lib/chat-utils";
+import type { Message, AttachedFile, Source, GeneratedFile, MessagePart, ExecutionPlan, PermissionRequest } from "../types";
 
 const supabase = createClient();
 
@@ -28,6 +28,7 @@ let nextId = 1;
 export function useChat(user: any) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isComputerMode, setIsComputerMode] = useState(false);
   const [activeGenerationStatus, setActiveGenerationStatus] = useState<{
     subtype: string;
     message: string;
@@ -173,6 +174,7 @@ export function useChat(user: any) {
           ? attachedFiles.map((f) => ({ name: f.name, content: f.content, type: f.type }))
           : undefined,
         conversationId: activeConversationId ?? undefined,
+        isComputerMode,
       };
 
       const endpoint = `${BACKEND_URL}/flux_ask`;
@@ -454,6 +456,19 @@ export function useChat(user: any) {
                 callbacks?.onMessageId?.(parsed.id);
               } catch { }
             }
+            // ─── TERMINAL ───────────────────────────
+            else if (eventType === "terminal") {
+              try {
+                const parsed = JSON.parse(data);
+                const termPart: MessagePart = {
+                  type: "terminal",
+                  content: parsed.content || "",
+                };
+                addPart(termPart);
+                const targetId = realMessageIdRef.current ?? assistantMsgId;
+                updateMessages(targetId);
+              } catch { }
+            }
             // ─── TODOS ───────────────────────────────
             else if (eventType === "todos") {
               try {
@@ -606,5 +621,7 @@ export function useChat(user: any) {
     retry,
     stop,
     activeGenerationStatus,
+    isComputerMode,
+    setIsComputerMode,
   };
 }

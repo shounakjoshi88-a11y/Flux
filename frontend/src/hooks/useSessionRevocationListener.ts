@@ -1,7 +1,7 @@
 // src/hooks/useSessionRevocationListener.ts
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { createClient } from "@/lib/client";
+import { createClient } from "../lib/client";
 
 export function useSessionRevocationListener() {
   const supabase = createClient();

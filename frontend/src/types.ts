@@ -64,7 +64,8 @@ export type MessagePart =
   | { type: "plan"; steps: PlanStep[]; userIntent: string; reasoning: string }
   | { type: "permission"; id: string; toolName: string; args: any; description: string; status: "pending" | "approved" | "denied" }
   | { type: "tool_group"; tools: { name: string; args: any }[] }
-  | { type: "agent_status"; status: string; message: string };
+  | { type: "agent_status"; status: string; message: string }
+  | { type: "terminal"; content: string };
 
 export type Message = {
   id: string | number;

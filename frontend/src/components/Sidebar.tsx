@@ -22,7 +22,7 @@ import {
 import type { User } from "@supabase/supabase-js";
 import { SidebarThread } from "./SidebarThread";
 import { useState, useRef, useEffect, memo, useCallback, useMemo } from "react";
-import type { ConversationListItem } from "@/types";
+import type { ConversationListItem } from "../types";
 
 type SidebarProps = {
   isOpen: boolean;

@@ -2,12 +2,12 @@
 // Features: O(1) message index, throttled thoughts, turn state machine guards,
 // approval store with session memory, tool normalizer
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { createClient } from "@/lib/client";
-import { BACKEND_URL } from "@/lib/config";
-import type { Message, AttachedFile, MessagePart } from "@/types";
-import { createMessageIndex, composeMessageWithIndex } from "@/lib/message-index";
-import { normalizeToolCall } from "@/lib/tool-normalizer";
-import { ApprovalStore, approvalKeyForTool, globalApprovalStore } from "@/lib/approval-store";
+import { createClient } from "../lib/client";
+import { BACKEND_URL } from "../lib/config";
+import type { Message, AttachedFile, MessagePart } from "../types";
+import { createMessageIndex, composeMessageWithIndex } from "../lib/message-index";
+import { normalizeToolCall } from "../lib/tool-normalizer";
+import { ApprovalStore, approvalKeyForTool, globalApprovalStore } from "../lib/approval-store";
 
 const supabase = createClient();
 

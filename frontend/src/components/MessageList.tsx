@@ -3,9 +3,9 @@ import { useRef, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { MessageItem } from "./MessageItem";
 import { SourceCard } from "./SourceCard";
-import { getDomain } from "@/lib/chat-utils";
-import { calculateTrustScore } from "@/utils/TrustScore";
-import type { Message, Source } from "@/types";
+import { getDomain } from "../lib/chat-utils";
+import { calculateTrustScore } from "../utils/TrustScore";
+import type { Message, Source } from "../types";
 
 // ─── Props ──────────────────────────────────────────────────
 type MessageListProps = {

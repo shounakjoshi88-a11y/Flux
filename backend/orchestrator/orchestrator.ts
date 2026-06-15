@@ -29,6 +29,7 @@ interface OrchestratorInput {
   ) => Promise<any>;
   requestToolApproval?: (toolName: string, args: any) => Promise<boolean>;
   fileContent?: string;
+  isComputerMode?: boolean;
 }
 
 interface OrchestratorOutput {
@@ -44,7 +45,7 @@ export class OrchestratorEngine {
   private verifier = new Verifier();
 
   async process(input: OrchestratorInput): Promise<OrchestratorOutput> {
-    const { plan, workflow } = this.planner.analyze(input.query, undefined, input.fileContent);
+    const { plan, workflow } = this.planner.analyze(input.query, undefined, input.fileContent, input.isComputerMode);
 
     // Show the plan for transparency, then let the LLM handle everything agentically
     if (workflow !== "simple_qa") {
@@ -237,6 +238,45 @@ export class OrchestratorEngine {
       return {
         phaseId: phase.id, type: "analyze", success: true,
         text: query, sources: [], files: [], skillContent: "", errors: [],
+      };
+    }
+
+    if (phase.type === "shell") {
+      const shellTool = tools["shell_execute"];
+      if (!shellTool?.execute) {
+        return {
+          phaseId: phase.id, type: "shell", success: false,
+          text: "Tool shell_execute not available", sources: [], files: [], skillContent: "", errors: ["shell_execute tool not found"],
+        };
+      }
+
+      const resultText = await shellTool.execute({
+        command: phase.prompt || query,
+      });
+
+      return {
+        phaseId: phase.id, type: "shell", success: true,
+        text: typeof resultText === "string" ? resultText : JSON.stringify(resultText),
+        sources: [], files: [], skillContent: "", errors: [],
+      };
+    }
+
+    if (phase.type === "filesystem") {
+      const toolName = phase.tools?.[0] || "file_list";
+      const fsTool = tools[toolName];
+      if (!fsTool?.execute) {
+        return {
+          phaseId: phase.id, type: "filesystem", success: false,
+          text: `Tool ${toolName} not available`, sources: [], files: [], skillContent: "", errors: [`${toolName} tool not found`],
+        };
+      }
+
+      const resultText = await fsTool.execute(phase.prompt ? JSON.parse(phase.prompt) : {});
+
+      return {
+        phaseId: phase.id, type: "filesystem", success: true,
+        text: typeof resultText === "string" ? resultText : JSON.stringify(resultText),
+        sources: [], files: [], skillContent: "", errors: [],
       };
     }
 

@@ -7,7 +7,9 @@ export type PhaseType =
   | "weather"
   | "analyze"
   | "execute"
-  | "verify";
+  | "verify"
+  | "shell"
+  | "filesystem";
 
 export interface VerificationCriterion {
   type: "has_sources" | "has_file" | "min_sources" | "has_skill_content" | "has_text_output" | "semantic_match";
@@ -72,4 +74,5 @@ export type WorkflowKind =
   | "weather"
   | "code"
   | "analysis"
-  | "multi_step";
+  | "multi_step"
+  | "computer_mode";

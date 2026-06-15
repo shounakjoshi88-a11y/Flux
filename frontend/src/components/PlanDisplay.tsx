@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { ChevronDown, ListChecks, Lightbulb } from "lucide-react";
-import type { PlanStep } from "@/types";
+import type { PlanStep } from "../types";
 
 type PlanDisplayProps = {
   steps: PlanStep[];

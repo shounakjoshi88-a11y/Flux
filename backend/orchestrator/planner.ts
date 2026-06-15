@@ -51,7 +51,30 @@ function detectTopic(query: string): string {
 }
 
 export class Planner {
-  analyze(query: string, _history?: any[], fileContent?: string): { plan: ExecutionPlan; workflow: WorkflowKind } {
+  analyze(query: string, _history?: any[], fileContent?: string, isComputerMode?: boolean): { plan: ExecutionPlan; workflow: WorkflowKind } {
+    if (isComputerMode) {
+      return {
+        workflow: "computer_mode",
+        plan: {
+          steps: [
+            {
+              id: "computer_task",
+              type: "shell",
+              description: "Execute local command",
+              tools: ["shell_execute", "file_list", "file_read", "file_write", "web_search"],
+              dependsOn: [],
+              required: true,
+              criteria: [{ type: "has_text_output", label: "Task completed" }],
+              maxRetries: 1,
+            },
+          ],
+          userIntent: "Local computer task",
+          reasoning: "Computer Mode is ACTIVE. Flux will work directly on the local file system and execute commands as needed.",
+          estimatedSteps: 1,
+        },
+      };
+    }
+
     const docType = detectDocType(query);
     const withFile = hasFileContext(query, fileContent);
 
