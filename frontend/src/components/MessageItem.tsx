@@ -91,8 +91,8 @@ import { StatusMessage } from "./StatusMessage";
 import PlanDisplay from "./PlanDisplay";
 import PermissionDialog from "./PermissionDialog";
 import { TerminalComponent } from "./TerminalComponent";
-import { ThoughtDisplay } from "./ThoughtDisplay";
-import FileChangesPanel from "./base/FileChangesPanel";
+import ThoughtDisplay from "./flux/chat/ThoughtDisplay";
+import FileChangesPanel from "./flux/base/FileChangesPanel";
 import { BACKEND_URL } from "../lib/config";
 import { createClient } from "../lib/client";
 
