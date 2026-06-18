@@ -7,10 +7,9 @@ import {
   SendHorizontal,
   X,
   Plus,
-  Monitor,
 } from "lucide-react";
 import React, { useRef, useState, useEffect, useCallback } from "react";
-import type { AttachedFile } from "../types";
+import type { AttachedFile } from "@/types";
 import { marked } from "marked";
 
 interface ModelOption {
@@ -42,8 +41,6 @@ export interface ChatInputProps {
   hideModelSelector?: boolean;
   searchEnabled?: boolean;
   setSearchEnabled?: React.Dispatch<React.SetStateAction<boolean>>;
-  computerModeEnabled?: boolean;
-  setComputerModeEnabled?: React.Dispatch<React.SetStateAction<boolean>>;
   compact?: boolean;
   toolsSlot?: React.ReactNode;
 }
@@ -125,7 +122,7 @@ const AnimatedAudioLines = ({ isActive }: { isActive: boolean }) => {
   );
 };
 
-// ─── Cursor preservation helpers ──────────────────────────────
+// ΓöÇΓöÇΓöÇ Cursor preservation helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 function saveCursor(el: HTMLElement): number {
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return 0;
@@ -181,8 +178,6 @@ export function ChatInput({
   hideModelSelector = false,
   searchEnabled = true,
   setSearchEnabled,
-  computerModeEnabled = false,
-  setComputerModeEnabled,
   compact = false,
 }: ChatInputProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -192,7 +187,7 @@ export function ChatInput({
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const isComposing = useRef(false);
 
-  // ─── Render markdown to HTML ──────────────────────────────
+  // ΓöÇΓöÇΓöÇ Render markdown to HTML ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   const renderMarkdown = useCallback(async (text: string): Promise<string> => {
     if (!text.trim()) return "";
     try {
@@ -203,7 +198,7 @@ export function ChatInput({
     }
   }, []);
 
-  // ─── Sync contenteditable from external query changes ────
+  // ΓöÇΓöÇΓöÇ Sync contenteditable from external query changes ΓöÇΓöÇΓöÇΓöÇ
   useEffect(() => {
     const el = editorRef.current;
     if (!el) return;
@@ -214,7 +209,7 @@ export function ChatInput({
     });
   }, [query, renderMarkdown]);
 
-  // ─── Handle user input ────────────────────────────────────
+  // ΓöÇΓöÇΓöÇ Handle user input ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   const handleInput = useCallback(async () => {
     const el = editorRef.current;
     if (!el) return;
@@ -239,7 +234,7 @@ export function ChatInput({
   const handleCompositionStart = useCallback(() => { isComposing.current = true; }, []);
   const handleCompositionEnd = useCallback(() => { isComposing.current = false; }, []);
 
-  // ─── Paste: handle images/files from clipboard ────────────
+  // ΓöÇΓöÇΓöÇ Paste: handle images/files from clipboard ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
     const items = Array.from(e.clipboardData.items);
     const fileItems = items.filter(item => item.kind === 'file');
@@ -319,7 +314,7 @@ export function ChatInput({
         ${compact ? "rounded-none border-x-0" : "max-w-[740px]"}
       `}
     >
-      {/* ─── FILE CARDS ─── */}
+      {/* ΓöÇΓöÇΓöÇ FILE CARDS ΓöÇΓöÇΓöÇ */}
       <AnimatePresence>
         {attachedFiles.length > 0 && (
           <motion.div
@@ -365,7 +360,7 @@ export function ChatInput({
         )}
       </AnimatePresence>
 
-      {/* ─── CONTENTEDITABLE EDITOR (markdown renders inline) ─── */}
+      {/* ΓöÇΓöÇΓöÇ CONTENTEDITABLE EDITOR (markdown renders inline) ΓöÇΓöÇΓöÇ */}
       <div className="px-4 pt-[14px] pb-1">
         <div
           ref={editorRef}
@@ -383,7 +378,7 @@ export function ChatInput({
         />
       </div>
 
-      {/* ─── BOTTOM CONTROLS — Claude-style clean ─── */}
+      {/* ΓöÇΓöÇΓöÇ BOTTOM CONTROLS ΓÇö Claude-style clean ΓöÇΓöÇΓöÇ */}
       <div className="flex items-center justify-between px-3 pb-2">
         <div className="relative">
           <div className="flex items-center gap-1">
@@ -464,7 +459,7 @@ export function ChatInput({
                               }`}
                           >
                             <span>{model.label}</span>
-                            {selectedModel === model.id && <span className="text-[var(--accent)]">●</span>}
+                            {selectedModel === model.id && <span className="text-[var(--accent)]">ΓùÅ</span>}
                           </button>
                         ))}
                       </div>
@@ -486,21 +481,6 @@ export function ChatInput({
             >
               <Globe className="size-3.5" />
               Web
-            </button>
-          )}
-
-          {setComputerModeEnabled && (
-            <button
-              onClick={() => setComputerModeEnabled((prev) => !prev)}
-              className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium transition ${
-                computerModeEnabled
-                  ? "bg-amber-500/12 border border-amber-500/25 text-amber-500"
-                  : "text-[var(--text-secondary)]/60 hover:text-[var(--text-primary)] hover:bg-[var(--surface-bg)] border border-transparent"
-              }`}
-              title="Computer Mode: Shell & Local Files"
-            >
-              <Monitor className="size-3.5" />
-              Computer
             </button>
           )}
 

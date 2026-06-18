@@ -90,9 +90,7 @@ type MessageItemProps = {
 import { StatusMessage } from "./StatusMessage";
 import PlanDisplay from "./PlanDisplay";
 import PermissionDialog from "./PermissionDialog";
-import { TerminalComponent } from "./TerminalComponent";
-import ThoughtDisplay from "./flux/chat/ThoughtDisplay";
-import FileChangesPanel from "./flux/base/FileChangesPanel";
+
 import { BACKEND_URL } from "../lib/config";
 import { createClient } from "../lib/client";
 
@@ -706,10 +704,7 @@ function PartsRenderer({
         if (part.content?.trim()) {
           renderedParts.push(
             <div key={`thought-${i}`} className="mb-0.5">
-              <ThoughtDisplay
-                thought={{ subject: "Flux Reasoning", description: part.content }}
-                running={isStreaming && i === parts.length - 1}
-              />
+              <div className="text-xs text-muted-foreground italic">{part.content}</div>
             </div>
           );
         }
@@ -823,7 +818,7 @@ function PartsRenderer({
       case "terminal": {
         renderedParts.push(
           <div key={`terminal-${i}`} className="mt-2 w-full">
-            <TerminalComponent content={part.content} />
+            <pre className="bg-black text-green-400 text-xs p-3 rounded-lg overflow-x-auto">{part.content}</pre>
           </div>
         );
         break;

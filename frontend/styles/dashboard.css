@@ -1,11 +1,13 @@
 /* ===================================================
-   dashboard.css – Modern Minimal Dark/Light Theme
-   Inspired by Perplexity (dark) & Claude (light)
+   dashboard.css – Consolidated theme & component styles
+   Single source of truth for both dark and light themes.
    =================================================== */
 
 /* ---------- CSS CUSTOM PROPERTIES ---------- */
+
+/* Dark theme (default) */
 :root {
-  /* Dark theme (default) — Claude-inspired dark navy */
+  /* Dashboard vars */
   --bg-primary: #181715;
   --bg-secondary: #12110f;
   --surface-bg: rgba(255, 255, 255, 0.03);
@@ -15,28 +17,96 @@
   --text-muted: #6c6a64;
   --accent: #cc785c;
   --accent-glow: rgba(204, 120, 92, 0.25);
+  --accent-foreground: #ffffff;
   --user-msg-bg: #222222;
-  --user-msg-border: #2a2a28;
-  --file-chip-bg: rgba(204, 120, 92, 0.12);
-  --file-chip-border: rgba(204, 120, 92, 0.25);
   --code-bg: #1f1e1b;
-  --table-header-bg: #252320;
-  --table-row-bg: #181715;
-  --table-row-alt-bg: #1f1e1b;
-  --table-border: #252320;
   --inline-code-bg: rgba(204, 120, 92, 0.12);
   --inline-code-text: #cc785c;
-  --inline-code-border: rgba(204, 120, 92, 0.10);
-  --skeleton-bg: rgba(255, 255, 255, 0.10);
-  --scrollbar-thumb: rgba(250, 249, 245, 0.35);
-  --shadow-heavy: rgba(0, 0, 0, 0.5);
-  --thought-header-bg: rgba(24, 23, 21, 0.9);
-  --thought-border: rgba(255, 255, 255, 0.06);
-  --status-hover: rgba(255, 255, 255, 0.04);
+
+  /* Global vars (dark values) */
+  --radius: 0.625rem;
+  --chart-1: #cc785c;
+  --chart-2: #5db8a6;
+  --chart-3: #faf9f5;
+  --chart-4: #e8a55a;
+  --chart-5: #a09d96;
+  --background: #181715;
+  --foreground: #faf9f5;
+  --card: #252320;
+  --card-foreground: #faf9f5;
+  --popover: #1f1e1b;
+  --popover-foreground: #faf9f5;
+  --primary: #cc785c;
+  --primary-foreground: #ffffff;
+  --secondary: #252320;
+  --secondary-foreground: #faf9f5;
+  --muted: #1f1e1b;
+  --muted-foreground: #a09d96;
+  --destructive: #c64545;
+  --border: #252320;
+  --input: #252320;
+  --ring: #cc785c;
+  --sidebar: #181715;
+  --sidebar-foreground: #faf9f5;
+  --sidebar-primary: #cc785c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #252320;
+  --sidebar-accent-foreground: #faf9f5;
+  --sidebar-border: #252320;
+  --sidebar-ring: #cc785c;
 }
 
+/* Also apply dark vars when .dark class is set */
+.dark {
+  --bg-primary: #181715;
+  --bg-secondary: #12110f;
+  --surface-bg: rgba(255, 255, 255, 0.03);
+  --surface-border: rgba(255, 255, 255, 0.08);
+  --text-primary: #faf9f5;
+  --text-secondary: #a09d96;
+  --text-muted: #6c6a64;
+  --accent: #cc785c;
+  --accent-glow: rgba(204, 120, 92, 0.25);
+  --accent-foreground: #ffffff;
+  --user-msg-bg: #222222;
+  --code-bg: #1f1e1b;
+  --inline-code-bg: rgba(204, 120, 92, 0.12);
+  --inline-code-text: #cc785c;
+  --radius: 0.625rem;
+  --chart-1: #cc785c;
+  --chart-2: #5db8a6;
+  --chart-3: #faf9f5;
+  --chart-4: #e8a55a;
+  --chart-5: #a09d96;
+  --background: #181715;
+  --foreground: #faf9f5;
+  --card: #252320;
+  --card-foreground: #faf9f5;
+  --popover: #1f1e1b;
+  --popover-foreground: #faf9f5;
+  --primary: #cc785c;
+  --primary-foreground: #ffffff;
+  --secondary: #252320;
+  --secondary-foreground: #faf9f5;
+  --muted: #1f1e1b;
+  --muted-foreground: #a09d96;
+  --destructive: #c64545;
+  --border: #252320;
+  --input: #252320;
+  --ring: #cc785c;
+  --sidebar: #181715;
+  --sidebar-foreground: #faf9f5;
+  --sidebar-primary: #cc785c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #252320;
+  --sidebar-accent-foreground: #faf9f5;
+  --sidebar-border: #252320;
+  --sidebar-ring: #cc785c;
+}
+
+/* Light theme */
 .light {
-  /* Light theme — Claude-inspired warm cream */
+  /* Dashboard vars (light) */
   --bg-primary: #faf9f5;
   --bg-secondary: #f5f0e8;
   --surface-bg: rgba(20, 20, 19, 0.03);
@@ -46,31 +116,46 @@
   --text-muted: #8e8b82;
   --accent: #cc785c;
   --accent-glow: rgba(204, 120, 92, 0.20);
+  --accent-foreground: #ffffff;
   --user-msg-bg: #ffffff;
-  --user-msg-border: #e6dfd8;
-  --file-chip-bg: rgba(204, 120, 92, 0.10);
-  --file-chip-border: rgba(204, 120, 92, 0.22);
   --code-bg: #efe9de;
-  --table-header-bg: #e8e0d2;
-  --table-row-bg: #faf9f5;
-  --table-row-alt-bg: #f5f0e8;
-  --table-border: #e6dfd8;
   --inline-code-bg: rgba(204, 120, 92, 0.08);
   --inline-code-text: #cc785c;
-  --inline-code-border: rgba(204, 120, 92, 0.08);
-  --skeleton-bg: rgba(0, 0, 0, 0.06);
-  --scrollbar-thumb: rgba(0, 0, 0, 0.12);
-  --shadow-heavy: rgba(0, 0, 0, 0.1);
-  --thought-header-bg: rgba(250, 249, 245, 0.95);
-  --thought-border: rgba(20, 20, 19, 0.06);
-  --status-hover: rgba(20, 20, 19, 0.02);
+
+  /* Global vars (light values) */
+  --radius: 0.625rem;
+  --chart-1: #cc785c;
+  --chart-2: #5db8a6;
+  --chart-3: #181715;
+  --chart-4: #e8a55a;
+  --chart-5: #6c6a64;
+  --background: #faf9f5;
+  --foreground: #141413;
+  --card: #efe9de;
+  --card-foreground: #141413;
+  --popover: #faf9f5;
+  --popover-foreground: #141413;
+  --primary: #cc785c;
+  --primary-foreground: #ffffff;
+  --secondary: #f5f0e8;
+  --secondary-foreground: #141413;
+  --muted: #f5f0e8;
+  --muted-foreground: #6c6a64;
+  --destructive: #c64545;
+  --border: #e6dfd8;
+  --input: #e6dfd8;
+  --ring: #cc785c;
+  --sidebar: #141413;
+  --sidebar-foreground: #faf9f5;
+  --sidebar-primary: #cc785c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1f1e1b;
+  --sidebar-accent-foreground: #faf9f5;
+  --sidebar-border: #1f1e1b;
+  --sidebar-ring: #cc785c;
 }
 
 /* ---------- GLOBAL ---------- */
-* {
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
-}
-
 body {
   transition: background-color 0.5s ease, color 0.4s ease;
   -webkit-font-smoothing: antialiased;
@@ -79,73 +164,50 @@ body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
 }
 
-.theme-surface {
-  transition: background-color 0.4s ease,
-              border-color 0.4s ease,
-              box-shadow 0.35s ease;
-}
-
 /* ---------- SCROLLBAR ---------- */
-/* Firefox */
-* {
-  scrollbar-width: thin;
+.sidebar-scroll,
+.custom-scrollbar {
+  scrollbar-width: auto;
   scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 
-/* WebKit — classic scrollbar with arrow buttons */
-::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb);
-  border-radius: 6px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(250, 249, 245, 0.5);
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-.light ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.25);
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-/* Thin for sidebar & editor panels */
 .sidebar-scroll::-webkit-scrollbar,
 .custom-scrollbar::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track,
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 5px;
 }
 
 .sidebar-scroll::-webkit-scrollbar-thumb,
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
-  border-radius: 4px;
-  border: 1.5px solid transparent;
+  border-radius: 5px;
+  border: 2px solid transparent;
   background-clip: padding-box;
 }
 
+.sidebar-scroll::-webkit-scrollbar-thumb:hover,
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(250, 249, 245, 0.5);
-  border: 1.5px solid transparent;
+  background: var(--text-muted);
+  border: 2px solid transparent;
   background-clip: padding-box;
 }
 
+.light .sidebar-scroll::-webkit-scrollbar-thumb:hover,
 .light .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.25);
-  border: 1.5px solid transparent;
+  background: var(--text-muted);
+  border: 2px solid transparent;
   background-clip: padding-box;
+}
+
+.sidebar-scroll::-webkit-scrollbar-button,
+.custom-scrollbar::-webkit-scrollbar-button {
+  display: none;
 }
 
 /* ---------- MAIN BACKGROUND ---------- */
@@ -154,12 +216,7 @@ body {
   transition: background 0.5s ease;
 }
 
-/* ---------- SIDEBAR ---------- */
-.sidebar-search-input::placeholder {
-  color: var(--text-muted);
-}
-
-/* ---------- ASSISTANT ANSWERS (Serif Display + Sans Body Split) — Claude-editorial ── */
+/* ---------- ASSISTANT ANSWERS ---------- */
 .assistant-section h1,
 .assistant-section h2,
 .assistant-section h3,
@@ -204,12 +261,11 @@ body {
   font-style: italic !important;
 }
 
-/* ---------- FORCE INTER FOR FOLLOW-UPS HEADING ---------- */
 .assistant-section .follow-ups-heading {
   font-family: 'Inter', sans-serif !important;
 }
 
-/* ---------- USER MESSAGES — Claude-style rounded pill ─── */
+/* ---------- USER MESSAGES ---------- */
 .user-message {
   border-radius: 1.125rem;
   padding: 0.625rem 1rem;
@@ -224,7 +280,7 @@ body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
 }
 
-/* ---------- UI ELEMENTS (Inter) ---------- */
+/* ---------- UI ELEMENTS ---------- */
 input,
 button,
 .sidebar-text,
@@ -271,7 +327,6 @@ button,
   line-height: 1.5;
 }
 
-/* Inline code — uses theme variables */
 .inline-code {
   border-radius: 0.25rem;
   background: var(--inline-code-bg) !important;
@@ -283,7 +338,7 @@ button,
   border: 1px solid var(--inline-code-border) !important;
 }
 
-/* ---------- TABLES (theme-aware via CSS variables) ---------- */
+/* ---------- TABLES ---------- */
 table {
   border-color: var(--table-border) !important;
   border-collapse: collapse;
@@ -338,28 +393,6 @@ table td {
   color: var(--text-primary);
 }
 
-/* ---------- TABS ---------- */
-.tab-btn {
-  padding-bottom: 0.375rem;
-  font-size: 1rem;
-  letter-spacing: 0.02em;
-  transition: all 0.25s ease;
-}
-
-.tab-btn.active {
-  border-bottom: 2px solid var(--accent);
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.tab-btn:not(.active) {
-  color: var(--text-secondary);
-}
-
-.tab-btn:not(.active):hover {
-  color: var(--text-primary);
-}
-
 /* ---------- SOURCES ---------- */
 .source-card {
   display: flex;
@@ -385,290 +418,11 @@ table td {
   border-color: var(--accent);
 }
 
-/* ---------- THOUGHT PROCESS BOX ---------- */
-.thought-process-box {
-  border-radius: 0.875rem;
-  border: 1px solid var(--thought-border);
-  background: var(--thought-header-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
-}
 
-.thought-process-header {
-  transition: background-color 0.2s ease;
-}
 
-.thought-process-header:hover {
-  background: rgba(255, 255, 255, 0.03);
-}
 
-.thought-process-content {
-  border-top: 1px solid var(--thought-border);
-  padding: 0.75rem 1rem 1rem 1rem;
-}
 
-/* ---------- STATUS MESSAGES ---------- */
-.status-message-item {
-  transition: all 0.2s ease;
-  border-radius: 0.5rem;
-  padding: 0.25rem 0.5rem;
-}
-
-.status-message-item:hover {
-  background: var(--status-hover);
-}
-
-.status-message-text {
-  font-size: 0.9375rem !important;
-  line-height: 1.6 !important;
-  color: var(--text-secondary) !important;
-}
-
-.status-message-text strong {
-  color: var(--text-primary) !important;
-}
-
-/* ---------- ATTACH LABELS ---------- */
-.attach-label {
-  margin-bottom: 0.25rem;
-  cursor: pointer;
-  padding: 0.5rem;
-  color: var(--text-secondary);
-  border-radius: 9999px;
-  transition: all 0.25s ease;
-}
-
-.attach-label:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--text-primary);
-  transform: scale(1.1);
-}
-
-.light .attach-label:hover {
-  background: rgba(0, 0, 0, 0.06);
-  color: var(--text-primary);
-}
-
-/* ---------- LOADING SKELETON ---------- */
-.loading-skeleton {
-  margin: 0 auto;
-  max-width: 760px;
-  display: flex;
-  flex-direction: column;
-  gap: 0.875rem;
-}
-
-.skeleton-line {
-  height: 1rem;
-  border-radius: 0.375rem;
-  background: var(--skeleton-bg);
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 0.3; }
-  50%      { opacity: 0.7; }
-}
-
-/* ---------- EMPTY STATE ---------- */
-.empty-state {
-  margin: 3rem auto 0;
-  max-width: 36rem;
-  text-align: center;
-}
-
-/* ---------- FILE ATTACHMENT CHIP ---------- */
-.file-chip-separate {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.625rem;
-  background: var(--file-chip-bg);
-  border: 1px solid var(--file-chip-border);
-  border-radius: 0.75rem;
-  padding: 0.5rem 1rem;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  max-width: fit-content;
-  transition: all 0.25s ease;
-}
-
-.file-chip-separate:hover {
-  background: rgba(32, 184, 205, 0.18);
-  border-color: var(--accent);
-  transform: translateY(-1px);
-}
-
-.light .file-chip-separate:hover {
-  background: rgba(32, 128, 141, 0.15);
-}
-
-/* ---------- BOTTOM DISCLAIMER ---------- */
-.ai-disclaimer {
-  font-size: 12px;
-  color: var(--text-secondary);
-  opacity: 0.7;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  user-select: none;
-}
-
-/* ---------- SOURCE FAVICON HOVER EFFECTS ---------- */
-.source-favicon-container {
-  transition: all 0.2s ease;
-}
-
-.source-favicon-container:hover {
-  transform: scale(1.15) translateY(-2px);
-  filter: drop-shadow(0 0 12px var(--accent-glow));
-}
-
-.source-favicon-img {
-  transition: all 0.2s ease;
-}
-
-.source-favicon-img:hover {
-  border-color: var(--accent) !important;
-  box-shadow: 0 0 15px var(--accent-glow);
-}
-
-/* ---------- READING LINK HOVER EFFECTS ---------- */
-.reading-link {
-  transition: all 0.2s ease;
-  border-radius: 0.25rem;
-  padding: 0.125rem 0.375rem;
-}
-
-.reading-link:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-primary);
-}
-
-.reading-link:hover .external-link-icon {
-  color: var(--accent);
-}
-
-/* ---------- FAVICON CASCADE IN STATUS MESSAGES ---------- */
-.status-favicon {
-  transition: all 0.15s ease;
-  border: 2px solid transparent;
-}
-
-.status-favicon:hover {
-  transform: scale(1.25) translateY(-2px);
-  border-color: var(--accent);
-  box-shadow: 0 0 12px var(--accent-glow);
-  z-index: 20 !important;
-}
-
-.status-favicon-tooltip {
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-bottom: 4px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.85);
-  color: var(--text-primary);
-  font-size: 10px;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
-}
-
-.status-favicon-container:hover .status-favicon-tooltip {
-  opacity: 1;
-}
-
-/* ---------- THOUGHT STEP INDICATORS ---------- */
-.thought-step {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  padding: 0.25rem 0;
-}
-
-.thought-step-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  margin-top: 6px;
-  flex-shrink: 0;
-  transition: all 0.3s ease;
-}
-
-.thought-step-dot.active {
-  background: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
-}
-
-.thought-step-dot.inactive {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.light .thought-step-dot.inactive {
-  background: rgba(0, 0, 0, 0.15);
-}
-
-.thought-step-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.thought-step-label {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.thought-step-detail {
-  font-size: 0.8125rem;
-  color: var(--text-muted);
-  margin-top: 0.125rem;
-}
-
-/* ---------- NEW: FADE-IN ANIMATION FOR PREVIEW IFRAME ---------- */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-/* ---------- NEW: EDITOR / CANVAS OVERRIDES ---------- */
-.editor-container {
-  background: #0d1117; /* matches HtmlCanvas dark theme */
-}
-
-.editor-container .custom-scrollbar {
-  scrollbar-width: thin;
-}
-
-/* ---------- NEW: GENERATION INDICATOR ANIMATION ---------- */
-@keyframes generationDotBounce {
-  0%, 80%, 100% { 
-    transform: scale(0);
-    opacity: 0.3;
-  } 
-  40% { 
-    transform: scale(1.0);
-    opacity: 1;
-  }
-}
-
-.animate-generation-dot {
-  animation: generationDotBounce 1.4s infinite ease-in-out both;
-}
-
-/* ---------- NEW: SERIF DISPLAY FOR EDITORIAL TITLES ---------- */
+/* ---------- SERIF DISPLAY ---------- */
 .serif-display {
   font-family: 'Cormorant Garamond', 'Newsreader', Georgia, 'Times New Roman', serif !important;
   font-weight: 400;

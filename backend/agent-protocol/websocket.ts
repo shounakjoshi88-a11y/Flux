@@ -97,6 +97,9 @@ async function handleMessage(ws: AuthenticatedSocket, msg: any) {
     case "permission_response":
       await handlePermissionResponse(ws, payload);
       break;
+    case "update_mode":
+      await handleUpdateMode(ws, payload);
+      break;
     case "session_stop":
       await handleSessionStop(ws, payload);
       break;
@@ -176,7 +179,7 @@ async function handleSessionStart(ws: AuthenticatedSocket, payload: any) {
     supportsVision: ["kimi-k2.6", "nemotron-nano-12b-v2-vl"].includes(config.model),
     supportsThinking: ["deepseek-v4-flash", "step-3.7-flash"].includes(config.model),
     supportedModes: ["default", "plan", "yolo"],
-    availableTools: ["web_search", "read_skill", "generate_document", "get_weather", "generate_image"],
+    availableTools: ["web_search", "read_skill", "generate_document", "get_weather", "generate_image", "shell_execute", "file_list", "file_read", "file_write"],
     maxContextLength: 128000,
   };
   session.setCapabilities(caps);
@@ -215,12 +218,15 @@ async function handleUserMessage(ws: AuthenticatedSocket, payload: any) {
 
   try {
     // Proxy to /flux_ask SSE endpoint — reuses all existing LLM+tools logic
+    const isComputerMode = session.config.mode === "yolo";
     const sseUrl = `http://localhost:3001/flux_ask`;
     const body = JSON.stringify({
       query: text,
       model: session.config.model,
       conversationId: session.config.conversationId,
       attachedFiles: attachments || [],
+      isComputerMode,
+      mode: session.config.mode,
     });
 
     const sseRes = await fetch(sseUrl, {
@@ -328,6 +334,7 @@ function mapSseEventToWs(eventType: string, parsed: any): string | null {
   if (eventType === "tool_group") return "tool_group";
   if (eventType === "tool_call") return "tool_call";
   if (eventType === "agent_status") return "agent_status";
+  if (eventType === "terminal") return "terminal";
 
   return null;
 }
@@ -345,6 +352,22 @@ async function handlePermissionResponse(ws: AuthenticatedSocket, payload: any) {
     id: permissionId,
     approved: !!approved,
   }));
+}
+
+async function handleUpdateMode(ws: AuthenticatedSocket, payload: any) {
+  if (!ws.sessionId) return;
+  const session = sessionRegistry.get(ws.sessionId);
+  if (!session) return;
+
+  const { mode } = payload || {};
+  if (mode && ["default", "plan", "yolo", "bypass_permissions"].includes(mode)) {
+    session.config.mode = mode;
+    send(ws, makeMsg(session, "agent_status", {
+      status: "mode_updated",
+      message: `Mode set to ${mode}`,
+      mode,
+    }));
+  }
 }
 
 async function handleSessionStop(ws: AuthenticatedSocket, payload: any) {

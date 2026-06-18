@@ -1,4 +1,4 @@
-// Agent Status Bar — shows session state, capabilities, mode switcher
+// Agent Status Bar ΓÇö shows session state, capabilities, mode switcher
 import { motion } from "framer-motion";
 import {
   Radio,
@@ -11,7 +11,7 @@ import {
   ListChecks,
   Shield,
 } from "lucide-react";
-import type { AgentMode } from "../hooks/useAgentSession";
+import type { AgentMode } from "@/hooks/useAgentSession";
 
 type AgentStatusBarProps = {
   sessionState: string;

@@ -40,3 +40,9 @@ GEMINI.md
 CLAUDE.md
 DESIGN.md
 data/
+the_app_i_copied_folders_from/
+
+# Electron
+dist-electron/
+release/
+*.exe

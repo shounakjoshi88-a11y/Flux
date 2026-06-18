@@ -46,6 +46,7 @@ import type {
 import { parseAssistantContent, extractLiveContent } from "../lib/chat-utils";
 import { BACKEND_URL, UNSPLASH_ACCESS_KEY } from "../lib/config";
 
+
 const supabase = createClient();
 
 type GeneratedFile = {
@@ -131,8 +132,6 @@ export default function Dashboard() {
     retry,
     stop,
     activeGenerationStatus,
-    isComputerMode,
-    setIsComputerMode,
   } = useChat(user);
   const ws = useAgentSession(user);
   const { categories: modelCategories, all: allModels, isLoading: modelsLoading } = useModels();
@@ -820,6 +819,7 @@ export default function Dashboard() {
   }
 
   return (
+  
     <div className="flex h-screen w-full main-container text-foreground overflow-hidden font-sans">
       <AnimatePresence>
         <Sidebar
@@ -875,6 +875,7 @@ export default function Dashboard() {
         className={`relative flex-1 flex flex-col min-w-0 transition-[margin] duration-300 ease-in-out ${
           isSidebarOpen ? "md:ml-[260px]" : "md:ml-0"
         } ${!isSidebarOpen ? 'px-[48px]' : ''}`}
+        style={{ minHeight: 0, height: '100%', overflow: 'hidden' }}
       >
         {hasStarted && (
           <PromptHistoryCard
@@ -882,7 +883,9 @@ export default function Dashboard() {
             onJumpToPrompt={handleJumpToPrompt}
           />
         )}
-        <section className="flex-1 min-h-0 flex flex-col rounded-xl border border-[var(--surface-border)] bg-[var(--bg-primary)]">
+        <section className={`flex-1 flex flex-col transition-all duration-300 ${
+          !hasStarted ? '' : 'rounded-xl border border-[var(--surface-border)] bg-[var(--bg-primary)]'
+        }`} style={{ minHeight: 0 }}>
           {hasStarted && (
             <header className="flex items-center justify-center border-b border-[var(--surface-border)] px-4 py-2">
               <div className="flex items-center gap-6">
@@ -898,7 +901,7 @@ export default function Dashboard() {
           )}
 
           {!hasStarted ? (
-            <div className="flex-1 overflow-y-auto px-6 flex flex-col justify-start items-center pt-[26vh] pb-12 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto px-6 flex flex-col justify-start items-center pt-[26vh] pb-12 custom-scrollbar" style={{ minHeight: 0 }}>
               <div className="w-full max-w-2xl mx-auto flex flex-col items-center">
                 {/* Claude-style warm greeting */}
                 <div className="flex items-center justify-center gap-4 mb-8 select-none">
@@ -913,7 +916,7 @@ export default function Dashboard() {
                     className="p-0 border-none bg-transparent cursor-pointer outline-none shrink-0"
                     title="Toggle dawn"
                   >
-                    <svg className="size-9" viewBox="0 0 24 24" style={{ overflow: 'visible' }}>
+                    <svg className="size-12 md:size-14" viewBox="0 0 24 24" style={{ overflow: 'visible' }}>
                       <path
                         d="M2 16C5 6 8 18 11 10S17 6 22 12 L22 24 L2 24 Z"
                         fill="var(--bg-primary)"
@@ -953,7 +956,7 @@ export default function Dashboard() {
                       />
                     </svg>
                   </button>
-                  <h1 className="serif-display text-4xl md:text-[44px] text-[var(--text-primary)] leading-tight">
+                  <h1 className="serif-display text-5xl md:text-[56px] text-[#cc785c] leading-tight">
                     {getGreeting()}
                   </h1>
                 </div>
@@ -976,8 +979,6 @@ export default function Dashboard() {
                       setModelDropdownOpen={setModelDropdownOpen}
                       handleAttachFiles={handleAttachFiles}
                       onStop={handleStop}
-                      computerModeEnabled={isComputerMode}
-                      setComputerModeEnabled={setIsComputerMode}
                     />
                   </div>
                 </div>
@@ -987,8 +988,9 @@ export default function Dashboard() {
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col min-h-0">
-              <div className="flex-1 flex flex-col min-h-0">
+            <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+              <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+
                 {activeTransport === "ws" && (
                   <AgentStatusBar
                     sessionState={sessionState}
@@ -1050,8 +1052,6 @@ export default function Dashboard() {
                 setModelDropdownOpen={setModelDropdownOpen}
                 handleAttachFiles={handleAttachFiles}
                 onStop={handleStop}
-                computerModeEnabled={isComputerMode}
-                setComputerModeEnabled={setIsComputerMode}
               />
             </div>
             <InputSeparator />

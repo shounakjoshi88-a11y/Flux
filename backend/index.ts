@@ -277,42 +277,6 @@ function sendStatus(res: any, subtype: string, message: string, data?: any, trac
     if (track) track.push(event);
 }
 
-function sendTerminal(res: any, content: string) {
-    if (res.writableEnded) return;
-    res.write(`event: terminal\ndata: ${JSON.stringify({ type: "terminal", content })}\n\n`);
-}
-
-import {
-    registerProcess,
-    unregisterProcess,
-    cleanupRegisteredAgentProcesses,
-    resolveAgentProcessRegistryPath,
-} from './flux-host/agent-process-registry';
-
-// ── Workspace & Data Configuration ─────────────────────────
-const WORKSPACE_DIR = path.resolve(process.cwd(), 'workspace');
-if (!fs.existsSync(WORKSPACE_DIR)) {
-    fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
-}
-
-const DATA_DIR = path.resolve(process.cwd(), 'data');
-if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
-const REGISTRY_PATH = resolveAgentProcessRegistryPath(DATA_DIR);
-
-// Cleanup stale processes on startup
-cleanupRegisteredAgentProcesses(DATA_DIR).catch(console.error);
-
-function resolveSafePath(unsafePath: string): string {
-    const resolved = path.resolve(WORKSPACE_DIR, unsafePath);
-    if (!resolved.startsWith(WORKSPACE_DIR)) {
-        throw new Error('Access denied: path is outside the workspace');
-    }
-    return resolved;
-}
-
 function sendProgress(res: any, subtype: string, progress: number, message: string, data?: any) {
     if (res.writableEnded) return;
     res.write(`event: status\ndata: ${JSON.stringify({ type: "status", subtype, message, data: data || null, progress })}\n\n`);
@@ -1405,7 +1369,7 @@ interface AgentState {
 
 // ── TOOL FACTORY ───────────────────────────────────────────────────────────
 // Creates all 5 tools scoped to the current request (has access to res + state).
-function createFluxTools(res: any, model: any, state: AgentState, userQuery?: string) {
+function createFluxTools(res: any, model: any, state: AgentState, userQuery?: string, activeConversationId?: string) {
     return {
 
         // ── web_search ────────────────────────────────────────────────────
@@ -1607,129 +1571,6 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                     `${safeDocType.toUpperCase()} file "${generatedFile.filename}" generated successfully. ` +
                     `Tell the user it is ready to download.`
                 );
-            },
-        }),
-
-        // ── shell_execute ─────────────────────────────────────────────────
-        shell_execute: (tool as any)({
-            description: 'Execute a shell command in the local workspace.',
-            parameters: z.object({
-                command: z.string().describe('The shell command to execute'),
-            }),
-            execute: async ({ command }: any) => {
-                sendStatus(res, 'executing', `Running: ${command}`, { command }, state.thoughtProcess);
-                sendTerminal(res, `\n> ${command}\n`);
-
-                try {
-                    // For Windows compatibility and interactive feel
-                    const isWindows = process.platform === 'win32';
-                    const shell = isWindows ? 'cmd.exe' : 'sh';
-                    const shellArgs = isWindows ? ['/c', command] : ['-c', command];
-
-                    const proc = Bun.spawn([shell, ...shellArgs], {
-                        cwd: WORKSPACE_DIR,
-                        stdout: "pipe",
-                        stderr: "pipe",
-                    });
-
-                    // Register process for potential cleanup/termination
-                    const procEntry = {
-                        pid: proc.pid,
-                        conversation_id: activeConversationId,
-                        agent_type: 'flux-shell',
-                        command_preview: command,
-                        registered_at_ms: Date.now(),
-                    };
-                    await registerProcess(REGISTRY_PATH, procEntry);
-
-                    let output = "";
-                    
-                    const readStream = async (stream: any) => {
-                        const reader = stream.getReader();
-                        while (true) {
-                            const { done, value } = await reader.read();
-                            if (done) break;
-                            const chunk = new TextDecoder().decode(value);
-                            output += chunk;
-                            sendTerminal(res, chunk);
-                        }
-                    };
-
-                    await Promise.all([
-                        readStream(proc.stdout),
-                        readStream(proc.stderr)
-                    ]);
-
-                    const exitCode = await proc.exited;
-                    await unregisterProcess(REGISTRY_PATH, proc.pid);
-                    
-                    sendTerminal(res, `\n[Process exited with code ${exitCode}]\n`);
-                    
-                    sendStatus(res, 'executing_success', `Command finished`, { exitCode }, state.thoughtProcess);
-                    return output || `Process exited with code ${exitCode}`;
-                } catch (e: any) {
-                    const errorMsg = `Error: ${e.message}`;
-                    sendTerminal(res, `\n${errorMsg}\n`);
-                    sendStatus(res, 'executing_error', errorMsg, undefined, state.thoughtProcess);
-                    return errorMsg;
-                }
-            },
-        }),
-
-        // ── file_list ─────────────────────────────────────────────────────
-        file_list: (tool as any)({
-            description: 'List files and directories in the local workspace.',
-            parameters: z.object({
-                path: z.string().default('.'),
-                recursive: z.boolean().default(false),
-            }),
-            execute: async ({ path: subPath, recursive }: any) => {
-                try {
-                    const target = resolveSafePath(subPath);
-                    if (!fs.existsSync(target)) return `Directory not found: ${subPath}`;
-                    const files = fs.readdirSync(target, { recursive });
-                    return JSON.stringify(files, null, 2);
-                } catch (e: any) {
-                    return `Error listing files: ${e.message}`;
-                }
-            },
-        }),
-
-        // ── file_read ─────────────────────────────────────────────────────
-        file_read: (tool as any)({
-            description: 'Read the content of a local file.',
-            parameters: z.object({
-                path: z.string(),
-            }),
-            execute: async ({ path: subPath }: any) => {
-                try {
-                    const target = resolveSafePath(subPath);
-                    if (!fs.existsSync(target)) return `File not found: ${subPath}`;
-                    return fs.readFileSync(target, 'utf-8');
-                } catch (e: any) {
-                    return `Error reading file: ${e.message}`;
-                }
-            },
-        }),
-
-        // ── file_write ────────────────────────────────────────────────────
-        file_write: (tool as any)({
-            description: 'Create or update a local file with specific content.',
-            parameters: z.object({
-                path: z.string(),
-                content: z.string(),
-            }),
-            execute: async ({ path: subPath, content }: any) => {
-                try {
-                    const target = resolveSafePath(subPath);
-                    const dir = path.dirname(target);
-                    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-                    fs.writeFileSync(target, content, 'utf-8');
-                    sendStatus(res, 'file_written', `Updated ${subPath}`, { path: subPath }, state.thoughtProcess);
-                    return `Successfully wrote ${content.length} characters to ${subPath}`;
-                } catch (e: any) {
-                    return `Error writing file: ${e.message}`;
-                }
             },
         }),
 
@@ -2260,6 +2101,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
             location,
             conversationId,
             isComputerMode,
+            mode,
         } = req.body as {
             query?: string;
             model?: string;
@@ -2268,6 +2110,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
             location?: string;
             conversationId?: string;
             isComputerMode?: boolean;
+            mode?: string;
         };
 
         if (!query?.trim()) return res.status(400).json({ error: 'Query is required' });
@@ -2368,7 +2211,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
 
         // ── Per-request agent state ──────────────────────────────────────
         const agentState: AgentState = { sources: [], generatedFiles: [], thoughtProcess: [] };
-        const tools = createFluxTools(res, model, agentState, nq);
+        const tools = createFluxTools(res, model, agentState, nq, activeConversationId);
         if (hasAnyFile) {
             delete (tools as any).web_search;
         }
@@ -2971,7 +2814,7 @@ app.post('/api/chat-sdk', middleware, async (req: any, res: any) => {
             on: () => { },
         };
         const agentState: AgentState = { sources: [], generatedFiles: [], thoughtProcess: [] };
-        const tools = createFluxTools(noopRes, model, agentState, nq);
+        const tools = createFluxTools(noopRes, model, agentState, nq, '');
 
         const memCtx = '';
         const dynSys = [

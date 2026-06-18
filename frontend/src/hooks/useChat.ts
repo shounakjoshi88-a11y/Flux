@@ -1,9 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { flushSync } from "react-dom";
-import { createClient } from "../lib/client";
-import { BACKEND_URL } from "../lib/config";
-import { extractLiveContent } from "../lib/chat-utils";
-import type { Message, AttachedFile, Source, GeneratedFile, MessagePart, ExecutionPlan, PermissionRequest } from "../types";
+import { createClient } from "@/lib/client";
+import { BACKEND_URL } from "@/lib/config";
+import { extractLiveContent } from "@/lib/chat-utils";
+import type { Message, AttachedFile, Source, GeneratedFile, MessagePart, ExecutionPlan, PermissionRequest } from "@/types";
 
 const supabase = createClient();
 
@@ -28,7 +28,6 @@ let nextId = 1;
 export function useChat(user: any) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isComputerMode, setIsComputerMode] = useState(false);
   const [activeGenerationStatus, setActiveGenerationStatus] = useState<{
     subtype: string;
     message: string;
@@ -53,7 +52,7 @@ export function useChat(user: any) {
   const streamingPartsRef = useRef<MessagePart[]>([]);
   const textAccumRef = useRef<string>("");
 
-  // Flux pattern: cancelled flag for async hydration safety
+  // AionUi pattern: cancelled flag for async hydration safety
   const cancelledRef = useRef(false);
 
   useEffect(() => {
@@ -174,7 +173,6 @@ export function useChat(user: any) {
           ? attachedFiles.map((f) => ({ name: f.name, content: f.content, type: f.type }))
           : undefined,
         conversationId: activeConversationId ?? undefined,
-        isComputerMode,
       };
 
       const endpoint = `${BACKEND_URL}/flux_ask`;
@@ -257,7 +255,7 @@ export function useChat(user: any) {
             const data = dataLines.join("\n");
             if (!data) continue;
 
-            // ─── ERROR ───────────────────────────────
+            // ΓöÇΓöÇΓöÇ ERROR ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             if (eventType === "error") {
               let errorMessage = "Server error";
               try {
@@ -269,15 +267,15 @@ export function useChat(user: any) {
               break;
             }
 
-            // ─── SOURCES ─────────────────────────────
+            // ΓöÇΓöÇΓöÇ SOURCES ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             if (eventType === "sources") {
               try { latestSources = JSON.parse(data) as Source[]; } catch { }
             }
-            // ─── FOLLOW_UPS ──────────────────────────
+            // ΓöÇΓöÇΓöÇ FOLLOW_UPS ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             else if (eventType === "follow_ups") {
               try { latestFollowUpsRef.current = JSON.parse(data) as string[]; } catch { }
             }
-            // ─── STATUS ──────────────────────────────
+            // ΓöÇΓöÇΓöÇ STATUS ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             else if (eventType === "status") {
               try {
                 const parsed = JSON.parse(data);
@@ -326,7 +324,7 @@ export function useChat(user: any) {
                 }
               } catch { }
             }
-            // ─── THOUGHT ─────────────────────────────
+            // ΓöÇΓöÇΓöÇ THOUGHT ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             else if (eventType === "thought") {
               try {
                 const parsed = JSON.parse(data);
@@ -343,7 +341,7 @@ export function useChat(user: any) {
                 }
               } catch { }
             }
-            // ─── PLAN ────────────────────────────────
+            // ΓöÇΓöÇΓöÇ PLAN ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             else if (eventType === "plan") {
               try {
                 const parsed = JSON.parse(data);
@@ -360,7 +358,7 @@ export function useChat(user: any) {
                 callbacks?.onPlan?.(parsed);
               } catch { }
             }
-            // ─── PERMISSION ──────────────────────────
+            // ΓöÇΓöÇΓöÇ PERMISSION ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             else if (eventType === "permission") {
               try {
                 const parsed = JSON.parse(data);
@@ -378,7 +376,7 @@ export function useChat(user: any) {
                 callbacks?.onPermissionRequest?.(parsed);
               } catch { }
             }
-            // ─── TOOL_GROUP ──────────────────────────
+            // ΓöÇΓöÇΓöÇ TOOL_GROUP ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             else if (eventType === "tool_group") {
               try {
                 const parsed = JSON.parse(data);
@@ -392,7 +390,7 @@ export function useChat(user: any) {
                 updateMessages(targetId);
               } catch { }
             }
-            // ─── AGENT_STATUS ────────────────────────
+            // ΓöÇΓöÇΓöÇ AGENT_STATUS ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             else if (eventType === "agent_status") {
               try {
                 const parsed = JSON.parse(data);
@@ -407,7 +405,7 @@ export function useChat(user: any) {
                 updateMessages(targetId);
               } catch { }
             }
-            // ─── TOOL_CALL ────────────────────────────
+            // ΓöÇΓöÇΓöÇ TOOL_CALL ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             else if (eventType === "tool_call") {
               try {
                 const parsed = JSON.parse(data);
@@ -423,7 +421,7 @@ export function useChat(user: any) {
                 updateMessages(targetId);
               } catch { }
             }
-            // ─── FILE ────────────────────────────────
+            // ΓöÇΓöÇΓöÇ FILE ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             else if (eventType === "file") {
               try {
                 const parsed = JSON.parse(data) as GeneratedFile;
@@ -447,7 +445,7 @@ export function useChat(user: any) {
                 console.error("Failed to parse file event:", e);
               }
             }
-            // ─── MESSAGE_ID ──────────────────────────
+            // ΓöÇΓöÇΓöÇ MESSAGE_ID ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             else if (eventType === "message_id") {
               try {
                 const parsed = JSON.parse(data);
@@ -456,20 +454,7 @@ export function useChat(user: any) {
                 callbacks?.onMessageId?.(parsed.id);
               } catch { }
             }
-            // ─── TERMINAL ───────────────────────────
-            else if (eventType === "terminal") {
-              try {
-                const parsed = JSON.parse(data);
-                const termPart: MessagePart = {
-                  type: "terminal",
-                  content: parsed.content || "",
-                };
-                addPart(termPart);
-                const targetId = realMessageIdRef.current ?? assistantMsgId;
-                updateMessages(targetId);
-              } catch { }
-            }
-            // ─── TODOS ───────────────────────────────
+            // ΓöÇΓöÇΓöÇ TODOS ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             else if (eventType === "todos") {
               try {
                 const parsed = JSON.parse(data);
@@ -491,14 +476,14 @@ export function useChat(user: any) {
                 }
               } catch { }
             }
-            // ─── TEXT ANSWER (default) ───────────────
+            // ΓöÇΓöÇΓöÇ TEXT ANSWER (default) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             else {
               if (data === "[DONE]") continue;
               assistantRawRef.current += data;
               textAccumRef.current += data;
             }
 
-            // ─── Update assistant message ──
+            // ΓöÇΓöÇΓöÇ Update assistant message ΓöÇΓöÇ
             try {
               const cleanAns = cleanAnswerText(assistantRawRef.current);
               const cleanCurrentText = cleanAnswerText(textAccumRef.current);
@@ -621,7 +606,5 @@ export function useChat(user: any) {
     retry,
     stop,
     activeGenerationStatus,
-    isComputerMode,
-    setIsComputerMode,
   };
 }

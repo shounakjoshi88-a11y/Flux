@@ -112,7 +112,7 @@ export function MessageList({
       }
     }
     return (
-      <div className="flex-1 overflow-y-auto px-6 pt-6 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto px-6 pt-6 custom-scrollbar" style={{ minHeight: 0 }}>
         <h2 className="text-lg font-semibold tracking-tight mb-4 text-center">Sources per prompt</h2>
         {sourceGroups.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center">No sources found in this conversation.</p>
@@ -157,7 +157,7 @@ export function MessageList({
   // ─── Images tab ───────────────────────────────────────────
   if (activeTab === "images") {
     return (
-      <div className="flex-1 overflow-y-auto px-6 pt-6 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto px-6 pt-6 custom-scrollbar" style={{ minHeight: 0 }}>
         <h2 className="text-lg font-semibold tracking-tight mb-4">Images</h2>
         {activeImages.length === 0 ? (
           <p className="text-sm text-muted-foreground">No images found for this query.</p>
@@ -186,6 +186,7 @@ export function MessageList({
         lastScrollTopRef.current = currentTop;
       }}
       className="flex-1 overflow-y-auto px-6 pt-6 pb-72 relative custom-scrollbar"
+      style={{ minHeight: 0 }}
     >
       {messages.length > 0 && (
         <div className="space-y-0.2">

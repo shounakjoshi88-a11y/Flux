@@ -150,8 +150,7 @@ function BarLineAreaChart({ spec }: { spec: ChartSpec }) {
           ) : (
             <>
               <XAxis
-                dataKey="name"
-                tick={{ fontSize: 11, fill: "#9ca3af", angle: xAngle, textAnchor: xAngle !== 0 ? "end" : "middle" }}
+                {...({ dataKey: "name", tick: { fontSize: 11, fill: "#9ca3af", angle: xAngle, textAnchor: xAngle !== 0 ? "end" : "middle" } } as any)}
                 height={xHeight}
                 label={spec.xLabel ? { value: spec.xLabel, position: "insideBottom", offset: -10, fill: "#6b7280", fontSize: 11 } : undefined}
               />

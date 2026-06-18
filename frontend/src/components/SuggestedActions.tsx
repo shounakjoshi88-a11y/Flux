@@ -71,7 +71,7 @@ export const SuggestedActions = memo(function SuggestedActions({
                     onAction(text);
                     setActiveCategory(null);
                   }}
-                  className="w-full text-left px-3 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/[0.04] transition duration-150 cursor-pointer block truncate"
+                  className="w-full text-left px-4 py-3 rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/[0.04] transition duration-150 cursor-pointer block truncate"
                 >
                   {text}
                 </button>
@@ -92,9 +92,9 @@ export const SuggestedActions = memo(function SuggestedActions({
                   key={cat.id}
                   type="button"
                   onClick={() => setActiveCategory(cat.id)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-white/[0.06] bg-white/[0.02] backdrop-blur-md hover:bg-white/[0.06] text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition duration-200 cursor-pointer shadow-sm"
+                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full border border-[var(--surface-border)] bg-[var(--card)]/30 backdrop-blur-md hover:bg-[var(--card)]/60 text-sm font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition duration-200 cursor-pointer"
                 >
-                  <cat.icon className="size-3 text-[var(--text-secondary)]/80" />
+                  <cat.icon className="size-3.5 text-[var(--text-muted)]" />
                   <span>{cat.label}</span>
                 </button>
               ))}

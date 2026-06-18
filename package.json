@@ -1,5 +1,20 @@
 {
-  "dependencies": {
-    "abcjs": "^6.6.3"
+  "name": "flux",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "powershell -ExecutionPolicy Bypass -File flux.ps1",
+    "postinstall": "cd backend && bunx prisma generate && cd ..",
+    "electron:build-frontend": "cd frontend && bun run build",
+    "electron:build-backend": "bun build backend/index.ts --compile --outfile=dist-electron/backend/flux-backend.exe --external=@edge-tts/universal",
+    "electron:build-all": "bun run electron:build-frontend && bun run electron:build-backend",
+    "electron:dev": "bun run electron:build-all && electron .",
+    "electron:dist": "bun run electron:build-all && electron-builder --win --config electron-builder.yml"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^26.0.0",
+    "typescript": "^5.8.0"
   }
 }

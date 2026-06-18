@@ -1,0 +1,24 @@
+appId: com.flux.app
+productName: Flux
+copyright: Copyright © 2026
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist-electron/**/*
+  - frontend/dist/**/*
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: frontend/src/icon-512.png
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: Flux

@@ -1,13 +1,13 @@
-// Agent Session hook — AionUi-grade implementation
+// Agent Session hook ΓÇö AionUi-grade implementation
 // Features: O(1) message index, throttled thoughts, turn state machine guards,
 // approval store with session memory, tool normalizer
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { createClient } from "../lib/client";
-import { BACKEND_URL } from "../lib/config";
-import type { Message, AttachedFile, MessagePart } from "../types";
-import { createMessageIndex, composeMessageWithIndex } from "../lib/message-index";
-import { normalizeToolCall } from "../lib/tool-normalizer";
-import { ApprovalStore, approvalKeyForTool, globalApprovalStore } from "../lib/approval-store";
+import { createClient } from "@/lib/client";
+import { BACKEND_URL } from "@/lib/config";
+import type { Message, AttachedFile, MessagePart } from "@/types";
+import { createMessageIndex, composeMessageWithIndex } from "@/lib/message-index";
+import { normalizeToolCall } from "@/lib/tool-normalizer";
+import { ApprovalStore, approvalKeyForTool, globalApprovalStore } from "@/lib/approval-store";
 
 const supabase = createClient();
 
@@ -46,7 +46,7 @@ interface UseAgentSessionCallbacks {
 
 let nextId = 1;
 
-// ── Throttle helper (50ms like AionUi) ────────────────────
+// ΓöÇΓöÇ Throttle helper (50ms like AionUi) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 function createThrottledUpdater<T>(ms: number, setter: (val: T) => void, getRef: () => { pending: T | null; timer: ReturnType<typeof setTimeout> | null; lastUpdate: number }) {
   return (data: T) => {
     const now = Date.now();
@@ -85,25 +85,25 @@ export function useAgentSession(user: any) {
   const maxReconnectAttempts = 5;
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // AionUi: singleton reconnect guard
 
-  // ── Turn lifecycle guards (like AionUi's turnFinishedRef) ──
+  // ΓöÇΓöÇ Turn lifecycle guards (like AionUi's turnFinishedRef) ΓöÇΓöÇ
   const turnFinishedRef = useRef(false);
   const hasContentInTurnRef = useRef(false);
   const runningRef = useRef(false);
   const activeAssistantIdRef = useRef<string | null>(null);
 
-  // ── AionUi pattern: cancelled flag + active message ID for stale event filtering ──
+  // ΓöÇΓöÇ AionUi pattern: cancelled flag + active message ID for stale event filtering ΓöÇΓöÇ
   const cancelledRef = useRef(false);
   const activeMsgIdRef = useRef<string | null>(null);
 
-  // ── O(1) message index ──
+  // ΓöÇΓöÇ O(1) message index ΓöÇΓöÇ
   const indexRef = useRef(createMessageIndex([]));
   const approvalStoreRef = useRef(globalApprovalStore);
 
-  // ── Streaming buffers ──
+  // ΓöÇΓöÇ Streaming buffers ΓöÇΓöÇ
   const streamingPartsRef = useRef<MessagePart[]>([]);
   const textAccumRef = useRef<string>("");
 
-  // ── Thought throttling (50ms like AionUi) ──
+  // ΓöÇΓöÇ Thought throttling (50ms like AionUi) ΓöÇΓöÇ
   const thoughtThrottleRef = useRef<{
     pending: { subject?: string; description?: string; elapsed: number } | null;
     timer: ReturnType<typeof setTimeout> | null;
@@ -115,7 +115,7 @@ export function useAgentSession(user: any) {
     []
   );
 
-  // ── Elapsed timer for thoughts ──
+  // ΓöÇΓöÇ Elapsed timer for thoughts ΓöÇΓöÇ
   const thoughtStartRef = useRef<number>(0);
   const thoughtTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -135,7 +135,7 @@ export function useAgentSession(user: any) {
     }
   }, []);
 
-  // ── WebSocket Connection ─── AionUi patterns: exponential backoff, singleton guard, connect timeout ──
+  // ΓöÇΓöÇ WebSocket Connection ΓöÇΓöÇΓöÇ AionUi patterns: exponential backoff, singleton guard, connect timeout ΓöÇΓöÇ
   const CONNECT_TIMEOUT_MS = 8000;
   const connect = useCallback(async () => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -193,7 +193,7 @@ export function useAgentSession(user: any) {
   }, []);
 
   const disconnect = useCallback(() => {
-    // AionUi pattern: enterTerminal — null out ALL handlers to prevent double-fire
+    // AionUi pattern: enterTerminal ΓÇö null out ALL handlers to prevent double-fire
     cancelledRef.current = true;
     if (reconnectTimerRef.current) {
       clearTimeout(reconnectTimerRef.current);
@@ -212,7 +212,7 @@ export function useAgentSession(user: any) {
     stopThoughtTimer();
   }, [stopThoughtTimer]);
 
-  // ── O(1) message update helper ──
+  // ΓöÇΓöÇ O(1) message update helper ΓöÇΓöÇ
   const updateMessages = useCallback(
     (updater: (prev: Message[], index: typeof indexRef.current) => Message[]) => {
       setMessages((prev) => {
@@ -224,7 +224,7 @@ export function useAgentSession(user: any) {
     []
   );
 
-  // ── Message Handler ───────────────────────────────────────
+  // ΓöÇΓöÇ Message Handler ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   const handleAgentMessage = useCallback((msg: AgentMessage) => {
     // AionUi pattern: stale event filtering via activeMsgIdRef
     const id = msg.payload?.msg_id || msg.id;
@@ -272,7 +272,7 @@ export function useAgentSession(user: any) {
     });
   }, [updateMessages]);
 
-  // ── Turn lifecycle (AionUi-style guards) ──
+  // ΓöÇΓöÇ Turn lifecycle (AionUi-style guards) ΓöÇΓöÇ
   const handleStart = useCallback((payload: any) => {
     turnFinishedRef.current = false;
     hasContentInTurnRef.current = false;
@@ -482,7 +482,7 @@ export function useAgentSession(user: any) {
     flushPartsToMessage();
   }, [stopThoughtTimer, throttledSetThought, flushPartsToMessage]);
 
-  // ── Send Message ──────────────────────────────────────────
+  // ΓöÇΓöÇ Send Message ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   const sendMessage = useCallback(
     async (
       text: string,
@@ -543,7 +543,7 @@ export function useAgentSession(user: any) {
         },
       }));
 
-      // Poll for parts updates — AionUi pattern: cancelled flag guard
+      // Poll for parts updates ΓÇö AionUi pattern: cancelled flag guard
       const pollInterval = setInterval(() => {
         if (cancelledRef.current) { clearInterval(pollInterval); return; }
         flushPartsToMessage();
@@ -585,7 +585,7 @@ export function useAgentSession(user: any) {
     [user, connect, mode, updateMessages, flushPartsToMessage]
   );
 
-  // ── Permission Response ───────────────────────────────────
+  // ΓöÇΓöÇ Permission Response ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   const respondPermission = useCallback((id: string, approved: boolean) => {
     wsRef.current?.send(JSON.stringify({
       type: "permission_response",
@@ -623,7 +623,7 @@ export function useAgentSession(user: any) {
     throttledSetThought(null as any);
   }, [stopThoughtTimer, throttledSetThought]);
 
-  // ── Cleanup ───────────────────────────────────────────────
+  // ΓöÇΓöÇ Cleanup ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   useEffect(() => {
     return () => {
       disconnect();

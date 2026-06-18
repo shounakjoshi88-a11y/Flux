@@ -47,18 +47,20 @@ export class OrchestratorEngine {
   async process(input: OrchestratorInput): Promise<OrchestratorOutput> {
     const { plan, workflow } = this.planner.analyze(input.query, undefined, input.fileContent, input.isComputerMode);
 
-    // Show the plan for transparency, then let the LLM handle everything agentically
+    // Always show the plan for transparency for non-trivial workflows
     if (workflow !== "simple_qa") {
       input.stream.writePlan(plan);
     }
 
-    return {
-      text: "",
-      sources: input.agentState.sources,
-      files: input.agentState.generatedFiles,
-      thoughtProcess: input.agentState.thoughtProcess,
-      executedPlan: false,
-    };
+    const result = await this.executePlan(plan, input, workflow);
+
+    // If the plan had no steps (simple_qa pass-through), don't claim
+    // the orchestrator handled it — let the AI SDK streaming path respond.
+    if (plan.steps.length === 0) {
+      return { ...result, executedPlan: false };
+    }
+
+    return result;
   }
 
   private async executePlan(
