@@ -146,6 +146,115 @@ toolRegistry.register('generate_image', {
   timeout: 180000,
 });
 
+toolRegistry.register('wiki_search', {
+  name: 'wiki_search',
+  description: 'Search the knowledge graph for concepts, entities, and topics previously discussed in this conversation.',
+  parameters: z.object({
+    query: z.string().describe('The concept or topic to search for'),
+  }),
+  execute: async () => 'Implemented in index.ts',
+  category: 'data',
+  requiresApproval: false,
+  maxRetries: 1,
+  timeout: 10000,
+});
+
+toolRegistry.register('create_project', {
+  name: 'create_project',
+  description: 'Scaffold a full project directory with files in the sandbox.',
+  parameters: z.object({
+    name: z.string().describe('Project name (folder name under /home/user)'),
+    files: z.array(z.object({
+      path: z.string().describe('Relative file path within the project'),
+      content: z.string().describe('Full file content'),
+    })).describe('Array of files to create'),
+  }),
+  execute: async () => 'Implemented in index.ts',
+  category: 'filesystem',
+  requiresApproval: true,
+  maxRetries: 1,
+  timeout: 30000,
+});
+
+toolRegistry.register('start_app', {
+  name: 'start_app',
+  description: 'Start a long-running background process (web server, dev server) in the sandbox.',
+  parameters: z.object({
+    name: z.string().describe('Human-readable name for this process'),
+    command: z.string().describe('Command to run'),
+    cwd: z.string().optional().describe('Working directory'),
+    port: z.number().optional().describe('Port the app listens on'),
+  }),
+  execute: async () => 'Implemented in index.ts',
+  category: 'computation',
+  requiresApproval: true,
+  maxRetries: 1,
+  timeout: 30000,
+});
+
+toolRegistry.register('stop_app', {
+  name: 'stop_app',
+  description: 'Stop a running background app by its ID.',
+  parameters: z.object({
+    app_id: z.string().describe('App ID returned by start_app'),
+  }),
+  execute: async () => 'Implemented in index.ts',
+  category: 'computation',
+  requiresApproval: false,
+  maxRetries: 1,
+  timeout: 10000,
+});
+
+toolRegistry.register('list_apps', {
+  name: 'list_apps',
+  description: 'List all running background apps.',
+  parameters: z.object({}),
+  execute: async () => 'Implemented in index.ts',
+  category: 'computation',
+  requiresApproval: false,
+  maxRetries: 1,
+  timeout: 10000,
+});
+
+toolRegistry.register('get_app_logs', {
+  name: 'get_app_logs',
+  description: 'Get stdout/stderr output from a running or finished app.',
+  parameters: z.object({
+    app_id: z.string().describe('App ID returned by start_app'),
+  }),
+  execute: async () => 'Implemented in index.ts',
+  category: 'computation',
+  requiresApproval: false,
+  maxRetries: 1,
+  timeout: 10000,
+});
+
+toolRegistry.register('get_app_url', {
+  name: 'get_app_url',
+  description: 'Get the public HTTPS URL for a running web app.',
+  parameters: z.object({
+    app_id: z.string().describe('App ID returned by start_app'),
+  }),
+  execute: async () => 'Implemented in index.ts',
+  category: 'computation',
+  requiresApproval: false,
+  maxRetries: 1,
+  timeout: 10000,
+});
+
+toolRegistry.register('get_generated_file', {
+  name: 'get_generated_file',
+  description: 'Download a file from the sandbox as base64 with MIME type.',
+  parameters: z.object({
+    path: z.string().describe('Absolute path to the file in the sandbox'),
+  }),
+  execute: async () => 'Implemented in index.ts',
+  category: 'filesystem',
+  requiresApproval: false,
+  maxRetries: 1,
+  timeout: 15000,
+});
+
 toolRegistry.register('shell_execute', {
   name: 'shell_execute',
   description: 'Execute a shell command in the local workspace. Use this for running code, installing packages, or system tasks.',

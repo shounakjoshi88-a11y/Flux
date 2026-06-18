@@ -387,6 +387,8 @@ export const ModelName = {
   User: 'User',
   Conversation: 'Conversation',
   Message: 'Message',
+  WikiNode: 'WikiNode',
+  WikiEdge: 'WikiEdge',
   Memory: 'Memory'
 } as const
 
@@ -403,7 +405,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "conversation" | "message" | "memory"
+    modelProps: "user" | "conversation" | "message" | "wikiNode" | "wikiEdge" | "memory"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -629,6 +631,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    WikiNode: {
+      payload: Prisma.$WikiNodePayload<ExtArgs>
+      fields: Prisma.WikiNodeFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.WikiNodeFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WikiNodePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.WikiNodeFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WikiNodePayload>
+        }
+        findFirst: {
+          args: Prisma.WikiNodeFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WikiNodePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.WikiNodeFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WikiNodePayload>
+        }
+        findMany: {
+          args: Prisma.WikiNodeFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WikiNodePayload>[]
+        }
+        create: {
+          args: Prisma.WikiNodeCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WikiNodePayload>
+        }
+        createMany: {
+          args: Prisma.WikiNodeCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.WikiNodeCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WikiNodePayload>[]
+        }
+        delete: {
+          args: Prisma.WikiNodeDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WikiNodePayload>
+        }
+        update: {
+          args: Prisma.WikiNodeUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WikiNodePayload>
+        }
+        deleteMany: {
+          args: Prisma.WikiNodeDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.WikiNodeUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.WikiNodeUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WikiNodePayload>[]
+        }
+        upsert: {
+          args: Prisma.WikiNodeUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WikiNodePayload>
+        }
+        aggregate: {
+          args: Prisma.WikiNodeAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateWikiNode>
+        }
+        groupBy: {
+          args: Prisma.WikiNodeGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WikiNodeGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.WikiNodeCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WikiNodeCountAggregateOutputType> | number
+        }
+      }
+    }
+    WikiEdge: {
+      payload: Prisma.$WikiEdgePayload<ExtArgs>
+      fields: Prisma.WikiEdgeFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.WikiEdgeFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WikiEdgePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.WikiEdgeFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WikiEdgePayload>
+        }
+        findFirst: {
+          args: Prisma.WikiEdgeFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WikiEdgePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.WikiEdgeFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WikiEdgePayload>
+        }
+        findMany: {
+          args: Prisma.WikiEdgeFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WikiEdgePayload>[]
+        }
+        create: {
+          args: Prisma.WikiEdgeCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WikiEdgePayload>
+        }
+        createMany: {
+          args: Prisma.WikiEdgeCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.WikiEdgeCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WikiEdgePayload>[]
+        }
+        delete: {
+          args: Prisma.WikiEdgeDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WikiEdgePayload>
+        }
+        update: {
+          args: Prisma.WikiEdgeUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WikiEdgePayload>
+        }
+        deleteMany: {
+          args: Prisma.WikiEdgeDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.WikiEdgeUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.WikiEdgeUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WikiEdgePayload>[]
+        }
+        upsert: {
+          args: Prisma.WikiEdgeUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WikiEdgePayload>
+        }
+        aggregate: {
+          args: Prisma.WikiEdgeAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateWikiEdge>
+        }
+        groupBy: {
+          args: Prisma.WikiEdgeGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WikiEdgeGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.WikiEdgeCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WikiEdgeCountAggregateOutputType> | number
+        }
+      }
+    }
     Memory: {
       payload: Prisma.$MemoryPayload<ExtArgs>
       fields: Prisma.MemoryFieldRefs
@@ -763,6 +913,36 @@ export const MessageScalarFieldEnum = {
 } as const
 
 export type MessageScalarFieldEnum = (typeof MessageScalarFieldEnum)[keyof typeof MessageScalarFieldEnum]
+
+
+export const WikiNodeScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  label: 'label',
+  description: 'description',
+  type: 'type',
+  sourceType: 'sourceType',
+  sourceUrl: 'sourceUrl',
+  metadata: 'metadata',
+  x: 'x',
+  y: 'y',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type WikiNodeScalarFieldEnum = (typeof WikiNodeScalarFieldEnum)[keyof typeof WikiNodeScalarFieldEnum]
+
+
+export const WikiEdgeScalarFieldEnum = {
+  id: 'id',
+  sourceId: 'sourceId',
+  targetId: 'targetId',
+  relationship: 'relationship',
+  weight: 'weight',
+  createdAt: 'createdAt'
+} as const
+
+export type WikiEdgeScalarFieldEnum = (typeof WikiEdgeScalarFieldEnum)[keyof typeof WikiEdgeScalarFieldEnum]
 
 
 export const MemoryScalarFieldEnum = {
@@ -1038,6 +1218,8 @@ export type GlobalOmitConfig = {
   user?: Prisma.UserOmit
   conversation?: Prisma.ConversationOmit
   message?: Prisma.MessageOmit
+  wikiNode?: Prisma.WikiNodeOmit
+  wikiEdge?: Prisma.WikiEdgeOmit
   memory?: Prisma.MemoryOmit
 }
 

@@ -54,6 +54,8 @@ export const ModelName = {
   User: 'User',
   Conversation: 'Conversation',
   Message: 'Message',
+  WikiNode: 'WikiNode',
+  WikiEdge: 'WikiEdge',
   Memory: 'Memory'
 } as const
 
@@ -110,6 +112,36 @@ export const MessageScalarFieldEnum = {
 } as const
 
 export type MessageScalarFieldEnum = (typeof MessageScalarFieldEnum)[keyof typeof MessageScalarFieldEnum]
+
+
+export const WikiNodeScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  label: 'label',
+  description: 'description',
+  type: 'type',
+  sourceType: 'sourceType',
+  sourceUrl: 'sourceUrl',
+  metadata: 'metadata',
+  x: 'x',
+  y: 'y',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type WikiNodeScalarFieldEnum = (typeof WikiNodeScalarFieldEnum)[keyof typeof WikiNodeScalarFieldEnum]
+
+
+export const WikiEdgeScalarFieldEnum = {
+  id: 'id',
+  sourceId: 'sourceId',
+  targetId: 'targetId',
+  relationship: 'relationship',
+  weight: 'weight',
+  createdAt: 'createdAt'
+} as const
+
+export type WikiEdgeScalarFieldEnum = (typeof WikiEdgeScalarFieldEnum)[keyof typeof WikiEdgeScalarFieldEnum]
 
 
 export const MemoryScalarFieldEnum = {

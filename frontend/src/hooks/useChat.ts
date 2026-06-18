@@ -19,6 +19,7 @@ type UseChatCallbacks = {
   onMessageId?: (id: string) => void;
   onPermissionRequest?: (request: PermissionRequest) => void;
   onPlan?: (plan: ExecutionPlan) => void;
+  onWikiUpdate?: (update: any) => void;
   fileContent?: string;
   attachedFiles?: { name: string; content?: string }[];
 };
@@ -444,6 +445,84 @@ export function useChat(user: any) {
               } catch (e) {
                 console.error("Failed to parse file event:", e);
               }
+            }
+            // ΓöÇΓöÇΓöÇ CODE_EXECUTION ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+            else if (eventType === "code_execution") {
+              try {
+                const parsed = JSON.parse(data);
+                flushPendingText();
+                const execPart: MessagePart = {
+                  type: "code_execution",
+                  block: {
+                    code: parsed.code || "",
+                    language: parsed.language || "python",
+                    outputLines: [], isRunning: true, generatedFiles: [],
+                  },
+                };
+                addPart(execPart);
+                const targetId = realMessageIdRef.current ?? assistantMsgId;
+                updateMessages(targetId);
+              } catch {}
+            }
+            // ΓöÇΓöÇΓöÇ CODE_OUTPUT ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+            else if (eventType === "code_output") {
+              try {
+                const parsed = JSON.parse(data);
+                const parts = streamingPartsRef.current;
+                const lastIdx = parts.length - 1;
+                const last = parts[lastIdx];
+                if (last?.type === "code_execution") {
+                  const updated = [...parts];
+                  const block = { ...last.block };
+                  block.outputLines = [...block.outputLines, { type: parsed.type || "stdout", content: parsed.content }];
+                  updated[lastIdx] = { ...last, block };
+                  streamingPartsRef.current = updated;
+                  updateMessages(realMessageIdRef.current ?? assistantMsgId);
+                }
+              } catch {}
+            }
+            // ΓöÇΓöÇΓöÇ CODE_DONE ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+            else if (eventType === "code_done") {
+              try {
+                const parsed = JSON.parse(data);
+                const parts = streamingPartsRef.current;
+                const lastIdx = parts.length - 1;
+                const last = parts[lastIdx];
+                if (last?.type === "code_execution") {
+                  const updated = [...parts];
+                  const block = { ...last.block };
+                  block.isRunning = false;
+                  block.exitCode = parsed.exitCode;
+                  block.duration = parsed.duration;
+                  updated[lastIdx] = { ...last, block };
+                  streamingPartsRef.current = updated;
+                  updateMessages(realMessageIdRef.current ?? assistantMsgId);
+                }
+              } catch {}
+            }
+            // ΓöÇΓöÇΓöÇ FILE_GENERATED ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+            else if (eventType === "file_generated") {
+              try {
+                const parsed = JSON.parse(data);
+                const parts = streamingPartsRef.current;
+                const lastIdx = parts.length - 1;
+                const last = parts[lastIdx];
+                if (last?.type === "code_execution") {
+                  const updated = [...parts];
+                  const block = { ...last.block };
+                  block.generatedFiles = [...block.generatedFiles, { filename: parsed.filename, downloadUrl: parsed.downloadUrl }];
+                  updated[lastIdx] = { ...last, block };
+                  streamingPartsRef.current = updated;
+                  updateMessages(realMessageIdRef.current ?? assistantMsgId);
+                }
+              } catch {}
+            }
+            // ΓöÇΓöÇΓöÇ WIKI_UPDATE ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+            else if (eventType === "wiki_update") {
+              try {
+                const parsed = JSON.parse(data);
+                callbacks?.onWikiUpdate?.(parsed);
+              } catch {}
             }
             // ΓöÇΓöÇΓöÇ MESSAGE_ID ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             else if (eventType === "message_id") {

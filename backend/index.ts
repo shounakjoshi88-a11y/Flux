@@ -22,6 +22,9 @@ import { retrieveMemories, extractMemories, buildMemoryContext, pruneMemories } 
 import { toolRegistry } from './tool-registry';
 import http from "http";
 import { createAgentWebSocket } from './agent-protocol';
+import { codeExecutor } from './tools/codeExecutor';
+import { sandboxManager } from './sandbox/sandboxManager';
+import { wikiManager } from './wiki/wikiManager';
 
 const client = tavily({ apiKey: process.env.TAVILY_API_KEY });
 const app = express();
@@ -421,6 +424,36 @@ TOOL RULES:
 • generate_image → Use when the user asks to create, draw, or generate an image (illustration, photo, painting, etc.). Do NOT use for charts, graphs, or diagrams.
 • read_skill     → Load generation rules for a document type (pdf/pptx/docx/xlsx/csv).
 • generate_document → Create a downloadable document file.
+
+SANDBOX & CODE EXECUTION TOOLS:
+You have a cloud-isolated Linux sandbox (E2B). It's persistent per conversation — files you create survive across messages. Use these tools:
+
+• run_python({ code }) — Execute Python. Pre-installed: pandas, numpy, matplotlib, seaborn, plotly, scipy, scikit-learn, pillow, requests. Save outputs to /home/user/ (e.g. plt.savefig('/home/user/chart.png')) and they auto-download to the user.
+• run_bash({ command }) — Run any bash command. Use for: pip install <pkg>, file ops, git, curl, system commands.
+• read_file({ path }) / write_file({ path, content }) / edit_file({ path, old_str, new_str }) / list_files({ path }) — File management inside /home/user/.
+• install_package({ package }) — pip install a package.
+• create_project({ name, files: [{path, content}] }) — Scaffold a multi-file project in one call.
+• start_app({ name, command, cwd?, port? }) — Start a long-running web server (e.g. python3 app.py, npm start) in the background. ALWAYS pass the port the app listens on.
+• stop_app({ app_id }) / list_apps() / get_app_logs({ app_id }) — Manage running apps.
+• get_app_url({ app_id }) — Get the PUBLIC HTTPS URL of a running web app. Call this AFTER start_app, then give the URL to the user.
+• get_generated_file({ path }) — Download a file from the sandbox and send it to the user inline (images render in chat).
+
+BUILDING WEB APPS — your superpower:
+When the user asks to "build an app", "make a website", "create a tool", "build a calculator/game/dashboard/timer" — you MUST build it as a real, working, previewable app:
+1. Use write_file to create /home/user/index.html (inline CSS in <style>, JS in <script> for simple apps). Use create_project for multi-file apps.
+2. Make it complete + polished: responsive, good colors, smooth interactions, real functionality. Use vanilla JS or CDN libs (Tailwind: https://cdn.tailwindcss.com, Chart.js, Three.js). NO npm/build tools for static apps.
+3. To preview a static HTML app: use get_generated_file({ path: "/home/user/index.html" }) — the frontend will render it in an iframe.
+4. To run a dynamic app (Node/Python server): use create_project to write the files, then start_app({ name, command: "node server.js", port: 3000 }), wait 2 seconds, then get_app_url({ app_id }) to get the public URL. Give the URL to the user.
+5. For changes: edit_file or write_file (overwrite), then tell the user to refresh.
+
+DATA ANALYSIS WORKFLOW:
+When the user asks to analyze data, make a chart, process a file:
+1. If they attached a file, it's at /home/user/<filename>. Use run_python with pandas to read it.
+2. Generate charts with matplotlib → save to /home/user/chart.png → the file auto-downloads.
+3. Use run_python to print summary stats (df.describe(), etc.) — the output streams to the user live.
+4. Explain the findings in your answer.
+
+ALWAYS: when run_python or run_bash produce output, READ the stderr. If it errors, fix your code and retry. Don't just report "it failed".
 
 DOCUMENT GENERATION WORKFLOW (follow this EXACT multi-step process):
 When the user asks to create a document (PDF, Word, PowerPoint, etc.):
@@ -1367,9 +1400,30 @@ interface AgentState {
     searchContent?: string;
 }
 
+function isGenericQuery(q: string): boolean {
+    const clean = q.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+    const genericPatterns = [
+        /^tell me more( about (it|this|that))?$/i,
+        /^can you tell me more( about (it|this|that))?$/i,
+        /^could you tell me more( about (it|this|that))?$/i,
+        /^elaborate( further| more)?$/i,
+        /^can you elaborate( further| more)?$/i,
+        /^please elaborate( further| more)?$/i,
+        /^explain( further| more)?$/i,
+        /^give me more details$/i,
+        /^more details$/i,
+        /^what else$/i,
+        /^continue$/i,
+        /^go on$/i,
+        /^what do you mean$/i,
+        /^(why|how|what|more|tell)$/i
+    ];
+    return genericPatterns.some(pat => pat.test(clean));
+}
+
 // ── TOOL FACTORY ───────────────────────────────────────────────────────────
 // Creates all 5 tools scoped to the current request (has access to res + state).
-function createFluxTools(res: any, model: any, state: AgentState, userQuery?: string, activeConversationId?: string) {
+function createFluxTools(res: any, model: any, state: AgentState, userQuery?: string, activeConversationId?: string, uid?: string, abortSignal?: AbortSignal) {
     return {
 
         // ── web_search ────────────────────────────────────────────────────
@@ -1393,31 +1447,62 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                 ).optional(),
             }),
             execute: async ({ query, queries: queriesArr }: any) => {
-                // Guard: models occasionally emit malformed tool calls with missing args.
-                // Zod reports the error but the AI SDK still invokes execute — leaving
-                // `query` as undefined. Without this check, `query.slice()` throws and
-                // crashes the whole request (Bun/JSC reports it as `txt.slice`).
-                // Some models pass `queries` (array) instead of `query` (string).
-                const safeQuery =
-                    typeof query === 'string'
-                        ? query.trim()
-                        : Array.isArray(queriesArr) && queriesArr.length > 0
-                            ? queriesArr.filter((q: any) => typeof q === 'string').map((q: string) => q.trim()).filter(Boolean).join(' ')
-                            : (typeof userQuery === 'string' ? userQuery.trim() : '');
-                if (!safeQuery) {
+                const queriesToRun: string[] = [];
+                if (Array.isArray(queriesArr) && queriesArr.length > 0) {
+                    queriesToRun.push(...queriesArr.filter((q: any) => typeof q === 'string').map((q: string) => q.trim()).filter(Boolean));
+                } else if (typeof query === 'string' && query.trim()) {
+                    queriesToRun.push(query.trim());
+                } else if (typeof userQuery === 'string' && userQuery.trim()) {
+                    queriesToRun.push(userQuery.trim());
+                }
+
+                const safeQueries = queriesToRun.slice(0, 3);
+
+                if (safeQueries.length === 0) {
                     console.warn('[TOOL] web_search called with no query — skipping');
                     sendStatus(res, 'error', 'Search skipped: no query provided.', undefined, state.thoughtProcess);
                     return 'No search query was provided. Answer from training knowledge instead.';
                 }
+
+                const genericQuery = safeQueries.find(q => isGenericQuery(q));
+                if (genericQuery) {
+                    console.warn('[TOOL] web_search called with generic/filler query — skipping:', genericQuery);
+                    sendStatus(res, 'error', 'Search skipped: generic request.', undefined, state.thoughtProcess);
+                    return `Search skipped: The query is generic ('${genericQuery}'). Do NOT search the web for generic phrases or requests to elaborate (e.g. 'tell me more'). Instead, answer by elaborating on the information already present in the conversation history, or ask the user to specify what they want to search for.`;
+                }
+
                 sendStatus(res, 'searching',
-                    `Searching "${safeQuery}"...`,
+                    `Searching for: ${safeQueries.map(q => `"${q}"`).join(', ')}...`,
                     undefined, state.thoughtProcess);
+
                 try {
-                    const results = await (client as any).search(safeQuery, {
-                        search_depth: 'basic',
-                        max_results: 7,
-                    });
-                    const srcs = (results?.results ?? []).map((r: any, i: number) => ({
+                    const searchPromises = safeQueries.map(q => 
+                        (client as any).search(q, {
+                            search_depth: 'basic',
+                            max_results: 6,
+                        }).catch((err: any) => {
+                            console.error(`[TOOL] Tavily search failed for "${q}":`, err);
+                            return null;
+                        })
+                    );
+                    const searchOutputs = await Promise.all(searchPromises);
+
+                    const allResults: any[] = [];
+                    const seenUrls = new Set<string>();
+                    for (const out of searchOutputs) {
+                        if (out && Array.isArray(out.results)) {
+                            for (const r of out.results) {
+                                if (r.url && !seenUrls.has(r.url)) {
+                                    seenUrls.add(r.url);
+                                    allResults.push(r);
+                                }
+                            }
+                        }
+                    }
+
+                    const uniqueResults = allResults.slice(0, 10);
+
+                    const srcs = uniqueResults.map((r: any, i: number) => ({
                         url: r.url,
                         index: (state.sources?.length ?? 0) + i + 1,
                     }));
@@ -1433,12 +1518,11 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                         { sources: srcs.map((s: any) => s.url) },
                         state.thoughtProcess);
 
-                    const titles = (results.results ?? []).slice(0, 5).map((r: any) =>
-                        r.title || getDomain(r.url));
-                    const urls = (results.results ?? []).slice(0, 5).map((r: any) => r.url);
+                    const titles = uniqueResults.slice(0, 7).map((r: any) => r.title || getDomain(r.url));
+                    const urls = uniqueResults.slice(0, 7).map((r: any) => r.url);
                     sendStatus(res, 'reading', `Reading ${titles.length} sources...`, { titles, urls }, state.thoughtProcess);
 
-                    const resultsText = (results.results ?? []).map((r: any, i: number) => {
+                    const resultsText = uniqueResults.map((r: any, i: number) => {
                         let c = (r.content || r.snippet || '')
                             .replace(/<[^>]*>/g, ' ')
                             .replace(/\s+/g, ' ')
@@ -1448,7 +1532,7 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                     }).join('\n\n');
                     let extraContent = '';
                     try {
-                        const topUrls = (results.results ?? []).slice(0, 2).map((r: any) => r.url).filter(Boolean);
+                        const topUrls = uniqueResults.slice(0, 3).map((r: any) => r.url).filter(Boolean);
                         if (topUrls.length > 0) {
                             sendStatus(res, 'reading', 'Extracting full content from top sources...', {}, state.thoughtProcess);
                             const extractResult = await client.extract(topUrls);
@@ -1456,18 +1540,29 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                             if (extracted.length > 0) {
                                 extraContent = '\n\n--- Full page content from top sources ---\n' + extracted.map((r: any, i: number) => {
                                     const txt = r.rawContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-                                    return `[SOURCE ${i + 1}] ${r.url || topUrls[i]}\n${txt.slice(0, 4000)}`;
+                                    return `[SOURCE ${i + 1}] ${r.url || topUrls[i]}\n${txt.slice(0, 1500)}`;
                                 }).join('\n\n');
                             }
                         }
                     } catch (e: any) {
                         console.warn('[TOOL] web_search extract failed (non-fatal):', e?.message ?? e);
                     }
-                    
-                    const fullSearchRes = `[Search Results for "${safeQuery}"]\n\n${resultsText}${extraContent}`;
+
+                    const safeQueryStr = safeQueries.join('; ');
+                    const fullSearchRes = `[Search Results for "${safeQueryStr}"]\n\n${resultsText}${extraContent}`;
                     state.searchContent = (state.searchContent || "") + "\n\n" + fullSearchRes;
 
-                    return `[IMPORTANT: These search results are from the CURRENT DATE. You MUST answer using ONLY this data — do NOT rely on your training knowledge. Today is not 2024 or 2025. Ignore any dates in your training data that contradict these results.]\n\n${resultsText}${extraContent}`;
+                    return `[FINAL STEP: REPORT YOUR FINDINGS]
+[IMPORTANT: These search results are from the CURRENT DATE. You MUST answer using ONLY this data — do NOT rely on your training knowledge. Today is not 2024 or 2025. Ignore any dates in your training data that contradict these results.]
+
+${resultsText}${extraContent}
+
+---
+INSTRUCTION FOR FLUX: You have just received search results. 
+1. EXPLAIN what you found to the user immediately in a conversational tone.
+2. If there is recent news, summarize the key headlines.
+3. If no results were found, state that clearly.
+Do NOT just stop after calling this tool. Provide a full answer based on the data above.`;
                 } catch (e: any) {
                     sendStatus(res, 'error', 'Search failed.', undefined, state.thoughtProcess);
                     return `Search failed: ${e.message}`;
@@ -1623,7 +1718,7 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                 sendStatus(res, 'image_enhancing', 'Enhancing image prompt with AI...', undefined, state.thoughtProcess);
                 const enhanced = await enhanceImagePrompt(prompt, model);
                 sendStatus(res, 'image_enhancing_success', 'Image prompt enhanced', undefined, state.thoughtProcess);
-                
+
                 const thoughtEvent = { type: 'thought', content: `Enhanced prompt: ${enhanced}` };
                 state.thoughtProcess.push(thoughtEvent);
                 res.write(
@@ -1669,6 +1764,381 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                 } catch (e: any) {
                     sendStatus(res, 'image_generating_error', `Image generation failed: ${e.message}`, undefined, state.thoughtProcess);
                     return `Image generation failed: ${e.message}`;
+                }
+            },
+        }),
+
+        // ── run_python ────────────────────────────────────────────────────
+        run_python: (tool as any)({
+            description: 'Execute Python code in an isolated sandbox. Use for data analysis, visualization, file processing, calculations. Has pandas, numpy, matplotlib, seaborn, plotly, scipy, scikit-learn pre-installed.',
+            parameters: z.object({
+                code: z.string().describe('Complete, runnable Python code to execute'),
+            }),
+            execute: async ({ code }: any) => {
+                const cid = activeConversationId || 'default';
+                sendStatus(res, 'sandbox_start', 'Starting Python execution...', { tool: 'run_python' }, state.thoughtProcess);
+                try {
+                    const result = await codeExecutor.runPython(cid, code || '', (type, line) => {
+                        if (!res.writableEnded) {
+                            res.write(`event: code_output\ndata: ${JSON.stringify({ type, content: line })}\n\n`);
+                        }
+                    }, abortSignal);
+                    if (!res.writableEnded) {
+                        res.write(`event: code_done\ndata: ${JSON.stringify({ exitCode: result.exitCode, duration: result.duration })}\n\n`);
+                    }
+                    for (const filePath of result.generatedFiles) {
+                        const filename = filePath.split('/').pop() || 'output';
+                        try {
+                            const { base64, mimeType } = await codeExecutor.getGeneratedFile(cid, filePath);
+                            if (!res.writableEnded) {
+                                res.write(`event: file_generated\ndata: ${JSON.stringify({ filename, path: filePath, mime: mimeType, base64, downloadUrl: `/api/sandbox/download/${cid}/${filename}` })}\n\n`);
+                            }
+                        } catch {
+                            if (!res.writableEnded) {
+                                res.write(`event: file_generated\ndata: ${JSON.stringify({ filename, path: filePath, downloadUrl: `/api/sandbox/download/${cid}/${filename}` })}\n\n`);
+                            }
+                        }
+                    }
+                    sendStatus(res, 'sandbox_success',
+                        `Python finished (exit ${result.exitCode}, ${(result.duration / 1000).toFixed(1)}s)`,
+                        { tool: 'run_python', exitCode: result.exitCode },
+                        state.thoughtProcess);
+                    const outFull = result.stdout.join('\n');
+                    const errFull = result.stderr.join('\n');
+                    const out = outFull.slice(0, 4000);
+                    const err = errFull.slice(0, 2000);
+                    const outTruncated = outFull.length > 4000 ? '\n[output truncated]' : '';
+                    const errTruncated = errFull.length > 2000 ? '\n[output truncated]' : '';
+                    return `Exit code: ${result.exitCode} (${(result.duration / 1000).toFixed(1)}s)\n${out ? `STDOUT:\n${out}${outTruncated}\n` : ''}${err ? `STDERR:\n${err}${errTruncated}\n` : ''}${result.generatedFiles.length ? `Generated files: ${result.generatedFiles.join(', ')} (sent to user)\n` : ''}${result.error ? `Error: ${result.error}` : ''}`;
+                } catch (e: any) {
+                    sendStatus(res, 'sandbox_error', `Python execution failed: ${e.message}`, { tool: 'run_python' }, state.thoughtProcess);
+                    return `Python execution failed: ${e.message}`;
+                }
+            },
+        }),
+
+        // ── run_bash ──────────────────────────────────────────────────────
+        run_bash: (tool as any)({
+            description: 'Run a bash command in the sandbox. For file operations, installing tools, checking system info.',
+            parameters: z.object({
+                command: z.string().describe('Bash command to execute'),
+            }),
+            execute: async ({ command }: any) => {
+                const cid = activeConversationId || 'default';
+                sendStatus(res, 'sandbox_start', 'Running bash command...', { tool: 'run_bash' }, state.thoughtProcess);
+                try {
+                    const result = await codeExecutor.runBash(cid, command || '', (type, line) => {
+                        if (!res.writableEnded) {
+                            res.write(`event: code_output\ndata: ${JSON.stringify({ type, content: line })}\n\n`);
+                        }
+                    }, abortSignal);
+                    if (!res.writableEnded) {
+                        res.write(`event: code_done\ndata: ${JSON.stringify({ exitCode: result.exitCode, duration: result.duration })}\n\n`);
+                    }
+                    for (const filePath of result.generatedFiles) {
+                        const filename = filePath.split('/').pop() || 'output';
+                        try {
+                            const { base64, mimeType } = await codeExecutor.getGeneratedFile(cid, filePath);
+                            if (!res.writableEnded) {
+                                res.write(`event: file_generated\ndata: ${JSON.stringify({ filename, path: filePath, mime: mimeType, base64, downloadUrl: `/api/sandbox/download/${cid}/${filename}` })}\n\n`);
+                            }
+                        } catch {
+                            if (!res.writableEnded) {
+                                res.write(`event: file_generated\ndata: ${JSON.stringify({ filename, path: filePath, downloadUrl: `/api/sandbox/download/${cid}/${filename}` })}\n\n`);
+                            }
+                        }
+                    }
+                    sendStatus(res, 'sandbox_success',
+                        `Bash finished (exit ${result.exitCode}, ${(result.duration / 1000).toFixed(1)}s)`,
+                        { tool: 'run_bash', exitCode: result.exitCode },
+                        state.thoughtProcess);
+                    const outFull = result.stdout.join('\n');
+                    const errFull = result.stderr.join('\n');
+                    const out = outFull.slice(0, 4000);
+                    const err = errFull.slice(0, 2000);
+                    const outTruncated = outFull.length > 4000 ? '\n[output truncated]' : '';
+                    const errTruncated = errFull.length > 2000 ? '\n[output truncated]' : '';
+                    return `Exit code: ${result.exitCode} (${(result.duration / 1000).toFixed(1)}s)\n${out ? `STDOUT:\n${out}${outTruncated}\n` : ''}${err ? `STDERR:\n${err}${errTruncated}\n` : ''}${result.generatedFiles.length ? `Generated files: ${result.generatedFiles.join(', ')} (sent to user)\n` : ''}`;
+                } catch (e: any) {
+                    sendStatus(res, 'sandbox_error', `Bash failed: ${e.message}`, { tool: 'run_bash' }, state.thoughtProcess);
+                    return `Bash failed: ${e.message}`;
+                }
+            },
+        }),
+
+        // ── read_file ─────────────────────────────────────────────────────
+        read_file: (tool as any)({
+            description: 'Read contents of a file from the sandbox.',
+            parameters: z.object({
+                path: z.string().describe('Absolute path like /home/user/data.csv'),
+            }),
+            execute: async ({ path }: any) => {
+                const cid = activeConversationId || 'default';
+                try {
+                    const content = await codeExecutor.readFile(cid, path);
+                    return `Contents of ${path}:\n\n${content}`;
+                } catch (e: any) {
+                    return `Failed to read ${path}: ${e.message}`;
+                }
+            },
+        }),
+
+        // ── write_file ────────────────────────────────────────────────────
+        write_file: (tool as any)({
+            description: 'Create or overwrite a file in the sandbox.',
+            parameters: z.object({
+                path: z.string().describe('File path like /home/user/output.csv'),
+                content: z.string().describe('Full file content'),
+            }),
+            execute: async ({ path, content }: any) => {
+                const cid = activeConversationId || 'default';
+                const filename = path.split('/').pop() || 'file';
+                sendStatus(res, 'generating_file', `Writing ${filename}...`, { path }, state.thoughtProcess);
+                try {
+                    await codeExecutor.writeFile(cid, path, content);
+                    sendStatus(res, 'generating_file_success', `Wrote ${filename}`, { path }, state.thoughtProcess);
+                    return `File written to ${path}`;
+                } catch (e: any) {
+                    sendStatus(res, 'generating_file_error', `Failed to write ${filename}: ${e.message}`, { path }, state.thoughtProcess);
+                    return `Failed to write ${path}: ${e.message}`;
+                }
+            },
+        }),
+
+        // ── list_files ────────────────────────────────────────────────────
+        list_files: (tool as any)({
+            description: 'List files in a sandbox directory.',
+            parameters: z.object({
+                path: z.string().optional().describe('Directory path, default /home/user'),
+            }),
+            execute: async ({ path }: any) => {
+                const cid = activeConversationId || 'default';
+                try {
+                    const files = await codeExecutor.listFiles(cid, path || '/home/user');
+                    return `Files in ${path || '/home/user'}:\n${files.join('\n') || '(empty)'}`;
+                } catch (e: any) {
+                    return `Failed to list files: ${e.message}`;
+                }
+            },
+        }),
+
+        // ── install_package ───────────────────────────────────────────────
+        install_package: (tool as any)({
+            description: 'Install a Python package via pip in the sandbox.',
+            parameters: z.object({
+                package: z.string().describe('Package name e.g. tensorflow or opencv-python'),
+            }),
+            execute: async ({ package: pkg }: any) => {
+                const cid = activeConversationId || 'default';
+                sendStatus(res, 'sandbox_start', `Installing ${pkg}...`, { tool: 'install_package' }, state.thoughtProcess);
+                try {
+                    await codeExecutor.installPackage(cid, pkg || '', (type, line) => {
+                        if (!res.writableEnded) {
+                            res.write(`event: code_output\ndata: ${JSON.stringify({ type, content: line })}\n\n`);
+                        }
+                    });
+                    sendStatus(res, 'sandbox_success', `${pkg} installed`, { tool: 'install_package' }, state.thoughtProcess);
+                    return `Package ${pkg} installed successfully.`;
+                } catch (e: any) {
+                    sendStatus(res, 'sandbox_error', `Install failed: ${e.message}`, { tool: 'install_package' }, state.thoughtProcess);
+                    return `Install failed: ${e.message}`;
+                }
+            },
+        }),
+
+        // ── edit_file ─────────────────────────────────────────────────────
+        edit_file: (tool as any)({
+            description: 'Surgically edit a file by replacing a specific string. ALWAYS read_file first.',
+            parameters: z.object({
+                path: z.string().describe('File path'),
+                old_str: z.string().describe('EXACT string to replace (must be unique)'),
+                new_str: z.string().describe('Replacement string'),
+            }),
+            execute: async ({ path, old_str, new_str }: any) => {
+                const cid = activeConversationId || 'default';
+                const filename = path.split('/').pop() || 'file';
+                sendStatus(res, 'generating_file', `Editing ${filename}...`, { path }, state.thoughtProcess);
+                try {
+                    const result = await codeExecutor.editFile(cid, path, old_str || '', new_str || '');
+                    if (result.success) {
+                        sendStatus(res, 'generating_file_success', `Edited ${filename}`, { path }, state.thoughtProcess);
+                        return `File ${path} edited successfully.`;
+                    }
+                    sendStatus(res, 'generating_file_error', `Edit failed on ${filename}: ${result.error}`, { path }, state.thoughtProcess);
+                    return `Edit failed: ${result.error}`;
+                } catch (e: any) {
+                    sendStatus(res, 'generating_file_error', `Edit failed on ${filename}: ${e.message}`, { path }, state.thoughtProcess);
+                    return `Edit failed: ${e.message}`;
+                }
+            },
+        }),
+
+        // ── wiki_search ───────────────────────────────────────────────────
+        wiki_search: (tool as any)({
+            description: 'Search the knowledge graph / wiki for concepts, entities, and topics extracted from this conversation. Returns related nodes and their relationships. Use this when the user asks about topics or concepts previously discussed.',
+            parameters: z.object({
+                query: z.string().describe('The concept or topic to search for in the wiki'),
+            }),
+            execute: async ({ query }: any) => {
+                if (!uid || !query) return 'No user or query provided.';
+                try {
+                    const nodes = await wikiManager.searchConcepts(uid, query);
+                    if (!nodes.length) return `No wiki entries found for "${query}".`;
+                    return `Wiki results for "${query}":\n${nodes.map((n: any) => `  - ${n.label} (${n.type}): ${n.description || 'no description'}`).join('\n')}`;
+                } catch (e: any) {
+                    return `Wiki search failed: ${e.message}`;
+                }
+            },
+        }),
+
+        // ── create_project ────────────────────────────────────────────────
+        create_project: (tool as any)({
+            description: 'Scaffold a full project directory with files in the sandbox. Use this when building a complete app (HTML/CSS/JS, React, Python web app, etc.). Provide the project name and an array of { path, content } objects.',
+            parameters: z.object({
+                name: z.string().describe('Project name (folder name under /home/user)'),
+                files: z.array(z.object({
+                    path: z.string().describe('Relative file path within the project, e.g. src/index.js'),
+                    content: z.string().describe('Full file content'),
+                })).describe('Array of files to create in the project'),
+            }),
+            execute: async ({ name, files }: any) => {
+                const cid = activeConversationId || 'default';
+                const projectDir = `/home/user/${name}`;
+                sendStatus(res, 'generating_file', `Scaffolding project "${name}"...`, { name }, state.thoughtProcess);
+                try {
+                    await codeExecutor.runBash(cid, `mkdir -p ${projectDir}`);
+                    let created = 0;
+                    for (const f of files || []) {
+                        const fullPath = f.path.startsWith('/') ? f.path : `${projectDir}/${f.path}`;
+                        const dir = fullPath.substring(0, fullPath.lastIndexOf('/'));
+                        await codeExecutor.runBash(cid, `mkdir -p ${dir}`);
+                        await codeExecutor.writeFile(cid, fullPath, f.content || '');
+                        created++;
+                    }
+                    sendStatus(res, 'generating_file_success', `Project "${name}" created with ${created} files.`, { name, created }, state.thoughtProcess);
+                    return `Project "${name}" created with ${created} files at ${projectDir}`;
+                } catch (e: any) {
+                    sendStatus(res, 'generating_file_error', `Failed to create project "${name}": ${e.message}`, { name }, state.thoughtProcess);
+                    return `Failed to create project: ${e.message}`;
+                }
+            },
+        }),
+
+        // ── start_app ─────────────────────────────────────────────────────
+        start_app: (tool as any)({
+            description: 'Start a long-running background process (web server, dev server, API) in the sandbox. Use this after creating project files with create_project or write_file. The process runs in the background — use stop_app to kill it and get_app_url for the public URL.',
+            parameters: z.object({
+                name: z.string().describe('A human-readable name for this app/process'),
+                command: z.string().describe('The command to run (e.g. "python3 app.py", "npm start", "node server.js")'),
+                cwd: z.string().optional().describe('Working directory (default: /home/user)'),
+                port: z.number().optional().describe('The port the app listens on (e.g. 3000, 8000, 5000). Required for get_app_url to work.'),
+            }),
+            execute: async ({ name, command, cwd, port }: any) => {
+                const cid = activeConversationId || 'default';
+                sendStatus(res, 'sandbox_start', `Launching app "${name}"...`, { name, command, port }, state.thoughtProcess);
+                try {
+                    const app = await codeExecutor.startApp(cid, name || 'app', command, cwd || '/home/user', port);
+                    sendStatus(res, 'sandbox_success', `App "${name}" launched on port ${port || 'auto'}`, { name, app_id: app.id }, state.thoughtProcess);
+                    return `App "${app.name}" started (ID: ${app.id})${port ? ` on port ${port}` : ''}. Use get_app_url with ID "${app.id}" to get the public URL, and stop_app to stop it.`;
+                } catch (e: any) {
+                    sendStatus(res, 'sandbox_error', `Failed to launch app "${name}": ${e.message}`, { name }, state.thoughtProcess);
+                    return `Failed to start app: ${e.message}`;
+                }
+            },
+        }),
+
+        // ── stop_app ──────────────────────────────────────────────────────
+        stop_app: (tool as any)({
+            description: 'Stop a running background app by its ID (returned by start_app).',
+            parameters: z.object({
+                app_id: z.string().describe('The app ID returned by start_app'),
+            }),
+            execute: async ({ app_id }: any) => {
+                const cid = activeConversationId || 'default';
+                try {
+                    const stopped = await codeExecutor.stopApp(cid, app_id);
+                    return stopped ? `App ${app_id} stopped.` : `App ${app_id} not found.`;
+                } catch (e: any) {
+                    return `Failed to stop app: ${e.message}`;
+                }
+            },
+        }),
+
+        // ── list_apps ─────────────────────────────────────────────────────
+        list_apps: (tool as any)({
+            description: 'List all running background apps in the current sandbox session.',
+            parameters: z.object({}),
+            execute: async () => {
+                const cid = activeConversationId || 'default';
+                const apps = codeExecutor.listApps(cid);
+                if (!apps.length) return 'No running apps.';
+                return apps.map(a =>
+                    `  ID: ${a.id} | Name: ${a.name} | Command: ${a.command} | CWD: ${a.cwd} | Port: ${a.port || '-'} | Started: ${new Date(a.startedAt).toLocaleTimeString()}`
+                ).join('\n');
+            },
+        }),
+
+        // ── get_app_logs ──────────────────────────────────────────────────
+        get_app_logs: (tool as any)({
+            description: 'Get the stdout/stderr output from a running or finished app. Returns whatever output has been buffered so far.',
+            parameters: z.object({
+                app_id: z.string().describe('The app ID returned by start_app'),
+            }),
+            execute: async ({ app_id }: any) => {
+                const cid = activeConversationId || 'default';
+                try {
+                    const logs = await codeExecutor.getAppLogs(cid, app_id);
+                    let result = '';
+                    if (logs.stdout) result += `STDOUT:\n${logs.stdout}\n`;
+                    if (logs.stderr) result += `STDERR:\n${logs.stderr}\n`;
+                    return result || 'No logs available yet.';
+                } catch (e: any) {
+                    return `Failed to get logs: ${e.message}`;
+                }
+            },
+        }),
+
+        // ── get_app_url ───────────────────────────────────────────────────
+        get_app_url: (tool as any)({
+            description: 'Get the public HTTPS URL for a running web app started with start_app. The app must have been started with a port number. Use this to provide the user with a clickable link to their app.',
+            parameters: z.object({
+                app_id: z.string().describe('The app ID returned by start_app'),
+            }),
+            execute: async ({ app_id }: any) => {
+                const cid = activeConversationId || 'default';
+                sendStatus(res, 'searching', 'Generating public preview URL...', { app_id }, state.thoughtProcess);
+                try {
+                    const url = await codeExecutor.getAppUrl(cid, app_id);
+                    if (url) {
+                        sendStatus(res, 'found_sources', 'Preview ready!', { url }, state.thoughtProcess);
+                        return `Your app is live at: ${url}`;
+                    }
+                    sendStatus(res, 'error', 'App preview not ready yet.', { app_id }, state.thoughtProcess);
+                    return 'App URL not yet available. The app may still be starting up or may not be listening on the expected port.';
+                } catch (e: any) {
+                    sendStatus(res, 'error', `Failed to get preview URL: ${e.message}`, { app_id }, state.thoughtProcess);
+                    return `Failed to get app URL: ${e.message}`;
+                }
+            },
+        }),
+
+        // ── get_generated_file ────────────────────────────────────────────
+        get_generated_file: (tool as any)({
+            description: 'Download a file from the sandbox and return its base64-encoded content with MIME type. Use this to return files (images, PDFs, CSVs) directly to the user in chat.',
+            parameters: z.object({
+                path: z.string().describe('Absolute path to the file in the sandbox, e.g. /home/user/output.png'),
+            }),
+            execute: async ({ path }: any) => {
+                const cid = activeConversationId || 'default';
+                try {
+                    const { base64, mimeType } = await codeExecutor.getGeneratedFile(cid, path);
+                    const filename = path.split('/').pop() || 'file';
+                    if (!res.writableEnded) {
+                        res.write(`event: file_generated\ndata: ${JSON.stringify({ filename, path, mime: mimeType, base64, downloadUrl: `/api/sandbox/download/${cid}/${filename}` })}\n\n`);
+                    }
+                    return `File "${filename}" (${mimeType}, ${Math.round(base64.length * 0.75 / 1024)}KB) has been sent to the user.`;
+                } catch (e: any) {
+                    return `Failed to get file: ${e.message}`;
                 }
             },
         }),
@@ -1724,6 +2194,88 @@ async function generateImageFollowUps(originalQuery: string, enhancedPrompt: str
         return ["Can you generate another one with a different style?", "Make this wear a hat", "What model was used for this?"];
     }
 }
+
+// ═══════════════════════════════════════════════════════════
+// SANDBOX / CODE INTERPRETER ROUTES
+// ═══════════════════════════════════════════════════════════
+
+app.post('/api/sandbox/upload', middleware, async (req: any, res: any) => {
+    try {
+        const { conversationId, filename, content } = req.body;
+        if (!conversationId || !filename || content === undefined) {
+            return res.status(400).json({ error: 'conversationId, filename, and content required' });
+        }
+        const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const remotePath = await sandboxManager.uploadFile(conversationId, safeName, Buffer.from(content, 'base64'));
+        res.json({ success: true, filename: safeName, remotePath });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/sandbox/download/:conversationId/:filename', middleware, async (req: any, res: any) => {
+    try {
+        const { conversationId, filename } = req.params;
+        const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const remotePath = `/home/user/${safeName}`;
+        const buffer = await sandboxManager.downloadFile(conversationId, remotePath);
+        res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.send(buffer);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════
+// WIKI / KNOWLEDGE GRAPH ROUTES
+// ═══════════════════════════════════════════════════════════
+
+app.get('/api/wiki', middleware, async (req: any, res: any) => {
+    try {
+        const uid = req.appUserId!;
+        const graph = await wikiManager.getGraph(uid);
+        res.json(graph);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/wiki/node/:nodeId', middleware, async (req: any, res: any) => {
+    try {
+        await wikiManager.deleteNode(req.params.nodeId);
+        res.json({ success: true });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/wiki/search', middleware, async (req: any, res: any) => {
+    try {
+        const uid = req.appUserId!;
+        const query = (req.query.q as string) || '';
+        const nodes = await wikiManager.searchConcepts(uid, query);
+        res.json(nodes);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/wiki/rebuild/progress', middleware, async (req: any, res: any) => {
+    const uid = req.appUserId!;
+    const progress = wikiManager.getProgress(uid);
+    res.json(progress || { phase: 'idle' });
+});
+
+app.post('/api/wiki/rebuild', middleware, async (req: any, res: any) => {
+    try {
+        const uid = req.appUserId!;
+        const result = await wikiManager.rebuildAll(uid);
+        res.json(result || { nodes: [], edges: [] });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
 
 // ═══════════════════════════════════════════════════════════
 // ROUTES
@@ -2209,9 +2761,17 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
             AGENT_SYSTEM_EXTENSION,
         ].join('\n\n');
 
+        // ── Abort Controller setup ──────────────────────────────────────
+        const abortController = new AbortController();
+        req.on('close', () => {
+            if (!res.writableEnded) {
+                abortController.abort();
+            }
+        });
+
         // ── Per-request agent state ──────────────────────────────────────
         const agentState: AgentState = { sources: [], generatedFiles: [], thoughtProcess: [] };
-        const tools = createFluxTools(res, model, agentState, nq, activeConversationId);
+        const tools = createFluxTools(res, model, agentState, nq, activeConversationId, uid, abortController.signal);
         if (hasAnyFile) {
             delete (tools as any).web_search;
         }
@@ -2370,8 +2930,9 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                 if (event.type === 'tool-result') {
                     toolResultSeen = true;
                     try {
-                        const name = (event as any).toolName ?? 'tool';
-                        const result = (event as any).result;
+                        const ev = event as any;
+                        const name = ev.toolName ?? 'tool';
+                        const result = ev.output ?? ev.result;
                         let txt = '';
                         if (typeof result === 'string') {
                             txt = result;
@@ -2383,6 +2944,12 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                                 txt = String(result);
                             }
                         }
+                        console.log('[ASK] tool-result captured:', {
+                            name,
+                            resultLen: txt?.length ?? 0,
+                            hasSearchContent: !!agentState.searchContent,
+                            searchContentLen: agentState.searchContent?.length ?? 0,
+                        });
                         collectedToolResults.push({ name, result: String(txt ?? '').slice(0, 20000) });
                     } catch (toolErr) {
                         console.warn('[ASK] tool-result handler error:', (toolErr as any)?.message);
@@ -2629,12 +3196,16 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                 const searchResults = collectedToolResults
                     .filter(r => r.name === 'web_search');
 
+                const joinedSearch = searchResults
+                    .map(r => r.result)
+                    .filter(Boolean)
+                    .join('\n\n---\n\n')
+                    .trim();
+
                 let synthesized = '';
 
-                // Build context: prefer search result text, fall back to source URLs
-                const searchText = searchResults.length > 0
-                    ? searchResults.map(r => r.result).join('\n\n---\n\n')
-                    : '';
+                // Build context: prefer search result text, fall back to agentState.searchContent, then source URLs
+                const searchText = (joinedSearch || agentState.searchContent || '').trim();
 
                 // Also include the user's file if they attached one (this is the key fix
                 // for "searched user's code then got no answer" situations)
@@ -2760,6 +3331,17 @@ If the search results are not relevant to the question (e.g. user asked about th
                         extractMemories([{ role: 'user', content: nq }, { role: 'assistant', content: cleanAnswer }], uid, activeConversationId, model)
                             .then(() => pruneMemories(uid))
                             .catch(e => console.warn('[MEMORY]', e));
+                    }
+
+                    // ── Wiki graph extraction (async, non-blocking) ────
+                    if (cleanAnswer && activeConversationId && uid) {
+                        wikiManager.updateGraph(uid, cleanAnswer, nq)
+                            .then(result => {
+                                if (result && !res.writableEnded) {
+                                    res.write(`event: wiki_update\ndata: ${JSON.stringify(result)}\n\n`);
+                                }
+                            })
+                            .catch(e => console.warn('[WIKI]', e));
                     }
                 }
             } catch (dbe: any) {
@@ -3340,110 +3922,114 @@ app.get("/proxy", middleware, async (req: any, res: any) => {
 
 // ── MODEL DISCOVERY ──────────────────────────────────────────
 const AVAILABLE_MODELS = [
-  { category: "General Purpose", models: [
-    { id: "mistral-large-675b", label: "Mistral Large 3 675B (Mistral AI)" },
-    { id: "glm-5.1", label: "GLM 5.1 (Z‑AI)" },
-    { id: "kimi-k2.6", label: "Kimi K2.6 (Moonshot AI)" },
-    { id: "nemotron-3-ultra-550b", label: "Nemotron 3 Ultra 550B (NVIDIA)" },
-    { id: "mistral-medium-3.5-128b", label: "Mistral Medium 3.5 128B (Mistral AI)" },
-    { id: "nemotron-3-super-120b-a12b", label: "Nemotron 3 Super 120B (NVIDIA)" },
-    { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash (DeepSeek)" },
-    { id: "qwen3.5-397b-a17b", label: "Qwen 3.5 397B (Qwen)" },
-    { id: "minimax-m2.7", label: "MiniMax M2.7 (MiniMax)" },
-    { id: "minimax-m3", label: "MiniMax M3 (MiniMax)" },
-    { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro (DeepSeek)" },
-    { id: "sarvam-m", label: "Sarvam-M (Sarvam AI)" },
-    { id: "stockmark-2-100b-instruct", label: "Stockmark 2 100B (Stockmark)" },
-    { id: "nemotron-nano-12b-v2-vl", label: "Nemotron Nano 12B v2 VL (NVIDIA)" },
-    { id: "nemotron-mini-4b", label: "Nemotron Mini 4B (NVIDIA)" },
-    { id: "sarvamai", label: "Sarvamai (Sarvamai)" },
-  ]},
-  { category: "Reasoning & Agents", models: [
-    { id: "step-3.7-flash", label: "Step 3.7 Flash (StepFun)" },
-    { id: "step-3.5-flash", label: "Step 3.5 Flash (StepFun)" },
-    { id: "nemotron-3-nano-omni-30b-a3b-reasoning", label: "Nemotron 3 Nano Omni 30B Reasoning (NVIDIA)" },
-  ]},
+    {
+        category: "General Purpose", models: [
+            { id: "mistral-large-675b", label: "Mistral Large 3 675B (Mistral AI)" },
+            { id: "glm-5.1", label: "GLM 5.1 (Z‑AI)" },
+            { id: "kimi-k2.6", label: "Kimi K2.6 (Moonshot AI)" },
+            { id: "nemotron-3-ultra-550b", label: "Nemotron 3 Ultra 550B (NVIDIA)" },
+            { id: "mistral-medium-3.5-128b", label: "Mistral Medium 3.5 128B (Mistral AI)" },
+            { id: "nemotron-3-super-120b-a12b", label: "Nemotron 3 Super 120B (NVIDIA)" },
+            { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash (DeepSeek)" },
+            { id: "qwen3.5-397b-a17b", label: "Qwen 3.5 397B (Qwen)" },
+            { id: "minimax-m2.7", label: "MiniMax M2.7 (MiniMax)" },
+            { id: "minimax-m3", label: "MiniMax M3 (MiniMax)" },
+            { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro (DeepSeek)" },
+            { id: "sarvam-m", label: "Sarvam-M (Sarvam AI)" },
+            { id: "stockmark-2-100b-instruct", label: "Stockmark 2 100B (Stockmark)" },
+            { id: "nemotron-nano-12b-v2-vl", label: "Nemotron Nano 12B v2 VL (NVIDIA)" },
+            { id: "nemotron-mini-4b", label: "Nemotron Mini 4B (NVIDIA)" },
+            { id: "sarvamai", label: "Sarvamai (Sarvamai)" },
+        ]
+    },
+    {
+        category: "Reasoning & Agents", models: [
+            { id: "step-3.7-flash", label: "Step 3.7 Flash (StepFun)" },
+            { id: "step-3.5-flash", label: "Step 3.5 Flash (StepFun)" },
+            { id: "nemotron-3-nano-omni-30b-a3b-reasoning", label: "Nemotron 3 Nano Omni 30B Reasoning (NVIDIA)" },
+        ]
+    },
 ];
 
 app.get("/api/models", (_req, res) => {
-  res.json({ categories: AVAILABLE_MODELS, all: AVAILABLE_MODELS.flatMap((c) => c.models) });
+    res.json({ categories: AVAILABLE_MODELS, all: AVAILABLE_MODELS.flatMap((c) => c.models) });
 });
 
 // ── ACP HANDSHAKE / CAPABILITIES ───────────────────────────
 app.get("/api/acp/capabilities", (_req, res) => {
-  res.json({
-    protocolVersion: 1,
-    agentInfo: {
-      name: "Flux",
-      version: "1.0.0",
-      description: "Flux AI agent with tool orchestration and team mode",
-    },
-    capabilities: {
-      supportsStreaming: true,
-      supportsVision: true,
-      supportsThinking: true,
-      maxTools: 10,
-      maxSteps: 8,
-      supportedModes: ["default", "plan", "yolo"],
-      availableTools: toolRegistry.getToolList().map((t) => ({
-        name: t.name,
-        description: t.description,
-        category: t.category,
-        requiresApproval: t.requiresApproval,
-      })),
-    },
-    configOptions: {
-      categories: [
-        {
-          name: "mode",
-          options: [
-            { value: "default", label: "Default — ask before tool execution" },
-            { value: "plan", label: "Plan — create execution plan first" },
-            { value: "yolo", label: "YOLO — execute without asking" },
-          ],
+    res.json({
+        protocolVersion: 1,
+        agentInfo: {
+            name: "Flux",
+            version: "1.0.0",
+            description: "Flux AI agent with tool orchestration and team mode",
         },
-      ],
-    },
-  });
+        capabilities: {
+            supportsStreaming: true,
+            supportsVision: true,
+            supportsThinking: true,
+            maxTools: 10,
+            maxSteps: 8,
+            supportedModes: ["default", "plan", "yolo"],
+            availableTools: toolRegistry.getToolList().map((t) => ({
+                name: t.name,
+                description: t.description,
+                category: t.category,
+                requiresApproval: t.requiresApproval,
+            })),
+        },
+        configOptions: {
+            categories: [
+                {
+                    name: "mode",
+                    options: [
+                        { value: "default", label: "Default — ask before tool execution" },
+                        { value: "plan", label: "Plan — create execution plan first" },
+                        { value: "yolo", label: "YOLO — execute without asking" },
+                    ],
+                },
+            ],
+        },
+    });
 });
 
 // ── CUSTOM AGENTS ───────────────────────────────────────────
 interface CustomAgentEntry {
-  id: string;
-  name: string;
-  command: string;
-  args: string[];
-  env?: Array<{ name: string; value: string }>;
-  icon?: string;
-  advanced?: {
-    yolo_id?: string;
-    native_skills_dirs?: string[];
-    description?: string;
-  };
-  createdAt: string;
+    id: string;
+    name: string;
+    command: string;
+    args: string[];
+    env?: Array<{ name: string; value: string }>;
+    icon?: string;
+    advanced?: {
+        yolo_id?: string;
+        native_skills_dirs?: string[];
+        description?: string;
+    };
+    createdAt: string;
 }
 
 const customAgents: Map<string, CustomAgentEntry> = new Map();
 
 app.get("/api/agents/custom", (_req, res) => {
-  res.json({ agents: [...customAgents.values()] });
+    res.json({ agents: [...customAgents.values()] });
 });
 
 app.post("/api/agents/custom", (req, res) => {
-  const { name, command, args, env, icon, advanced } = req.body || {};
-  if (!name || !command) return res.status(400).json({ error: "name and command required" });
-  const id = `custom_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const entry: CustomAgentEntry = {
-    id, name, command, args: args || [], env, icon, advanced,
-    createdAt: new Date().toISOString(),
-  };
-  customAgents.set(id, entry);
-  res.status(201).json({ agent: entry });
+    const { name, command, args, env, icon, advanced } = req.body || {};
+    if (!name || !command) return res.status(400).json({ error: "name and command required" });
+    const id = `custom_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const entry: CustomAgentEntry = {
+        id, name, command, args: args || [], env, icon, advanced,
+        createdAt: new Date().toISOString(),
+    };
+    customAgents.set(id, entry);
+    res.status(201).json({ agent: entry });
 });
 
 app.delete("/api/agents/custom/:id", (req, res) => {
-  if (!customAgents.delete(req.params.id!)) return res.status(404).json({ error: "not found" });
-  res.json({ ok: true });
+    if (!customAgents.delete(req.params.id!)) return res.status(404).json({ error: "not found" });
+    res.json({ ok: true });
 });
 
 // ── SERVER START ─────────────────────────────────────────────

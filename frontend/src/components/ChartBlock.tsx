@@ -393,6 +393,7 @@ function MermaidBlock({ raw }: { raw: string }) {
     setError(false);
 
     import("mermaid").then(({ default: mermaid }) => {
+      if (cancelled) return;
       mermaid.initialize({
         startOnLoad: false,
         theme: "dark",
@@ -408,15 +409,22 @@ function MermaidBlock({ raw }: { raw: string }) {
           fontSize: "14px",
         },
       });
+      mermaid.parseError = () => {};
+      const ml = mermaid as any;
+      if (ml.logger) { ml.logger.warn = () => {}; ml.logger.error = () => {}; }
+      const trimmed = raw.trim();
+      if (typeof mermaid.parse === "function") {
+        try { (mermaid as any).parse(trimmed); } catch { if (!cancelled) setError(true); return; }
+      }
       mermaid
-        .render(idRef.current, raw.trim())
+        .render(idRef.current, trimmed)
         .then(({ svg: renderedSvg }) => {
           if (!cancelled) setSvg(renderedSvg);
         })
         .catch(() => {
           if (!cancelled) setError(true);
         });
-    });
+    }).catch(() => {});
 
     return () => { cancelled = true; };
   }, [raw]);

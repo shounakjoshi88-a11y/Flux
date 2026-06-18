@@ -26,6 +26,7 @@ import { Settings } from "../components/Settings";
 import { PromptHistoryCard } from "../components/PromptHistoryCard";
 import { ArtifactsModal, prefetchArtifacts } from "../components/ArtifactsModal";
 import { NewsModal } from "../components/NewsModal";
+import { WikiGraph } from "../components/WikiGraph";
 import { useChat } from "../hooks/useChat";
 import { useAgentSession } from "../hooks/useAgentSession";
 import { useModels } from "../hooks/useModels";
@@ -104,6 +105,7 @@ export default function Dashboard() {
   const [peekFile, setPeekFile] = useState<{ name: string; content: string } | null>(null);
   const [isArtifactsOpen, setIsArtifactsOpen] = useState(false);
   const [isNewsOpen, setIsNewsOpen] = useState(false);
+  const [isWikiOpen, setIsWikiOpen] = useState(false);
   const [toast, setToast] = useState<{ conversationId: string; title: string } | null>(null);
   const [activeImages, setActiveImages] = useState<string[]>([]);
   const [query, setQuery] = useState("");
@@ -846,6 +848,7 @@ export default function Dashboard() {
           onSearchModalClose={handleSearchModalClose}
           onSettingsOpen={handleSettingsOpen}
           onArtifactsOpen={() => setIsArtifactsOpen(true)}
+          onWikiOpen={() => setIsWikiOpen(true)}
           onNewsOpen={() => setIsNewsOpen(true)}
           onCustomAgentsOpen={() => setIsCustomAgentsOpen((p) => !p)}
           onTeamOpen={() => setIsTeamPanelOpen((p) => !p)}
@@ -857,6 +860,11 @@ export default function Dashboard() {
         onClose={() => setIsArtifactsOpen(false)}
         onSelectConversation={openConversation}
         onPreview={handlePreview}
+      />
+
+      <WikiGraph
+        isOpen={isWikiOpen}
+        onClose={() => setIsWikiOpen(false)}
       />
 
       <NewsModal
@@ -875,7 +883,7 @@ export default function Dashboard() {
         className={`relative flex-1 flex flex-col min-w-0 transition-[margin] duration-300 ease-in-out ${
           isSidebarOpen ? "md:ml-[260px]" : "md:ml-0"
         } ${!isSidebarOpen ? 'px-[48px]' : ''}`}
-        style={{ minHeight: 0, height: '100%', overflow: 'hidden' }}
+        style={{ minHeight: 0, height: '100%' }}
       >
         {hasStarted && (
           <PromptHistoryCard
@@ -901,7 +909,7 @@ export default function Dashboard() {
           )}
 
           {!hasStarted ? (
-            <div className="flex-1 overflow-y-auto px-6 flex flex-col justify-start items-center pt-[26vh] pb-12 custom-scrollbar" style={{ minHeight: 0 }}>
+            <div className="flex-1 overflow-y-auto px-6 flex flex-col justify-start items-center pt-[30vh] pb-12 custom-scrollbar" style={{ minHeight: 0 }}>
               <div className="w-full max-w-2xl mx-auto flex flex-col items-center">
                 {/* Claude-style warm greeting */}
                 <div className="flex items-center justify-center gap-4 mb-8 select-none">
@@ -956,7 +964,7 @@ export default function Dashboard() {
                       />
                     </svg>
                   </button>
-                  <h1 className="serif-display text-5xl md:text-[56px] text-[#cc785c] leading-tight">
+                  <h1 className="serif-display text-4xl md:text-5xl text-[#cc785c] leading-tight">
                     {getGreeting()}
                   </h1>
                 </div>

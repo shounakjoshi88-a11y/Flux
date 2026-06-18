@@ -184,6 +184,7 @@ export type UserWhereInput = {
   supabaseId?: Prisma.StringFilter<"User"> | string
   conversations?: Prisma.ConversationListRelationFilter
   memories?: Prisma.MemoryListRelationFilter
+  wikiNodes?: Prisma.WikiNodeListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -194,6 +195,7 @@ export type UserOrderByWithRelationInput = {
   supabaseId?: Prisma.SortOrder
   conversations?: Prisma.ConversationOrderByRelationAggregateInput
   memories?: Prisma.MemoryOrderByRelationAggregateInput
+  wikiNodes?: Prisma.WikiNodeOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -207,6 +209,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   name?: Prisma.StringFilter<"User"> | string
   conversations?: Prisma.ConversationListRelationFilter
   memories?: Prisma.MemoryListRelationFilter
+  wikiNodes?: Prisma.WikiNodeListRelationFilter
 }, "id" | "supabaseId">
 
 export type UserOrderByWithAggregationInput = {
@@ -239,6 +242,7 @@ export type UserCreateInput = {
   supabaseId: string
   conversations?: Prisma.ConversationCreateNestedManyWithoutUserInput
   memories?: Prisma.MemoryCreateNestedManyWithoutUserInput
+  wikiNodes?: Prisma.WikiNodeCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -249,6 +253,7 @@ export type UserUncheckedCreateInput = {
   supabaseId: string
   conversations?: Prisma.ConversationUncheckedCreateNestedManyWithoutUserInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutUserInput
+  wikiNodes?: Prisma.WikiNodeUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserUpdateInput = {
@@ -259,6 +264,7 @@ export type UserUpdateInput = {
   supabaseId?: Prisma.StringFieldUpdateOperationsInput | string
   conversations?: Prisma.ConversationUpdateManyWithoutUserNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutUserNestedInput
+  wikiNodes?: Prisma.WikiNodeUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -269,6 +275,7 @@ export type UserUncheckedUpdateInput = {
   supabaseId?: Prisma.StringFieldUpdateOperationsInput | string
   conversations?: Prisma.ConversationUncheckedUpdateManyWithoutUserNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutUserNestedInput
+  wikiNodes?: Prisma.WikiNodeUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -346,6 +353,20 @@ export type UserUpdateOneRequiredWithoutConversationsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutConversationsInput, Prisma.UserUpdateWithoutConversationsInput>, Prisma.UserUncheckedUpdateWithoutConversationsInput>
 }
 
+export type UserCreateNestedOneWithoutWikiNodesInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutWikiNodesInput, Prisma.UserUncheckedCreateWithoutWikiNodesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutWikiNodesInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutWikiNodesNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutWikiNodesInput, Prisma.UserUncheckedCreateWithoutWikiNodesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutWikiNodesInput
+  upsert?: Prisma.UserUpsertWithoutWikiNodesInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutWikiNodesInput, Prisma.UserUpdateWithoutWikiNodesInput>, Prisma.UserUncheckedUpdateWithoutWikiNodesInput>
+}
+
 export type UserUpdateOneRequiredWithoutMemoriesNestedInput = {
   create?: Prisma.XOR<Prisma.UserCreateWithoutMemoriesInput, Prisma.UserUncheckedCreateWithoutMemoriesInput>
   connectOrCreate?: Prisma.UserCreateOrConnectWithoutMemoriesInput
@@ -361,6 +382,7 @@ export type UserCreateWithoutConversationsInput = {
   name: string
   supabaseId: string
   memories?: Prisma.MemoryCreateNestedManyWithoutUserInput
+  wikiNodes?: Prisma.WikiNodeCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutConversationsInput = {
@@ -370,6 +392,7 @@ export type UserUncheckedCreateWithoutConversationsInput = {
   name: string
   supabaseId: string
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutUserInput
+  wikiNodes?: Prisma.WikiNodeUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutConversationsInput = {
@@ -395,6 +418,7 @@ export type UserUpdateWithoutConversationsInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   supabaseId?: Prisma.StringFieldUpdateOperationsInput | string
   memories?: Prisma.MemoryUpdateManyWithoutUserNestedInput
+  wikiNodes?: Prisma.WikiNodeUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutConversationsInput = {
@@ -403,6 +427,63 @@ export type UserUncheckedUpdateWithoutConversationsInput = {
   provider?: Prisma.EnumAuthProviderFieldUpdateOperationsInput | $Enums.AuthProvider
   name?: Prisma.StringFieldUpdateOperationsInput | string
   supabaseId?: Prisma.StringFieldUpdateOperationsInput | string
+  memories?: Prisma.MemoryUncheckedUpdateManyWithoutUserNestedInput
+  wikiNodes?: Prisma.WikiNodeUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutWikiNodesInput = {
+  id?: string
+  email: string
+  provider: $Enums.AuthProvider
+  name: string
+  supabaseId: string
+  conversations?: Prisma.ConversationCreateNestedManyWithoutUserInput
+  memories?: Prisma.MemoryCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutWikiNodesInput = {
+  id?: string
+  email: string
+  provider: $Enums.AuthProvider
+  name: string
+  supabaseId: string
+  conversations?: Prisma.ConversationUncheckedCreateNestedManyWithoutUserInput
+  memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutWikiNodesInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutWikiNodesInput, Prisma.UserUncheckedCreateWithoutWikiNodesInput>
+}
+
+export type UserUpsertWithoutWikiNodesInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutWikiNodesInput, Prisma.UserUncheckedUpdateWithoutWikiNodesInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutWikiNodesInput, Prisma.UserUncheckedCreateWithoutWikiNodesInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutWikiNodesInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutWikiNodesInput, Prisma.UserUncheckedUpdateWithoutWikiNodesInput>
+}
+
+export type UserUpdateWithoutWikiNodesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  provider?: Prisma.EnumAuthProviderFieldUpdateOperationsInput | $Enums.AuthProvider
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  supabaseId?: Prisma.StringFieldUpdateOperationsInput | string
+  conversations?: Prisma.ConversationUpdateManyWithoutUserNestedInput
+  memories?: Prisma.MemoryUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutWikiNodesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  provider?: Prisma.EnumAuthProviderFieldUpdateOperationsInput | $Enums.AuthProvider
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  supabaseId?: Prisma.StringFieldUpdateOperationsInput | string
+  conversations?: Prisma.ConversationUncheckedUpdateManyWithoutUserNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutUserNestedInput
 }
 
@@ -413,6 +494,7 @@ export type UserCreateWithoutMemoriesInput = {
   name: string
   supabaseId: string
   conversations?: Prisma.ConversationCreateNestedManyWithoutUserInput
+  wikiNodes?: Prisma.WikiNodeCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutMemoriesInput = {
@@ -422,6 +504,7 @@ export type UserUncheckedCreateWithoutMemoriesInput = {
   name: string
   supabaseId: string
   conversations?: Prisma.ConversationUncheckedCreateNestedManyWithoutUserInput
+  wikiNodes?: Prisma.WikiNodeUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutMemoriesInput = {
@@ -447,6 +530,7 @@ export type UserUpdateWithoutMemoriesInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   supabaseId?: Prisma.StringFieldUpdateOperationsInput | string
   conversations?: Prisma.ConversationUpdateManyWithoutUserNestedInput
+  wikiNodes?: Prisma.WikiNodeUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutMemoriesInput = {
@@ -456,6 +540,7 @@ export type UserUncheckedUpdateWithoutMemoriesInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   supabaseId?: Prisma.StringFieldUpdateOperationsInput | string
   conversations?: Prisma.ConversationUncheckedUpdateManyWithoutUserNestedInput
+  wikiNodes?: Prisma.WikiNodeUncheckedUpdateManyWithoutUserNestedInput
 }
 
 
@@ -466,11 +551,13 @@ export type UserUncheckedUpdateWithoutMemoriesInput = {
 export type UserCountOutputType = {
   conversations: number
   memories: number
+  wikiNodes: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   conversations?: boolean | UserCountOutputTypeCountConversationsArgs
   memories?: boolean | UserCountOutputTypeCountMemoriesArgs
+  wikiNodes?: boolean | UserCountOutputTypeCountWikiNodesArgs
 }
 
 /**
@@ -497,6 +584,13 @@ export type UserCountOutputTypeCountMemoriesArgs<ExtArgs extends runtime.Types.E
   where?: Prisma.MemoryWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountWikiNodesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.WikiNodeWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -506,6 +600,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   supabaseId?: boolean
   conversations?: boolean | Prisma.User$conversationsArgs<ExtArgs>
   memories?: boolean | Prisma.User$memoriesArgs<ExtArgs>
+  wikiNodes?: boolean | Prisma.User$wikiNodesArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -537,6 +632,7 @@ export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = run
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   conversations?: boolean | Prisma.User$conversationsArgs<ExtArgs>
   memories?: boolean | Prisma.User$memoriesArgs<ExtArgs>
+  wikiNodes?: boolean | Prisma.User$wikiNodesArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -547,6 +643,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   objects: {
     conversations: Prisma.$ConversationPayload<ExtArgs>[]
     memories: Prisma.$MemoryPayload<ExtArgs>[]
+    wikiNodes: Prisma.$WikiNodePayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -950,6 +1047,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   readonly [Symbol.toStringTag]: "PrismaPromise"
   conversations<T extends Prisma.User$conversationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$conversationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ConversationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   memories<T extends Prisma.User$memoriesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$memoriesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MemoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  wikiNodes<T extends Prisma.User$wikiNodesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$wikiNodesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WikiNodePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1422,6 +1520,30 @@ export type User$memoriesArgs<ExtArgs extends runtime.Types.Extensions.InternalA
   take?: number
   skip?: number
   distinct?: Prisma.MemoryScalarFieldEnum | Prisma.MemoryScalarFieldEnum[]
+}
+
+/**
+ * User.wikiNodes
+ */
+export type User$wikiNodesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the WikiNode
+   */
+  select?: Prisma.WikiNodeSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the WikiNode
+   */
+  omit?: Prisma.WikiNodeOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.WikiNodeInclude<ExtArgs> | null
+  where?: Prisma.WikiNodeWhereInput
+  orderBy?: Prisma.WikiNodeOrderByWithRelationInput | Prisma.WikiNodeOrderByWithRelationInput[]
+  cursor?: Prisma.WikiNodeWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.WikiNodeScalarFieldEnum | Prisma.WikiNodeScalarFieldEnum[]
 }
 
 /**

@@ -53,6 +53,18 @@ export type ToolGroup = {
   tools: { name: string; args: any }[];
 };
 
+export type CodeOutputLine = { type: "stdout" | "stderr"; content: string };
+
+export type CodeExecutionBlock = {
+  code: string;
+  language: string;
+  outputLines: CodeOutputLine[];
+  exitCode?: number;
+  duration?: number;
+  isRunning: boolean;
+  generatedFiles: { filename: string; downloadUrl: string }[];
+};
+
 export type MessagePart =
   | { type: "text"; text: string }
   | { type: "tool_call"; name: string; input?: any; output?: any; status: "pending" | "running" | "completed" | "error" }
@@ -65,7 +77,8 @@ export type MessagePart =
   | { type: "permission"; id: string; toolName: string; args: any; description: string; status: "pending" | "approved" | "denied" }
   | { type: "tool_group"; tools: { name: string; args: any }[] }
   | { type: "agent_status"; status: string; message: string }
-  | { type: "terminal"; content: string };
+  | { type: "terminal"; content: string }
+  | { type: "code_execution"; block: CodeExecutionBlock };
 
 export type Message = {
   id: string | number;

@@ -50,6 +50,7 @@ import {
 } from "lucide-react";
 import { MessageRenderer, InlineMath } from "./MessageRenderer";
 import { FileDownloadButton } from "./FileDownloadButton";
+import { CodeOutputBlock } from "./CodeOutputBlock";
 import { getDomain } from "../lib/chat-utils";
 import type { Message, MessagePart, Source } from "../types";
 
@@ -819,6 +820,14 @@ function PartsRenderer({
         renderedParts.push(
           <div key={`terminal-${i}`} className="mt-2 w-full">
             <pre className="bg-black text-green-400 text-xs p-3 rounded-lg overflow-x-auto">{part.content}</pre>
+          </div>
+        );
+        break;
+      }
+      case "code_execution": {
+        renderedParts.push(
+          <div key={`code-${i}`} className="mt-2 w-full">
+            <CodeOutputBlock {...part.block} />
           </div>
         );
         break;

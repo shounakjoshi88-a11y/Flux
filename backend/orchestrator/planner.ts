@@ -175,33 +175,12 @@ export class Planner {
 
     if (CODE_RE.test(query)) {
       return {
-        workflow: "code",
+        workflow: "simple_qa",
         plan: {
-          steps: [
-            {
-              id: "research",
-              type: "research",
-              description: "Research code requirements and best practices",
-              tools: ["web_search"],
-              dependsOn: [],
-              required: false,
-              criteria: [{ type: "has_sources", label: "Sources found" }],
-              maxRetries: 1,
-            },
-            {
-              id: "execute",
-              type: "execute",
-              description: "Generate code solution",
-              tools: [],
-              dependsOn: [],
-              required: true,
-              criteria: [{ type: "has_text_output", label: "Code generated" }],
-              maxRetries: 1,
-            },
-          ],
+          steps: [],
           userIntent: "Code generation/assistance",
-          reasoning: "Research then generate code solution.",
-          estimatedSteps: 2,
+          reasoning: "Code-related query — using streaming path for flexible tool usage.",
+          estimatedSteps: 0,
         },
       };
     }

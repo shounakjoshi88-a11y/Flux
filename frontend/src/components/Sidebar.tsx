@@ -18,6 +18,7 @@ import {
   ChevronsUpDown,
   Bot,
   Users,
+  Network,
 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { SidebarThread } from "./SidebarThread";
@@ -44,6 +45,7 @@ type SidebarProps = {
   onSettingsOpen: () => void;
   onArtifactsOpen: () => void;
   onArtifactsPrefetch?: () => void;
+  onWikiOpen: () => void;
   onNewsOpen: () => void;
   onCustomAgentsOpen: () => void;
   onTeamOpen: () => void;
@@ -102,6 +104,7 @@ export const Sidebar = memo(function Sidebar({
   onSettingsOpen,
   onArtifactsOpen,
   onArtifactsPrefetch,
+  onWikiOpen,
   onNewsOpen,
   onCustomAgentsOpen,
   onTeamOpen,
@@ -624,6 +627,23 @@ export const Sidebar = memo(function Sidebar({
               {isOpen && (
                 <span className="text-sm font-medium whitespace-nowrap overflow-hidden">
                   Artifacts
+                </span>
+              )}
+            </button>
+
+            {/* Knowledge Graph */}
+            <button
+              type="button"
+              onClick={onWikiOpen}
+              className={`flex items-center h-9 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-sidebar-foreground transition-all gap-2.5 cursor-pointer ${
+                isOpen ? "w-[calc(100%-16px)] mx-2 px-2.5 justify-start" : "w-9 mx-1.5 px-0 justify-center"
+              }`}
+              title="Knowledge Graph"
+            >
+              <Network className="size-4 shrink-0" />
+              {isOpen && (
+                <span className="text-sm font-medium whitespace-nowrap overflow-hidden">
+                  Knowledge Graph
                 </span>
               )}
             </button>

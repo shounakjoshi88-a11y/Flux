@@ -57,6 +57,16 @@ export type Conversation = Prisma.ConversationModel
  */
 export type Message = Prisma.MessageModel
 /**
+ * Model WikiNode
+ * 
+ */
+export type WikiNode = Prisma.WikiNodeModel
+/**
+ * Model WikiEdge
+ * 
+ */
+export type WikiEdge = Prisma.WikiEdgeModel
+/**
  * Model Memory
  * 
  */

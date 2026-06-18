@@ -11,5 +11,7 @@
 export type * from './models/User.ts'
 export type * from './models/Conversation.ts'
 export type * from './models/Message.ts'
+export type * from './models/WikiNode.ts'
+export type * from './models/WikiEdge.ts'
 export type * from './models/Memory.ts'
 export type * from './commonInputTypes.ts'

@@ -1,7 +1,6 @@
 generator client {
   provider        = "prisma-client"
   output          = "./generated"
-  previewFeatures = ["partialIndexes"]
   engineType      = "client"
   runtime         = "bun"
 }
@@ -18,6 +17,7 @@ model User {
   supabaseId    String         @unique
   conversations Conversation[]
   memories      Memory[]
+  wikiNodes     WikiNode[]
 }
 
 model Conversation {
@@ -27,6 +27,7 @@ model Conversation {
   userId   String
   user     User      @relation(fields: [userId], references: [id])
   messages Message[]
+
 
   @@index([userId])
 }
@@ -48,6 +49,42 @@ model Message {
 
   @@index([conversationId, createdAt(sort: Desc)])
   @@index([conversationId])
+}
+
+model WikiNode {
+  id             String     @id @default(uuid())
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label          String
+  description    String?
+  type           String     @default("concept")
+  sourceType     String?
+  sourceUrl      String?
+  metadata       Json?
+  x              Float?
+  y              Float?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  sourceEdges    WikiEdge[] @relation("EdgeSource")
+  targetEdges    WikiEdge[] @relation("EdgeTarget")
+
+  @@unique([userId, label])
+  @@index([userId])
+}
+
+model WikiEdge {
+  id           String   @id @default(uuid())
+  sourceId     String
+  targetId     String
+  relationship String
+  weight       Float    @default(1.0)
+  createdAt    DateTime @default(now())
+  source       WikiNode @relation("EdgeSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  target       WikiNode @relation("EdgeTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, targetId, relationship])
+  @@index([sourceId])
+  @@index([targetId])
 }
 
 model Memory {
