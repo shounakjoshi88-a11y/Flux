@@ -286,9 +286,15 @@ export function useChat(user: any) {
                 if (isTerminal) {
                   setActiveGenerationStatus(null);
                   const baseSub = sub.replace(/_(?:success|error|complete)$/, '');
-                  const idx = streamingPartsRef.current.findIndex(
+                  let idx = streamingPartsRef.current.findIndex(
                     p => p.type === 'tool_call' && p.name === baseSub
                   );
+                  // Handle _start naming pattern (sandbox_start → sandbox_success)
+                  if (idx < 0) {
+                    idx = streamingPartsRef.current.findIndex(
+                      p => p.type === 'tool_call' && p.name === `${baseSub}_start`
+                    );
+                  }
                   if (idx >= 0) {
                     const updated = [...streamingPartsRef.current];
                     (updated[idx] as any).status = sub.endsWith('_error') ? 'error' : 'completed';
@@ -319,7 +325,8 @@ export function useChat(user: any) {
                   sub === 'generating_chart' ||
                   sub === 'image_enhancing' ||
                   sub === 'image_generating' ||
-                  sub === 'reading_skill'
+                  sub === 'reading_skill' ||
+                  sub === 'sandbox_start'
                 ) {
                   setActiveGenerationStatus({ subtype: sub, message: parsed.message });
                 }

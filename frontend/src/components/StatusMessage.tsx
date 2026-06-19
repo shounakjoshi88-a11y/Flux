@@ -609,50 +609,78 @@ export function StatusMessage({
 
   // ─── Collapsible detail row (used by generating_file and reading_skill) ───
 
-  if (status.subtype === 'generating_file') {
-    const docType: string = status.data?.docType ?? '';
-    const topic: string = status.data?.topic ?? '';
+  if (status.subtype === 'generating_file' || status.subtype === 'generating_file_success' || status.subtype === 'generating_file_error') {
+    const filePath: string = status.data?.path ?? '';
+    const fileContent: string = status.data?.contentPreview ?? status.data?.content ?? '';
+    const isSuccess = status.subtype === 'generating_file_success';
+    const isError = status.subtype === 'generating_file_error';
+    const filename = filePath.split('/').pop() || filePath.split('\\').pop() || '';
+
+    const fileIcon = (
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"
+        strokeLinecap="round" strokeLinejoin="round"
+        className={`size-4 shrink-0 ${
+          isActive ? 'text-[var(--accent)]'
+          : isSuccess ? 'text-emerald-400/70'
+          : isError ? 'text-red-400/70'
+          : 'text-[var(--text-secondary)]/40'
+        }`}>
+        <rect x="2" y="3.5" width="16" height="13" rx="2" />
+        <polyline points="5.5,8 8,10.5 5.5,13" strokeWidth="1.5" />
+        <line x1="9.5" y1="13" x2="14.5" y2="13" strokeWidth="1.3" />
+      </svg>
+    );
+
     return (
       <div className="relative overflow-hidden">
-        {/* Flare sweep across this line during generation */}
         {isActive && (
           <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-md">
-            <div className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/6 to-transparent
-                            animate-flare-sweep" />
+            <div className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-flare-sweep" />
           </div>
         )}
-        <StepRow rightSlot={rightSlot}
-          icon={
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"
-              strokeLinecap="round" strokeLinejoin="round"
-              className={`size-5 shrink-0 ${isActive ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]/40'}`}>
-              <path d="M5 2.5h7l3.5 3.5V17a1 1 0 0 1-1-1H5a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1z" />
-              <polyline points="12,2.5 12,6 15.5,6" />
-              <line x1="7" y1="9.5" x2="13" y2="9.5" strokeWidth="1.2" />
-              <line x1="7" y1="12.5" x2="11" y2="12.5" strokeWidth="1.2" />
-              <line x1="15.5" y1="12" x2="15.5" y2="14" strokeWidth="1.3" />
-              <line x1="14.5" y1="13" x2="16.5" y2="13" strokeWidth="1.3" />
-            </svg>
-          }
-          message={status.message}
-          isFirst={isFirst}
-          isLast={isLast}
-          pulse={isActive}
-        >
-          <button
-            onClick={() => setDetailOpen(v => !v)}
-            className="flex items-center gap-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors mt-1"
-          >
-            <ChevronDown className={`size-3 transition-transform duration-200 ${detailOpen ? 'rotate-180' : ''}`} />
-            {detailOpen ? 'Hide build details' : 'Build details'}
-          </button>
-          {detailOpen && (docType || topic) && (
-            <div className="mt-1.5 space-y-1 text-[12px] text-[var(--text-muted)]">
-              {docType && <div className="flex items-center gap-1.5"><span className="text-[var(--text-muted)]">Type:</span> <span className="text-[var(--text-secondary)] font-medium">{docType.toUpperCase()}</span></div>}
-              {topic && <div className="flex items-center gap-1.5"><span className="text-[var(--text-muted)]">Topic:</span> <span className="text-[var(--text-secondary)]">{topic}</span></div>}
-            </div>
-          )}
-        </StepRow>
+        <div className="flex gap-2.5">
+          <TimelineNode icon={fileIcon} isFirst={isFirst} isLast={isLast} showRail={true} />
+          <div className="py-2 min-w-0 flex-1">
+            <span
+              onClick={() => fileContent && setDetailOpen(v => !v)}
+              className="inline-flex items-center gap-1.5 text-[13px] text-[var(--text-secondary)] leading-snug font-medium hover:text-[var(--text-primary)] transition-colors select-none cursor-pointer"
+            >
+              <span>{status.message}</span>
+              {fileContent && (
+                <ChevronDown className={`size-3 shrink-0 transition-transform duration-200 ${detailOpen ? 'rotate-0' : '-rotate-90'} text-[var(--text-muted)]`} />
+              )}
+            </span>
+            {rightSlot && <span className="inline-flex shrink-0 align-middle ml-1">{rightSlot}</span>}
+
+            {detailOpen && (
+              <div className="mt-3 flex flex-col gap-2">
+                <div className="rounded-md border border-[var(--surface-border)] overflow-hidden bg-[#0c0c0b]">
+                  <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--surface-border)] bg-black/20">
+                    <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="size-3 text-[var(--text-muted)]">
+                      <polyline points="3.5,5 5.5,7 3.5,9" />
+                      <line x1="7" y1="9" x2="9" y2="9" />
+                    </svg>
+                    <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-medium">{filename} · {fileContent.length} chars</span>
+                  </div>
+                  <pre className="text-[11.5px] leading-relaxed p-3 overflow-x-auto font-mono whitespace-pre max-h-[380px] overflow-y-auto text-[#c9c7be]" style={{ tabSize: 2 }}>{fileContent}</pre>
+                </div>
+                <div className="rounded-md border border-[var(--surface-border)] overflow-hidden bg-[#0c0c0b]">
+                  <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--surface-border)] bg-black/20">
+                    <span className={`size-2 rounded-full ${isSuccess ? 'bg-emerald-500' : isError ? 'bg-red-500' : 'bg-[var(--text-muted)]'}`} />
+                    <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-medium">Output</span>
+                  </div>
+                  <pre className="text-[11.5px] leading-relaxed p-3 overflow-x-auto font-mono whitespace-pre text-[#c9c7be]">{isSuccess ? `File written to ${filePath}` : status.message}</pre>
+                </div>
+              </div>
+            )}
+
+            {isLast && (
+              <div className="flex items-center h-4 mt-1">
+                <span className="text-[13px] text-[var(--text-secondary)] leading-snug font-medium">Done</span>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     );
   }
@@ -700,6 +728,51 @@ export function StatusMessage({
     );
   }
 
+  // ─── sandbox tool events (run_bash / start_app / etc.) ──────────────────
+  if (status.subtype === 'sandbox_start' || status.subtype === 'sandbox_success' || status.subtype === 'sandbox_error') {
+    const command: string = status.data?.command ?? '';
+    const exitCode: number | undefined = status.data?.exitCode;
+    const isSuccess = status.subtype === 'sandbox_success';
+    const isError = status.subtype === 'sandbox_error';
+
+    const termIcon = (
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"
+        strokeLinecap="round" strokeLinejoin="round"
+        className={`size-4 shrink-0 ${
+          isActive ? 'text-[var(--accent)]'
+          : isSuccess ? 'text-emerald-400/70'
+          : isError ? 'text-red-400/70'
+          : 'text-[var(--text-secondary)]/40'
+        }`}>
+        <rect x="2" y="3.5" width="16" height="13" rx="2" />
+        <polyline points="5.5,8 8,10.5 5.5,13" strokeWidth="1.5" />
+        <line x1="9.5" y1="13" x2="14.5" y2="13" strokeWidth="1.3" />
+      </svg>
+    );
+
+    return (
+      <StepRow rightSlot={rightSlot}
+        icon={termIcon}
+        message={status.message}
+        isFirst={isFirst}
+        isLast={isLast}
+        pulse={isActive}
+      >
+        {command && (
+          <div className="mt-1 font-mono text-[11px] text-[var(--text-muted)] bg-black/30 rounded px-2 py-1 flex items-center gap-2 max-w-full overflow-hidden">
+            <span className="text-emerald-500/70 shrink-0">$</span>
+            <span className="truncate">{command}</span>
+            {exitCode !== undefined && (
+              <span className={`ml-auto shrink-0 text-[10px] rounded px-1.5 py-0.5 ${
+                exitCode === 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+              }`}>exit {exitCode}</span>
+            )}
+          </div>
+        )}
+      </StepRow>
+    );
+  }
+
   // ─── image_enhancing — AI is rewriting the prompt for higher quality ────
   if (status.subtype === 'image_enhancing') {
     return (
@@ -744,10 +817,27 @@ export function StatusMessage({
     );
   }
 
+  const toolInput = status.data as Record<string, unknown> | undefined;
+  const hasDetail = toolInput && Object.keys(toolInput).length > 0 && !isActive;
   return (
     <StepRow rightSlot={rightSlot}
       icon={<span className="size-4 flex items-center justify-center"><span className="size-1.5 rounded-full bg-[var(--text-muted)]" /></span>}
       message={status.message} isFirst={isFirst} isLast={isLast} pulse={isActive}
-    />
+    >
+      {hasDetail && (
+        <button
+          onClick={() => setDetailOpen(v => !v)}
+          className="flex items-center gap-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors mt-1"
+        >
+          <ChevronDown className={`size-3 transition-transform duration-200 ${detailOpen ? 'rotate-180' : ''}`} />
+          {detailOpen ? 'Hide details' : 'Show details'}
+        </button>
+      )}
+      {detailOpen && hasDetail && (
+        <pre className="mt-2 text-[12px] text-[var(--text-secondary)] font-mono whitespace-pre-wrap bg-[var(--surface-bg)] border border-[var(--surface-border)] rounded-md p-2 max-h-[200px] overflow-y-auto">
+          {JSON.stringify(toolInput, null, 2)}
+        </pre>
+      )}
+    </StepRow>
   );
 }

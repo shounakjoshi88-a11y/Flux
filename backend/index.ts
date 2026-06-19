@@ -403,76 +403,221 @@ function sanitizeThought(text: string): string {
 
 // ── Format reminders ─────────────────────────────────────────
 const AGENT_SYSTEM_EXTENSION = `
-You are Flux — a powerful AI assistant with real tools.
+<sandbox_environment>
+You have a cloud-isolated Linux sandbox (E2B). Persistent per conversation — files survive across messages.
 
-RESPONSE STYLE:
-• Write naturally — no <THOUGHT> or <ANSWER> tags ever.
-• After tools complete, seamlessly integrate their results into your answer.
-• End EVERY response with exactly 3 follow-up questions in this exact format:
+<tool name="run_python">
+Execute Python. Pre-installed: pandas, numpy, matplotlib, seaborn, plotly, scipy, scikit-learn, pillow, requests.
+Save outputs to /home/user/ (e.g. plt.savefig('/home/user/chart.png')) — they auto-download.
+</tool>
+<tool name="run_bash">
+Run any bash command. File ops, git, curl, system commands, compile & execute code.
+</tool>
+<tool name="write_file">
+Create or overwrite a file at /home/user/.
+IMPORTANT (<code_workflow>): after writing code files, IMMEDIATELY call run_bash to compile+execute.
+</tool>
+<tool name="read_file">Read file contents from sandbox.</tool>
+<tool name="edit_file">Surgically edit a file. ALWAYS read_file first.</tool>
+<tool name="list_files">List files in a sandbox directory.</tool>
+<tool name="install_package">pip install a package.</tool>
+<tool name="create_project">Scaffold a multi-file project in one call. Provide { name, files: [{path, content}] }.</tool>
+<tool name="start_app">Start a long-running web server. ALWAYS pass the port.</tool>
+<tool name="stop_app">Stop a running background app.</tool>
+<tool name="list_apps">List running apps.</tool>
+<tool name="get_app_logs">Get logs from a running app.</tool>
+<tool name="get_app_url">Get the PUBLIC HTTPS URL of a running web app. Call AFTER start_app.</tool>
+<tool name="get_generated_file">Download a file from sandbox to the user. Images render inline in chat.</tool>
+</sandbox_environment>
 
-<FOLLOW_UPS>
-<question>Question one here</question>
-<question>Question two here</question>
-<question>Question three here</question>
-</FOLLOW_UPS>
+<code_workflow>
+When the user asks to write code (function, algorithm, program), follow this EXACT sequence. Do NOT skip steps, do NOT reorder, do NOT narrate the plan.
 
-TOOL RULES:
-• web_search     → Search for current info, news, facts. Write SPECIFIC targeted queries.
-                   CRITICAL: IGNORE your training data — answer ONLY from search results.
-                   Include the current year in your query.
-• get_weather    → Use when the user asks about weather in a specific place.
-• generate_image → Use when the user asks to create, draw, or generate an image (illustration, photo, painting, etc.). Do NOT use for charts, graphs, or diagrams.
-• read_skill     → Load generation rules for a document type (pdf/pptx/docx/xlsx/csv).
-• generate_document → Create a downloadable document file.
+Step 1 — write_file to create the file with full implementation.
+Step 2 — IMMEDIATELY run_bash to compile and execute:
+  • .c   → gcc -Wall -Wextra -o /home/user/out /home/user/file.c && /home/user/out
+  • .cpp → g++ -Wall -Wextra -o /home/user/out /home/user/file.cpp && /home/user/out
+  • .py  → python3 /home/user/file.py
+  • .js  → node /home/user/file.js
+  • .ts  → npx tsx /home/user/file.ts
+Step 3 — Explain the code using the actual output from Step 2:
+  • Algorithm and how it works
+  • Time/space complexity
+  • Edge cases handled
+  • Actual test output — state clearly which test cases passed
 
-SANDBOX & CODE EXECUTION TOOLS:
-You have a cloud-isolated Linux sandbox (E2B). It's persistent per conversation — files you create survive across messages. Use these tools:
+<critical>NEVER explain the code before calling run_bash. Always compile/run first, then explain with real output in hand.</critical>
 
-• run_python({ code }) — Execute Python. Pre-installed: pandas, numpy, matplotlib, seaborn, plotly, scipy, scikit-learn, pillow, requests. Save outputs to /home/user/ (e.g. plt.savefig('/home/user/chart.png')) and they auto-download to the user.
-• run_bash({ command }) — Run any bash command. Use for: pip install <pkg>, file ops, git, curl, system commands.
-• read_file({ path }) / write_file({ path, content }) / edit_file({ path, old_str, new_str }) / list_files({ path }) — File management inside /home/user/.
-• install_package({ package }) — pip install a package.
-• create_project({ name, files: [{path, content}] }) — Scaffold a multi-file project in one call.
-• start_app({ name, command, cwd?, port? }) — Start a long-running web server (e.g. python3 app.py, npm start) in the background. ALWAYS pass the port the app listens on.
-• stop_app({ app_id }) / list_apps() / get_app_logs({ app_id }) — Manage running apps.
-• get_app_url({ app_id }) — Get the PUBLIC HTTPS URL of a running web app. Call this AFTER start_app, then give the URL to the user.
-• get_generated_file({ path }) — Download a file from the sandbox and send it to the user inline (images render in chat).
+<example_group title="C — linked list reversal">
+<example>
+User: Write a C function to reverse a linked list with test cases.
 
-BUILDING WEB APPS — your superpower:
-When the user asks to "build an app", "make a website", "create a tool", "build a calculator/game/dashboard/timer" — you MUST build it as a real, working, previewable app:
-1. Use write_file to create /home/user/index.html (inline CSS in <style>, JS in <script> for simple apps). Use create_project for multi-file apps.
-2. Make it complete + polished: responsive, good colors, smooth interactions, real functionality. Use vanilla JS or CDN libs (Tailwind: https://cdn.tailwindcss.com, Chart.js, Three.js). NO npm/build tools for static apps.
-3. To preview a static HTML app: use get_generated_file({ path: "/home/user/index.html" }) — the frontend will render it in an iframe.
-4. To run a dynamic app (Node/Python server): use create_project to write the files, then start_app({ name, command: "node server.js", port: 3000 }), wait 2 seconds, then get_app_url({ app_id }) to get the public URL. Give the URL to the user.
-5. For changes: edit_file or write_file (overwrite), then tell the user to refresh.
+<agent_response>
+[write_file /home/user/reverse.c]
+[run_bash "gcc -Wall -Wextra -o /home/user/out /home/user/reverse.c && /home/user/out"]
+The function uses three pointers (prev, curr, next) to reverse the list in a single pass. Time: O(n), Space: O(1). Handles empty list, single node, and two nodes. All 4 test cases passed.
+</agent_response>
+</example>
+</example_group>
 
-DATA ANALYSIS WORKFLOW:
+<example_group title="Python — fibonacci with error recovery">
+<example>
+User: Write a Python script that prints the first 20 fibonacci numbers.
+
+<agent_response>
+[write_file /home/user/fib.py]
+[run_bash "python3 /home/user/fib.py"]
+[stdout: 0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181]
+Iterative approach: two variables track the sequence, O(n) time, O(1) space. Starts at fib(0)=0. All 20 numbers printed correctly.
+</agent_response>
+</example>
+
+<counterexample>
+<agent_response>
+[write_file /home/user/fib.py]
+This script uses dynamic programming with a list to store all values...
+[run_bash "python3 /home/user/fib.py"]
+</agent_response>
+The explanation came before execution. The model doesn't know if the code has bugs, imports the right module, or handles edge cases correctly. Write → run → explain, in that order.
+</counterexample>
+</example_group>
+
+<example_group title="Python — data processing with install + error recovery">
+<example>
+User: Write a script to download a webpage and extract all image URLs.
+
+<agent_response>
+[write_file /home/user/extract_images.py]
+[run_bash "python3 /home/user/extract_images.py"]
+[stderr: ModuleNotFoundError: No module named 'requests']
+[run_bash "pip install requests"]
+[run_bash "python3 /home/user/extract_images.py"]
+[stdout: Found 12 images: https://example.com/img/hero.png, ...]
+Uses requests + BeautifulSoup (via html.parser). Installed missing dependency on first error, then re-ran. Script extracts all <img src> from the page.
+</agent_response>
+</example>
+</example_group>
+</code_workflow>
+
+<web_app_workflow>
+When the user asks to "build an app", "make a website", "create a tool", "build a calculator/game/dashboard/timer":
+
+1. Static app: write_file → /home/user/index.html (inline CSS in <style>, JS in <script>). Use create_project for multi-file apps.
+2. Polished: responsive, good colors, smooth interactions, real functionality. Vanilla JS or CDN libs (Tailwind, Chart.js, Three.js). NO npm/build tools for static apps.
+3. Preview static HTML: get_generated_file({ path: "/home/user/index.html" }) — renders in iframe.
+4. Dynamic app: create_project → start_app({ command, port }) → wait 2s → get_app_url → give URL.
+5. Changes: edit_file or write_file (overwrite), then tell user to refresh.
+
+<example_group title="Static HTML calculator app">
+<example>
+User: Build a pixel-art editor web app.
+
+<agent_response>
+[write_file /home/user/index.html — creates HTML with canvas grid, color picker, export button, all inline]
+[get_generated_file { path: "/home/user/index.html" }]
+Here's a pixel-art editor. Click cells to draw, pick colors from the palette, and export your art as PNG.
+</agent_response>
+</example>
+</example_group>
+
+<example_group title="Dynamic Node.js web server">
+<example>
+User: Build a real-time chat app with a Node.js backend.
+
+<agent_response>
+[create_project: chat-app — creates package.json, server.js with WebSocket, public/index.html with chat UI]
+[start_app { name: "chat", command: "node server.js", port: 3000 }]
+[get_app_url { app_id: "..." }]
+The app is live at https://abc123.e2b.dev. Users connect via WebSocket, messages broadcast in real time. Server handles connect/disconnect, message history, and username assignment.
+</agent_response>
+</example>
+</example_group>
+</web_app_workflow>
+
+<data_analysis_workflow>
 When the user asks to analyze data, make a chart, process a file:
-1. If they attached a file, it's at /home/user/<filename>. Use run_python with pandas to read it.
-2. Generate charts with matplotlib → save to /home/user/chart.png → the file auto-downloads.
-3. Use run_python to print summary stats (df.describe(), etc.) — the output streams to the user live.
-4. Explain the findings in your answer.
+1. Attached file is at /home/user/<filename>. Use run_python with pandas to read it.
+2. Generate charts with matplotlib → save to /home/user/chart.png → auto-downloads.
+3. Print summary stats (df.describe(), etc.) — output streams live.
+4. Explain findings concisely.
 
-ALWAYS: when run_python or run_bash produce output, READ the stderr. If it errors, fix your code and retry. Don't just report "it failed".
+<example_group title="CSV revenue analysis with chart">
+<example>
+User: Here's our Q4 sales data. Show me revenue by region.
 
-DOCUMENT GENERATION WORKFLOW (follow this EXACT multi-step process):
-When the user asks to create a document (PDF, Word, PowerPoint, etc.):
+<agent_response>
+[run_python: import pandas; df = pd.read_csv('/home/user/sales.csv'); print(df.head()); print(df.describe())]
+[output streams: shows 1200 rows, 4 regions, revenue range $12k-$890k]
+[run_python: df.groupby('region')['revenue'].sum().plot(kind='bar', title='Revenue by Region', ylabel='USD'); plt.savefig('/home/user/chart.png')]
+[chart auto-downloads]
+North America leads at $2.1M, followed by Europe at $1.4M. APAC grew 40% quarter-over-quarter. The bar chart shows all 4 regions with actual revenue values.
+</agent_response>
+</example>
+</example_group>
 
-Step 1 — RESEARCH: Call web_search to find relevant information about the topic.
-   After the search results return, EXPLAIN to the user what you found.
-   Summarize the key information conversationally ("Based on my research...").
+<example_group title="File processing with error recovery">
+<example>
+User: Merge these three CSV files and remove duplicates.
 
-Step 2 — LOAD SKILLS: Call read_skill with the document type (e.g., doc_type="pdf").
-   After the skill content loads, tell the user what rules/format you'll be following.
-   Be specific about the document type's guidelines.
+<agent_response>
+[run_python: pd.read_csv('/home/user/file1.csv'); pd.read_csv('/home/user/file2.csv')]
+[stderr: FileNotFoundError: file3.csv not found]
+[list_files /home/user/ — discovers file is named file_3.csv]
+[run_python: pd.concat([df1, df2, pd.read_csv('/home/user/file_3.csv')]).drop_duplicates().to_csv('/home/user/merged.csv')]
+[get_generated_file { path: "/home/user/merged.csv" }]
+Merged 3 CSVs (found the third had a slightly different filename), removed 23 duplicate rows. Output: 1,847 unique rows.
+</agent_response>
+</example>
+</example_group>
+</data_analysis_workflow>
 
-Step 3 — GENERATE: Call generate_document with the doc_type and topic.
-   Pass the skill_content from read_skill so the builder follows the correct rules.
-   After generation, announce the file to the user.
+<error_recovery>
+When run_python or run_bash produce output: READ the stderr. If it errors, fix your code and retry. Never just report "it failed".
 
-IMPORTANT: After each tool call, WAIT for the result, then write your explanation
-before proceeding to the next step. This creates a conversational agentic flow.
-Search multiple times if the first results are insufficient — verify your findings.
+<pattern name="compile-and-fix-cycle">
+On compilation error:
+  1. Read the stderr line by line — identify the exact error (missing semicolon, wrong type, undefined variable, etc.)
+  2. Call edit_file to fix the issue
+  3. Re-run the compilation
+  4. Repeat until clean compile
+</pattern>
+
+<example_group title="Multi-cycle compilation fix">
+<example>
+User: Write a C program that sorts an array using quicksort.
+
+<agent_response>
+[write_file /home/user/quicksort.c]
+[run_bash "gcc -Wall -Wextra -o /home/user/out /home/user/quicksort.c && /home/user/out"]
+[stderr: error: 'ARRAY_SIZE' undeclared — line 5 uses it but no #define exists]
+[edit_file: adds #define ARRAY_SIZE 10 before main]
+[run_bash "gcc -Wall -Wextra -o /home/user/out /home/user/quicksort.c && /home/user/out"]
+[stderr: warning: implicit declaration of function 'qsort_swap' — line 22 calls swap before definition]
+[edit_file: adds forward declaration before qsort function]
+[run_bash "gcc -Wall -Wextra -o /home/user/out /home/user/quicksort.c && /home/user/out"]
+[stdout: Sorted array: 1 3 5 7 9 11 13 15 17 19]
+Quicksort implementation with Lomuto partition scheme. O(n log n) average, O(n²) worst case. Fixed two compilation errors: missing #define and missing forward declaration. Output confirms correct sorting.
+</agent_response>
+</example>
+</example_group>
+
+<example_group title="Runtime fix — off-by-one">
+<example>
+User: Write a Python function to check if a string is a palindrome.
+
+<agent_response>
+[write_file /home/user/palindrome.py]
+[run_bash "python3 /home/user/palindrome.py"]
+[stdout: Test 1: 'racecar' → True ✓ | Test 2: 'hello' → True ✗ (expected False)]
+[read_file /home/user/palindrome.py — inspects the function logic]
+[edit_file: fixes comparison to check s[i] != s[-i-1] instead of s[i] != s[-i]]
+[run_bash "python3 /home/user/palindrome.py"]
+[stdout: Test 1: 'racecar' → True ✓ | Test 2: 'hello' → False ✓ | Test 3: '' → True ✓ | Test 4: 'a' → True ✓]
+The palindrome check compares characters from both ends inward. Initial bug: off-by-one in the mirrored index. Fixed by changing s[-i] to s[-i-1]. All 4 test cases pass, including edge cases (empty string, single char).
+</agent_response>
+</example>
+</example_group>
+</error_recovery>
 `;
 
 const VISUAL_INSTRUCTIONS = `
@@ -1825,7 +1970,11 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
             }),
             execute: async ({ command }: any) => {
                 const cid = activeConversationId || 'default';
-                sendStatus(res, 'sandbox_start', 'Running bash command...', { tool: 'run_bash' }, state.thoughtProcess);
+                // Emit code_execution FIRST so streaming output lines have a visible container
+                if (!res.writableEnded) {
+                    res.write(`event: code_execution\ndata: ${JSON.stringify({ code: command || '', language: 'bash' })}\n\n`);
+                }
+                sendStatus(res, 'sandbox_start', `$ ${(command || '').slice(0, 80)}`, { tool: 'run_bash', command }, state.thoughtProcess);
                 try {
                     const result = await codeExecutor.runBash(cid, command || '', (type, line) => {
                         if (!res.writableEnded) {
@@ -1885,7 +2034,7 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
 
         // ── write_file ────────────────────────────────────────────────────
         write_file: (tool as any)({
-            description: 'Create or overwrite a file in the sandbox.',
+            description: 'Create or overwrite a file in the sandbox. AFTER writing code files (.c, .cpp, .py, .js, .ts, etc.), you MUST IMMEDIATELY ALSO call run_bash to compile and execute them — do NOT stop after write_file.',
             parameters: z.object({
                 path: z.string().describe('File path like /home/user/output.csv'),
                 content: z.string().describe('Full file content'),
@@ -1893,10 +2042,13 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
             execute: async ({ path, content }: any) => {
                 const cid = activeConversationId || 'default';
                 const filename = path.split('/').pop() || 'file';
-                sendStatus(res, 'generating_file', `Writing ${filename}...`, { path }, state.thoughtProcess);
+                const ext = filename.split('.').pop()?.toLowerCase() || '';
+                const langMap: Record<string, string> = { c: 'c', cpp: 'cpp', py: 'python', js: 'javascript', ts: 'typescript', html: 'html', css: 'css', sh: 'bash', json: 'json', md: 'markdown', rs: 'rust', go: 'go', java: 'java' };
+                const language = langMap[ext] || 'text';
+                sendStatus(res, 'generating_file', `Writing ${filename}...`, { path, filename, content, language }, state.thoughtProcess);
                 try {
                     await codeExecutor.writeFile(cid, path, content);
-                    sendStatus(res, 'generating_file_success', `Wrote ${filename}`, { path }, state.thoughtProcess);
+                    sendStatus(res, 'generating_file_success', `Wrote ${filename}`, { path, filename, content, language }, state.thoughtProcess);
                     return `File written to ${path}`;
                 } catch (e: any) {
                     sendStatus(res, 'generating_file_error', `Failed to write ${filename}: ${e.message}`, { path }, state.thoughtProcess);
@@ -2818,7 +2970,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
         let dbBuf = '';
         let hasToolCall = false;
         let toolResultSeen = false;
-        const collectedToolResults: Array<{ name: string; result: string }> = [];
+        const collectedToolResults: Array<{ name: string; args?: any; result: string }> = [];
         const orchestratorHandled = orchResult.executedPlan;
 
         if (orchestratorHandled) {
@@ -2932,6 +3084,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                     try {
                         const ev = event as any;
                         const name = ev.toolName ?? 'tool';
+                        const args = ev.args ?? {};
                         const result = ev.output ?? ev.result;
                         let txt = '';
                         if (typeof result === 'string') {
@@ -2950,7 +3103,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                             hasSearchContent: !!agentState.searchContent,
                             searchContentLen: agentState.searchContent?.length ?? 0,
                         });
-                        collectedToolResults.push({ name, result: String(txt ?? '').slice(0, 20000) });
+                        collectedToolResults.push({ name, args, result: String(txt ?? '').slice(0, 20000) });
                     } catch (toolErr) {
                         console.warn('[ASK] tool-result handler error:', (toolErr as any)?.message);
                     }
@@ -3266,11 +3419,29 @@ If the search results are not relevant to the question (e.g. user asked about th
             if (!charsSent && !res.writableEnded) {
                 const nonSearchResults = collectedToolResults.filter(r => r.name !== 'web_search');
                 if (nonSearchResults.length > 0) {
-                    const resultText = nonSearchResults.map(r => r.result).join('\n\n');
-                    console.log(`[ASK] synthesized from ${nonSearchResults.length} non-search tool results`);
-                    writeSafeSSE(res, resultText);
-                    charsSent += resultText.length;
-                    fullText += resultText;
+                    const toolResultsText = nonSearchResults.map(r => {
+                        let block = `Tool: ${r.name}\nResult: ${r.result}`;
+                        if (r.args?.content) {
+                            const preview = typeof r.args.content === 'string' ? r.args.content.slice(0, 3000) : JSON.stringify(r.args.content).slice(0, 3000);
+                            block += `\nContent:\n${preview}`;
+                        }
+                        return block;
+                    }).join('\n\n');
+                    try {
+                        const synth = await generateText({
+                            model,
+                            prompt: `The user asked a coding question. The following tool was executed. Write a thorough explanation of the code: what it does, the algorithm, time/space complexity, edge cases, and how to compile/run it. Do NOT use tags like <ANSWER> or <FOLLOW_UPS>. Just write a natural explanation.\n\n${toolResultsText}`,
+                            maxTokens: 1000,
+                        } as any);
+                        const text = synth.text?.trim() || toolResultsText;
+                        writeSafeSSE(res, text);
+                        charsSent += text.length;
+                        fullText += text;
+                    } catch {
+                        writeSafeSSE(res, toolResultsText);
+                        charsSent += toolResultsText.length;
+                        fullText += toolResultsText;
+                    }
                 } else {
                     const msg = 'Received results. Please try rephrasing your question for a more detailed answer.';
                     console.log('[ASK] last-resort safety net fired');

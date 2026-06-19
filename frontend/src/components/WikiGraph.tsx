@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useLayoutEffect } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import * as d3 from "d3";
 import { X, Search, LoaderCircle, RefreshCw, AlertCircle, Network } from "lucide-react";
 import { BACKEND_URL } from "../lib/config";
@@ -44,7 +44,7 @@ interface WikiGraphProps {
   onClose: () => void;
 }
 
-const COLORS: Record<string, string> = {
+const BASE_COLORS: Record<string, string> = {
   concept: "#cc785c",
   entity: "#5db8a6",
   topic: "#e8a55a",
@@ -58,23 +58,21 @@ const TYPE_LABELS: Record<string, string> = {
   lesson: "Lessons",
   source: "Sources",
 };
-// Fallback color palette for unknown types
 const FALLBACK_COLORS = ["#c97bdb", "#d4886c", "#5ca8cc", "#c4c45c", "#cc5c7b", "#5cccc0"];
+const colorCache: Record<string, string> = { ...BASE_COLORS };
 
 function getNodeColor(type: string): string {
-  if (COLORS[type]) return COLORS[type];
+  if (colorCache[type]) return colorCache[type] as string;
   let hash = 0;
   for (let i = 0; i < type.length; i++) hash = type.charCodeAt(i) + ((hash << 5) - hash);
-  const idx = Math.abs(hash) % FALLBACK_COLORS.length;
-  COLORS[type] = FALLBACK_COLORS[idx];
-  return COLORS[type];
+  const color = FALLBACK_COLORS[Math.abs(hash) % FALLBACK_COLORS.length] as string;
+  colorCache[type] = color;
+  return color;
 }
 
 function getTypeLabel(type: string): string {
-  if (TYPE_LABELS[type]) return TYPE_LABELS[type];
-  const label = type.charAt(0).toUpperCase() + type.slice(1) + "s";
-  TYPE_LABELS[type] = label;
-  return label;
+  if (TYPE_LABELS[type]) return TYPE_LABELS[type] as string;
+  return type.charAt(0).toUpperCase() + type.slice(1) + "s";
 }
 
 const DARK = "#0f0f0e";
@@ -86,8 +84,8 @@ const TXT_MUTED = "#8e8b82";
 export function WikiGraph({ isOpen, onClose }: WikiGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const simRef = useRef<any>(null);
-  const initRef = useRef(false);
+  const simRef = useRef<ReturnType<typeof d3.forceSimulation> | null>(null);
+  const renderKeyRef = useRef(0);
 
   const [nodes, setNodes] = useState<WikiNode[]>([]);
   const [edges, setEdges] = useState<WikiEdge[]>([]);
@@ -99,30 +97,23 @@ export function WikiGraph({ isOpen, onClose }: WikiGraphProps) {
   const [selectedNode, setSelectedNode] = useState<WikiNode | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<WikiNode[]>([]);
-  const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
+  const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set(Object.keys(BASE_COLORS)));
   const [connected, setConnected] = useState<Array<{ node: WikiNode; edge: WikiEdge }>>([]);
 
-  // Derive all unique types from actual node data and keep filters in sync
   const allTypes = Array.from(new Set(nodes.map(n => n.type)));
-
-  useEffect(() => {
-    if (allTypes.length > 0) {
-      setActiveFilters(prev => {
-        if (prev.size === 0) return new Set(allTypes);
-        const next = new Set(prev);
-        for (const t of allTypes) {
-          if (!next.has(t)) next.add(t);
-        }
-        return next;
-      });
-    }
-  }, [allTypes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchGraph = useCallback(async () => {
     setLoading(true);
     try {
       const data = await apiFetch(`/api/wiki`);
-      if (data.nodes) { setNodes(data.nodes); setEdges(data.edges || []); }
+      if (data.nodes && Array.isArray(data.nodes)) {
+        const loadedNodes: WikiNode[] = data.nodes;
+        const loadedEdges: WikiEdge[] = data.edges || [];
+        const types = new Set<string>(loadedNodes.map(n => n.type));
+        setNodes(loadedNodes);
+        setEdges(loadedEdges);
+        setActiveFilters(types);
+      }
     } catch (e) { console.warn("[WikiGraph] fetch failed", e); }
     finally { setLoading(false); }
   }, []);
@@ -146,12 +137,12 @@ export function WikiGraph({ isOpen, onClose }: WikiGraphProps) {
       const pi = setInterval(async () => {
         try {
           const p = await apiFetch(`/api/wiki/rebuild/progress`);
-          if (p.phase === "extracting") setRebuildProgress(`Extracting concepts (${p.processed}/${p.total})...`);
-          else if (p.phase === "relationships") setRebuildProgress("Finding relationships...");
-          else if (p.phase === "saving") setRebuildProgress("Saving graph...");
+          if (p.phase === "extracting") setRebuildProgress(`Extracting (${p.processed}/${p.total})…`);
+          else if (p.phase === "relationships") setRebuildProgress("Finding relationships…");
+          else if (p.phase === "saving") setRebuildProgress("Saving graph…");
           if (p.error) setRebuildError(p.error);
         } catch { }
-      }, 600);
+      }, 700);
       const data = await apiFetch(`/api/wiki/rebuild`, { method: "POST" });
       clearInterval(pi);
       if (data.error) setRebuildError(data.error);
@@ -170,109 +161,207 @@ export function WikiGraph({ isOpen, onClose }: WikiGraphProps) {
     setConnected(conns);
   }, [selectedNode, nodes, edges]);
 
-  const selectNode = useCallback((node: WikiNode | null) => {
-    setSelectedNode(node);
-  }, []);
+  const selectNode = useCallback((node: WikiNode | null) => setSelectedNode(node), []);
 
-  useLayoutEffect(() => {
-    if (!svgRef.current || nodes.length === 0) return;
-
+  // ── D3 graph rendering ────────────────────────────────────────────────────
+  // Use a callback ref approach: render after a brief delay so the container
+  // has had time to paint its dimensions via the browser layout engine.
+  const renderGraph = useCallback(() => {
     const svgEl = svgRef.current;
-    const parent = svgEl.parentElement;
-    if (!parent) return;
+    const container = containerRef.current;
+    if (!svgEl || !container) return;
 
-    const W = Math.max(parent.clientWidth, parent.getBoundingClientRect().width, 800);
-    const H = Math.max(parent.clientHeight, parent.getBoundingClientRect().height, 600);
+    const filteredNodes = nodes.filter(n => activeFilters.has(n.type));
+    if (filteredNodes.length === 0) {
+      d3.select(svgEl).selectAll("*").remove();
+      return;
+    }
 
-    svgEl.setAttribute("width", String(Math.floor(W)));
-    svgEl.setAttribute("height", String(Math.floor(H)));
-    svgEl.setAttribute("viewBox", `0 0 ${Math.floor(W)} ${Math.floor(H)}`);
+    // Get real dimensions from the container element (after paint)
+    const rect = container.getBoundingClientRect();
+    const W = rect.width > 0 ? rect.width : container.offsetWidth || 800;
+    const H = rect.height > 0 ? rect.height : container.offsetHeight || 600;
+
+    // Stop any running simulation
+    if (simRef.current) {
+      simRef.current.stop();
+      simRef.current = null;
+    }
 
     const svg = d3.select(svgEl);
     svg.selectAll("*").remove();
 
-    const nodeCopy = nodes.map(n => ({ ...n }));
-    const nodeMap = new Map(nodeCopy.map(n => [n.id, n]));
-    const linkData = edges
-      .filter(e => nodeMap.has(e.sourceId) && nodeMap.has(e.targetId))
-      .map(e => ({ source: e.sourceId, target: e.targetId, relationship: e.relationship, weight: e.weight, id: e.id }));
+    // Set SVG to match container exactly — no viewBox that can cause coord mismatch
+    svgEl.setAttribute("width", String(W));
+    svgEl.setAttribute("height", String(H));
 
+    // ── Defs ──────────────────────────────────────────────────────
     const defs = svg.append("defs");
-    const glow = defs.append("filter").attr("id", "glow");
-    const blur = glow.append("feGaussianBlur");
-    blur.attr("stdDeviation", "3").attr("result", "blur");
-    const merge = glow.append("feMerge");
-    merge.append("feMergeNode").attr("in", "blur");
-    merge.append("feMergeNode").attr("in", "SourceGraphic");
+
+    // Glow filter
+    const glowFilter = defs.append("filter")
+      .attr("id", "node-glow")
+      .attr("x", "-50%").attr("y", "-50%")
+      .attr("width", "200%").attr("height", "200%");
+    glowFilter.append("feGaussianBlur").attr("stdDeviation", "4").attr("result", "blur");
+    const glowMerge = glowFilter.append("feMerge");
+    glowMerge.append("feMergeNode").attr("in", "blur");
+    glowMerge.append("feMergeNode").attr("in", "SourceGraphic");
+
+    // Subtle dot grid
+    const dotPattern = defs.append("pattern")
+      .attr("id", "dot-grid").attr("width", 28).attr("height", 28)
+      .attr("patternUnits", "userSpaceOnUse");
+    dotPattern.append("circle")
+      .attr("cx", 1).attr("cy", 1).attr("r", 0.8)
+      .attr("fill", "#222120");
+
+    // Background
+    svg.append("rect").attr("width", W).attr("height", H).attr("fill", DARK);
+    svg.append("rect").attr("width", W).attr("height", H).attr("fill", "url(#dot-grid)");
 
     const g = svg.append("g");
 
+    // ── Zoom ──────────────────────────────────────────────────────
     const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.2, 4])
+      .scaleExtent([0.05, 6])
       .on("zoom", (event) => { g.attr("transform", event.transform); });
     svg.call(zoom);
+    // No initial transform — nodes start centered via forceCenter
 
+    // ── Prepare data ──────────────────────────────────────────────
+    const nodeCopy = filteredNodes.map(n => ({ ...n, x: W / 2 + (Math.random() - 0.5) * 100, y: H / 2 + (Math.random() - 0.5) * 100 }));
+    const nodeMap = new Map(nodeCopy.map(n => [n.id, n]));
+    const linkData = edges
+      .filter(e => nodeMap.has(e.sourceId) && nodeMap.has(e.targetId))
+      .map(e => ({
+        ...e,
+        source: e.sourceId,
+        target: e.targetId,
+      }));
+
+    // ── Links ──────────────────────────────────────────────────────
+    const linkG = g.append("g").attr("class", "links");
+    const link = linkG.selectAll<SVGLineElement, typeof linkData[0]>("line")
+      .data(linkData).join("line")
+      .attr("stroke", "#4a4843")
+      .attr("stroke-width", d => Math.max(1.5, Math.sqrt((d as any).weight || 1) * 2.4))
+      .attr("stroke-opacity", 0.85);
+
+    // ── Nodes ──────────────────────────────────────────────────────
+    const nodeG = g.append("g").attr("class", "nodes")
+      .selectAll<SVGGElement, typeof nodeCopy[0]>("g")
+      .data(nodeCopy).join("g")
+      .style("cursor", "pointer")
+      .on("click", (_event, d) => {
+        const orig = nodes.find(n => n.id === d.id);
+        if (orig) selectNode(orig);
+      });
+
+    // Drag
+    nodeG.call(
+      d3.drag<SVGGElement, typeof nodeCopy[0]>()
+        .on("start", (e, d: any) => {
+          if (!e.active && simRef.current) simRef.current.alphaTarget(0.3).restart();
+          d.fx = d.x; d.fy = d.y;
+        })
+        .on("drag", (e, d: any) => { d.fx = e.x; d.fy = e.y; })
+        .on("end", (e, d: any) => {
+          if (!e.active && simRef.current) simRef.current.alphaTarget(0);
+          d.fx = null; d.fy = null;
+        })
+    );
+
+    // Outer pulse ring
+    nodeG.append("circle")
+      .attr("class", "ring")
+      .attr("r", d => d.type === "source" ? 12 : 18)
+      .attr("fill", "transparent")
+      .attr("stroke", d => getNodeColor(d.type))
+      .attr("stroke-width", 0)
+      .attr("stroke-opacity", 0.3);
+
+    // Main filled circle
+    nodeG.append("circle")
+      .attr("class", "dot")
+      .attr("r", d => d.type === "source" ? 7 : 11)
+      .attr("fill", d => getNodeColor(d.type))
+      .attr("filter", "url(#node-glow)")
+      .attr("stroke", "#0a0a09")
+      .attr("stroke-width", 2);
+
+    // Label
+    nodeG.append("text")
+      .attr("dy", "3em")
+      .attr("text-anchor", "middle")
+      .attr("fill", "#b4b2ac")
+      .attr("font-size", "9px")
+      .attr("font-family", "Inter, sans-serif")
+      .attr("font-weight", "500")
+      .attr("pointer-events", "none")
+      .text(d => d.label.length > 20 ? d.label.slice(0, 18) + "…" : d.label);
+
+    // Hover effects
+    nodeG
+      .on("mouseenter", function (_e, d) {
+        d3.select(this).select<SVGCircleElement>(".ring")
+          .attr("stroke-width", 6)
+          .attr("r", d.type === "source" ? 14 : 22);
+        d3.select(this).select<SVGCircleElement>(".dot")
+          .attr("r", d.type === "source" ? 9 : 14);
+      })
+      .on("mouseleave", function (_e, d) {
+        d3.select(this).select<SVGCircleElement>(".ring")
+          .attr("stroke-width", 0)
+          .attr("r", d.type === "source" ? 12 : 18);
+        d3.select(this).select<SVGCircleElement>(".dot")
+          .attr("r", d.type === "source" ? 7 : 11);
+      });
+
+    // ── Force simulation ───────────────────────────────────────────
     const simulation = d3.forceSimulation(nodeCopy as any)
-      .force("link", d3.forceLink(linkData).id((d: any) => d.id).distance(120))
-      .force("charge", d3.forceManyBody().strength(-350))
-      .force("center", d3.forceCenter(W / 2, H / 2))
+      .force("link", d3.forceLink(linkData as any)
+        .id((d: any) => d.id)
+        .distance(110)
+        .strength(0.5))
+      .force("charge", d3.forceManyBody().strength(-300).distanceMax(400))
+      .force("center", d3.forceCenter(W / 2, H / 2).strength(0.08))
       .force("collision", d3.forceCollide().radius(50))
       .alphaDecay(0.02);
 
-    const link = g.append("g")
-      .selectAll("line").data(linkData).join("line")
-      .attr("stroke", "#3a3936")
-      .attr("stroke-width", (d: any) => Math.max(0.5, Math.sqrt(d.weight || 1)))
-      .attr("stroke-opacity", 0.5);
-
-    const nodeG = g.append("g")
-      .selectAll("g").data(nodeCopy).join("g")
-      .style("cursor", "pointer")
-      .on("click", (_event: any, d: any) => {
-        const orig = nodes.find(n => n.id === d.id);
-        if (orig) selectNode(orig);
-      })
-      .call(d3.drag<any, any>()
-        .on("start", (e, d) => { if (!e.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
-        .on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; })
-        .on("end", (e, d) => { if (!e.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }));
-
-    nodeG.append("circle")
-      .attr("r", (d: any) => d.type === "source" ? 7 : 12)
-      .attr("fill", (d: any) => COLORS[d.type as string] || "#cc785c")
-      .attr("filter", "url(#glow)")
-      .attr("stroke", "#1f1e1b")
-      .attr("stroke-width", 1.5);
-
-    nodeG.append("text")
-      .attr("dy", "2.5em").attr("text-anchor", "middle")
-      .attr("fill", "#c4c2bc").attr("font-size", "9px")
-      .attr("font-family", "Inter, sans-serif").attr("font-weight", "500")
-      .attr("pointer-events", "none")
-      .text((d: any) => (d.label as string).length > 18 ? (d.label as string).slice(0, 16) + ".." : d.label);
-
-    link.lower();
-
     simulation.on("tick", () => {
       link
-        .attr("x1", (d: any) => d.source.x).attr("y1", (d: any) => d.source.y)
-        .attr("x2", (d: any) => d.target.x).attr("y2", (d: any) => d.target.y);
-      nodeG.attr("transform", (d: any) => `translate(${d.x},${d.y})`);
+        .attr("x1", (d: any) => d.source.x ?? 0)
+        .attr("y1", (d: any) => d.source.y ?? 0)
+        .attr("x2", (d: any) => d.target.x ?? 0)
+        .attr("y2", (d: any) => d.target.y ?? 0);
+      nodeG.attr("transform", (d: any) => `translate(${d.x ?? 0},${d.y ?? 0})`);
     });
 
     simRef.current = simulation;
-    initRef.current = true;
-
     simulation.alpha(1).restart();
+  }, [nodes, edges, activeFilters, selectNode]);
 
-    return () => {
-      simulation.stop();
-      initRef.current = false;
-    };
-  }, [nodes, edges]);
+  // Trigger re-render when data/filters change, with a short delay so the
+  // container's flex layout has been painted and clientWidth/Height are accurate.
+  useEffect(() => {
+    if (!isOpen || nodes.length === 0) return;
+    const key = ++renderKeyRef.current;
+    const t = setTimeout(() => {
+      if (renderKeyRef.current === key) renderGraph();
+    }, 80);
+    return () => clearTimeout(t);
+  }, [isOpen, renderGraph]);
 
-  const visibleNodes = nodes.filter(n => activeFilters.has(n.type));
-  const showGraph = !loading && nodes.length > 0 && visibleNodes.length > 0;
+  // Cleanup on close
+  useEffect(() => {
+    if (!isOpen && simRef.current) {
+      simRef.current.stop();
+      simRef.current = null;
+    }
+  }, [isOpen]);
+
+  const visibleNodeCount = nodes.filter(n => activeFilters.has(n.type)).length;
 
   if (!isOpen) return null;
 
@@ -280,43 +369,47 @@ export function WikiGraph({ isOpen, onClose }: WikiGraphProps) {
     <div onClick={onClose} style={{
       position: "fixed", inset: 0, zIndex: 100,
       display: "flex", alignItems: "center", justifyContent: "center",
-      background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)",
+      background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)",
     }}>
       <div onClick={e => e.stopPropagation()} style={{
         width: "92vw", height: "88vh", maxWidth: "1360px",
-        background: PANEL, borderRadius: "12px",
+        background: PANEL, borderRadius: "14px",
         display: "flex", flexDirection: "column", overflow: "hidden",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+        boxShadow: "0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px #222",
       }}>
+        {/* Header */}
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
           padding: "14px 20px", borderBottom: `1px solid ${BORDER}`,
+          background: "linear-gradient(180deg, #181714 0%, #141413 100%)",
+          flexShrink: 0,
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <Network size={18} color="#cc785c" />
             <div>
-              <h2 style={{ fontSize: "16px", fontWeight: 500, color: "#faf9f5", margin: 0, fontFamily: "Inter, sans-serif" }}>
+              <h2 style={{ fontSize: "15px", fontWeight: 600, color: "#faf9f5", margin: 0, fontFamily: "Inter, sans-serif" }}>
                 Knowledge Graph
               </h2>
               <p style={{ fontSize: "11px", color: TXT_SEC, margin: "1px 0 0 0", fontFamily: "Inter, sans-serif" }}>
                 {nodes.length > 0
-                  ? `${nodes.length} concepts · ${edges.length} relationships${stats ? ` · ${stats.concepts} extracted` : ""}`
+                  ? `${nodes.length} concepts · ${edges.length} relationships${stats ? ` · rebuilt ${stats.concepts} nodes` : ""}`
                   : "Automatically extracted from your conversations"}
               </p>
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            {rebuilding && visibleNodes.length > 0 && (
+            {rebuilding && (
               <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", color: TXT_SEC, fontFamily: "Inter, sans-serif" }}>
                 <LoaderCircle size={13} className="animate-spin" />
-                <span>{rebuildProgress || "Updating..."}</span>
+                <span>{rebuildProgress || "Updating…"}</span>
               </div>
             )}
             <button onClick={handleRebuild} disabled={rebuilding} style={{
               display: "flex", alignItems: "center", gap: "6px",
               padding: "6px 14px", borderRadius: "6px",
               background: "transparent", color: TXT_MUTED, border: `1px solid ${BORDER}`,
-              cursor: "pointer", fontSize: "12px", fontFamily: "Inter, sans-serif",
+              cursor: rebuilding ? "not-allowed" : "pointer", fontSize: "12px",
+              fontFamily: "Inter, sans-serif", opacity: rebuilding ? 0.5 : 1,
             }}><RefreshCw size={13} /> Rebuild</button>
             <button onClick={onClose} style={{
               background: "none", border: "none", cursor: "pointer",
@@ -325,41 +418,55 @@ export function WikiGraph({ isOpen, onClose }: WikiGraphProps) {
           </div>
         </div>
 
-        <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+        <div style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0 }}>
+          {/* Sidebar */}
           <div style={{
-            width: "240px", borderRight: `1px solid ${BORDER}`,
-            display: "flex", flexDirection: "column", background: PANEL,
+            width: "220px", borderRight: `1px solid ${BORDER}`,
+            display: "flex", flexDirection: "column", background: "#111110",
+            flexShrink: 0, overflowY: "auto",
           }}>
-            <div style={{ padding: "12px 14px", borderBottom: `1px solid ${BORDER}` }}>
+            {/* Search */}
+            <div style={{ padding: "12px 14px", borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
               <div style={{ position: "relative" }}>
                 <Search size={13} style={{ position: "absolute", left: "9px", top: "50%", transform: "translateY(-50%)", color: TXT_MUTED }} />
-                <input value={searchQuery} onChange={e => { setSearchQuery(e.target.value); searchNodes(e.target.value); }}
-                  placeholder="Search concepts..."
+                <input
+                  value={searchQuery}
+                  onChange={e => { setSearchQuery(e.target.value); searchNodes(e.target.value); }}
+                  placeholder="Search concepts…"
                   style={{
                     width: "100%", padding: "7px 9px 7px 28px", borderRadius: "6px",
                     border: `1px solid ${BORDER}`, background: DARK, color: "#faf9f5",
                     fontSize: "12px", outline: "none", fontFamily: "Inter, sans-serif",
-                  }} />
+                    boxSizing: "border-box",
+                  }}
+                />
               </div>
             </div>
 
-            <div style={{ padding: "12px 14px", borderBottom: `1px solid ${BORDER}` }}>
-              <div style={{ fontSize: "10px", color: TXT_SEC, marginBottom: "8px", fontWeight: 500, fontFamily: "Inter, sans-serif", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            {/* Filters */}
+            <div style={{ padding: "12px 14px", borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
+              <div style={{ fontSize: "10px", color: TXT_SEC, marginBottom: "8px", fontWeight: 600, fontFamily: "Inter, sans-serif", textTransform: "uppercase", letterSpacing: "0.6px" }}>
                 Filters
               </div>
-              {allTypes.map(t => (
+              {allTypes.length === 0 ? (
+                <div style={{ fontSize: "11px", color: TXT_MUTED, fontFamily: "Inter, sans-serif" }}>No data yet</div>
+              ) : allTypes.map(t => (
                 <label key={t} style={{
                   display: "flex", alignItems: "center", gap: "8px",
                   cursor: "pointer", fontSize: "12px", color: "#c4c2bc",
-                  fontFamily: "Inter, sans-serif",
+                  fontFamily: "Inter, sans-serif", padding: "3px 0",
                 }}>
-                  <input type="checkbox" checked={activeFilters.has(t)}
+                  <input
+                    type="checkbox"
+                    checked={activeFilters.has(t)}
                     onChange={() => {
-                      const next = new Set(activeFilters);
-                      next.has(t) ? next.delete(t) : next.add(t);
-                      setActiveFilters(next);
+                      setActiveFilters(prev => {
+                        const next = new Set(prev);
+                        next.has(t) ? next.delete(t) : next.add(t);
+                        return next;
+                      });
                     }}
-                    style={{ accentColor: getNodeColor(t) }}
+                    style={{ accentColor: getNodeColor(t), width: 13, height: 13 }}
                   />
                   <span style={{ width: 8, height: 8, borderRadius: "50%", background: getNodeColor(t), display: "inline-block", flexShrink: 0 }} />
                   {getTypeLabel(t)}
@@ -370,10 +477,11 @@ export function WikiGraph({ isOpen, onClose }: WikiGraphProps) {
               ))}
             </div>
 
+            {/* Search results */}
             {searchResults.length > 0 && (
               <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
-                <div style={{ fontSize: "10px", color: TXT_SEC, padding: "4px 14px 6px", fontWeight: 500, fontFamily: "Inter, sans-serif", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                  Search Results
+                <div style={{ fontSize: "10px", color: TXT_SEC, padding: "4px 14px 6px", fontWeight: 600, fontFamily: "Inter, sans-serif", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Results
                 </div>
                 {searchResults.map(n => (
                   <div key={n.id} onClick={() => { selectNode(n); setSearchResults([]); setSearchQuery(""); }}
@@ -381,22 +489,13 @@ export function WikiGraph({ isOpen, onClose }: WikiGraphProps) {
                     onMouseEnter={e => (e.currentTarget.style.background = "#1a1a18")}
                     onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                     <span style={{ color: getNodeColor(n.type), fontWeight: 500 }}>{n.label}</span>
+                    <span style={{ color: TXT_MUTED, fontSize: "10px", display: "block" }}>{n.type}</span>
                   </div>
                 ))}
               </div>
             )}
 
-            {searchResults.length === 0 && !selectedNode && (
-              <div style={{ flex: 1, overflowY: "auto", padding: "14px" }}>
-                <div style={{ fontSize: "10px", color: TXT_SEC, marginBottom: "8px", fontWeight: 500, fontFamily: "Inter, sans-serif", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                  All Concepts
-                </div>
-                <div style={{ fontSize: "11px", color: TXT_MUTED, fontFamily: "Inter, sans-serif" }}>
-                  Click a node on the graph to see details.
-                </div>
-              </div>
-            )}
-
+            {/* Selected node detail */}
             {!searchResults.length && selectedNode && (
               <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -417,72 +516,129 @@ export function WikiGraph({ isOpen, onClose }: WikiGraphProps) {
                   }}><X size={13} /></button>
                 </div>
                 {selectedNode.description && (
-                  <p style={{ fontSize: "11px", color: "#9c9a94", marginTop: "10px", lineHeight: "1.5", fontFamily: "Inter, sans-serif" }}>
+                  <p style={{ fontSize: "11px", color: "#9c9a94", marginTop: "10px", lineHeight: "1.6", fontFamily: "Inter, sans-serif" }}>
                     {selectedNode.description}
                   </p>
                 )}
-                <div style={{ fontSize: "10px", color: TXT_SEC, marginTop: "14px", marginBottom: "6px", fontWeight: 500, fontFamily: "Inter, sans-serif", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                <div style={{ fontSize: "10px", color: TXT_SEC, marginTop: "14px", marginBottom: "6px", fontWeight: 600, fontFamily: "Inter, sans-serif", textTransform: "uppercase", letterSpacing: "0.5px" }}>
                   Connections ({connected.length})
                 </div>
                 {connected.map(c => (
                   <div key={c.edge.id} onClick={() => selectNode(c.node)}
-                    style={{ padding: "5px 8px", borderRadius: "4px", cursor: "pointer", fontSize: "11px", color: "#c4c2bc", fontFamily: "Inter, sans-serif" }}
+                    style={{ padding: "5px 8px", borderRadius: "5px", cursor: "pointer", fontSize: "11px", color: "#c4c2bc", fontFamily: "Inter, sans-serif" }}
                     onMouseEnter={e => { e.currentTarget.style.background = "#1a1a18"; }}
                     onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
                     <span style={{ color: getNodeColor(c.node.type) }}>{c.node.label}</span>
                     <span style={{ color: TXT_MUTED, marginLeft: "6px", fontSize: "10px" }}>— {c.edge.relationship}</span>
                   </div>
                 ))}
-                {connected.length === 0 && <div style={{ fontSize: "11px", color: TXT_MUTED, fontFamily: "Inter, sans-serif" }}>No direct connections</div>}
+                {connected.length === 0 && (
+                  <div style={{ fontSize: "11px", color: TXT_MUTED, fontFamily: "Inter, sans-serif" }}>No direct connections</div>
+                )}
+              </div>
+            )}
+
+            {/* Default hint */}
+            {!searchResults.length && !selectedNode && nodes.length > 0 && (
+              <div style={{ padding: "14px" }}>
+                <div style={{ fontSize: "11px", color: TXT_MUTED, fontFamily: "Inter, sans-serif", lineHeight: 1.6 }}>
+                  Click any node to explore connections.<br />Drag to rearrange. Scroll to zoom.
+                </div>
               </div>
             )}
           </div>
 
-          <div ref={containerRef} style={{ flex: 1, position: "relative", background: DARK }}>
+          {/* Graph canvas */}
+          <div
+            ref={containerRef}
+            style={{ flex: 1, position: "relative", background: DARK, overflow: "hidden", minWidth: 0 }}
+          >
+            {/* Loading overlay */}
             {loading && (
-              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,15,14,0.8)" }}>
-                <LoaderCircle size={26} className="animate-spin" style={{ color: "#cc785c" }} />
+              <div style={{
+                position: "absolute", inset: 0, display: "flex", alignItems: "center",
+                justifyContent: "center", background: "rgba(15,15,14,0.9)", zIndex: 2,
+              }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
+                  <LoaderCircle size={28} className="animate-spin" style={{ color: "#cc785c" }} />
+                  <span style={{ fontSize: "12px", color: TXT_SEC, fontFamily: "Inter, sans-serif" }}>Loading graph…</span>
+                </div>
               </div>
             )}
-            <svg ref={svgRef} style={{
-              width: "100%", height: "100%", display: "block",
-              visibility: showGraph ? "visible" : "hidden",
-            }} />
-            {!loading && visibleNodes.length === 0 && (
-              <div style={{
+
+            {/* SVG — fills container via position absolute */}
+            <svg
+              ref={svgRef}
+              style={{
                 position: "absolute", inset: 0,
+                width: "100%", height: "100%",
+                display: "block",
+              }}
+            />
+
+            {/* Empty state */}
+            {!loading && visibleNodeCount === 0 && (
+              <div style={{
+                position: "absolute", inset: 0, zIndex: 1,
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                color: TXT_SEC, fontSize: "13px", padding: "40px", textAlign: "center",
+                color: TXT_SEC, padding: "40px", textAlign: "center",
                 fontFamily: "Inter, sans-serif", gap: "16px",
               }}>
                 <Network size={48} color={TXT_MUTED} strokeWidth={1.5} />
                 <div>
                   <p style={{ fontSize: "14px", color: "#c4c2bc", fontWeight: 500, margin: 0 }}>
-                    {nodes.length === 0 ? "No concepts yet" : "No visible nodes"}
+                    {nodes.length === 0 ? "No concepts yet" : "All nodes hidden by filters"}
                   </p>
-                  <p style={{ fontSize: "12px", color: TXT_MUTED, margin: "4px 0 0 0", maxWidth: "300px" }}>
-                    {nodes.length === 0 ? "Concepts are extracted from your conversations automatically." : "All nodes are hidden by the current filters."}
+                  <p style={{ fontSize: "12px", color: TXT_MUTED, margin: "4px 0 0 0", maxWidth: "320px" }}>
+                    {nodes.length === 0
+                      ? "Click \"Rebuild\" to extract concepts from your conversation history."
+                      : "Enable some filters in the sidebar to show nodes."}
                   </p>
                 </div>
                 {nodes.length === 0 && (rebuilding ? (
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
-                    <LoaderCircle size={18} className="animate-spin" style={{ color: "#cc785c" }} />
-                    <span style={{ fontSize: "12px", color: TXT_SEC, fontFamily: "Inter, sans-serif" }}>{rebuildProgress || "Building..."}</span>
+                    <LoaderCircle size={20} className="animate-spin" style={{ color: "#cc785c" }} />
+                    <span style={{ fontSize: "12px", color: TXT_SEC }}>{rebuildProgress || "Building…"}</span>
                   </div>
                 ) : (
                   <button onClick={handleRebuild} style={{
                     display: "flex", alignItems: "center", gap: "8px",
-                    padding: "10px 20px", borderRadius: "8px",
+                    padding: "10px 22px", borderRadius: "8px",
                     background: "#cc785c", color: "#fff", border: "none",
                     cursor: "pointer", fontSize: "13px", fontWeight: 500,
                     fontFamily: "Inter, sans-serif",
                   }}><RefreshCw size={15} /> Build from chat history</button>
                 ))}
                 {rebuildError && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", color: "#e55", fontFamily: "Inter, sans-serif", maxWidth: "350px", textAlign: "left" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", color: "#e55", maxWidth: "350px" }}>
                     <AlertCircle size={12} style={{ flexShrink: 0 }} /><span>{rebuildError}</span>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Legend */}
+            {!loading && visibleNodeCount > 0 && allTypes.filter(t => activeFilters.has(t)).length > 0 && (
+              <div style={{
+                position: "absolute", bottom: 16, right: 16, zIndex: 1,
+                background: "rgba(18,17,16,0.92)", borderRadius: "8px",
+                border: `1px solid ${BORDER}`, padding: "8px 12px",
+                display: "flex", flexDirection: "column", gap: "5px",
+                backdropFilter: "blur(6px)",
+              }}>
+                {allTypes.filter(t => activeFilters.has(t)).map(t => (
+                  <div key={t} style={{ display: "flex", alignItems: "center", gap: "7px", fontSize: "11px", color: "#c4c2bc", fontFamily: "Inter, sans-serif" }}>
+                    <span style={{
+                      width: 8, height: 8, borderRadius: "50%",
+                      background: getNodeColor(t), flexShrink: 0,
+                      boxShadow: `0 0 6px ${getNodeColor(t)}88`,
+                    }} />
+                    {getTypeLabel(t)}
+                    <span style={{ color: TXT_MUTED, marginLeft: "auto", paddingLeft: 8 }}>
+                      {nodes.filter(n => n.type === t).length}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
           </div>

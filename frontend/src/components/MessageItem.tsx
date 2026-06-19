@@ -681,13 +681,14 @@ function PartsRenderer({
           const partIndex = i - (toolParts.length - 1) + idx;
           const actualIsFirst = partIndex === 0 || parts[partIndex - 1]?.type !== "tool_call";
           const actualIsLast = !activeGenerationStatus && (partIndex === parts.length - 1 || parts[partIndex + 1]?.type !== "tool_call");
+          const derivedSubtype = tp.status === 'completed' ? `${tp.name}_success` : tp.status === 'error' ? `${tp.name}_error` : tp.name;
 
           renderedParts.push(
             <div key={`tool-${partIndex}`} className="mb-0.5">
               <StatusMessage
                 status={{
                   type: tp.name,
-                  subtype: tp.name,
+                  subtype: derivedSubtype,
                   message: tp.output || "",
                   data: tp.input,
                 }}
