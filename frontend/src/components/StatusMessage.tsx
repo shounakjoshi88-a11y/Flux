@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef } from "react";
 import { ChevronDown } from "lucide-react";
 import { MessageRenderer } from "./MessageRenderer";
-
 import { calculateTrustScore } from "../utils/TrustScore";
 
 // ── Icons — 20×20 viewport, size-5, 1.6px stroke ──────────
@@ -13,7 +12,6 @@ const S = ({ cls = "", children }: { cls?: string; children: React.ReactNode }) 
     className={`size-4 shrink-0 ${cls}`}>{children}</svg>
 );
 
-// Search — offset circle for visual weight, thick angled handle
 const SearchIcon = ({ cls = "" }: IProps) => (
   <S cls={cls}>
     <circle cx="8.5" cy="8.5" r="5.2" />
@@ -21,7 +19,6 @@ const SearchIcon = ({ cls = "" }: IProps) => (
   </S>
 );
 
-// Globe — sphere with equator, tropic lines, and two meridian curves (tilted left)
 const GlobeIcon = ({ cls = "" }: IProps) => (
   <S cls={cls}>
     <g transform="rotate(-20 10 10)">
@@ -35,26 +32,20 @@ const GlobeIcon = ({ cls = "" }: IProps) => (
   </S>
 );
 
-// Book — open book with spine, curved pages, and 3 text lines on each page
 const BookIcon = ({ cls = "" }: IProps) => (
   <S cls={cls}>
-    {/* spine */}
     <line x1="10" y1="17" x2="10" y2="4.5" />
-    {/* page outlines */}
     <path d="M10 5c-2-1.5-4-1.5-6.5-1v11.5c2.5-.5 4.5-.5 6.5 1" />
     <path d="M10 5c2-1.5 4-1.5 6.5-1v11.5c-2.5-.5-4.5-.5-6.5 1" />
-    {/* left page lines */}
     <line x1="4.5" y1="8" x2="8.5" y2="7.5" strokeWidth="1" opacity="0.6" />
     <line x1="4.5" y1="10.5" x2="8.5" y2="10" strokeWidth="1" opacity="0.6" />
     <line x1="4.5" y1="13" x2="8.5" y2="12.5" strokeWidth="1" opacity="0.6" />
-    {/* right page lines */}
     <line x1="11.5" y1="7.5" x2="15.5" y2="8" strokeWidth="1" opacity="0.6" />
     <line x1="11.5" y1="10" x2="15.5" y2="10.5" strokeWidth="1" opacity="0.6" />
     <line x1="11.5" y1="12.5" x2="15.5" y2="13" strokeWidth="1" opacity="0.6" />
   </S>
 );
 
-// External link — compact box + diagonal arrow
 const LinkIcon = ({ cls = "" }: IProps) => (
   <S cls={cls}>
     <path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11" />
@@ -63,7 +54,6 @@ const LinkIcon = ({ cls = "" }: IProps) => (
   </S>
 );
 
-// Warning triangle — wide base, tall, sharp
 const WarnIcon = ({ cls = "" }: IProps) => (
   <S cls={cls}>
     <path d="M10 3 1.5 17.5h17L10 3z" />
@@ -72,17 +62,59 @@ const WarnIcon = ({ cls = "" }: IProps) => (
   </S>
 );
 
-// Checkmark — bold confident tick
 const DoneIcon = ({ cls = "" }: IProps) => (
   <S cls={cls}>
     <polyline points="2.5,10 7.5,15.5 17.5,4.5" />
   </S>
 );
 
-// Weather — same monochrome tone as all other icons, uses S wrapper
+// Terminal icon — rectangle with cursor prompt lines
+const TerminalIcon = ({ cls = "" }: IProps) => (
+  <S cls={cls}>
+    <rect x="2" y="3.5" width="16" height="13" rx="2" />
+    <polyline points="5.5,8 8,10.5 5.5,13" strokeWidth="1.5" />
+    <line x1="9.5" y1="13" x2="14.5" y2="13" strokeWidth="1.3" />
+  </S>
+);
+
+// File icon — document with folded corner
+const FileIcon = ({ cls = "" }: IProps) => (
+  <S cls={cls}>
+    <path d="M5 2.5h6.5l3 3V16a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1z" />
+    <polyline points="11.5,2.5 11.5,5.5 14.5,5.5" />
+    <line x1="7" y1="9" x2="13" y2="9" strokeWidth="1.1" />
+    <line x1="7" y1="11.5" x2="11" y2="11.5" strokeWidth="1.1" />
+  </S>
+);
+
+// Wiki/graph node icon
+const WikiIcon = ({ cls = "" }: IProps) => (
+  <S cls={cls}>
+    <circle cx="10" cy="10" r="2.5" />
+    <circle cx="3.5" cy="5" r="1.8" />
+    <circle cx="16.5" cy="5" r="1.8" />
+    <circle cx="3.5" cy="15" r="1.8" />
+    <circle cx="16.5" cy="15" r="1.8" />
+    <line x1="5.2" y1="5.8" x2="8" y2="8.5" strokeWidth="1.2" />
+    <line x1="14.8" y1="5.8" x2="12" y2="8.5" strokeWidth="1.2" />
+    <line x1="5.2" y1="14.2" x2="8" y2="11.5" strokeWidth="1.2" />
+    <line x1="14.8" y1="14.2" x2="12" y2="11.5" strokeWidth="1.2" />
+  </S>
+);
+
+// Package/install icon
+const PackageIcon = ({ cls = "" }: IProps) => (
+  <S cls={cls}>
+    <path d="M10 2L17.5 6v8L10 18 2.5 14V6L10 2z" />
+    <polyline points="2.5,6 10,10 17.5,6" />
+    <line x1="10" y1="10" x2="10" y2="18" />
+    <line x1="6" y1="4" x2="14" y2="8" strokeWidth="1" opacity="0.5" />
+  </S>
+);
+
+// Weather icons
 const WeatherIcon = ({ state, cls = "" }: { state: "fetching" | "success" | "error"; cls?: string }) => {
   if (state === "fetching") return (
-    // Thermometer with tick marks
     <S cls={cls}>
       <path d="M10 3.5v8.2" />
       <path d="M8 3.5a2 2 0 0 1 4 0v8.2a4 4 0 1 1-4 0z" />
@@ -92,7 +124,6 @@ const WeatherIcon = ({ state, cls = "" }: { state: "fetching" | "success" | "err
     </S>
   );
   if (state === "success") return (
-    // Cloud with sun peeking behind
     <S cls={cls}>
       <circle cx="13.5" cy="7" r="3" />
       <line x1="13.5" y1="2.5" x2="13.5" y2="1.5" />
@@ -102,7 +133,6 @@ const WeatherIcon = ({ state, cls = "" }: { state: "fetching" | "success" | "err
     </S>
   );
   return (
-    // Cloud with lightning bolt
     <S cls={cls}>
       <path d="M4.5 15.5a3.5 3.5 0 0 1-.8-6.9A5.5 5.5 0 0 1 14.2 10a3 3 0 0 1-.7 5.5H4.5z" />
       <polyline points="10.5,13 8.5,16.5 11,16.5 9,20" />
@@ -110,8 +140,6 @@ const WeatherIcon = ({ state, cls = "" }: { state: "fetching" | "success" | "err
   );
 };
 
-
-// ── NEW: Wand/sparkle icon for image enhancing ────────────
 const WandIcon = ({ cls = "" }: IProps) => (
   <S cls={cls}>
     <line x1="3.5" y1="16.5" x2="11" y2="9" />
@@ -123,7 +151,6 @@ const WandIcon = ({ cls = "" }: IProps) => (
   </S>
 );
 
-// ── NEW: Image frame icon for image generating ────────────
 const ImageIcon = ({ cls = "" }: IProps) => (
   <S cls={cls}>
     <rect x="2.5" y="4.5" width="15" height="11" rx="1.5" />
@@ -132,67 +159,225 @@ const ImageIcon = ({ cls = "" }: IProps) => (
   </S>
 );
 
+const ChartIcon = ({ cls = "" }: IProps) => (
+  <S cls={cls}>
+    <rect x="2.5" y="10" width="3" height="7.5" rx="0.5" />
+    <rect x="8.5" y="6" width="3" height="11.5" rx="0.5" />
+    <rect x="14.5" y="2.5" width="3" height="15" rx="0.5" />
+    <line x1="1.5" y1="18" x2="18.5" y2="18" strokeWidth="1.2" />
+  </S>
+);
 
-interface StatusMessageProps {
-  status: {
-    type: string;
-    subtype: string;
-    message: string;
-    content?: string;
-    data?: any;
-  };
-  isFirst?: boolean;
-  isLast?: boolean;
-  isActive?: boolean;
-  showRail?: boolean;
-  onSourceClick?: (url: string | null) => void;
-  elapsedSeconds?: number;
-  rightSlot?: React.ReactNode;
+// ── Language colour map for file extension badges ──────────
+const LANG_COLORS: Record<string, { badge: string; dot: string }> = {
+  python: { badge: 'text-blue-400/80 bg-blue-500/10 border-blue-500/20', dot: 'bg-blue-400/70' },
+  javascript: { badge: 'text-yellow-400/80 bg-yellow-500/10 border-yellow-500/20', dot: 'bg-yellow-400/70' },
+  typescript: { badge: 'text-sky-400/80 bg-sky-500/10 border-sky-500/20', dot: 'bg-sky-400/70' },
+  html: { badge: 'text-orange-400/80 bg-orange-500/10 border-orange-500/20', dot: 'bg-orange-400/70' },
+  css: { badge: 'text-purple-400/80 bg-purple-500/10 border-purple-500/20', dot: 'bg-purple-400/70' },
+  bash: { badge: 'text-green-400/80 bg-green-500/10 border-green-500/20', dot: 'bg-green-400/70' },
+  c: { badge: 'text-slate-300/80 bg-slate-500/10 border-slate-500/20', dot: 'bg-slate-300/70' },
+  cpp: { badge: 'text-indigo-300/80 bg-indigo-500/10 border-indigo-500/20', dot: 'bg-indigo-300/70' },
+  rust: { badge: 'text-orange-300/80 bg-orange-500/10 border-orange-500/20', dot: 'bg-orange-300/70' },
+  go: { badge: 'text-cyan-400/80 bg-cyan-500/10 border-cyan-500/20', dot: 'bg-cyan-400/70' },
+  java: { badge: 'text-red-400/80 bg-red-500/10 border-red-500/20', dot: 'bg-red-400/70' },
+  json: { badge: 'text-yellow-300/80 bg-yellow-500/10 border-yellow-500/20', dot: 'bg-yellow-300/70' },
+  markdown: { badge: 'text-[var(--text-muted)] bg-[var(--surface-bg)] border-[var(--surface-border)]', dot: 'bg-[var(--text-muted)]' },
+  sql: { badge: 'text-teal-400/80 bg-teal-500/10 border-teal-500/20', dot: 'bg-teal-400/70' },
+};
+
+const getLangStyle = (lang: string) =>
+  LANG_COLORS[lang?.toLowerCase()] ?? { badge: 'text-[var(--text-muted)] bg-[var(--surface-bg)] border-[var(--surface-border)]', dot: 'bg-[var(--text-muted)]' };
+
+// ─── Claude-style Terminal Block ───────────────────────────────────────────────
+// Shows a dark code box with "bash/script" header + command + optional Output section
+function TerminalBlock({
+  command,
+  language = 'bash',
+  isRunning = false,
+  exitCode,
+  durationStr,
+  output,
+}: {
+  command?: string;
+  language?: string;
+  isRunning?: boolean;
+  exitCode?: number;
+  durationStr?: string;
+  output?: string;
+}) {
+  const [outputOpen, setOutputOpen] = useState(true);
+  if (!command) return null;
+
+  const isSuccess = exitCode === 0;
+  const isFailure = exitCode !== undefined && exitCode !== 0;
+
+  return (
+    <div className={`mt-2 rounded-lg overflow-hidden border transition-all duration-200 ${isRunning
+      ? 'border-[var(--accent)]/25 shadow-[0_0_0_1px_var(--accent)/6]'
+      : isFailure
+        ? 'border-red-500/25'
+        : 'border-[var(--surface-border)]'
+      }`} style={{ background: '#0f0f0e' }}>
+
+      {/* ── Block header bar */}
+      <div className="flex items-center gap-2 px-3 py-[7px] border-b border-white/[0.06]"
+        style={{ background: 'rgba(0,0,0,0.25)' }}>
+        {/* Traffic dots */}
+        <div className="flex gap-1.5 shrink-0">
+          <span className="size-[7px] rounded-full" style={{ background: '#ff5f57', opacity: 0.55 }} />
+          <span className="size-[7px] rounded-full" style={{ background: '#febc2e', opacity: 0.55 }} />
+          <span className="size-[7px] rounded-full" style={{ background: '#28c840', opacity: 0.55 }} />
+        </div>
+
+        <span className="text-[11px] text-[var(--text-muted)] font-mono tracking-wide ml-0.5">{language}</span>
+
+        <div className="ml-auto flex items-center gap-2 shrink-0">
+          {isRunning && (
+            <span className="flex items-center gap-1 text-[10px] text-[var(--accent)]/70">
+              <span className="size-[5px] rounded-full bg-[var(--accent)]/70 animate-pulse" />
+              running
+            </span>
+          )}
+          {exitCode !== undefined && (
+            <span className={`text-[10px] font-mono rounded px-1.5 py-0.5 border ${isSuccess
+              ? 'bg-emerald-500/8 text-emerald-400/80 border-emerald-500/20'
+              : 'bg-red-500/8 text-red-400/80 border-red-500/20'
+              }`}>
+              exit {exitCode}{durationStr ? ` · ${durationStr}` : ''}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ── Command area */}
+      <pre className="text-[12.5px] leading-[1.65] font-mono px-4 py-3 overflow-x-auto whitespace-pre"
+        style={{ color: '#d4d1cb' }}>
+        {command}
+        {isRunning && (
+          <span
+            className="inline-block w-[7px] h-[14px] ml-0.5 align-middle rounded-sm"
+            style={{ background: 'var(--accent)', opacity: 0.7, animation: 'blink 1s step-end infinite' }}
+          />
+        )}
+      </pre>
+
+      {/* ── Output section (if data available) */}
+      {output && (
+        <>
+          <div className="flex items-center gap-2 px-3 py-[7px] border-t border-white/[0.06]"
+            style={{ background: 'rgba(0,0,0,0.2)' }}>
+            <span className="text-[11px] text-[var(--text-muted)] font-mono tracking-wide">Output</span>
+            <button
+              onClick={() => setOutputOpen(v => !v)}
+              className="ml-auto flex items-center gap-0.5 text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+            >
+              <ChevronDown className={`size-3 transition-transform duration-200 ${outputOpen ? 'rotate-180' : ''}`} />
+              {outputOpen ? 'hide' : 'show'}
+            </button>
+          </div>
+          {outputOpen && (
+            <pre className="text-[11.5px] leading-[1.6] font-mono px-4 py-2.5 overflow-x-auto max-h-[360px] overflow-y-auto whitespace-pre border-t border-white/[0.04]"
+              style={{ color: '#9a978f' }}>
+              {output}
+            </pre>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
-// ── Strip thought-only content; remove ANSWER/FOLLOW_UPS blocks entirely ──
-function cleanThoughtText(text: string): string {
-  return text
-    .replace(/<ANSWER>[\s\S]*?<\/ANSWER>/gi, "")   // full ANSWER block
-    .replace(/<ANSWER>[\s\S]*/gi, "")               // partial ANSWER (streaming)
-    .replace(/<FOLLOW_UPS>[\s\S]*?<\/FOLLOW_UPS>/gi, "")
-    .replace(/<FOLLOW_UPS>[\s\S]*/gi, "")
-    .replace(/<\/?[A-Z_]+>/gi, "")                  // remaining tag wrappers
-    .trim();
+// ─── File Code Block ────────────────────────────────────────────────────────
+function FileCodeBlock({
+  filename,
+  content,
+  language = 'text',
+  isRunning = false,
+  isSuccess = false,
+  isError = false,
+}: {
+  filename: string;
+  content?: string;
+  language?: string;
+  isRunning?: boolean;
+  isSuccess?: boolean;
+  isError?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const lang = getLangStyle(language);
+  const preview = content ? content.slice(0, 4000) : '';
+  const truncated = content && content.length > 4000;
+  const hasContent = !!preview;
+  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+
+  // Count lines for the line number hint
+  const lineCount = content ? content.split('\n').length : 0;
+
+  return (
+    <div className={`mt-2 rounded-lg overflow-hidden border transition-all duration-200 ${isSuccess
+      ? 'border-emerald-500/20'
+      : isError
+        ? 'border-red-500/20'
+        : isRunning
+          ? 'border-[var(--accent)]/25'
+          : 'border-[var(--surface-border)]'
+      }`} style={{ background: '#0f0f0e' }}>
+
+      {/* File header */}
+      <button
+        onClick={() => hasContent && setOpen(v => !v)}
+        disabled={!hasContent}
+        className="w-full flex items-center gap-2 px-3 py-2 text-left border-b border-white/[0.06] hover:bg-white/[0.02] transition-colors disabled:cursor-default"
+        style={{ background: 'rgba(0,0,0,0.22)' }}
+      >
+        {/* Status dot */}
+        <span className={`size-[7px] rounded-full shrink-0 ${isSuccess ? 'bg-emerald-400/70'
+          : isError ? 'bg-red-400/70'
+            : isRunning ? 'bg-[var(--accent)]/70 animate-pulse'
+              : lang.dot
+          }`} />
+
+        {/* Filename */}
+        <span className="font-mono text-[12.5px] text-[#d4d1cb] truncate">{filename}</span>
+
+        <div className="ml-auto flex items-center gap-2 shrink-0">
+          {/* Line count hint */}
+          {lineCount > 1 && !isRunning && (
+            <span className="text-[10px] text-[var(--text-muted)]">{lineCount} lines</span>
+          )}
+          {/* Language badge */}
+          <span className={`text-[10px] font-mono rounded border px-1.5 py-[2px] ${lang.badge}`}>
+            {language || ext || 'txt'}
+          </span>
+          {/* Expand chevron */}
+          {hasContent && (
+            <ChevronDown
+              className={`size-3.5 text-[var(--text-muted)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+            />
+          )}
+        </div>
+      </button>
+
+      {/* Content preview */}
+      {open && preview && (
+        <div className="relative">
+          <pre
+            className="text-[11.5px] leading-[1.65] font-mono px-4 py-3 overflow-x-auto max-h-[420px] overflow-y-auto whitespace-pre"
+            style={{ color: '#b5b2aa', tabSize: 2 } as React.CSSProperties}
+          >
+            {preview}
+            {truncated && (
+              <span style={{ color: 'var(--text-muted)' }}>{'\n'}… (truncated)</span>
+            )}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
 }
 
-// ── Split thought text into individual reasoning steps ────────────────────
-function parseThoughtSteps(text: string): string[] {
-  const clean = text.trim();
-  if (!clean) return [];
-
-  const strip = (s: string) =>
-    s.replace(/^[\s•·‣▸\-–—]+/, "").trim();
-
-  const meaningful = (s: string) => strip(s).length > 8;
-
-  const byDouble = clean.split(/\n{2,}/).map(strip).filter(meaningful);
-  if (byDouble.length > 1) return byDouble;
-
-  const bySingle = clean.split(/\n/).map(strip).filter(meaningful);
-  if (bySingle.length > 1) return bySingle;
-
-  const byBullet = clean
-    .split(/\s*[•·‣▸]\s*/)
-    .map(strip)
-    .filter(meaningful);
-  if (byBullet.length > 1) return byBullet;
-
-  const byStep = clean
-    .split(/(?=\bStep\s+\d+\b)/i)
-    .map(strip)
-    .filter(meaningful);
-  if (byStep.length > 1) return byStep;
-
-  return [strip(clean)];
-}
-
-// ── Word-by-word typewriter hook ──────────────────────────────────────────
+// ─── Word-by-word typewriter hook ──────────────────────────────────────────
 function useWordByWord(fullText: string, isActive: boolean): string {
   const [visibleCount, setVisibleCount] = useState<number>(
     () => (isActive ? 0 : Number.MAX_SAFE_INTEGER)
@@ -214,17 +399,14 @@ function useWordByWord(fullText: string, isActive: boolean): string {
       return;
     }
     if (clampedCount >= tokens.length) return;
-    const t = setTimeout(
-      () => setVisibleCount(c => c + 2),
-      30
-    );
+    const t = setTimeout(() => setVisibleCount(c => c + 2), 30);
     return () => clearTimeout(t);
   }, [fullText, clampedCount, isActive, tokens.length]);
 
   return tokens.slice(0, clampedCount).join("");
 }
 
-// ── Timeline column — Claude-style: 1px rail, compact dot ──────────────
+// ── Timeline column ──────────────────────────────────────────────────────────
 export function TimelineNode({
   icon,
   isFirst = false,
@@ -242,29 +424,21 @@ export function TimelineNode({
   if (!showRail) {
     return (
       <div className="flex flex-col items-center w-4 shrink-0 pt-2">
-        <div className="relative z-10 flex items-center justify-center">
-          {icon}
-        </div>
+        <div className="relative z-10 flex items-center justify-center">{icon}</div>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col items-center w-4 shrink-0 self-stretch">
-      <div
-        className={`${lineWidth} h-[12px] shrink-0 transition-opacity duration-300 ${!isFirst ? "opacity-100" : "opacity-0"} ${lineColor}`}
-      />
+      <div className={`${lineWidth} h-[12px] shrink-0 transition-opacity duration-300 ${!isFirst ? "opacity-100" : "opacity-0"} ${lineColor}`} />
 
       <div className="flex items-center justify-center h-4 w-4 shrink-0 relative">
-        <div
-          className={`absolute left-1/2 -translate-x-1/2 ${lineWidth} ${lineColor}
-            ${isFirst ? "top-[12px]" : "top-0"}
-            ${isLast ? "bottom-[12px]" : "bottom-0"}`}
+        <div className={`absolute left-1/2 -translate-x-1/2 ${lineWidth} ${lineColor}
+          ${isFirst ? "top-[12px]" : "top-0"}
+          ${isLast ? "bottom-[12px]" : "bottom-0"}`}
         />
-
-        <div className="relative z-10 flex items-center justify-center">
-          {icon}
-        </div>
+        <div className="relative z-10 flex items-center justify-center">{icon}</div>
       </div>
 
       {isLast ? (
@@ -284,7 +458,7 @@ export function TimelineNode({
   );
 }
 
-// ── Generic step row — Claude-style: compact, muted ─────────────────────
+// ── Generic step row ─────────────────────────────────────────────────────────
 function StepRow({
   icon, message, children, isFirst = false, isLast = false, pulse = false, showRail = true, rightSlot,
 }: {
@@ -314,7 +488,44 @@ function StepRow({
   );
 }
 
-// ── ThoughtBlock — Claude-style: minimal, clean, with MessageRenderer ────
+// ── Spinner icon ──────────────────────────────────────────────────────────────
+function SpinnerIcon({ cls = "" }: IProps) {
+  return (
+    <span className={`size-4 flex items-center justify-center ${cls}`}>
+      <span className="relative size-3">
+        <span className="absolute inset-0 rounded-full border border-[var(--accent)]/25 border-t-[var(--accent)] animate-spin" />
+      </span>
+    </span>
+  );
+}
+
+// ── ThoughtBlock ──────────────────────────────────────────────────────────────
+function cleanThoughtText(text: string): string {
+  return text
+    .replace(/<ANSWER>[\s\S]*?<\/ANSWER>/gi, "")
+    .replace(/<ANSWER>[\s\S]*/gi, "")
+    .replace(/<FOLLOW_UPS>[\s\S]*?<\/FOLLOW_UPS>/gi, "")
+    .replace(/<FOLLOW_UPS>[\s\S]*/gi, "")
+    .replace(/<\/?[A-Z_]+>/gi, "")
+    .trim();
+}
+
+function parseThoughtSteps(text: string): string[] {
+  const clean = text.trim();
+  if (!clean) return [];
+  const strip = (s: string) => s.replace(/^[\s•·‣▸\-–—]+/, "").trim();
+  const meaningful = (s: string) => strip(s).length > 8;
+  const byDouble = clean.split(/\n{2,}/).map(strip).filter(meaningful);
+  if (byDouble.length > 1) return byDouble;
+  const bySingle = clean.split(/\n/).map(strip).filter(meaningful);
+  if (bySingle.length > 1) return bySingle;
+  const byBullet = clean.split(/\s*[•·‣▸]\s*/).map(strip).filter(meaningful);
+  if (byBullet.length > 1) return byBullet;
+  const byStep = clean.split(/(?=\bStep\s+\d+\b)/i).map(strip).filter(meaningful);
+  if (byStep.length > 1) return byStep;
+  return [strip(clean)];
+}
+
 function ThoughtBlock({
   status, isFirst = false, isLast = false, isActive, elapsedSeconds,
 }: {
@@ -326,13 +537,10 @@ function ThoughtBlock({
 }) {
   const [open, setOpen] = useState(true);
   const isThinking = isActive !== undefined ? isActive : isLast;
-
   const rawText = cleanThoughtText(status.content || status.message);
   const allSteps = parseThoughtSteps(rawText);
 
-  const [shownCount, setShownCount] = useState<number>(() =>
-    isThinking ? 0 : allSteps.length
-  );
+  const [shownCount, setShownCount] = useState<number>(() => isThinking ? 0 : allSteps.length);
 
   useEffect(() => {
     if (!isThinking) setShownCount(allSteps.length);
@@ -341,10 +549,7 @@ function ThoughtBlock({
   useEffect(() => {
     if (!isThinking) return;
     if (shownCount >= allSteps.length) return;
-    const t = setTimeout(
-      () => setShownCount((c) => c + 1),
-      shownCount === 0 ? 80 : 700,
-    );
+    const t = setTimeout(() => setShownCount(c => c + 1), shownCount === 0 ? 80 : 700);
     return () => clearTimeout(t);
   }, [isThinking, shownCount, allSteps.length]);
 
@@ -352,29 +557,22 @@ function ThoughtBlock({
   const animatedActive = useWordByWord(activeStepText, isThinking && shownCount > 0);
 
   if (!rawText) return null;
-
   const stepsToRender = allSteps.slice(0, shownCount);
 
-  const railIcon = isThinking ? (
-    <span className="size-4 flex items-center justify-center">
-      <span className="relative size-3">
-        <span className="absolute inset-0 rounded-full border border-[var(--accent)]/25 border-t-[var(--accent)] animate-spin" />
+  const railIcon = isThinking
+    ? <SpinnerIcon />
+    : (
+      <span className="size-4 flex items-center justify-center">
+        <span className="size-1.5 rounded-full bg-[var(--text-secondary)]/40" />
       </span>
-    </span>
-  ) : (
-    <span className="size-4 flex items-center justify-center">
-      <span className="size-1.5 rounded-full bg-[var(--text-secondary)]/40" />
-    </span>
-  );
+    );
 
   return (
     <div className="flex gap-2.5">
-      <div className="flex flex-col items-center w-4 shrink-0 pt-2">
-        {railIcon}
-      </div>
+      <div className="flex flex-col items-center w-4 shrink-0 pt-2">{railIcon}</div>
       <div className="py-2 min-w-0 flex-1">
         <button
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => setOpen(v => !v)}
           aria-expanded={open}
           className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors select-none"
         >
@@ -385,10 +583,7 @@ function ThoughtBlock({
               <span className="text-[var(--text-secondary)]">
                 Thinking{elapsedSeconds != null ? ` · ${elapsedSeconds}s` : ""}
               </span>
-              <ChevronDown
-                className={`size-3.5 text-[var(--text-muted)] transition-transform duration-200 ${open ? "rotate-180" : "rotate-0"
-                  }`}
-              />
+              <ChevronDown className={`size-3.5 text-[var(--text-muted)] transition-transform duration-200 ${open ? "rotate-180" : "rotate-0"}`} />
             </>
           )}
         </button>
@@ -400,38 +595,20 @@ function ThoughtBlock({
               const isAnimating = isThinking && isLastShown;
               const text = isAnimating ? animatedActive : step;
               const hasLineBelow = i < stepsToRender.length - 1 || (isThinking && isLastShown);
-
               return (
-                <div
-                  key={i}
-                  className="flex gap-2 items-start"
+                <div key={i} className="flex gap-2 items-start"
                   style={{
-                    animation: !isThinking
-                      ? "thoughtStepIn 0.3s ease both"
-                      : undefined,
+                    animation: !isThinking ? "thoughtStepIn 0.3s ease both" : undefined,
                     animationDelay: !isThinking ? `${i * 0.1}s` : undefined,
-                  }}
-                >
+                  }}>
                   <div className="flex flex-col items-center shrink-0 w-2.5 self-stretch">
-                    <span
-                      className={`mt-[5px] size-[4px] rounded-full shrink-0 ${isAnimating ? "bg-[var(--accent)]" : "bg-[var(--text-secondary)]/40"
-                        }`}
-                    />
-                    {hasLineBelow && (
-                      <div className="w-px flex-1 mt-1 min-h-[10px] bg-[var(--text-muted)]/15" />
-                    )}
+                    <span className={`mt-[5px] size-[4px] rounded-full shrink-0 ${isAnimating ? "bg-[var(--accent)]" : "bg-[var(--text-secondary)]/40"}`} />
+                    {hasLineBelow && <div className="w-px flex-1 mt-1 min-h-[10px] bg-[var(--text-muted)]/15" />}
                   </div>
-
-                  <div
-                    className={`text-[13px] leading-relaxed pb-2.5 min-w-0 flex-1 ${isAnimating ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]/80"
-                      }`}
-                  >
+                  <div className={`text-[13px] leading-relaxed pb-2.5 min-w-0 flex-1 ${isAnimating ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]/80"}`}>
                     <MessageRenderer content={text || ""} onCitationClick={() => { }} sources={[]} />
                     {isAnimating && (
-                      <span
-                        className="inline-block w-px h-[13px] bg-[var(--text-secondary)] ml-0.5 align-middle"
-                        style={{ animation: "blink 1s step-end infinite" }}
-                      />
+                      <span className="inline-block w-px h-[13px] bg-[var(--text-secondary)] ml-0.5 align-middle" style={{ animation: "blink 1s step-end infinite" }} />
                     )}
                   </div>
                 </div>
@@ -442,10 +619,8 @@ function ThoughtBlock({
 
         <style>{`
           @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-          @keyframes thoughtStepIn {
-            from { opacity:0; transform:translateY(4px); }
-            to   { opacity:1; transform:translateY(0);   }
-          }
+          @keyframes thoughtStepIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+          @keyframes flare-sweep { from{transform:translateX(-100%)} to{transform:translateX(200%)} }
         `}</style>
       </div>
     </div>
@@ -453,6 +628,25 @@ function ThoughtBlock({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MAIN COMPONENT
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface StatusMessageProps {
+  status: {
+    type: string;
+    subtype: string;
+    message: string;
+    content?: string;
+    data?: any;
+  };
+  isFirst?: boolean;
+  isLast?: boolean;
+  isActive?: boolean;
+  showRail?: boolean;
+  onSourceClick?: (url: string | null) => void;
+  elapsedSeconds?: number;
+  rightSlot?: React.ReactNode;
+}
 
 export function StatusMessage({
   status, isFirst = false, isLast = false, isActive, onSourceClick, elapsedSeconds, rightSlot,
@@ -471,12 +665,15 @@ export function StatusMessage({
 
   const [detailOpen, setDetailOpen] = useState(false);
 
+  // ─── skip silently ────────────────────────────────────────────────────────
   if (status.subtype === "complete") return null;
 
+  // ─── thought ──────────────────────────────────────────────────────────────
   if (status.subtype === "thought") {
     return <ThoughtBlock status={status} isFirst={isFirst} isLast={isLast} isActive={isActive} elapsedSeconds={elapsedSeconds} />;
   }
 
+  // ─── weather ─────────────────────────────────────────────────────────────
   if (status.subtype === "weather") {
     const apiLabel = status.data?.hasKey ? "OpenWeatherMap" : "Open-Meteo";
     return (
@@ -496,12 +693,10 @@ export function StatusMessage({
         message={status.message} isFirst={isFirst} isLast={isLast} pulse={false}
       >
         {source && (
-          <span
-            className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium mt-1 ${isOWM
-              ? "border-[var(--accent)]/20 bg-[var(--accent)]/8 text-[var(--accent)]/80"
-              : "border-teal-500/30 bg-teal-500/8 text-teal-400/80"
-              }`}
-          >
+          <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium mt-1 ${isOWM
+            ? "border-[var(--accent)]/20 bg-[var(--accent)]/8 text-[var(--accent)]/80"
+            : "border-teal-500/30 bg-teal-500/8 text-teal-400/80"
+            }`}>
             <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className="size-3 shrink-0">
               <circle cx="6" cy="4.5" r="2" />
               <path d="M1.5 8.5c0-1.1.8-2 2-2h5c1.2 0 2 .9 2 2a1.2 1.2 0 0 1-1.2 1.2H2.7A1.2 1.2 0 0 1 1.5 8.5z" />
@@ -522,11 +717,25 @@ export function StatusMessage({
     );
   }
 
+  // ─── web search ──────────────────────────────────────────────────────────
   if (status.subtype === "searching") {
+    const query: string = status.data?.query ?? "";
     return (
-      <div className="py-2 flex items-start gap-1 w-full">
-        <div className="min-w-0 flex-1 text-[13px] text-[var(--text-secondary)] leading-snug font-medium break-words">{status.message}</div>
-        {rightSlot && <div className="shrink-0 mt-0.5">{rightSlot}</div>}
+      <div className="flex gap-2.5">
+        <TimelineNode
+          icon={<SearchIcon cls={isActive ? "text-[var(--accent)]" : "text-[var(--text-secondary)]/40"} />}
+          isFirst={isFirst} isLast={isLast}
+        />
+        <div className="py-2 min-w-0 flex-1">
+          <span className="text-[13px] text-[var(--text-secondary)] leading-snug font-medium">{status.message}</span>
+          {rightSlot && <span className="inline-flex shrink-0 align-middle ml-1">{rightSlot}</span>}
+          {query && (
+            <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-md border border-[var(--surface-border)] bg-[var(--surface-bg)] px-2.5 py-1 text-[12px] text-[var(--text-secondary)] font-mono">
+              <SearchIcon cls="size-3 text-[var(--text-muted)]" />
+              <span className="truncate max-w-[260px]">{query}</span>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -539,7 +748,7 @@ export function StatusMessage({
         icon={<GlobeIcon cls="text-[var(--text-muted)]" />}
         message={status.message} isFirst={isFirst} isLast={isLast} pulse={false}
       >
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5 mt-0.5">
           {sources.map((url, idx) => {
             const { score } = calculateTrustScore(url);
             return (
@@ -568,13 +777,13 @@ export function StatusMessage({
         message={status.message} isFirst={isFirst} isLast={isLast} pulse={isActive}
       >
         {titles.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5 mt-0.5">
             {titles.map((title, idx) => (
               <button
                 key={`${urls[idx] ?? idx}`}
                 onClick={() => urls[idx] && onSourceClick?.(urls[idx])}
                 aria-label={`View source: ${title}`}
-                className="group flex items-center gap-1 rounded-md border border-[var(--surface-border)] bg-[var(--surface-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-muted)]/80 transition-all duration-150 hover:border-[var(--accent)]/20 hover:bg-[var(--surface-bg)] hover:text-[var(--text-primary)]"
+                className="group flex items-center gap-1 rounded-md border border-[var(--surface-border)] bg-[var(--surface-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-muted)]/80 transition-all duration-150 hover:border-[var(--accent)]/20 hover:text-[var(--text-primary)]"
               >
                 <span className="truncate max-w-[180px]">{title}</span>
                 <LinkIcon cls="size-2.5 opacity-0 group-hover:opacity-60 transition-opacity" />
@@ -586,92 +795,135 @@ export function StatusMessage({
     );
   }
 
-  if (status.subtype === 'generating_chart') {
+  if (status.subtype === "no_results") {
     return (
       <StepRow rightSlot={rightSlot}
-        icon={
-          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"
-            strokeLinecap="round" strokeLinejoin="round"
-            className={`size-5 shrink-0 ${isActive ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]/40'}`}>
-            <rect x="2.5" y="10" width="3" height="7.5" rx="0.5" />
-            <rect x="8.5" y="6" width="3" height="11.5" rx="0.5" />
-            <rect x="14.5" y="2.5" width="3" height="15" rx="0.5" />
-            <line x1="1.5" y1="18" x2="18.5" y2="18" strokeWidth="1.2" />
-          </svg>
-        }
-        message={status.message}
-        isFirst={isFirst}
-        isLast={isLast}
-        pulse={isActive}
+        icon={<WarnIcon cls="text-[var(--text-secondary)]/60" />}
+        message={status.message} isFirst={isFirst} isLast={isLast} pulse={false}
       />
     );
   }
 
-  // ─── Collapsible detail row (used by generating_file and reading_skill) ───
+  // ─── reading_skill ────────────────────────────────────────────────────────
+  if (status.subtype === "reading_skill" || status.subtype === "reading_skill_success" || status.subtype === "reading_skill_error") {
+    const docType: string = status.data?.docType ?? "";
+    const isSuccess = status.subtype === "reading_skill_success";
+    const isError = status.subtype === "reading_skill_error";
+    const isLoading = status.subtype === "reading_skill";
 
-  if (status.subtype === 'generating_file' || status.subtype === 'generating_file_success' || status.subtype === 'generating_file_error') {
-    const filePath: string = status.data?.path ?? '';
-    const fileContent: string = status.data?.contentPreview ?? status.data?.content ?? '';
-    const isSuccess = status.subtype === 'generating_file_success';
-    const isError = status.subtype === 'generating_file_error';
-    const filename = filePath.split('/').pop() || filePath.split('\\').pop() || '';
+    const skillIcon = (
+      <span className="size-4 flex items-center justify-center">
+        {isLoading && isActive ? (
+          <span className="relative size-3">
+            <span className="absolute inset-0 rounded-full border border-[var(--accent)]/25 border-t-[var(--accent)] animate-spin" />
+          </span>
+        ) : (
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+            className={`size-3.5 ${isSuccess ? 'text-emerald-400/70' : isError ? 'text-red-400/70' : 'text-[var(--text-secondary)]/50'}`}>
+            <path d="M2 2h12v12H2z" />
+            <line x1="5" y1="5.5" x2="11" y2="5.5" strokeWidth="1" />
+            <line x1="5" y1="8" x2="11" y2="8" strokeWidth="1" />
+            <line x1="5" y1="10.5" x2="8.5" y2="10.5" strokeWidth="1" />
+          </svg>
+        )}
+      </span>
+    );
 
-    const fileIcon = (
+    return (
+      <StepRow rightSlot={rightSlot}
+        icon={skillIcon}
+        message={status.message}
+        isFirst={isFirst} isLast={isLast} pulse={isLoading && isActive}
+      >
+        {docType && (
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-medium ${isSuccess
+              ? 'border-emerald-500/20 bg-emerald-500/6 text-emerald-400/80'
+              : isError
+                ? 'border-red-500/20 bg-red-500/6 text-red-400/80'
+                : 'border-[var(--accent)]/20 bg-[var(--accent)]/5 text-[var(--accent)]/80'
+              }`}>
+              <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" className="size-2.5 shrink-0">
+                <path d="M2 1h6v8H2z" />
+                <line x1="3.5" y1="3.5" x2="6.5" y2="3.5" strokeWidth="1" />
+                <line x1="3.5" y1="5.5" x2="5.5" y2="5.5" strokeWidth="1" />
+              </svg>
+              {docType.toUpperCase()} rules
+            </span>
+          </div>
+        )}
+      </StepRow>
+    );
+  }
+
+  // ─── chart ────────────────────────────────────────────────────────────────
+  if (status.subtype === "generating_chart") {
+    return (
+      <StepRow rightSlot={rightSlot}
+        icon={<ChartIcon cls={isActive ? "text-[var(--accent)]" : "text-[var(--text-secondary)]/40"} />}
+        message={status.message}
+        isFirst={isFirst} isLast={isLast} pulse={isActive}
+      />
+    );
+  }
+
+  // ─── file write / edit / create-project ──────────────────────────────────
+  if (
+    status.subtype === "generating_file" ||
+    status.subtype === "generating_file_success" ||
+    status.subtype === "generating_file_error"
+  ) {
+    const filePath: string = status.data?.path ?? "";
+    const filename: string = status.data?.filename ?? filePath.split(/[\\/]/).pop() ?? filePath;
+    const fileContent: string = status.data?.contentPreview ?? status.data?.content ?? "";
+    const language: string = status.data?.language ?? "";
+    const isSuccess = status.subtype === "generating_file_success";
+    const isError = status.subtype === "generating_file_error";
+    const isWriting = status.subtype === "generating_file";
+
+    const fileIconColor = isWriting && isActive
+      ? "text-[var(--accent)]"
+      : isSuccess
+        ? "text-emerald-400/70"
+        : isError
+          ? "text-red-400/70"
+          : "text-[var(--text-secondary)]/40";
+
+    const fileIconEl = (
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"
         strokeLinecap="round" strokeLinejoin="round"
-        className={`size-4 shrink-0 ${
-          isActive ? 'text-[var(--accent)]'
-          : isSuccess ? 'text-emerald-400/70'
-          : isError ? 'text-red-400/70'
-          : 'text-[var(--text-secondary)]/40'
-        }`}>
-        <rect x="2" y="3.5" width="16" height="13" rx="2" />
-        <polyline points="5.5,8 8,10.5 5.5,13" strokeWidth="1.5" />
-        <line x1="9.5" y1="13" x2="14.5" y2="13" strokeWidth="1.3" />
+        className={`size-4 shrink-0 ${fileIconColor}`}>
+        <path d="M5 2.5h6.5l3 3V16a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1z" />
+        <polyline points="11.5,2.5 11.5,5.5 14.5,5.5" />
+        <line x1="7" y1="9" x2="13" y2="9" strokeWidth="1.1" />
+        <line x1="7" y1="11.5" x2="11" y2="11.5" strokeWidth="1.1" />
       </svg>
     );
 
     return (
       <div className="relative overflow-hidden">
-        {isActive && (
+        {isWriting && isActive && (
           <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-md">
-            <div className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-flare-sweep" />
+            <div className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-[flare-sweep_2s_linear_infinite]" />
           </div>
         )}
         <div className="flex gap-2.5">
-          <TimelineNode icon={fileIcon} isFirst={isFirst} isLast={isLast} showRail={true} />
+          <TimelineNode icon={fileIconEl} isFirst={isFirst} isLast={isLast} />
           <div className="py-2 min-w-0 flex-1">
-            <span
-              onClick={() => fileContent && setDetailOpen(v => !v)}
-              className="inline-flex items-center gap-1.5 text-[13px] text-[var(--text-secondary)] leading-snug font-medium hover:text-[var(--text-primary)] transition-colors select-none cursor-pointer"
-            >
-              <span>{status.message}</span>
-              {fileContent && (
-                <ChevronDown className={`size-3 shrink-0 transition-transform duration-200 ${detailOpen ? 'rotate-0' : '-rotate-90'} text-[var(--text-muted)]`} />
-              )}
-            </span>
+            {/* Status label */}
+            <span className="text-[13px] text-[var(--text-secondary)] leading-snug font-medium">{status.message}</span>
             {rightSlot && <span className="inline-flex shrink-0 align-middle ml-1">{rightSlot}</span>}
 
-            {detailOpen && (
-              <div className="mt-3 flex flex-col gap-2">
-                <div className="rounded-md border border-[var(--surface-border)] overflow-hidden bg-[#0c0c0b]">
-                  <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--surface-border)] bg-black/20">
-                    <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="size-3 text-[var(--text-muted)]">
-                      <polyline points="3.5,5 5.5,7 3.5,9" />
-                      <line x1="7" y1="9" x2="9" y2="9" />
-                    </svg>
-                    <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-medium">{filename} · {fileContent.length} chars</span>
-                  </div>
-                  <pre className="text-[11.5px] leading-relaxed p-3 overflow-x-auto font-mono whitespace-pre max-h-[380px] overflow-y-auto text-[#c9c7be]" style={{ tabSize: 2 }}>{fileContent}</pre>
-                </div>
-                <div className="rounded-md border border-[var(--surface-border)] overflow-hidden bg-[#0c0c0b]">
-                  <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--surface-border)] bg-black/20">
-                    <span className={`size-2 rounded-full ${isSuccess ? 'bg-emerald-500' : isError ? 'bg-red-500' : 'bg-[var(--text-muted)]'}`} />
-                    <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-medium">Output</span>
-                  </div>
-                  <pre className="text-[11.5px] leading-relaxed p-3 overflow-x-auto font-mono whitespace-pre text-[#c9c7be]">{isSuccess ? `File written to ${filePath}` : status.message}</pre>
-                </div>
-              </div>
+            {/* File block with content preview */}
+            {filename && (
+              <FileCodeBlock
+                filename={filename}
+                content={fileContent || undefined}
+                language={language || filename.split('.').pop() || 'text'}
+                isRunning={isWriting && !!isActive}
+                isSuccess={isSuccess}
+                isError={isError}
+              />
             )}
 
             {isLast && (
@@ -685,129 +937,264 @@ export function StatusMessage({
     );
   }
 
-  // ─── reading_skill — model is loading generation rules for a doc type ───
-  if (status.subtype === 'reading_skill') {
-    const docType: string = status.data?.docType ?? '';
-    return (
-      <div className="py-2 w-full">
-        <div className="flex items-start gap-1 w-full">
-          <div className="min-w-0 flex-1 text-[13px] text-[var(--text-secondary)] leading-snug font-medium break-words">
-            {status.message}
-            {rightSlot && <span className="inline-flex shrink-0 align-middle ml-1">{rightSlot}</span>}
-          </div>
-        </div>
-        <div className="flex items-center gap-2 mt-1.5">
-          {docType && (
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--accent)]/20 bg-[var(--accent)]/5 text-[var(--accent)]/80 px-2 py-0.5 text-[11px] font-medium">
-              <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.4"
-                strokeLinecap="round" className="size-2.5 shrink-0">
-                <path d="M2 1h6v8H2z" /><line x1="3.5" y1="3.5" x2="6.5" y2="3.5" strokeWidth="1" />
-                <line x1="3.5" y1="5.5" x2="5.5" y2="5.5" strokeWidth="1" />
-              </svg>
-              {docType.toUpperCase()} rules
-            </span>
-          )}
-          <button
-            onClick={() => setDetailOpen(v => !v)}
-            className="flex items-center gap-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-          >
-            <ChevronDown className={`size-3 transition-transform duration-200 ${detailOpen ? 'rotate-180' : ''}`} />
-          </button>
-        </div>
-        {detailOpen && docType && (
-          <div className="mt-1.5 text-[12px] text-[var(--text-muted)] leading-relaxed">
-            Loaded <span className="text-[var(--text-secondary)] font-medium">{docType.toUpperCase()}</span> generation rules — the model will follow these formatting guidelines when building the document.
-          </div>
-        )}
-        {isLast && (
-          <div className="flex items-center h-4 mt-1">
-            <span className="text-[13px] text-[var(--text-secondary)] leading-snug font-medium">Done</span>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // ─── sandbox tool events (run_bash / start_app / etc.) ──────────────────
-  if (status.subtype === 'sandbox_start' || status.subtype === 'sandbox_success' || status.subtype === 'sandbox_error') {
-    const command: string = status.data?.command ?? '';
+  // ─── sandbox: run_bash / run_python / install_package ────────────────────
+  if (
+    status.subtype === "sandbox_start" ||
+    status.subtype === "sandbox_success" ||
+    status.subtype === "sandbox_error"
+  ) {
+    const command: string = status.data?.command ?? "";
+    const tool: string = status.data?.tool ?? "run_bash";
     const exitCode: number | undefined = status.data?.exitCode;
-    const isSuccess = status.subtype === 'sandbox_success';
-    const isError = status.subtype === 'sandbox_error';
+    const isRunning = status.subtype === "sandbox_start";
+    const isSuccess = status.subtype === "sandbox_success";
+    const isError = status.subtype === "sandbox_error";
 
-    const termIcon = (
+    // Determine language label
+    const langLabel =
+      tool === "run_python" ? "python"
+        : tool === "install_package" ? "bash"
+          : "bash";
+
+    // Icon — terminal for bash, python symbol for python, package for install
+    const termIconEl = (
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"
         strokeLinecap="round" strokeLinejoin="round"
-        className={`size-4 shrink-0 ${
-          isActive ? 'text-[var(--accent)]'
-          : isSuccess ? 'text-emerald-400/70'
-          : isError ? 'text-red-400/70'
-          : 'text-[var(--text-secondary)]/40'
-        }`}>
+        className={`size-4 shrink-0 ${isRunning && isActive ? "text-[var(--accent)]"
+          : isSuccess ? "text-emerald-400/70"
+            : isError ? "text-red-400/70"
+              : "text-[var(--text-secondary)]/40"
+          }`}>
         <rect x="2" y="3.5" width="16" height="13" rx="2" />
         <polyline points="5.5,8 8,10.5 5.5,13" strokeWidth="1.5" />
         <line x1="9.5" y1="13" x2="14.5" y2="13" strokeWidth="1.3" />
       </svg>
     );
 
+    // Parse duration from the success message e.g. "Bash finished (exit 0, 1.5s)"
+    const durationMatch = status.message.match(/(\d+\.?\d*s)\)/);
+    const durationStr = durationMatch?.[1];
+
     return (
-      <StepRow rightSlot={rightSlot}
-        icon={termIcon}
-        message={status.message}
-        isFirst={isFirst}
-        isLast={isLast}
-        pulse={isActive}
-      >
-        {command && (
-          <div className="mt-1 font-mono text-[11px] text-[var(--text-muted)] bg-black/30 rounded px-2 py-1 flex items-center gap-2 max-w-full overflow-hidden">
-            <span className="text-emerald-500/70 shrink-0">$</span>
-            <span className="truncate">{command}</span>
-            {exitCode !== undefined && (
-              <span className={`ml-auto shrink-0 text-[10px] rounded px-1.5 py-0.5 ${
-                exitCode === 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
-              }`}>exit {exitCode}</span>
-            )}
+      <div className="flex gap-2.5">
+        <TimelineNode icon={termIconEl} isFirst={isFirst} isLast={isLast} />
+        <div className="py-2 min-w-0 flex-1">
+          {/* Header label */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[13px] text-[var(--text-secondary)] leading-snug font-medium">
+              {status.message}
+            </span>
+            {rightSlot && <span className="inline-flex shrink-0 align-middle">{rightSlot}</span>}
           </div>
-        )}
-      </StepRow>
+
+          {/* Terminal block — only on start (has command) */}
+          {command && (
+            <TerminalBlock
+              command={command}
+              language={langLabel}
+              isRunning={isRunning && !!isActive}
+              exitCode={isSuccess ? exitCode : undefined}
+              durationStr={durationStr}
+            />
+          )}
+
+          {/* Success / error micro-badge when no command data */}
+          {!command && (exitCode !== undefined || isError) && (
+            <div className="mt-1.5 flex items-center gap-1.5">
+              {exitCode !== undefined && (
+                <span className={`text-[11px] font-mono rounded border px-1.5 py-[2px] ${exitCode === 0
+                  ? 'bg-emerald-500/8 text-emerald-400/80 border-emerald-500/20'
+                  : 'bg-red-500/8 text-red-400/80 border-red-500/20'
+                  }`}>
+                  exit {exitCode}
+                </span>
+              )}
+              {durationStr && (
+                <span className="text-[11px] text-[var(--text-muted)]">{durationStr}</span>
+              )}
+            </div>
+          )}
+
+          {isLast && (
+            <div className="flex items-center h-4 mt-1">
+              <span className="text-[13px] text-[var(--text-secondary)] leading-snug font-medium">Done</span>
+            </div>
+          )}
+        </div>
+      </div>
     );
   }
 
-  // ─── image_enhancing — AI is rewriting the prompt for higher quality ────
-  if (status.subtype === 'image_enhancing') {
+  // ─── wiki_search ──────────────────────────────────────────────────────────
+  if (status.subtype === "wiki_search" || status.subtype === "wiki_search_success" || status.subtype === "wiki_search_error") {
+    const query: string = status.data?.query ?? "";
+    const resultCount: number = status.data?.count ?? 0;
+    const isSuccess = status.subtype === "wiki_search_success";
+    const isError = status.subtype === "wiki_search_error";
+    const isLoading = status.subtype === "wiki_search";
+
+    return (
+      <div className="flex gap-2.5">
+        <TimelineNode
+          icon={<WikiIcon cls={
+            isLoading && isActive ? "text-[var(--accent)]"
+              : isSuccess ? "text-emerald-400/70"
+                : isError ? "text-red-400/70"
+                  : "text-[var(--text-secondary)]/40"
+          } />}
+          isFirst={isFirst} isLast={isLast}
+        />
+        <div className="py-2 min-w-0 flex-1">
+          <span className="text-[13px] text-[var(--text-secondary)] leading-snug font-medium">{status.message}</span>
+          {rightSlot && <span className="inline-flex shrink-0 align-middle ml-1">{rightSlot}</span>}
+
+          {query && (
+            <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--surface-border)] bg-[var(--surface-bg)] px-2.5 py-1 text-[12px] text-[var(--text-secondary)] font-mono">
+                <WikiIcon cls="size-3 text-[var(--text-muted)]" />
+                <span className="truncate max-w-[220px]">{query}</span>
+              </span>
+              {isSuccess && resultCount > 0 && (
+                <span className="text-[11px] text-emerald-400/70 bg-emerald-500/8 border border-emerald-500/20 rounded px-1.5 py-0.5">
+                  {resultCount} node{resultCount !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ─── tool_call — generic tool call from orchestrator ─────────────────────
+  // Handles event: tool_call SSE events converted to status subtype
+  if (status.subtype === "tool_call") {
+    const toolName: string = status.data?.toolName ?? "";
+    const args: any = status.data?.args ?? {};
+    const result: string = status.data?.result ?? "";
+    const toolStatus: string = status.data?.status ?? "running";
+    const isDone = toolStatus === "done" || toolStatus === "success";
+    const isRunning = toolStatus === "running" || toolStatus === "pending";
+    const isErrTool = toolStatus === "error";
+
+    // Decide icon based on tool name
+    const toolIconEl = toolName.includes("bash") || toolName.includes("python")
+      ? <TerminalIcon cls={isRunning ? "text-[var(--accent)]" : isDone ? "text-emerald-400/70" : "text-[var(--text-secondary)]/40"} />
+      : toolName.includes("file") || toolName.includes("write") || toolName.includes("read")
+        ? <FileIcon cls={isDone ? "text-emerald-400/70" : "text-[var(--text-secondary)]/40"} />
+        : toolName.includes("wiki")
+          ? <WikiIcon cls={isDone ? "text-emerald-400/70" : "text-[var(--text-secondary)]/40"} />
+          : toolName.includes("search")
+            ? <SearchIcon cls={isRunning ? "text-[var(--accent)]" : "text-[var(--text-secondary)]/40"} />
+            : toolName.includes("package") || toolName.includes("install")
+              ? <PackageIcon cls={isRunning ? "text-[var(--accent)]" : "text-[var(--text-secondary)]/40"} />
+              : (
+                <span className="size-4 flex items-center justify-center">
+                  {isRunning
+                    ? <SpinnerIcon />
+                    : <span className={`size-1.5 rounded-full ${isDone ? 'bg-emerald-400/70' : isErrTool ? 'bg-red-400/70' : 'bg-[var(--text-muted)]'}`} />
+                  }
+                </span>
+              );
+
+    // Pick command to show in terminal block
+    const terminalCmd = args?.command ?? args?.code ?? args?.path ?? "";
+    const terminalLang = toolName.includes("python") ? "python" : "bash";
+
+    return (
+      <div className="flex gap-2.5">
+        <TimelineNode icon={toolIconEl} isFirst={isFirst} isLast={isLast} />
+        <div className="py-2 min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[13px] text-[var(--text-secondary)] leading-snug font-medium">
+              {status.message || toolName}
+            </span>
+            <span className="text-[11px] text-[var(--text-muted)] font-mono bg-[var(--surface-bg)] border border-[var(--surface-border)] rounded px-1.5 py-0.5">
+              {toolName}
+            </span>
+            {rightSlot && <span className="inline-flex shrink-0 align-middle">{rightSlot}</span>}
+          </div>
+
+          {terminalCmd ? (
+            <TerminalBlock
+              command={terminalCmd}
+              language={terminalLang}
+              isRunning={isRunning}
+              output={result || undefined}
+            />
+          ) : Object.keys(args).length > 0 && (
+            <div className="mt-2 rounded-lg border border-[var(--surface-border)] overflow-hidden" style={{ background: '#0f0f0e' }}>
+              <div className="px-3 py-1.5 border-b border-white/[0.06] text-[10px] text-[var(--text-muted)] font-mono uppercase tracking-wider" style={{ background: 'rgba(0,0,0,0.2)' }}>
+                Input
+              </div>
+              <pre className="text-[11.5px] leading-relaxed font-mono px-4 py-2.5 overflow-x-auto max-h-[200px] overflow-y-auto" style={{ color: '#b5b2aa' }}>
+                {JSON.stringify(args, null, 2)}
+              </pre>
+              {result && (
+                <>
+                  <div className="px-3 py-1.5 border-t border-white/[0.06] text-[10px] text-[var(--text-muted)] font-mono uppercase tracking-wider" style={{ background: 'rgba(0,0,0,0.2)' }}>
+                    Output
+                  </div>
+                  <pre className="text-[11.5px] leading-relaxed font-mono px-4 py-2.5 overflow-x-auto max-h-[200px] overflow-y-auto" style={{ color: '#9a978f' }}>
+                    {result}
+                  </pre>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ─── image tools ──────────────────────────────────────────────────────────
+  if (status.subtype === "image_enhancing" || status.subtype === "image_enhancing_success") {
+    const isDone = status.subtype === "image_enhancing_success";
     return (
       <StepRow rightSlot={rightSlot}
-        icon={<WandIcon cls={isActive ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]/40'} />}
+        icon={<WandIcon cls={
+          isDone ? "text-[var(--text-secondary)]/50"
+            : isActive ? "text-[var(--accent)]"
+              : "text-[var(--text-secondary)]/40"
+        } />}
         message={status.message}
-        isFirst={isFirst}
-        isLast={isLast}
-        pulse={isActive}
+        isFirst={isFirst} isLast={isLast} pulse={!isDone && !!isActive}
       />
     );
   }
 
-  // ─── image_generating — diffusion model is running ───────────────────────
-  if (status.subtype === 'image_generating') {
+  if (
+    status.subtype === "image_generating" ||
+    status.subtype === "image_generating_success" ||
+    status.subtype === "image_generating_error"
+  ) {
+    const isDone = status.subtype === "image_generating_success";
+    const isError = status.subtype === "image_generating_error";
     return (
       <StepRow rightSlot={rightSlot}
-        icon={<ImageIcon cls={isActive ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]/40'} />}
+        icon={<ImageIcon cls={
+          isDone ? "text-emerald-400/70"
+            : isError ? "text-red-400/70"
+              : isActive ? "text-[var(--accent)]"
+                : "text-[var(--text-secondary)]/40"
+        } />}
         message={status.message}
-        isFirst={isFirst}
-        isLast={isLast}
-        pulse={isActive}
+        isFirst={isFirst} isLast={isLast} pulse={!isDone && !isError && !!isActive}
       />
     );
   }
 
-  if (status.subtype === "error" || status.subtype === "no_results") {
+  // ─── error ────────────────────────────────────────────────────────────────
+  if (status.subtype === "error") {
     return (
       <StepRow rightSlot={rightSlot}
-        icon={<WarnIcon cls="text-[var(--text-secondary)]" />}
+        icon={<WarnIcon cls="text-red-400/60" />}
         message={status.message} isFirst={isFirst} isLast={isLast} pulse={false}
       />
     );
   }
 
+  // ─── done ─────────────────────────────────────────────────────────────────
   if (status.subtype === "done") {
     return (
       <StepRow rightSlot={rightSlot}
@@ -817,11 +1204,19 @@ export function StatusMessage({
     );
   }
 
+  // ─── fallback: any unhandled subtype ─────────────────────────────────────
   const toolInput = status.data as Record<string, unknown> | undefined;
   const hasDetail = toolInput && Object.keys(toolInput).length > 0 && !isActive;
+
   return (
     <StepRow rightSlot={rightSlot}
-      icon={<span className="size-4 flex items-center justify-center"><span className="size-1.5 rounded-full bg-[var(--text-muted)]" /></span>}
+      icon={
+        isActive
+          ? <SpinnerIcon />
+          : <span className="size-4 flex items-center justify-center">
+            <span className="size-1.5 rounded-full bg-[var(--text-muted)]" />
+          </span>
+      }
       message={status.message} isFirst={isFirst} isLast={isLast} pulse={isActive}
     >
       {hasDetail && (
@@ -834,9 +1229,14 @@ export function StatusMessage({
         </button>
       )}
       {detailOpen && hasDetail && (
-        <pre className="mt-2 text-[12px] text-[var(--text-secondary)] font-mono whitespace-pre-wrap bg-[var(--surface-bg)] border border-[var(--surface-border)] rounded-md p-2 max-h-[200px] overflow-y-auto">
-          {JSON.stringify(toolInput, null, 2)}
-        </pre>
+        <div className="mt-2 rounded-lg overflow-hidden border border-[var(--surface-border)]" style={{ background: '#0f0f0e' }}>
+          <div className="px-3 py-1.5 border-b border-white/[0.06] text-[10px] text-[var(--text-muted)] font-mono uppercase tracking-wider" style={{ background: 'rgba(0,0,0,0.2)' }}>
+            Details
+          </div>
+          <pre className="text-[11.5px] leading-relaxed font-mono px-4 py-2.5 overflow-x-auto max-h-[200px] overflow-y-auto whitespace-pre-wrap" style={{ color: '#b5b2aa' }}>
+            {JSON.stringify(toolInput, null, 2)}
+          </pre>
+        </div>
       )}
     </StepRow>
   );
