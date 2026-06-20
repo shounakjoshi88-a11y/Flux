@@ -4,6 +4,8 @@ import { Loader2, Search, Network, Brain, Layers, ChevronDown, ArrowRight, Check
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
+import { MessageRenderer } from "../components/MessageRenderer";
+import "../../styles/dashboard.css";
 
 const supabase = createClient();
 
@@ -62,6 +64,7 @@ function GraphBackdrop({ reduced }: { reduced: boolean }) {
       {GRAPH_EDGES.map(([a, b], i) => {
         const from = GRAPH_NODES[a];
         const to = GRAPH_NODES[b];
+        if (!from || !to) return null;
         return (
           <motion.line
             key={i}
@@ -214,10 +217,12 @@ Here is a breakdown of what the search results actually show:
 **Conclusion:** The premise of your question—that DeepMind has shut down humanoid robot research—is not supported by these search results. Instead, the data shows DeepMind is actively developing robotics, integrating language models into robot control, and operating within a rapidly growing humanoid robotics industry. The pivot you described appears to be a hypothetical scenario not reflected in the provided information.`;
 
 const MOCK_SOURCES = [
-  { domain: "techcrunch.com", title: "Gemini Robotics 1.5 released", trust: 98 },
-  { domain: "theverge.com", title: "DeepMind AI Integration", trust: 95 },
-  { domain: "arxiv.org", title: "Vision-Language Models", trust: 99 },
-  { domain: "youtube.com", title: "2026 Humanoid Update", trust: 85 },
+  { url: "https://arxiv.org", domain: "arxiv.org", title: "Vision-Language Models", trust: 99, content: "Vision-language models can be adapted for robot control with minimal fine-tuning." },
+  { url: "https://theverge.com", domain: "theverge.com", title: "DeepMind AI Integration", trust: 95 },
+  { url: "https://youtube.com", domain: "youtube.com", title: "2026 Humanoid Update", trust: 85, content: "AI Robots Got Shockingly Human This Year (2026 Update)" },
+  { url: "https://techcrunch.com", domain: "techcrunch.com", title: "Gemini Robotics 1.5 released", trust: 98, content: "Google DeepMind quietly released Gemini Robotics 1.5." },
+  { url: "https://techcrunch.com", domain: "techcrunch.com", title: "Humanoid Robotics Trends", trust: 98 },
+  { url: "https://theverge.com", domain: "theverge.com", title: "Gemini Robotics Progress", trust: 95, content: "DeepMind has been making progress in how its Gemini models are used for robotics." },
 ];
 
 function LiveDemoChat() {
@@ -233,7 +238,7 @@ function LiveDemoChat() {
   // Trigger animation when scrolled into view
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && !hasStarted) {
+      if (entries[0]?.isIntersecting && !hasStarted) {
         setHasStarted(true);
       }
     }, { threshold: 0.3 });
@@ -288,7 +293,7 @@ function LiveDemoChat() {
       </div>
 
       {/* Chat Body */}
-      <div ref={scrollRef} className="flex-1 p-6 sm:p-8 overflow-y-auto bg-background/30 font-sans text-sm relative flex flex-col gap-6 scroll-smooth">
+      <div ref={scrollRef} className="flex-1 p-6 sm:p-8 overflow-y-auto custom-scrollbar bg-background/30 font-sans text-sm relative flex flex-col gap-6 scroll-smooth">
 
         {/* Prompt */}
         <AnimatePresence>
@@ -415,10 +420,13 @@ function LiveDemoChat() {
                       animate={{ opacity: 1 }}
                       className="pt-2"
                     >
-                      <div
-                        className="bg-muted/40 text-foreground/90 rounded-2xl rounded-bl-md py-3 px-4 shadow-sm text-[13px] leading-relaxed"
-                        dangerouslySetInnerHTML={{ __html: formatText(typedAnswer) }}
-                      />
+                      <div className="bg-muted/40 text-foreground/90 rounded-2xl rounded-bl-md py-3 px-4 shadow-sm text-[13px] leading-relaxed">
+                        <MessageRenderer
+                          content={typedAnswer}
+                          onCitationClick={() => {}}
+                          sources={MOCK_SOURCES}
+                        />
+                      </div>
                       {isStreaming && <span className="inline-block w-2 h-4 bg-primary animate-pulse align-middle ml-1"></span>}
                     </motion.div>
                   )}
