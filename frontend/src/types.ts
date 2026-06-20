@@ -1,4 +1,4 @@
-export type Source = { url: string };
+export type Source = { url: string; content?: string };
 
 export type ConversationListItem = {
   id: string;

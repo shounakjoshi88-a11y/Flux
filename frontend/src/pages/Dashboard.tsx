@@ -5,6 +5,7 @@ import type { User } from "@supabase/supabase-js";
 import {
   Globe,
   Image,
+  Check,
   LoaderCircle,
   X,
   FileText,
@@ -111,6 +112,19 @@ export default function Dashboard() {
   const [activeImages, setActiveImages] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"answer" | "links" | "images">("answer");
+  const [shared, setShared] = useState(false);
+
+  const handleShare = useCallback(async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Flux AI', url: window.location.href });
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        setShared(true);
+        setTimeout(() => setShared(false), 2000);
+      }
+    } catch { /* user cancelled */ }
+  }, []);
 
   // ─── Search modal state ──────────────────────────────────
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
@@ -980,8 +994,8 @@ export default function Dashboard() {
           !hasStarted ? '' : 'rounded-xl border border-[var(--surface-border)] bg-[var(--bg-primary)]'
         }`} style={{ minHeight: 0 }}>
           {hasStarted && (
-            <header className="flex items-center justify-center border-b border-[var(--surface-border)] px-4 py-2">
-              <div className="flex items-center gap-6">
+            <header className="flex items-center justify-between border-b border-[var(--surface-border)] px-4 py-2">
+              <div className="flex items-center gap-6 flex-1 justify-center">
                 <button type="button" onClick={() => setActiveTab("answer")} className={tabClass("answer")}>Answer</button>
                 <button type="button" onClick={() => setActiveTab("links")} className={tabClass("links")}>
                   <Globe className="size-3 inline mr-1" /> Links
@@ -990,6 +1004,9 @@ export default function Dashboard() {
                   <Image className="size-3 inline mr-1" /> Images
                 </button>
               </div>
+              <button onClick={handleShare} className="text-xs font-medium px-3 py-1 rounded-md bg-[var(--surface-border)]/60 hover:bg-[var(--surface-border)] transition text-white/80 hover:text-white shrink-0" title="Share conversation">
+                {shared ? <Check className="size-3.5 text-emerald-400 inline mr-0.5" /> : null}Share
+              </button>
             </header>
           )}
 

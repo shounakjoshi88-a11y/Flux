@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { ChevronDown } from "lucide-react";
 import { MessageRenderer } from "./MessageRenderer";
-import { calculateTrustScore } from "../utils/TrustScore";
+import { calculateReputationScore } from "../utils/ReputationScore";
 
 // ── Icons — 20×20 viewport, size-5, 1.6px stroke ──────────
 type IProps = { cls?: string };
@@ -667,6 +667,7 @@ export function StatusMessage({
 
   // ─── skip silently ────────────────────────────────────────────────────────
   if (status.subtype === "complete") return null;
+  if (status.message?.includes("Search skipped")) return null;
 
   // ─── thought ──────────────────────────────────────────────────────────────
   if (status.subtype === "thought") {
@@ -737,7 +738,7 @@ export function StatusMessage({
       >
         <div className="flex flex-wrap gap-1.5 mt-0.5">
           {sources.map((url, idx) => {
-            const { score } = calculateTrustScore(url);
+            const { score } = calculateReputationScore(url);
             return (
               <button
                 key={`${url}-${idx}`}
@@ -1188,6 +1189,8 @@ export function StatusMessage({
 
   // ─── error ────────────────────────────────────────────────────────────────
   if (status.subtype === "error") {
+    // Silently suppress search-skipped noise
+    if (status.message?.includes("Search skipped")) return null;
     return (
       <StepRow rightSlot={rightSlot}
         icon={<WarnIcon cls="text-red-400/60" />}

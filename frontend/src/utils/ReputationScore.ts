@@ -1,15 +1,15 @@
-// src/utils/TrustScore.ts
+// src/utils/ReputationScore.ts
 //
-// Calculates a Trust Score for a given URL based on its domain.
+// Calculates a Reputation Score for a given URL based on its domain.
 // Used for web search result ranking and citation validation.
 
-export type TrustScoreResult = {
+export type ReputationResult = {
   score: number;
   reason: string;
   category: "high" | "medium" | "low" | "unverified";
 };
 
-// ─── Trusted Domains (High) ──────────────────────────────────
+// ─── High-reputation domains ─────────────────────────────────
 const TRUSTED_DOMAINS = [
   "wikipedia.org",
   "reuters.com",
@@ -30,6 +30,44 @@ const TRUSTED_DOMAINS = [
   "microsoft.com",
   "apple.com",
   "google.com",
+  "nvidia.com",
+  "amd.com",
+  "intel.com",
+  "arm.com",
+  "qualcomm.com",
+  "ibm.com",
+  "oracle.com",
+  "adobe.com",
+  "hp.com",
+  "dell.com",
+  "samsung.com",
+  "tesla.com",
+  "spacex.com",
+  "nasa.gov",
+  "who.int",
+  "nist.gov",
+  "python.org",
+  "docker.com",
+  "kubernetes.io",
+  "linuxfoundation.org",
+  "cncf.io",
+  "postgresql.org",
+  "mongodb.com",
+  "redis.io",
+  "apache.org",
+  "nginx.com",
+  "react.dev",
+  "nextjs.org",
+  "vercel.com",
+  "cloudflare.com",
+  "digitalocean.com",
+  "canonical.com",
+  "ubuntu.com",
+  "redhat.com",
+  "kernel.org",
+  "npmjs.com",
+  "rust-lang.org",
+  "golang.org",
 ];
 
 // ─── Medium Trust Domains ──────────────────────────────────
@@ -53,9 +91,9 @@ const LOW_TRUST_DOMAINS = [
 ];
 
 /**
- * Calculates a 0-100 trust score for a URL.
+ * Calculates a 0-100 reputation score for a URL.
  */
-export function calculateTrustScore(url: string | undefined): TrustScoreResult {
+export function calculateReputationScore(url: string | undefined): ReputationResult {
   if (!url) {
     return { score: 0, reason: "No URL provided", category: "unverified" };
   }

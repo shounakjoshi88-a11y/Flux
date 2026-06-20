@@ -1,5 +1,5 @@
 // src/lib/chat-utils.ts
-export type Source = { url: string };
+export type Source = { url: string; content?: string };
 
 export function parseAssistantContent(raw: string) {
   const sourcesRegex = /<SOURCES>([\s\S]*?)<\/SOURCES>/;

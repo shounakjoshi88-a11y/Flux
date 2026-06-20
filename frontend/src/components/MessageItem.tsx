@@ -42,11 +42,12 @@ import {
   RefreshCw,
   ThumbsUp,
   ThumbsDown,
-  Share2,
   Copy,
   Check,
   ChevronDown,
   Trash2,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { MessageRenderer, InlineMath } from "./MessageRenderer";
 import { FileDownloadButton } from "./FileDownloadButton";
@@ -1161,6 +1162,17 @@ export function MessageItem({
   // ── Unconditional hooks (moved up to avoid conditional hook count violations) ──
   const [userCopied, setUserCopied] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [liked, setLiked] = useState<'up' | 'down' | null>(null);
+  const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
+
+  useEffect(() => {
+    const load = () => { voicesRef.current = speechSynthesis.getVoices(); };
+    load();
+    speechSynthesis.addEventListener('voiceschanged', load);
+    return () => speechSynthesis.removeEventListener('voiceschanged', load);
+  }, []);
   const _hasParts = !!(message.parts && Array.isArray(message.parts) && message.parts.length > 0);
   const _lastTextPart = _hasParts
     ? (message.parts as MessagePart[]).slice().reverse().find((p): p is MessagePart & { type: "text" } => p.type === "text")
@@ -1259,6 +1271,42 @@ export function MessageItem({
     }
   };
 
+  const handleTTS = async () => {
+    if (isSpeaking) {
+      speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+    const text = parsedContentBundle.cleanDisplayAnswer;
+    if (!text) return;
+    const utterance = new SpeechSynthesisUtterance(text);
+    let allVoices = voicesRef.current.length > 0 ? voicesRef.current : speechSynthesis.getVoices();
+    if (allVoices.length === 0) {
+      await new Promise<void>(resolve => {
+        const onv = () => { allVoices = speechSynthesis.getVoices(); speechSynthesis.removeEventListener('voiceschanged', onv); resolve(); };
+        speechSynthesis.addEventListener('voiceschanged', onv);
+        setTimeout(resolve, 500);
+      });
+    }
+    console.log('[TTS] Voices:', allVoices.map((v: SpeechSynthesisVoice) => `${v.name} (${v.lang})`));
+    const preferred = allVoices.find((v: SpeechSynthesisVoice) => /google/i.test(v.name) && v.lang.startsWith('en'))
+      ?? allVoices.find((v: SpeechSynthesisVoice) => /(zira|jenny|hazel|microsoft.*female)/i.test(v.name))
+      ?? allVoices.find((v: SpeechSynthesisVoice) => /(samantha|karen|moira|tessa|alice|fiona)/i.test(v.name))
+      ?? allVoices.find((v: SpeechSynthesisVoice) => v.lang.startsWith('en') && !/david/i.test(v.name) && !/default/i.test(v.name))
+      ?? allVoices.find((v: SpeechSynthesisVoice) => v.lang.startsWith('en'));
+    if (preferred) {
+      utterance.voice = preferred;
+      console.log('[TTS] Selected:', preferred.name);
+    }
+    utterance.rate = 0.9;
+    utterance.pitch = 1.05;
+    utterance.onend = () => { setIsSpeaking(false); speechRef.current = null; };
+    utterance.onerror = () => { setIsSpeaking(false); speechRef.current = null; };
+    speechRef.current = utterance;
+    speechSynthesis.speak(utterance);
+    setIsSpeaking(true);
+  };
+
   // Detect live streaming: optimistic assistant messages use IDs like "temp-assistant-N"
   const isStreaming = String(message.id).startsWith("temp-");
   const cleanContent = parsedContentBundle.cleanDisplayAnswer;
@@ -1347,8 +1395,8 @@ export function MessageItem({
               <button onClick={handleCopyAnswer} className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/8 transition text-muted-foreground/60 hover:text-foreground" title="Copy">
                 {copied ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
               </button>
-              <button className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/8 transition text-muted-foreground/60 hover:text-foreground" title="Share">
-                <Share2 className="size-3.5" />
+              <button onClick={handleTTS} className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/8 transition text-muted-foreground/60 hover:text-foreground" title={isSpeaking ? "Stop" : "Read aloud"}>
+                {isSpeaking ? <VolumeX className="size-3.5" /> : <Volume2 className="size-3.5" />}
               </button>
               <button onClick={() => onRegenerate?.()} className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/8 transition text-muted-foreground/60 hover:text-foreground" title="Rewrite">
                 <RefreshCw className="size-3.5" />
@@ -1370,11 +1418,11 @@ export function MessageItem({
         {/* Thumbs up/down – hide during streaming */}
         {!isStreaming && (
           <div className="flex items-center gap-0.5">
-            <button className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/8 transition text-muted-foreground/60 hover:text-foreground" title="Good response">
-              <ThumbsUp className="size-3.5" />
+            <button onClick={() => setLiked(liked === 'up' ? null : 'up')} className={`p-1.5 rounded-md transition-all duration-200 text-muted-foreground/60 hover:text-foreground ${liked === 'up' ? 'text-emerald-500 scale-110' : ''}`} title="Good response">
+              <ThumbsUp className={`size-3.5 transition-transform duration-200 ${liked === 'up' ? 'fill-emerald-500' : ''}`} />
             </button>
-            <button className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/8 transition text-muted-foreground/60 hover:text-foreground" title="Bad response">
-              <ThumbsDown className="size-3.5" />
+            <button onClick={() => setLiked(liked === 'down' ? null : 'down')} className={`p-1.5 rounded-md transition-all duration-200 text-muted-foreground/60 hover:text-foreground ${liked === 'down' ? 'text-red-500 scale-110' : ''}`} title="Bad response">
+              <ThumbsDown className={`size-3.5 transition-transform duration-200 ${liked === 'down' ? 'fill-red-500' : ''}`} />
             </button>
           </div>
         )}

@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { MessageItem } from "./MessageItem";
 import { SourceCard } from "./SourceCard";
 import { getDomain } from "../lib/chat-utils";
-import { calculateTrustScore } from "../utils/TrustScore";
+import { calculateReputationScore } from "../utils/ReputationScore";
 import type { Message, Source } from "../types";
 
 // ─── Props ──────────────────────────────────────────────────
@@ -127,7 +127,7 @@ export function MessageList({
                 </p>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {group.sources.map((source) => {
-                    const { score } = calculateTrustScore(source.url);
+                    const { score } = calculateReputationScore(source.url);
                     const badgeColor = score >= 90
                       ? "text-emerald-400 bg-emerald-400/10 border-emerald-400/35"
                       : score >= 70

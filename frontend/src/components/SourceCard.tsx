@@ -11,7 +11,7 @@ type SourceCardProps = {
   onOpenExternal: () => void;
 };
 
-function getTrustInfo(score: number): { label: string; description: string } {
+function getReputationInfo(score: number): { label: string; description: string } {
   if (score >= 90)
     return {
       label: "Excellent",
@@ -20,7 +20,7 @@ function getTrustInfo(score: number): { label: string; description: string } {
   if (score >= 70)
     return {
       label: "Good",
-      description: "Generally trustworthy with solid credibility. Score 70‑89.",
+      description: "Generally reputable with solid credibility. Score 70‑89.",
     };
   if (score >= 50)
     return {
@@ -42,7 +42,7 @@ export const SourceCard = memo(function SourceCard({
   onOpenExternal,
 }: SourceCardProps) {
   const [showTooltip, setShowTooltip] = useState(false);
-  const trustInfo = getTrustInfo(trustScore);
+  const repInfo = getReputationInfo(trustScore);
 
   return (
     <motion.button
@@ -81,7 +81,7 @@ export const SourceCard = memo(function SourceCard({
           <span
             className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium cursor-default leading-none tracking-tight ${badgeColor}`}
           >
-            Trust {trustScore}%
+            Reputation {trustScore}%
           </span>
 
           <AnimatePresence>
@@ -98,12 +98,12 @@ export const SourceCard = memo(function SourceCard({
                 className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-20 w-56"
               >
                 <div className="bg-black/80 dark:bg-[#1e1e1e]/90 backdrop-blur-xl border border-white/10 text-foreground text-[10px] rounded-xl px-3.5 py-2.5 shadow-2xl text-center leading-normal">
-                  <span className="font-semibold">{trustInfo.label}</span>
+                  <span className="font-semibold">{repInfo.label}</span>
                   <br />
-                  {trustInfo.description}
+                  {repInfo.description}
                   <br />
                   <span className="text-muted-foreground">
-                    Based on domain authority, freshness, and factual accuracy.
+                    Based on domain authority and source reputation.
                   </span>
                 </div>
               </motion.div>

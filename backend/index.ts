@@ -1957,9 +1957,8 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
             execute: async ({ query, queries: queriesArr }: any) => {
                 // ── Re-search guard: hard limit to prevent infinite loops ─────
                 if (state.searchCount >= 1 && state.searchContent) {
-                    console.warn(`[TOOL] web_search blocked (already searched ${state.searchCount}x) — model must answer from existing results`);
-                    sendStatus(res, 'error', 'Search skipped: already have results.', undefined, state.thoughtProcess);
-                    return `[SEARCH NOT ALLOWED] You already searched and have results below. DO NOT search again. Answer the user from the existing search content.\n\n${state.searchContent}`;
+                    console.warn(`[TOOL] web_search blocked (already searched ${state.searchCount}x)`);
+                    return `__SEARCH_BLOCKED__ You already searched and have results below. Answer the user from the existing search content.\n\n${state.searchContent}`;
                 }
                 state.searchCount++;
 
@@ -2039,6 +2038,7 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                     const srcs = uniqueResults.map((r: any, i: number) => ({
                         url: r.url,
                         index: (state.sources?.length ?? 0) + i + 1,
+                        content: ((r.content || r.snippet || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, 400),
                     }));
                     state.sources.push(...srcs);
 
@@ -2541,7 +2541,7 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
             execute: async ({ query }: any) => {
                 if (!uid || !query) return 'No user or query provided.';
                 if (state.wikiSearchCount >= 1) {
-                    return '[WIKI SKIPPED] You already searched the wiki. Answer from the results you have.';
+                    return '__WIKI_BLOCKED__ You already searched the wiki. Answer from the results you have.';
                 }
                 state.wikiSearchCount++;
                 try {
@@ -3519,6 +3519,10 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                             searchContentLen: agentState.searchContent?.length ?? 0,
                         });
                         collectedToolResults.push({ name, args, result: String(txt ?? '').slice(0, 20000) });
+                        // Don't break the stream — model may still produce text after seeing blocked result
+                        if (txt.includes('__SEARCH_BLOCKED__') || txt.includes('__WIKI_BLOCKED__')) {
+                            console.log(`[STREAM] ${name} blocked — model can still continue`);
+                        }
                     } catch (toolErr) {
                         console.warn('[ASK] tool-result handler error:', (toolErr as any)?.message);
                     }
@@ -4560,6 +4564,40 @@ app.get("/proxy", middleware, async (req: any, res: any) => {
         res.removeHeader("X-Frame-Options");
         res.setHeader("Content-Security-Policy", "frame-ancestors *");
         return res.status(200).send(errorHtml);
+    }
+});
+
+// ── ARTICLE PREVIEW (text snippet) ──────────────────────────
+app.get("/preview", middleware, async (req: any, res: any) => {
+    const rawUrl = ((req.query.url as string) ?? "").trim();
+    if (!rawUrl) return res.status(400).json({ error: "url required" });
+    let parsed: URL;
+    try { parsed = new URL(rawUrl); }
+    catch { return res.status(400).json({ error: "invalid url" }); }
+    if (!["http:", "https:"].includes(parsed.protocol)) return res.status(400).json({ error: "invalid protocol" });
+    try {
+        const upstream = await fetch(rawUrl, {
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            },
+            redirect: "follow", signal: AbortSignal.timeout(5000),
+        });
+        const html = await upstream.text();
+        const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || parsed.hostname.replace("www.", "");
+
+        // Strip tags and extract first meaningful paragraph
+        const body = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, " ")
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, " ")
+            .replace(/<[^>]+>/g, " ")
+            .replace(/\s+/g, " ").trim();
+        const sentences = body.split(/[.!?]\s+/).filter(s => s.trim().length > 40);
+        const snippet = (sentences[0] || body.slice(0, 300)).slice(0, 300).trim() + (body.length > 300 ? "..." : "");
+
+        res.json({ title, snippet, url: rawUrl });
+    } catch (e: any) {
+        console.error("[PREVIEW] error:", e?.message);
+        res.json({ title: parsed.hostname.replace("www.", ""), snippet: "", url: rawUrl });
     }
 });
 

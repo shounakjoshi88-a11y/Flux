@@ -17,11 +17,12 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { Copy, Check, ChevronDown } from "lucide-react";
+import { Copy, Check, ChevronDown, Download } from "lucide-react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 
 import type { Source } from "../types";
+import { getDomain } from "../lib/chat-utils";
 import { ChartRenderer, type ChartData } from "./ChartBlock";
 import SmilesDrawer from "smiles-drawer";
 
@@ -984,6 +985,26 @@ function splitWithDelimiters(text: string, regex: RegExp): { type: "delimiter" |
 // ── Note: [a-zA-Z*]+ (was [a-z*]+) so that \begin{CD}, \begin{Bmatrix}, etc. match ──
 const INLINE_DELIM_REGEX = /(\$\$[\s\S]+?\$\$|(?<!\\)\\\[(?!-?\d+pt)[\s\S]+?\\\]|(\\begin\{[a-zA-Z*]+\}[\s\S]*?\\end\{[a-zA-Z*]+\})|`[^`]+`|\*\*[\s\S]+?\*\*|__[\s\S]+?__|\*(?!\*)[\s\S]+?\*|_(?!_)[\s\S]+?_|\\\(.+?\\\)|\\\[.+?\\\]|\$.+?\$|\[\d+\])/g;
 
+function CitationHoverCard({ url, content, children }: { url: string; content?: string; children: React.ReactNode }) {
+  const [hovered, setHovered] = useState(false);
+  const domain = (() => { try { return new URL(url).hostname.replace("www.", ""); } catch { return url; } })();
+  return (
+    <span className="relative inline" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+      {children}
+      {hovered && (
+        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2.5 rounded-lg border border-[var(--surface-border)] bg-[var(--bg-primary)] shadow-xl z-50 w-80 pointer-events-none">
+          <span className="flex items-center gap-2 mb-2">
+            <img src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32`} alt="" className="size-4 rounded shrink-0" />
+            <span className="text-foreground font-medium text-xs truncate">{domain}</span>
+          </span>
+          {content && <span className="text-muted-foreground text-[11px] leading-relaxed block">{content}</span>}
+          {!content && <span className="text-muted-foreground text-[11px] truncate block">{url}</span>}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function formatInlineText(text: string, onCitationClick: any, sources: Source[], parentKey: string): React.ReactNode[] {
   if (typeof text !== "string") return [];
   return splitWithDelimiters(text, INLINE_DELIM_REGEX).flatMap((part, partIdx) => {
@@ -1002,7 +1023,9 @@ function formatInlineText(text: string, onCitationClick: any, sources: Source[],
     if (cMatch) {
       const num = Number(cMatch[1]);
       const idx = num - 1;
-      return <button key={key} onClick={() => { onCitationClick(idx); if (sources[idx]?.url) window.open(sources[idx].url, "_blank"); }} className="citation-btn text-[0.7em] align-super ml-0.5">{num}</button>;
+      const name = sources[idx]?.url ? getDomain(sources[idx].url) : `[${num}]`;
+      const url = sources[idx]?.url;
+      return <CitationHoverCard key={key} url={url || ''} content={sources[idx]?.content}><button onClick={() => { onCitationClick(idx); if (url) window.open(url, "_blank"); }} className="citation-btn text-[0.7em] align-super ml-0.5">{name}</button></CitationHoverCard>;
     }
     return <span key={key}>{val}</span>;
   });
@@ -1021,6 +1044,24 @@ function parseTable(lines: string[], startIndex: number) {
     i++;
   }
   return { rows, nextIndex: i };
+}
+
+function downloadTableAsCsv(rows: string[][], tableIndex: number) {
+  const header = rows[0] ?? [];
+  const data = rows.slice(1);
+  const csvContent = [
+    header.map(c => `"${c.replace(/"/g, '""')}"`).join(","),
+    ...data.map(row => header.map((_, ci) => `"${(row[ci] ?? "").replace(/"/g, '""')}"`).join(",")),
+  ].join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `table-${tableIndex + 1}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
 function parseList(lines: string[], startIndex: number) {
@@ -1074,12 +1115,22 @@ function renderPlainBlocks(text: string, onCitationClick: any, sources: Source[]
     if (trimmed.startsWith("|")) {
       const { rows, nextIndex } = parseTable(lines, i);
       if (rows.length > 1) {
+        const tblIdx = elements.length;
         elements.push(
-          <div key={`tab-${parentIdx}-${i}`} className="my-6 overflow-x-auto border border-white/10 rounded-lg shadow-sm">
+          <div key={`tab-${parentIdx}-${i}`} className="group my-6 overflow-x-auto border border-white/10 rounded-lg shadow-sm relative">
             <table className="min-w-full divide-y divide-white/10 text-sm">
               <thead className="bg-white/5 text-left"><tr>{rows[0]!.map((cell, ci) => (<th key={ci} className="px-4 py-3 font-semibold">{formatInlineText(cell, onCitationClick, sources, `th-${parentIdx}-${i}-${ci}`)}</th>))}</tr></thead>
               <tbody className="divide-y divide-white/5">{rows.slice(1).map((row, ri) => (<tr key={ri} className="hover:bg-white/[0.02] transition-colors">{row.map((cell, ci) => (<td key={ci} className="px-4 py-3 text-muted-foreground">{formatInlineText(cell, onCitationClick, sources, `td-${parentIdx}-${i}-${ri}-${ci}`)}</td>))}</tr>))}</tbody>
             </table>
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-1 right-1">
+              <button
+                title="Export as CSV"
+                onClick={() => downloadTableAsCsv(rows, tblIdx)}
+                className="p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                <Download className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         );
         i = nextIndex; continue;
