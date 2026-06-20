@@ -124,7 +124,7 @@ function useTypewriter(text: string, start: boolean, speed: number = 15, chunkSi
 
 function formatText(text: string) {
   return text
-    .replace(/\*\*(.*?)\*\*/g, '<strong class="text-foreground font-medium">$1</strong>")
+    .replace(/\*\*(.*?)\*\*/g, '<strong class="text-foreground font-medium">$1</strong>')
       .replace(/\n\n/g, '<br/><br/>')
       .replace(/\n/g, '<br/>');
 }
