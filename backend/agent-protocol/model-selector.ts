@@ -22,11 +22,79 @@ const NIM_MODELS: Record<string, string> = {
 
 const VISION_MODELS = new Set(["nemotron-nano-12b-v2-vl", "kimi-k2.6"]);
 
+function createFallbackModel(primaryModel: any, preferredModelId: string | undefined, modelsMap: Record<string, string>): any {
+  const getFallbackSequence = (prefId?: string) => {
+    const list = ["kimi-k2.6"];
+    for (const key of Object.keys(modelsMap)) {
+      if (key !== prefId && key !== "kimi-k2.6") {
+        list.push(key);
+      }
+    }
+    return list;
+  };
+
+  return new Proxy(primaryModel, {
+    get(target: any, prop: string | symbol, receiver: any) {
+      if (prop === 'doGenerate') {
+        return async function(options: any) {
+          try {
+            console.log(`[MODEL FALLBACK] Trying primary model: ${preferredModelId || target.modelId}`);
+            return await target.doGenerate(options);
+          } catch (primaryError: any) {
+            console.warn(`[MODEL FALLBACK] Primary model failed:`, primaryError?.message ?? primaryError);
+            const fallbackIds = getFallbackSequence(preferredModelId);
+            for (const fallbackId of fallbackIds) {
+              try {
+                console.log(`[MODEL FALLBACK] Trying fallback model: ${fallbackId}`);
+                const fallbackModel = nim.chatModel(modelsMap[fallbackId]!);
+                const fallbackOptions = { ...options, providerOptions: {} };
+                return await fallbackModel.doGenerate(fallbackOptions);
+              } catch (fallbackError: any) {
+                console.warn(`[MODEL FALLBACK] Fallback model ${fallbackId} failed:`, fallbackError?.message ?? fallbackError);
+              }
+            }
+            throw primaryError;
+          }
+        };
+      }
+      if (prop === 'doStream') {
+        return async function(options: any) {
+          try {
+            console.log(`[MODEL FALLBACK] Trying primary model stream: ${preferredModelId || target.modelId}`);
+            return await target.doStream(options);
+          } catch (primaryError: any) {
+            console.warn(`[MODEL FALLBACK] Primary model stream failed:`, primaryError?.message ?? primaryError);
+            const fallbackIds = getFallbackSequence(preferredModelId);
+            for (const fallbackId of fallbackIds) {
+              try {
+                console.log(`[MODEL FALLBACK] Trying fallback model stream: ${fallbackId}`);
+                const fallbackModel = nim.chatModel(modelsMap[fallbackId]!);
+                const fallbackOptions = { ...options, providerOptions: {} };
+                return await fallbackModel.doStream(fallbackOptions);
+              } catch (fallbackError: any) {
+                console.warn(`[MODEL FALLBACK] Fallback model stream ${fallbackId} failed:`, fallbackError?.message ?? fallbackError);
+              }
+            }
+            throw primaryError;
+          }
+        };
+      }
+      return Reflect.get(target, prop, receiver);
+    }
+  });
+}
+
 export function selectModel(preferredModel?: string): any {
+  let primaryModel: any;
+  let actualPref: string;
   if (preferredModel && NIM_MODELS[preferredModel]) {
-    return nim.chatModel(NIM_MODELS[preferredModel]);
+    primaryModel = nim.chatModel(NIM_MODELS[preferredModel]);
+    actualPref = preferredModel;
+  } else {
+    primaryModel = nim.chatModel('moonshotai/kimi-k2.6');
+    actualPref = 'kimi-k2.6';
   }
-  return nim.chatModel('moonshotai/kimi-k2.6');
+  return createFallbackModel(primaryModel, actualPref, NIM_MODELS);
 }
 
 export function getModelList(): Array<{ id: string; name: string }> {

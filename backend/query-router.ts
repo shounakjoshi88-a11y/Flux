@@ -32,7 +32,7 @@ export function classifyQuery(query: string): Complexity {
   // Opinion questions without factual anchors
   if (/\b(what do you think|opinion|thoughts|your take|how do you feel)\b/.test(q)) {
     const hasFactualAnchor = /\b(announce|shut down|launch|release|acquir|report|new|latest|results?|data|study|research)\b/.test(q);
-    if (!hasFactualAnchor) return "simple";
+    if (!hasFactualAnchor) return "complex";
   }
 
   // Meta chat

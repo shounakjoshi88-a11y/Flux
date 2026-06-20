@@ -92,6 +92,7 @@ type MessageItemProps = {
 
 import { StatusMessage, TimelineNode } from "./StatusMessage";
 import PermissionDialog from "./PermissionDialog";
+import { MessageRenderer, InlineMath } from "./MessageRenderer";
 
 import { BACKEND_URL } from "../lib/config";
 import { createClient } from "../lib/client";
@@ -806,8 +807,8 @@ function PartsRenderer({
           <div key={`astatus-${i}`} className="mb-0.5">
             <div className="mt-2 flex items-center gap-2 text-xs text-zinc-500 border-l-2 border-zinc-700/30 pl-3 py-1">
               <span className={`size-1.5 rounded-full ${part.status === "connected" ? "bg-emerald-500" :
-                  part.status === "processing" ? "bg-amber-500 animate-pulse" :
-                    part.status === "error" ? "bg-red-500" : "bg-zinc-500"
+                part.status === "processing" ? "bg-amber-500 animate-pulse" :
+                  part.status === "error" ? "bg-red-500" : "bg-zinc-500"
                 }`} />
               {part.message}
             </div>
