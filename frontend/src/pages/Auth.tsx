@@ -133,7 +133,21 @@ function formatText(text: string) {
 }
 
 // --- Source Cascade Component ---
-function ScrollableSourceCascade({ sources }: { sources: any[] }) {
+const getDomain = (url: string) => {
+  try {
+    return new URL(url).hostname.replace("www.", "");
+  } catch {
+    return url;
+  }
+};
+
+function ScrollableSourceCascade({
+  sources,
+  onSourceClick,
+}: {
+  sources: any[];
+  onSourceClick?: (url: string) => void;
+}) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const speedRef = useRef(0);
   const targetSpeedRef = useRef(0);
@@ -153,7 +167,10 @@ function ScrollableSourceCascade({ sources }: { sources: any[] }) {
 
   useEffect(() => {
     animFrameRef.current = requestAnimationFrame(step);
-    return () => { cancelAnimationFrame(animFrameRef.current); };
+    return () => {
+      cancelAnimationFrame(animFrameRef.current);
+      if (decelTimerRef.current) clearTimeout(decelTimerRef.current);
+    };
   }, [step]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -162,40 +179,69 @@ function ScrollableSourceCascade({ sources }: { sources: any[] }) {
     const rect = container.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const width = rect.width;
-
-    // Edge zones (15%)
-    const edge = width * 0.15;
-    if (x < edge) {
-      targetSpeedRef.current = -4.5 * (1 - x / edge);
-    } else if (x > width - edge) {
-      targetSpeedRef.current = 4.5 * (1 - (width - x) / edge);
-    } else {
-      targetSpeedRef.current = 0;
+    const edgeThreshold = 0.3;
+    const maxSpeed = 4.5;
+    let newTarget = 0;
+    if (x < width * edgeThreshold) {
+      const fraction = 1 - x / (width * edgeThreshold);
+      newTarget = -maxSpeed * fraction;
+    } else if (x > width * (1 - edgeThreshold)) {
+      const fraction = (x - width * (1 - edgeThreshold)) / (width * edgeThreshold);
+      newTarget = maxSpeed * fraction;
     }
-
-    if (decelTimerRef.current) clearTimeout(decelTimerRef.current);
+    targetSpeedRef.current = newTarget;
+    if (decelTimerRef.current) {
+      clearTimeout(decelTimerRef.current);
+      decelTimerRef.current = null;
+    }
   }, []);
 
   const handleMouseLeave = useCallback(() => {
-    targetSpeedRef.current = 0;
+    const decelerate = () => {
+      const current = targetSpeedRef.current;
+      if (Math.abs(current) < 0.1) {
+        targetSpeedRef.current = 0;
+        return;
+      }
+      targetSpeedRef.current = current * 0.85;
+      decelTimerRef.current = setTimeout(decelerate, 16);
+    };
+    decelerate();
   }, []);
 
   return (
     <div
       ref={scrollRef}
-      className="flex items-center -space-x-2 overflow-x-auto max-w-[120px] no-scrollbar"
-      style={{ maskImage: "linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%)", WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%)" }}
+      className="flex items-center -space-x-2 overflow-x-auto scroll-smooth max-w-[120px] pr-2 py-1"
+      style={{
+        maskImage: "linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%)",
+        WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%)",
+        scrollbarWidth: "none",
+      }}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
     >
       {sources.map((source, idx) => (
-        <div key={idx} className="shrink-0 rounded-full" style={{ zIndex: sources.length - idx }}>
+        <button
+          key={(source.url || source.domain) + idx}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onSourceClick) {
+              onSourceClick(source.url);
+            } else if (source.url) {
+              window.open(source.url, "_blank");
+            }
+          }}
+          className="transition-all duration-150 hover:scale-125 hover:-translate-y-0.5 hover:shadow-lg focus:outline-none shrink-0 rounded-full"
+          title={source.title || getDomain(source.url || source.domain)}
+          style={{ zIndex: sources.length - idx }}
+        >
           <img
-            src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(source.domain)}&sz=64`}
-            alt={source.domain}
-            className="size-6 rounded-full border-2 border-background object-cover"
+            src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(source.url || source.domain)}&sz=64`}
+            alt={getDomain(source.url || source.domain)}
+            className="size-6 rounded-full border-2 border-background bg-white dark:bg-[#000] object-contain hover:border-[var(--accent)]/70 transition-colors"
           />
-        </div>
+        </button>
       ))}
     </div>
   );
@@ -668,7 +714,7 @@ export default function Auth() {
   };
 
   return (
-    <div className="relative w-full min-h-screen bg-background text-foreground overflow-hidden">
+    <div className="relative w-full h-screen bg-background text-foreground overflow-y-auto overflow-x-hidden custom-scrollbar">
       {/* Film Grain Overlay */}
       <div className="pointer-events-none fixed inset-0 z-[100] opacity-[0.03] mix-blend-overlay" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.65\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")' }}></div>
 
