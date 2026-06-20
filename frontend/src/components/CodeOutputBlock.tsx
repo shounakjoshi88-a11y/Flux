@@ -1,5 +1,3 @@
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import type { CodeOutputLine } from "../types";
 
 interface CodeOutputBlockProps {
@@ -21,8 +19,6 @@ export function CodeOutputBlock({
   isRunning,
   generatedFiles = [],
 }: CodeOutputBlockProps) {
-  const [showCode, setShowCode] = useState(false);
-
   return (
     <div style={{
       borderRadius: "8px",
@@ -38,10 +34,7 @@ export function CodeOutputBlock({
         borderBottom: "1px solid #333",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#ff5f56" }} />
-          <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#ffbd2e" }} />
-          <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#27c93f" }} />
-          <span style={{ fontSize: "11px", color: "#888", marginLeft: "4px" }}>{language} interpreter</span>
+          <span style={{ fontSize: "11px", color: "#888", marginLeft: "4px" }}>$ {language}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           {isRunning && (
@@ -56,28 +49,10 @@ export function CodeOutputBlock({
             </span>
           )}
           {code && (
-            <button onClick={() => setShowCode(!showCode)} style={{
-              background: "none", border: "1px solid #444", color: "#888",
-              fontSize: "10px", padding: "2px 6px", borderRadius: "4px", cursor: "pointer",
-            }}>
-              {showCode ? "hide code" : "show code"}
-            </button>
+            <span style={{ fontSize: "10px", color: "#555" }}>$ {code}</span>
           )}
         </div>
       </div>
-
-      <AnimatePresence>
-        {showCode && code && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            style={{ background: "#2d2d2d", padding: "12px", borderBottom: "1px solid #333", overflow: "hidden" }}
-          >
-            <pre style={{ margin: 0, fontSize: "12px", color: "#ccc", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{code}</pre>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <div style={{
         background: "#0d1117", padding: "12px", maxHeight: "400px",

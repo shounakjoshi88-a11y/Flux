@@ -301,22 +301,26 @@ export function useChat(user: any) {
                     (updated[idx] as any).output = parsed.message;
                     streamingPartsRef.current = updated;
                   } else {
-                    streamingPartsRef.current = [...streamingPartsRef.current, {
-                      type: "tool_call",
-                      name: baseSub,
-                      input: parsed.data,
-                      output: parsed.message,
-                      status: sub.endsWith('_error') ? 'error' : 'completed',
-                    }];
+                    if (baseSub !== 'sandbox') {
+                      streamingPartsRef.current = [...streamingPartsRef.current, {
+                        type: "tool_call",
+                        name: baseSub,
+                        input: parsed.data,
+                        output: parsed.message,
+                        status: sub.endsWith('_error') ? 'error' : 'completed',
+                      }];
+                    }
                   }
                 } else {
-                  streamingPartsRef.current = [...streamingPartsRef.current, {
-                    type: "tool_call",
-                    name: sub,
-                    input: parsed.data,
-                    output: parsed.message,
-                    status: "running",
-                  }];
+                  if (sub !== 'sandbox_start') {
+                    streamingPartsRef.current = [...streamingPartsRef.current, {
+                      type: "tool_call",
+                      name: sub,
+                      input: parsed.data,
+                      output: parsed.message,
+                      status: "running",
+                    }];
+                  }
                 }
                 const targetId = realMessageIdRef.current ?? assistantMsgId;
                 updateMessages(targetId);

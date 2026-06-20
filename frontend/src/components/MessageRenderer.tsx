@@ -23,6 +23,7 @@ import "katex/dist/katex.min.css";
 
 import type { Source } from "../types";
 import { ChartRenderer, type ChartData } from "./ChartBlock";
+import SmilesDrawer from "smiles-drawer";
 
 // ─── KaTeX global setup + mhchem ─────────────────────────
 if (typeof window !== "undefined") {
@@ -614,27 +615,197 @@ const loadMermaid = async () => {
   return mermaid;
 };
 
+// ─── SMILES / Molecular Structure Renderer ──────────────
+function SmilesRenderer({ smiles }: { smiles: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [state, setState] = useState<"loading" | "rendered" | "error">("loading");
+  const [isLight, setIsLight] = useState(
+    () => document.documentElement.classList.contains('light')
+  );
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsLight(document.documentElement.classList.contains('light'));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!ref.current || !smiles) return;
+    setState("loading");
+
+    try {
+      const clean = SmilesDrawer.clean(smiles);
+      if (!clean) { setState("error"); return; }
+
+      const drawer = new SmilesDrawer.Drawer({
+        width: 400,
+        height: 300,
+        padding: 20,
+      });
+
+      SmilesDrawer.parse(clean, (tree: any) => {
+        if (!ref.current) return;
+        const theme = isLight ? "light" : "dark";
+        drawer.draw(tree, ref.current, theme, false);
+        setState("rendered");
+      }, (err: any) => {
+        console.error("SMILES parse error:", err);
+        setState("error");
+      });
+    } catch (e) {
+      console.error("SMILES render error:", e);
+      setState("error");
+    }
+  }, [smiles, isLight]);
+
+  if (state === "error") {
+    return (
+      <div className="my-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+        <p className="text-xs font-medium text-amber-400 mb-1">⚠ Could not render molecular structure</p>
+        <p className="text-[11px] text-foreground/60 mb-1">Invalid or unsupported SMILES string.</p>
+        <pre className="text-[11px] font-mono text-foreground/50 whitespace-pre-wrap">{smiles}</pre>
+      </div>
+    );
+  }
+
+  return (
+    <div className="my-4">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-[10px] font-medium text-muted-foreground bg-black/10 dark:bg-white/10 px-1.5 py-0.5 rounded">SMILES</span>
+      </div>
+      {state === "loading" && (
+        <div className="flex items-center justify-center gap-2 py-8 text-muted-foreground">
+          <svg className="animate-spin size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+          <span className="text-xs">Rendering SMILES structure...</span>
+        </div>
+      )}
+      <div ref={ref} className="flex justify-center" style={{ minHeight: 80 }} />
+    </div>
+  );
+}
+
 // ─── TikZ Renderer ───────────────────────────────────────
+let tikzPromise: Promise<boolean> | null = null;
+
+function loadTikzjax(): Promise<boolean> {
+  if (typeof window === "undefined") return Promise.resolve(false);
+  if ((window as any).__tikzjaxLoaded) return Promise.resolve(true);
+  if (tikzPromise) return tikzPromise;
+
+  tikzPromise = new Promise((resolve) => {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "https://cdn.jsdelivr.net/npm/tikzjax@latest/dist/fonts.css";
+    link.crossOrigin = "anonymous";
+    document.head.appendChild(link);
+
+    const script = document.createElement("script");
+    const isDark = document.documentElement.classList.contains("dark");
+    const theme = isDark ? "dark" : "light";
+    const styles = [
+      "body { margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }",
+      `svg text { fill: ${isDark ? "#d4d1cb" : "#1a1a1a"}; }`,
+      `svg .TikZGraphic path:not([fill]), svg .TikZGraphic line { stroke: ${isDark ? "#d4d1cb" : "#1a1a1a"}; }`,
+    ].join("");
+    script.textContent = `document.addEventListener("DOMContentLoaded",()=>{const s=document.createElement("style");s.textContent=${JSON.stringify(styles)};document.head.appendChild(s)});`;
+    document.head.appendChild(script);
+
+    const mainScript = document.createElement("script");
+    mainScript.src = "https://cdn.jsdelivr.net/npm/tikzjax@latest/dist/tikzjax.js";
+    mainScript.crossOrigin = "anonymous";
+    mainScript.onload = () => {
+      (window as any).__tikzjaxLoaded = true;
+      resolve(true);
+    };
+    mainScript.onerror = () => {
+      console.error("Failed to load TikZJax from CDN");
+      resolve(false);
+    };
+    document.head.appendChild(mainScript);
+  });
+
+  return tikzPromise;
+}
+
 function TikzRenderer({ code }: { code: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [rendered, setRendered] = useState(false);
+  const [state, setState] = useState<"loading" | "rendered" | "error">("loading");
+  const renderedRef = useRef(false);
+
   useEffect(() => {
-    if (ref.current && !rendered && code) {
+    if (!ref.current || !code || renderedRef.current) return;
+    renderedRef.current = true;
+    setState("loading");
+
+    (async () => {
+      const loaded = await loadTikzjax();
+      if (!ref.current) return;
+      if (!loaded) { setState("error"); return; }
+
       const script = document.createElement("script");
       script.type = "text/tikz";
       script.textContent = code;
       ref.current.appendChild(script);
+
+      // tikzjax auto-renders all <script type="text/tikz"> on load,
+      // but if it loaded before us we need to trigger render
       const tz = (window as any).tikzjax;
       if (tz && typeof tz.render === "function") {
-        try { tz.render(); } catch (e) { console.error("TikZJax render error:", e); }
+        try {
+          tz.render();
+          // tikzjax renders async — wait a frame then check
+          requestAnimationFrame(() => {
+            if (ref.current) setState("rendered");
+          });
+        } catch (e) {
+          console.error("TikZJax render error:", e);
+          setState("error");
+        }
+      } else {
+        // Wait for tikzjax to auto-discover our script
+        const check = setInterval(() => {
+          if (ref.current && ref.current.querySelector("svg")) {
+            clearInterval(check);
+            setState("rendered");
+          }
+        }, 100);
+        setTimeout(() => { clearInterval(check); if (ref.current && !ref.current.querySelector("svg")) setState("error"); }, 8000);
       }
-      setRendered(true);
-    }
-  }, [code, rendered]);
-  return <div ref={ref} className="tikz-renderer my-4 flex justify-center overflow-x-auto" />;
+    })();
+  }, [code]);
+
+  if (state === "error") {
+    return (
+      <div className="my-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 text-center">
+        <p className="text-xs font-medium text-amber-400 mb-1">⚠ TikZ render failed</p>
+        <p className="text-[11px] text-foreground/60 mb-2">Could not render TikZ diagram. Make sure <code className="inline-code">tikzjax</code> loaded correctly.</p>
+        <details className="text-left">
+          <summary className="text-[10px] text-muted-foreground cursor-pointer hover:text-foreground">Show TeX source</summary>
+          <pre className="text-[11px] font-mono text-foreground/70 whitespace-pre-wrap mt-2 p-2 rounded bg-black/10 dark:bg-white/5">{code}</pre>
+        </details>
+      </div>
+    );
+  }
+
+  return (
+    <div className="tikz-renderer my-4">
+      {state === "loading" && (
+        <div className="flex items-center justify-center gap-2 py-8 text-muted-foreground">
+          <svg className="animate-spin size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+          <span className="text-xs">Rendering TikZ diagram...</span>
+        </div>
+      )}
+      <div ref={ref} className="flex justify-center overflow-x-auto" style={{ opacity: state === "rendered" ? 1 : 0 }} />
+    </div>
+  );
 }
 
-// ─── LilyPond/Music Renderer (using abcjs for portability) ──
+// ─── Music Notation Renderer (uses abcjs for ABC notation, NOT LilyPond) ──
+// NOTE: This renders ABC notation (https://abcnotation.com), not LilyPond.
+// LilyPond → web requires server-side compilation; abcjs is used as a portable
+// client-side alternative that handles the common use case.
 let abcjs: any = null;
 const loadAbcjs = async () => {
   if (!abcjs) {
@@ -646,25 +817,47 @@ const loadAbcjs = async () => {
   return abcjs;
 };
 
-function LilyPondRenderer({ code }: { code: string }) {
+function MusicRenderer({ code }: { code: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
+    setError(null);
     (async () => {
       if (ref.current && code) {
         try {
           const lib = await loadAbcjs();
           if (lib && typeof lib.renderAbc === "function") {
+            ref.current.innerHTML = "";
             lib.renderAbc(ref.current, code, {
               responsive: "resize",
               theme: "dark",
               paddingtop: 0, paddingbottom: 0, paddingright: 0, paddingleft: 0,
             });
           }
-        } catch (e) { console.error("abcjs render error:", e); }
+        } catch (e) {
+          console.error("abcjs render error:", e);
+          setError("Failed to render ABC notation");
+        }
       }
     })();
   }, [code]);
-  return <div ref={ref} className="lilypond-renderer my-4 bg-white/5 rounded-lg p-4 overflow-x-auto" />;
+  if (error) {
+    return (
+      <div className="my-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+        <p className="text-xs font-medium text-amber-400 mb-1">⚠ Music render error</p>
+        <p className="text-[11px] text-foreground/60">{error}</p>
+        <pre className="text-[11px] font-mono text-foreground/50 mt-2 whitespace-pre-wrap">{code}</pre>
+      </div>
+    );
+  }
+  return (
+    <div className="my-4">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-[10px] font-medium text-muted-foreground bg-black/10 dark:bg-white/10 px-1.5 py-0.5 rounded">ABC notation</span>
+      </div>
+      <div ref={ref} className="bg-white/5 rounded-lg p-4 overflow-x-auto" />
+    </div>
+  );
 }
 
 // ─── Mermaid Renderer ────────────────────────────────────
@@ -697,7 +890,7 @@ function MermaidRenderer({ code }: { code: string }) {
 }
 
 // ─── Code Block ──────────────────────────────────────────
-function CodeBlock({ language, code }: { language: string; code: string }) {
+function CodeBlock({ language, code, onHtmlPreview }: { language: string; code: string; onHtmlPreview?: (html: string) => void }) {
   const [copied, setCopied] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [isLight, setIsLight] = useState(
@@ -718,6 +911,7 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const isHtml = language === "html";
   const syntaxTheme = isLight ? oneLight : vscDarkPlus;
   return (
     <div className="code-block-wrapper group my-4">
@@ -731,12 +925,24 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
             </button>
           )}
         </div>
-        <button onClick={handleCopy} className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground">
-          {copied ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
-          {copied ? "Copied!" : "Copy"}
-        </button>
+        <div className="flex items-center gap-1.5">
+          {isHtml && onHtmlPreview && (
+            <button
+              onClick={() => onHtmlPreview(code)}
+              className="flex items-center gap-1 text-[11px] font-medium text-emerald-400 hover:text-emerald-300 transition-colors"
+              title="Run HTML preview"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+              Preview
+            </button>
+          )}
+          <button onClick={handleCopy} className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground">
+            {copied ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+            {copied ? "Copied!" : "Copy"}
+          </button>
+        </div>
       </div>
-      <div className={`overflow-auto transition-all duration-300 ${collapsed ? "max-h-0" : "max-h-[600px]"}`}>
+      <div className={`overflow-auto transition-all duration-300 ${collapsed ? "max-h-0" : "max-h-[800px]"}`}>
         <SyntaxHighlighter
           language={language || "text"}
           style={syntaxTheme}
@@ -895,14 +1101,14 @@ function renderPlainBlocks(text: string, onCitationClick: any, sources: Source[]
 }
 
 // ── Block regex: also uses [a-zA-Z*]+ so \begin{CD} is captured ──
-const BLOCK_DELIM_REGEX = /(<(CHART|MERMAID|svg|TIKZ|LILYPOND|CHEMICAL)(?:\s+[^>]*)?>[\s\S]*?<\/(?:CHART|MERMAID|svg|TIKZ|LILYPOND|CHEMICAL)>|```[a-z]*[\s\S]*?```|(?<=\n|^)\s*\$\$[\s\S]*?\n\s*\$\$(?=\s*$|\n)|(?<!\\)\\\[(?!-?\d+pt)[\s\S]+?\\\]|\\begin\{([a-zA-Z*]+)\}[\s\S]*?\\end\{[a-zA-Z*]+\})/gim;
+const BLOCK_DELIM_REGEX = /(<(CHART|MERMAID|svg|TIKZ|LILYPOND|MUSIC|ABC|CHEMICAL|SMILES|MOL)(?:\s+[^>]*)?>[\s\S]*?<\/(?:CHART|MERMAID|svg|TIKZ|LILYPOND|MUSIC|ABC|CHEMICAL|SMILES|MOL)>|```[a-z]*[\s\S]*?```|(?<=\n|^)\s*\$\$[\s\S]*?\n\s*\$\$(?=\s*$|\n)|(?<!\\)\\\[(?!-?\d+pt)[\s\S]+?\\\]|\\begin\{([a-zA-Z*]+)\}[\s\S]*?\\end\{[a-zA-Z*]+\})/gim;
 
-function renderBlocks(text: string, onCitationClick: any, sources: Source[]) {
+function renderBlocks(text: string, onCitationClick: any, sources: Source[], onHtmlPreview?: (html: string) => void) {
   if (typeof text !== "string") return [];
   return splitWithDelimiters(text, BLOCK_DELIM_REGEX).flatMap((part, pi) => {
     if (part.type === "delimiter") {
       const val = part.value;
-      const tagMatch = val.match(/<(CHART|MERMAID|svg|TIKZ|LILYPOND|CHEMICAL)/i);
+      const tagMatch = val.match(/<(CHART|MERMAID|svg|TIKZ|LILYPOND|MUSIC|ABC|CHEMICAL|SMILES|MOL)/i);
       if (tagMatch) {
         const tag = tagMatch[1]!.toUpperCase();
         const contentBase = val.replace(/<[^>]+>/gi, "").trim();
@@ -918,13 +1124,25 @@ function renderBlocks(text: string, onCitationClick: any, sources: Source[]) {
           return <MermaidRenderer key={pi} code={mermaidCode} />;
         }
         if (tag === "TIKZ") return <TikzRenderer key={pi} code={contentBase} />;
-        if (tag === "LILYPOND") return <LilyPondRenderer key={pi} code={contentBase} />;
-        if (tag === "CHEMICAL") return <DisplayMath key={pi} formula={`\\ce{${contentBase}}`} />;
+        if (tag === "LILYPOND" || tag === "MUSIC" || tag === "ABC") return <MusicRenderer key={pi} code={contentBase} />;
+        if (tag === "CHEMICAL") {
+          // \ce{} only handles chemical equations (e.g. \ce{H2O}, \ce{NaOH + HCl -> NaCl + H2O}).
+          // For structural formulas use <SMILES>...</SMILES> with a SMILES string.
+          return (
+            <div key={pi}>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[10px] font-medium text-muted-foreground bg-black/10 dark:bg-white/10 px-1.5 py-0.5 rounded">Chemical equation</span>
+              </div>
+              <DisplayMath formula={`\\ce{${contentBase}}`} />
+            </div>
+          );
+        }
+        if (tag === "SMILES" || tag === "MOL") return <SmilesRenderer key={pi} smiles={contentBase} />;
         return <div key={pi} className="my-4 overflow-x-auto" dangerouslySetInnerHTML={{ __html: val }} />;
       }
       if (val.startsWith("```")) {
         const match = val.match(/^```([a-z]*)\n?([\s\S]*?)\n?```$/i);
-        return <CodeBlock key={pi} language={match?.[1] || "text"} code={match?.[2] || ""} />;
+        return <CodeBlock key={pi} language={match?.[1] || "text"} code={match?.[2] || ""} onHtmlPreview={onHtmlPreview} />;
       }
       if (val.startsWith("\\begin{")) {
         const envMatch = val.match(/\\begin\{([a-zA-Z*]+)\}/i);
@@ -953,12 +1171,14 @@ export const MessageRenderer = React.memo(function MessageRenderer({
   content,
   onCitationClick,
   sources,
+  onHtmlPreview,
 }: {
   content: string;
   onCitationClick: (index: number) => void;
   sources: Source[];
+  onHtmlPreview?: (html: string) => void;
 }) {
   const safeContent = content ?? "";
-  const blocks = useMemo(() => renderBlocks(safeContent, onCitationClick, sources), [safeContent, onCitationClick, sources]);
+  const blocks = useMemo(() => renderBlocks(safeContent, onCitationClick, sources, onHtmlPreview), [safeContent, onCitationClick, sources, onHtmlPreview]);
   return <div className="markdown-body space-y-1">{blocks}</div>;
 });

@@ -31,6 +31,7 @@ type MessageListProps = {
     html?: string;
     filename: string
   }) => void;
+  onHtmlPreview?: (html: string) => void;
 };
 
 // ─── Three dots loader ──────────────────────────────────────
@@ -75,6 +76,7 @@ export function MessageList({
   onFileDelete,
   activeGenerationStatus,
   onPreview,
+  onHtmlPreview,
 }: MessageListProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const lastScrollTopRef = useRef(0);
@@ -208,6 +210,7 @@ export function MessageList({
                   onPreview={onPreview}
                   onFileDelete={onFileDelete}
                   activeGenerationStatus={activeGenerationStatus}
+                  onHtmlPreview={onHtmlPreview}
                 />
               </div>
             </div>

@@ -103,6 +103,7 @@ export default function Dashboard() {
   const [peekXlsx, setPeekXlsx] = useState<{ base64: string; filename: string } | null>(null);
   const [peekMd, setPeekMd] = useState<{ base64: string; filename: string } | null>(null);
   const [peekFile, setPeekFile] = useState<{ name: string; content: string } | null>(null);
+  const [htmlPreviewContent, setHtmlPreviewContent] = useState<string | null>(null);
   const [isArtifactsOpen, setIsArtifactsOpen] = useState(false);
   const [isNewsOpen, setIsNewsOpen] = useState(false);
   const [isWikiOpen, setIsWikiOpen] = useState(false);
@@ -312,25 +313,101 @@ export default function Dashboard() {
           // Reconstruct parts from thoughtProcess for backward compatibility
           if (!(msg as any).parts && Array.isArray(storedThoughtProcess) && storedThoughtProcess.length) {
             const parts: MessagePart[] = [];
-            if (answer.trim()) {
-              parts.push({ type: "text", text: answer });
-            }
             let lastTodosIdx = -1;
             for (let tpi = 0; tpi < storedThoughtProcess.length; tpi++) {
               const tp = storedThoughtProcess[tpi];
               if (!tp) continue;
               if (tp.type === "status") {
-                parts.push({
-                  type: "tool_call",
-                  name: tp.subtype,
-                  input: tp.data,
-                  output: tp.message,
-                  status: "completed",
-                });
+                const sub = tp.subtype as string;
+                const isTerminal = sub.endsWith('_success') || sub.endsWith('_error') || sub.endsWith('_complete');
+                
+                // Map/merge sandbox status events into code_execution blocks
+                if (sub.startsWith('sandbox_')) {
+                  const isStart = sub === 'sandbox_start';
+                  const lastCodeExec = [...parts].reverse().find(p => p.type === 'code_execution') as any;
+                  
+                  if (isStart) {
+                    parts.push({
+                      type: "code_execution",
+                      block: {
+                        code: tp.data?.command ?? tp.data?.code ?? "",
+                        language: tp.data?.tool === "run_python" ? "python" : "bash",
+                        outputLines: [],
+                        isRunning: true,
+                        generatedFiles: []
+                      }
+                    } as any);
+                  } else {
+                    if (lastCodeExec && lastCodeExec.block) {
+                      lastCodeExec.block.isRunning = false;
+                      lastCodeExec.block.exitCode = tp.data?.exitCode ?? (sub === 'sandbox_error' ? 1 : 0);
+                      lastCodeExec.block.duration = tp.data?.duration;
+                      if (tp.data?.stdout || tp.data?.stderr) {
+                        lastCodeExec.block.outputLines = [
+                          ...(tp.data.stdout ? tp.data.stdout.split('\n').map((line: string) => ({ type: 'stdout', content: line })) : []),
+                          ...(tp.data.stderr ? tp.data.stderr.split('\n').map((line: string) => ({ type: 'stderr', content: line })) : [])
+                        ];
+                      }
+                    } else {
+                      parts.push({
+                        type: "code_execution",
+                        block: {
+                          code: tp.data?.command ?? tp.data?.code ?? "",
+                          language: tp.data?.tool === "run_python" ? "python" : "bash",
+                          outputLines: [
+                            ...(tp.data?.stdout ? tp.data.stdout.split('\n').map((line: string) => ({ type: 'stdout', content: line })) : []),
+                            ...(tp.data?.stderr ? tp.data.stderr.split('\n').map((line: string) => ({ type: 'stderr', content: line })) : [])
+                          ],
+                          isRunning: false,
+                          exitCode: tp.data?.exitCode,
+                          duration: tp.data?.duration,
+                          generatedFiles: []
+                        }
+                      } as any);
+                    }
+                  }
+                  continue;
+                }
+
+                if (isTerminal) {
+                  const baseSub = sub.replace(/_(?:success|error|complete)$/, '');
+                  let idx = parts.findIndex(
+                    p => p.type === 'tool_call' && p.name === baseSub
+                  );
+                  if (idx < 0) {
+                    idx = parts.findIndex(
+                      p => p.type === 'tool_call' && p.name === `${baseSub}_start`
+                    );
+                  }
+                  if (idx >= 0) {
+                    const existing = parts[idx] as any;
+                    existing.status = sub.endsWith('_error') ? 'error' : 'completed';
+                    existing.output = tp.message;
+                    if (tp.data) {
+                      existing.input = { ...existing.input, ...tp.data };
+                    }
+                  } else {
+                    parts.push({
+                      type: "tool_call",
+                      name: baseSub,
+                      input: tp.data || {},
+                      output: tp.message || "",
+                      status: sub.endsWith('_error') ? 'error' : 'completed',
+                    });
+                  }
+                } else {
+                  parts.push({
+                    type: "tool_call",
+                    name: sub,
+                    input: tp.data || {},
+                    output: tp.message || "",
+                    status: "running",
+                  });
+                }
               } else if (tp.type === "thought" && tp.content?.trim()) {
                 parts.push({ type: "thought", content: tp.content });
               } else if (tp.type === "todos" && tp.items?.length) {
-                lastTodosIdx = parts.length; // will be overwritten by later events
+                lastTodosIdx = parts.length;
                 parts.push({ type: "todos", items: tp.items });
               }
             }
@@ -342,6 +419,9 @@ export default function Dashboard() {
                 if (parts[pi]?.type === "todos") parts.splice(pi, 1);
               }
               parts.push(lastEntry);
+            }
+            if (answer.trim()) {
+              parts.push({ type: "text", text: answer });
             }
             (msg as any).parts = parts;
           }
@@ -496,6 +576,11 @@ export default function Dashboard() {
     } catch {
       setActiveImages([]);
     }
+  }, []);
+
+  // ── HTML preview handler ────────────────────────────────
+  const handleHtmlPreview = useCallback((html: string) => {
+    setHtmlPreviewContent(html);
   }, []);
 
   // ── Artifact preview handler ─────────────────────────────
@@ -1020,6 +1105,7 @@ export default function Dashboard() {
                   onRetry={handleRetry}
                   onFileClick={(file) => setPeekFile(file)}
                   onPreview={handlePreview}
+                  onHtmlPreview={handleHtmlPreview}
                   showPromptHistory={hasStarted}
                   onJumpToPrompt={handleJumpToPrompt}
                   onFileDelete={handleDeleteFile}
@@ -1126,6 +1212,48 @@ export default function Dashboard() {
                 <pre className="text-xs whitespace-pre-wrap font-mono text-foreground/80 leading-relaxed">
                   {peekFile.content || "No content available."}
                 </pre>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {htmlPreviewContent && (
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed top-0 right-0 h-full w-full sm:w-[600px] bg-white dark:bg-[#0a0a0a] border-l border-black/5 dark:border-white/10 z-50 shadow-2xl flex flex-col"
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-black/5 dark:border-white/10 shrink-0">
+                <div className="flex items-center gap-2">
+                  <Globe className="size-4 text-orange-500" />
+                  <span className="text-sm font-medium">HTML Preview</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => {
+                      const win = window.open("", "_blank");
+                      if (win) { win.document.write(htmlPreviewContent); win.document.close(); }
+                    }}
+                    className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition text-muted-foreground hover:text-foreground"
+                    title="Open in new tab"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  </button>
+                  <button onClick={() => setHtmlPreviewContent(null)} className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition text-muted-foreground hover:text-foreground">
+                    <X className="size-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex-1 bg-white">
+                <iframe
+                  srcDoc={htmlPreviewContent}
+                  className="w-full h-full border-none"
+                  sandbox="allow-scripts allow-same-origin allow-forms"
+                  title="HTML Preview"
+                />
               </div>
             </motion.div>
           )}

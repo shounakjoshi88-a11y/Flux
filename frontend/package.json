@@ -64,6 +64,7 @@
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
     "sharp": "^0.35.1",
+    "smiles-drawer": "^2.3.0",
     "streamdown": "^2.5.0",
     "swr": "^2.4.1",
     "tailwind-merge": "^3.3.1",

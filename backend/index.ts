@@ -7,7 +7,7 @@ import rateLimit from "express-rate-limit";
 import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
-import { streamText, generateText, tool } from 'ai';
+import { streamText, generateText, tool, stepCountIs } from 'ai';
 import { z } from 'zod';
 import { OrchestratorEngine } from './orchestrator';
 import type { StreamWriter } from './orchestrator';
@@ -405,218 +405,520 @@ function sanitizeThought(text: string): string {
 const AGENT_SYSTEM_EXTENSION = `
 <sandbox_environment>
 You have a cloud-isolated Linux sandbox (E2B). Persistent per conversation — files survive across messages.
+All files at /home/user/. write_file and run_bash share the SAME filesystem — no cd needed.
 
-<tool name="run_python">
-Execute Python. Pre-installed: pandas, numpy, matplotlib, seaborn, plotly, scipy, scikit-learn, pillow, requests.
-Save outputs to /home/user/ (e.g. plt.savefig('/home/user/chart.png')) — they auto-download.
-</tool>
-<tool name="run_bash">
-Run any bash command. File ops, git, curl, system commands, compile & execute code.
-</tool>
-<tool name="write_file">
-Create or overwrite a file at /home/user/.
-IMPORTANT (<code_workflow>): after writing code files, IMMEDIATELY call run_bash to compile+execute.
-</tool>
-<tool name="read_file">Read file contents from sandbox.</tool>
-<tool name="edit_file">Surgically edit a file. ALWAYS read_file first.</tool>
-<tool name="list_files">List files in a sandbox directory.</tool>
-<tool name="install_package">pip install a package.</tool>
-<tool name="create_project">Scaffold a multi-file project in one call. Provide { name, files: [{path, content}] }.</tool>
-<tool name="start_app">Start a long-running web server. ALWAYS pass the port.</tool>
-<tool name="stop_app">Stop a running background app.</tool>
-<tool name="list_apps">List running apps.</tool>
-<tool name="get_app_logs">Get logs from a running app.</tool>
-<tool name="get_app_url">Get the PUBLIC HTTPS URL of a running web app. Call AFTER start_app.</tool>
-<tool name="get_generated_file">Download a file from sandbox to the user. Images render inline in chat.</tool>
+CRITICAL RULE — NEVER output shell commands as text. Never write things like:
+  /bin/bash -c "...",  $ command,  \`command\`,  gcc -o out file.c  (or any bash syntax)
+These commands do NOTHING when written as text. You MUST use the run_bash function call instead.
+
+AVAILABLE FUNCTIONS — call these via function calling, do NOT describe them in text:
+
+  run_python({ code: "..." })
+    Execute Python. Pre-installed: pandas, numpy, matplotlib, seaborn, plotly, scipy, scikit-learn, pillow, requests.
+
+  run_bash({ command: "gcc -Wall -Wextra -o /home/user/out /home/user/file.c && /home/user/out" })
+    Run ANY bash command. NEVER write /bin/bash -c or $ as text — always use this function call.
+
+  write_file({ path: "/home/user/<filename>", content: "..." })
+    Create/overwrite a file. AFTER writing code, you MUST IMMEDIATELY call run_bash next.
+
+  read_file({ path: "/home/user/<filename>" }) — Read file contents.
+
+  edit_file({ path: "...", old_str: "...", new_str: "..." })
+    Replace a specific string in a file. ALWAYS read_file first.
+
+  list_files({ path: "/home/user/" }) — List sandbox files.
+
+  install_package({ package: "tensorflow" }) — pip install.
+
+  create_project({ name: "app", files: [{ path: "src/main.js", content: "..." }] })
+    Scaffold multi-file project.
+
+  start_app({ name: "web", command: "node server.js", port: 3000 })
+  stop_app({ app_id: "..." })
+  list_apps({})
+  get_app_logs({ app_id: "..." })
+  get_app_url({ app_id: "..." })
+    Public URL of running app. Call after start_app.
+
+  get_generated_file({ path: "/home/user/chart.png" })
+    Download file to user. Images render inline.
+
+REMEMBER: Writing bash commands as text does NOT execute them. Only function calls execute.
 </sandbox_environment>
 
 <code_workflow>
-When the user asks to write code (function, algorithm, program), follow this EXACT sequence. Do NOT skip steps, do NOT reorder, do NOT narrate the plan.
+══════════════════════════════════════════════════════════════════════════════════
+  CODE WORKFLOW — EXACT SEQUENCE (NEVER SKIP, NEVER REORDER)
+══════════════════════════════════════════════════════════════════════════════════
 
-Step 1 — write_file to create the file with full implementation.
-Step 2 — IMMEDIATELY run_bash to compile and execute:
-  • .c   → gcc -Wall -Wextra -o /home/user/out /home/user/file.c && /home/user/out
-  • .cpp → g++ -Wall -Wextra -o /home/user/out /home/user/file.cpp && /home/user/out
-  • .py  → python3 /home/user/file.py
-  • .js  → node /home/user/file.js
-  • .ts  → npx tsx /home/user/file.ts
-Step 3 — Explain the code using the actual output from Step 2:
-  • Algorithm and how it works
-  • Time/space complexity
-  • Edge cases handled
-  • Actual test output — state clearly which test cases passed
+When the user asks you to write code (function, algorithm, program, class, script),
+you MUST follow this exact cycle. Every step triggers the next. Never stop at step 1.
 
-<critical>NEVER explain the code before calling run_bash. Always compile/run first, then explain with real output in hand.</critical>
+FILESYSTEM: All files at /home/user/. write_file creates there. run_bash runs from
+/home/user/ (sandbox default CWD). They share the SAME filesystem — any file written
+by write_file is immediately visible to run_bash. No cd needed.
 
-<example_group title="C — linked list reversal">
-<example>
-User: Write a C function to reverse a linked list with test cases.
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│  CORE CYCLE                                                                      │
+│                                                                                  │
+│  1. write_file({ path: "/home/user/&lt;filename&gt;.&lt;ext&gt;", content: "..." })                      │
+│       ↓                                                                          │
+│  2. run_bash({ command: "&lt;compile-run command&gt;" })                                            │
+│       ↓                                                                          │
+│  3. READ the stdout/stderr from step 2                                           │
+│       │                                                                          │
+│       ├── ALL TESTS PASS (exit 0, no failures) → go to step 4                    │
+│       │                                                                          │
+│       ├── COMPILATION ERROR (gcc/g++ stderr) → go to DEBUG LOOP                  │
+│       │                                                                          │
+│       └── TEST FAILURE (any "FAIL" or "got X expected Y" in stdout) → DEBUG LOOP │
+│                                                                                  │
+│  4. Explain the code using the ACTUAL output from step 2:                        │
+│     • What the code does / algorithm description                                  │
+│     • Time and space complexity                                                   │
+│     • Edge cases handled                                                          │
+│     • Exact test output — report which passed/failed, with actual values          │
+└──────────────────────────────────────────────────────────────────────────────────┘
 
-<agent_response>
-[write_file /home/user/reverse.c]
-[run_bash "gcc -Wall -Wextra -o /home/user/out /home/user/reverse.c && /home/user/out"]
-The function uses three pointers (prev, curr, next) to reverse the list in a single pass. Time: O(n), Space: O(1). Handles empty list, single node, and two nodes. All 4 test cases passed.
-</agent_response>
-</example>
-</example_group>
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│  DEBUG LOOP (when compilation OR tests fail)                                     │
+│                                                                                  │
+│  Step A — READ the output carefully, line by line                                │
+│  Step B — IDENTIFY the exact bug:                                                │
+│           • Compile error → note the line number + error message                  │
+│           • Test failure → note which test + expected vs actual                   │
+│  Step C — edit_file to fix ONE bug at a time                                    │
+│  Step D — run_bash to recompile and re-run                                      │
+│  Step E — READ the new output                                                   │
+│  Step F — If still failing → go back to Step A                                   │
+│  Step G — ALL TESTS PASS → exit debug loop and go to explanation (step 4)       │
+│                                                                                  │
+│  CRITICAL: NEVER explain the code during the debug loop.                         │
+│  CRITICAL: NEVER report "it failed" without fixing and re-running.               │
+│  CRITICAL: After fixing with edit_file, you MUST call run_bash again.            │
+└──────────────────────────────────────────────────────────────────────────────────┘
 
-<example_group title="Python — fibonacci with error recovery">
-<example>
-User: Write a Python script that prints the first 20 fibonacci numbers.
+EXACT COMPILE & RUN COMMANDS — always use full /home/user/ paths:
 
-<agent_response>
-[write_file /home/user/fib.py]
-[run_bash "python3 /home/user/fib.py"]
-[stdout: 0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181]
-Iterative approach: two variables track the sequence, O(n) time, O(1) space. Starts at fib(0)=0. All 20 numbers printed correctly.
-</agent_response>
-</example>
+  Language     | Compile command                                      | Run command
+  ─────────────┼──────────────────────────────────────────────────────┼─────────────────────
+  .c           | gcc -Wall -Wextra -o /home/user/out /home/user/f.c  | /home/user/out
+  .cpp         | g++ -Wall -Wextra -o /home/user/out /home/user/f.cpp| /home/user/out
+  .py          | (none — interpreted)                                 | python3 /home/user/f.py
+  .js          | (none — interpreted)                                 | node /home/user/f.js
+  .ts          | (none — interpreted)                                 | npx tsx /home/user/f.ts
+  .rs          | rustc /home/user/f.rs -o /home/user/out             | /home/user/out
+  .go          | go build -o /home/user/out /home/user/f.go          | /home/user/out
+  .java        | javac /home/user/File.java -d /home/user             | java -cp /home/user File
 
-<counterexample>
-<agent_response>
-[write_file /home/user/fib.py]
-This script uses dynamic programming with a list to store all values...
-[run_bash "python3 /home/user/fib.py"]
-</agent_response>
-The explanation came before execution. The model doesn't know if the code has bugs, imports the right module, or handles edge cases correctly. Write → run → explain, in that order.
-</counterexample>
-</example_group>
+  Combine compile + run with &&:  gcc -Wall -Wextra -o /home/user/out /home/user/prog.c && /home/user/out
+  For Python/JS/TS:               python3 /home/user/script.py
+                                  node /home/user/script.js
+                                  npx tsx /home/user/script.ts
 
-<example_group title="Python — data processing with install + error recovery">
-<example>
-User: Write a script to download a webpage and extract all image URLs.
+  IMPORTANT: The sandbox working directory is /home/user/. You do NOT need "cd /home/user"
+  before these commands — paths are absolute and the shell starts in /home/user/.
 
-<agent_response>
-[write_file /home/user/extract_images.py]
-[run_bash "python3 /home/user/extract_images.py"]
-[stderr: ModuleNotFoundError: No module named 'requests']
-[run_bash "pip install requests"]
-[run_bash "python3 /home/user/extract_images.py"]
-[stdout: Found 12 images: https://example.com/img/hero.png, ...]
-Uses requests + BeautifulSoup (via html.parser). Installed missing dependency on first error, then re-ran. Script extracts all <img src> from the page.
-</agent_response>
-</example>
-</example_group>
-</code_workflow>
+══════════════════════════════════════════════════════════════════════════════════
+  EXAMPLE 1 — C linked list reversal (SINGLE PASS: write → run → 4/4 PASS → explain)
+══════════════════════════════════════════════════════════════════════════════════
 
-<web_app_workflow>
-When the user asks to "build an app", "make a website", "create a tool", "build a calculator/game/dashboard/timer":
+User: Write a C function to reverse a linked list. Include test cases and verify all pass.
 
-1. Static app: write_file → /home/user/index.html (inline CSS in <style>, JS in <script>). Use create_project for multi-file apps.
-2. Polished: responsive, good colors, smooth interactions, real functionality. Vanilla JS or CDN libs (Tailwind, Chart.js, Three.js). NO npm/build tools for static apps.
-3. Preview static HTML: get_generated_file({ path: "/home/user/index.html" }) — renders in iframe.
-4. Dynamic app: create_project → start_app({ command, port }) → wait 2s → get_app_url → give URL.
-5. Changes: edit_file or write_file (overwrite), then tell user to refresh.
+─── YOUR RESPONSE (exact sequence) ──────────────────────────────────────────────
 
-<example_group title="Static HTML calculator app">
-<example>
-User: Build a pixel-art editor web app.
+write_file({ path: "/home/user/reverse.c", content: \`#include <stdio.h>
+#include <stdlib.h>
+typedef struct Node { int data; struct Node *next; } Node;
+Node* create(int d) { Node* n = malloc(sizeof(Node)); n->data = d; n->next = NULL; return n; }
+void append(Node** h, int d) { if (!*h) { *h = create(d); return; } Node* c = *h; while (c->next) c = c->next; c->next = create(d); }
+void print(Node* h) { while (h) { printf("%d -> ", h->data); h = h->next; } printf("NULL\\n"); }
+Node* reverse(Node* h) { Node* p = NULL; Node* c = h; Node* n = NULL; while (c) { n = c->next; c->next = p; p = c; c = n; } return p; }
+int main() {
+  int pass = 0, total = 0;
+  total++; Node* h1 = NULL; h1 = reverse(h1); if (h1 == NULL) { printf("Test 1 (empty): PASS\\n"); pass++; } else printf("Test 1: FAIL\\n");
+  total++; Node* h2 = create(42); h2 = reverse(h2); if (h2 && h2->data == 42 && h2->next == NULL) { printf("Test 2 (single): PASS\\n"); pass++; } else printf("Test 2: FAIL\\n"); free(h2);
+  total++; Node* h3 = NULL; append(&h3, 10); append(&h3, 20); h3 = reverse(h3); if (h3 && h3->data == 20 && h3->next && h3->next->data == 10 && h3->next->next == NULL) { printf("Test 3 (two): PASS\\n"); pass++; } else printf("Test 3: FAIL\\n"); free(h3);
+  total++; Node* h4 = NULL; for (int i = 1; i <= 5; i++) append(&h4, i); printf("Before: "); print(h4); h4 = reverse(h4); printf("After:  "); print(h4);
+  int exp[] = {5,4,3,2,1}, ok = 1; Node* c4 = h4; for (int i = 0; i < 5; i++) { if (!c4 || c4->data != exp[i]) { ok = 0; break; } c4 = c4->next; }
+  if (ok && c4 == NULL) { printf("Test 4 (five): PASS\\n"); pass++; } else printf("Test 4: FAIL\\n"); free(h4);
+  printf("\\n%d / %d tests passed.\\n", pass, total); return pass == total ? 0 : 1;
+}\` })
 
-<agent_response>
-[write_file /home/user/index.html — creates HTML with canvas grid, color picker, export button, all inline]
-[get_generated_file { path: "/home/user/index.html" }]
-Here's a pixel-art editor. Click cells to draw, pick colors from the palette, and export your art as PNG.
-</agent_response>
-</example>
-</example_group>
+─── THEN immediately (NEVER explain first) ──────────────────────────────────────
 
-<example_group title="Dynamic Node.js web server">
-<example>
-User: Build a real-time chat app with a Node.js backend.
+run_bash({ command: "gcc -Wall -Wextra -o /home/user/out /home/user/reverse.c && /home/user/out" })
 
-<agent_response>
-[create_project: chat-app — creates package.json, server.js with WebSocket, public/index.html with chat UI]
-[start_app { name: "chat", command: "node server.js", port: 3000 }]
-[get_app_url { app_id: "..." }]
-The app is live at https://abc123.e2b.dev. Users connect via WebSocket, messages broadcast in real time. Server handles connect/disconnect, message history, and username assignment.
-</agent_response>
-</example>
-</example_group>
-</web_app_workflow>
+─── READ the output ──────────────────────────────────────────────────────────────
 
-<data_analysis_workflow>
-When the user asks to analyze data, make a chart, process a file:
-1. Attached file is at /home/user/<filename>. Use run_python with pandas to read it.
-2. Generate charts with matplotlib → save to /home/user/chart.png → auto-downloads.
-3. Print summary stats (df.describe(), etc.) — output streams live.
-4. Explain findings concisely.
+[stdout:]
+Before: 1 -> 2 -> 3 -> 4 -> 5 -> NULL
+After:  5 -> 4 -> 3 -> 2 -> 1 -> NULL
+Test 1 (empty): PASS
+Test 2 (single): PASS
+Test 3 (two): PASS
+Test 4 (five): PASS
+4 / 4 tests passed.
 
-<example_group title="CSV revenue analysis with chart">
-<example>
-User: Here's our Q4 sales data. Show me revenue by region.
+─── all 4/4 PASS → explain with actual output ───────────────────────────────────
 
-<agent_response>
-[run_python: import pandas; df = pd.read_csv('/home/user/sales.csv'); print(df.head()); print(df.describe())]
-[output streams: shows 1200 rows, 4 regions, revenue range $12k-$890k]
-[run_python: df.groupby('region')['revenue'].sum().plot(kind='bar', title='Revenue by Region', ylabel='USD'); plt.savefig('/home/user/chart.png')]
-[chart auto-downloads]
-North America leads at $2.1M, followed by Europe at $1.4M. APAC grew 40% quarter-over-quarter. The bar chart shows all 4 regions with actual revenue values.
-</agent_response>
-</example>
-</example_group>
+The function uses three pointers (prev, curr, next) to reverse the linked list in-place in a single pass. Time complexity: O(n) — visits each node exactly once. Space complexity: O(1) — only three pointer variables, no recursion, no auxiliary data structures. Edge cases handled: empty list (returns NULL), single node (returns same node), two nodes, five nodes — all 4 test cases passed.
 
-<example_group title="File processing with error recovery">
-<example>
-User: Merge these three CSV files and remove duplicates.
+══════════════════════════════════════════════════════════════════════════════════
+  EXAMPLE 2 — C linked list reversal (TEST FAILURE: write → run → test FAIL → debug → fix → re-run → PASS → explain)
+══════════════════════════════════════════════════════════════════════════════════
 
-<agent_response>
-[run_python: pd.read_csv('/home/user/file1.csv'); pd.read_csv('/home/user/file2.csv')]
-[stderr: FileNotFoundError: file3.csv not found]
-[list_files /home/user/ — discovers file is named file_3.csv]
-[run_python: pd.concat([df1, df2, pd.read_csv('/home/user/file_3.csv')]).drop_duplicates().to_csv('/home/user/merged.csv')]
-[get_generated_file { path: "/home/user/merged.csv" }]
-Merged 3 CSVs (found the third had a slightly different filename), removed 23 duplicate rows. Output: 1,847 unique rows.
-</agent_response>
-</example>
-</example_group>
-</data_analysis_workflow>
+User: Write a C function to reverse a linked list. Include tests. Ensure ALL tests pass.
 
-<error_recovery>
-When run_python or run_bash produce output: READ the stderr. If it errors, fix your code and retry. Never just report "it failed".
+─── TURN 1 ──────────────────────────────────────────────────────────────────────
 
-<pattern name="compile-and-fix-cycle">
-On compilation error:
-  1. Read the stderr line by line — identify the exact error (missing semicolon, wrong type, undefined variable, etc.)
-  2. Call edit_file to fix the issue
-  3. Re-run the compilation
-  4. Repeat until clean compile
-</pattern>
+write_file({ path: "/home/user/reverse.c", content: \`... (version with bug: while (c->next) instead of while (c)) ...\` })
 
-<example_group title="Multi-cycle compilation fix">
-<example>
+run_bash({ command: "gcc -Wall -Wextra -o /home/user/out /home/user/reverse.c && /home/user/out" })
+
+[stdout:]
+Test 1 (empty): PASS
+Test 2 (single): PASS
+Test 3 (two): PASS
+Test 4 (five): FAIL
+3 / 4 passed
+
+─── TEST FAILURE detected! Enter DEBUG LOOP ──────────────────────────────────────
+
+─── TURN 2 — READ the code, IDENTIFY the bug, FIX it ────────────────────────────
+
+read_file({ path: "/home/user/reverse.c" })
+→ Inspecting reverse() function: while (c->next) { ... }
+
+IDENTIFIED BUG: The while condition is \`c->next\` instead of \`c\`. When \`c\` points to the last node, \`c->next\` is NULL, so the loop stops before processing it — the last node never gets linked.
+
+edit_file({ path: "/home/user/reverse.c",
+  old_str: "while (c->next) { n = c->next; c->next = p; p = c; c = n; }",
+  new_str: "while (c) { n = c->next; c->next = p; p = c; c = n; }"
+})
+
+─── RE-RUN after fix ─────────────────────────────────────────────────────────────
+
+run_bash({ command: "gcc -Wall -Wextra -o /home/user/out /home/user/reverse.c && /home/user/out" })
+
+[stdout:]
+Before: 1 -> 2 -> 3 -> 4 -> 5 -> NULL
+After:  5 -> 4 -> 3 -> 2 -> 1 -> NULL
+Test 1 (empty): PASS
+Test 2 (single): PASS
+Test 3 (two): PASS
+Test 4 (five): PASS
+4 / 4 tests passed.
+
+─── ALL TESTS PASS now → EXPLAIN with actual output ──────────────────────────────
+
+The bug was in the while loop condition: \`while (c->next)\` stops one node early, skipping the last element because c->next is NULL on the final node. Fixed to \`while (c)\` which processes every node including the last one. After fix: all 4 test cases pass. The three-pointer technique runs in O(n) time with O(1) space.
+
+══════════════════════════════════════════════════════════════════════════════════
+  EXAMPLE 3 — Python palindrome (MULTI-CYCLE: write → run → 2 test failures → read → edit 2 bugs → re-run → 5/5 PASS)
+══════════════════════════════════════════════════════════════════════════════════
+
+User: Write a Python function to check if a string is a palindrome. Include test cases and verify all pass.
+
+─── TURN 1 ──────────────────────────────────────────────────────────────────────
+
+write_file({ path: "/home/user/palindrome.py", content: \`def is_palindrome(s):
+    s = s.lower().replace(" ", "")
+    for i in range(len(s)):
+        if s[i] != s[-i]:
+            return False
+    return True
+
+tests = [("racecar", True), ("hello", False), ("", True), ("a", True), ("A man a plan a canal Panama", True)]
+passed = 0
+for s, expected in tests:
+    result = is_palindrome(s)
+    status = "PASS" if result == expected else "FAIL"
+    if result == expected: passed += 1
+    print(f"'{s[:25]}': {status} (got {result}, expected {expected})")
+print(f"{passed}/{len(tests)} passed")\` })
+
+run_bash({ command: "python3 /home/user/palindrome.py" })
+
+[stdout:]
+'racecar': PASS (got True, expected True)
+'hello': FAIL (got True, expected False)
+'': PASS (got True, expected True)
+'a': PASS (got True, expected True)
+'A man a plan a canal Panama': FAIL (got True, expected False)
+3/5 passed
+
+─── 2 TEST FAILURES! Enter DEBUG LOOP ───────────────────────────────────────────
+
+─── TURN 2 — READ code, DIAGNOSE both bugs ──────────────────────────────────────
+
+read_file({ path: "/home/user/palindrome.py" })
+
+IDENTIFIED BUG 1: \`s[i] != s[-i]\` when i=0 → compares s[0] with s[-0] = s[0] (same char!). Should be \`s[-i-1]\` because Python negative indexing starts at -1 for the last element.
+
+IDENTIFIED BUG 2: \`.replace(" ", "")\` only removes spaces. "A man, a plan, a canal Panama" becomes "aman,apan,acanalpanama" — the commas remain, so it's not a palindrome.
+
+edit_file({ path: "/home/user/palindrome.py",
+  old_str: "s = s.lower().replace(\" \", \"\")",
+  new_str: "import re\ns = re.sub(r'[^a-z0-9]', '', s.lower())"
+})
+
+edit_file({ path: "/home/user/palindrome.py",
+  old_str: "if s[i] != s[-i]:",
+  new_str: "if s[i] != s[-i-1]:"
+})
+
+─── RE-RUN after fixes ───────────────────────────────────────────────────────────
+
+run_bash({ command: "python3 /home/user/palindrome.py" })
+
+[stdout:]
+'racecar': PASS (got True, expected True)
+'hello': PASS (got False, expected False)
+'': PASS (got True, expected True)
+'a': PASS (got True, expected True)
+'A man a plan a canal Panama': PASS (got True, expected True)
+5/5 passed
+
+─── ALL 5/5 TESTS PASS → EXPLAIN with actual output ─────────────────────────────
+
+Fixed two bugs: (1) Python's negative indexing starts at -1 for the last element, not -0. Changed s[-i] to s[-i-1] so i=0 maps to the last character. (2) Used regex \`re.sub(r'[^a-z0-9]', '', ...)\` to strip ALL non-alphanumeric characters (commas, spaces, punctuation), not just spaces. After both fixes: all 5/5 test cases pass, including edge cases (empty string, single char, all punctuation).
+
+══════════════════════════════════════════════════════════════════════════════════
+  EXAMPLE 4 — C quicksort (COMPILATION ERROR: write → compile error → read → fix → recompile → success)
+══════════════════════════════════════════════════════════════════════════════════
+
 User: Write a C program that sorts an array using quicksort.
 
-<agent_response>
-[write_file /home/user/quicksort.c]
-[run_bash "gcc -Wall -Wextra -o /home/user/out /home/user/quicksort.c && /home/user/out"]
-[stderr: error: 'ARRAY_SIZE' undeclared — line 5 uses it but no #define exists]
-[edit_file: adds #define ARRAY_SIZE 10 before main]
-[run_bash "gcc -Wall -Wextra -o /home/user/out /home/user/quicksort.c && /home/user/out"]
-[stderr: warning: implicit declaration of function 'qsort_swap' — line 22 calls swap before definition]
-[edit_file: adds forward declaration before qsort function]
-[run_bash "gcc -Wall -Wextra -o /home/user/out /home/user/quicksort.c && /home/user/out"]
-[stdout: Sorted array: 1 3 5 7 9 11 13 15 17 19]
-Quicksort implementation with Lomuto partition scheme. O(n log n) average, O(n²) worst case. Fixed two compilation errors: missing #define and missing forward declaration. Output confirms correct sorting.
-</agent_response>
-</example>
-</example_group>
+─── TURN 1 ──────────────────────────────────────────────────────────────────────
 
-<example_group title="Runtime fix — off-by-one">
-<example>
-User: Write a Python function to check if a string is a palindrome.
+write_file({ path: "/home/user/quicksort.c", content: \`#include <stdio.h>
+#include <stdlib.h>
+void swap(int *a, int *b) { int t = *a; *a = *b; *b = t; }
+int partition(int arr[], int lo, int hi) {
+  int pivot = arr[hi], i = lo - 1;
+  for (int j = lo; j < hi; j++) if (arr[j] <= pivot) { i++; swap(&arr[i], &arr[j]); }
+  swap(&arr[i+1], &arr[hi]); return i+1;
+}
+void qsort(int arr[], int lo, int hi) {
+  if (lo < hi) { int p = partition(arr, lo, hi); qsort(arr, lo, p-1); qsort(arr, p+1, hi); }
+}
+int main() {
+  int arr[] = {9,2,7,1,5,3,8,4,6};
+  int n = sizeof(arr)/sizeof(arr[0]);
+  qsort(arr, 0, n-1);
+  for (int i = 0; i < n; i++) printf("%d ", arr[i]);
+  printf("\\n");
+  return 0;
+}\` })
 
-<agent_response>
-[write_file /home/user/palindrome.py]
-[run_bash "python3 /home/user/palindrome.py"]
-[stdout: Test 1: 'racecar' → True ✓ | Test 2: 'hello' → True ✗ (expected False)]
-[read_file /home/user/palindrome.py — inspects the function logic]
-[edit_file: fixes comparison to check s[i] != s[-i-1] instead of s[i] != s[-i]]
-[run_bash "python3 /home/user/palindrome.py"]
-[stdout: Test 1: 'racecar' → True ✓ | Test 2: 'hello' → False ✓ | Test 3: '' → True ✓ | Test 4: 'a' → True ✓]
-The palindrome check compares characters from both ends inward. Initial bug: off-by-one in the mirrored index. Fixed by changing s[-i] to s[-i-1]. All 4 test cases pass, including edge cases (empty string, single char).
-</agent_response>
-</example>
-</example_group>
+run_bash({ command: "gcc -Wall -Wextra -o /home/user/out /home/user/quicksort.c && /home/user/out" })
+
+[stderr:]
+/home/user/quicksort.c:13: error: conflicting types for 'qsort'; have 'void(int*, int, int)'
+/usr/include/stdlib.h: note: previous declaration of 'qsort' with type 'void(void*, size_t, size_t, __compar_fn_t)'
+
+─── COMPILATION ERROR! Enter DEBUG LOOP ──────────────────────────────────────────
+
+─── TURN 2 — IDENTIFY: name conflict with stdlib.h's built-in qsort(). FIX + RE-RUN
+
+edit_file({ path: "/home/user/quicksort.c",
+  old_str: "void qsort(int arr[], int lo, int hi) {",
+  new_str: "void quicksort(int arr[], int lo, int hi) {"
+})
+edit_file({ path: "/home/user/quicksort.c",
+  old_str: "qsort(arr, 0, n-1);",
+  new_str: "quicksort(arr, 0, n-1);"
+})
+edit_file({ path: "/home/user/quicksort.c",
+  old_str: "qsort(arr, lo, p-1); qsort(arr, p+1, hi);",
+  new_str: "quicksort(arr, lo, p-1); quicksort(arr, p+1, hi);"
+})
+
+run_bash({ command: "gcc -Wall -Wextra -o /home/user/out /home/user/quicksort.c && /home/user/out" })
+
+[stdout:]
+1 2 3 4 5 6 7 8 9
+
+─── CLEAN COMPILE → EXPLAIN ──────────────────────────────────────────────────────
+
+Fixed name conflict: renamed qsort() to quicksort() to avoid clashing with stdlib.h's built-in qsort(). Output: 1 2 3 4 5 6 7 8 9 — all 9 elements sorted correctly. Uses Lomuto partition scheme. O(n log n) average case, O(n²) worst case.
+
+══════════════════════════════════════════════════════════════════════════════════
+  EXAMPLE 5 — FULL TDD: Kadane max subarray sum (write → run → test FAIL → debug → fix → re-run → all PASS → explain)
+══════════════════════════════════════════════════════════════════════════════════
+
+User: Write a C function for the maximum subarray sum (Kadane's algorithm). Include edge case tests. Ensure ALL pass.
+
+─── TURN 1 ──────────────────────────────────────────────────────────────────────
+
+write_file({ path: "/home/user/kadane.c", content: \`#include <stdio.h>
+int max_subarray(int arr[], int n) {
+  int max_sum = 0, cur_sum = 0;
+  for (int i = 0; i < n; i++) {
+    cur_sum += arr[i];
+    if (cur_sum > max_sum) max_sum = cur_sum;
+    if (cur_sum < 0) cur_sum = 0;
+  }
+  return max_sum;
+}
+int main() {
+  int pass = 0, total = 0;
+  total++; int t1[] = {-2,1,-3,4,-1,2,1,-5,4}; if (max_subarray(t1,9) == 6) { printf("Test 1 (mixed): PASS\\n"); pass++; } else { printf("Test 1: FAIL (got %d)\\n", max_subarray(t1,9)); }
+  total++; int t2[] = {-5,-3,-1};              int r2 = max_subarray(t2,3); if (r2 == -1) { printf("Test 2 (all neg): PASS\\n"); pass++; } else { printf("Test 2: FAIL (got %d, expected -1)\\n", r2); }
+  total++; int t3[] = {1,2,3,4};               if (max_subarray(t3,4) == 10) { printf("Test 3 (all pos): PASS\\n"); pass++; } else { printf("Test 3: FAIL\\n"); }
+  total++; int t4[] = {7};                     if (max_subarray(t4,1) == 7) { printf("Test 4 (single): PASS\\n"); pass++; } else { printf("Test 4: FAIL\\n"); }
+  printf("\\n%d/%d passed\\n", pass, total); return pass == total ? 0 : 1;
+}\` })
+
+run_bash({ command: "gcc -Wall -Wextra -o /home/user/out /home/user/kadane.c && /home/user/out" })
+
+[stdout:]
+Test 1 (mixed): PASS
+Test 2 (all neg): FAIL (got 0, expected -1)
+Test 3 (all pos): PASS
+Test 4 (single): PASS
+3/4 passed
+
+─── TEST FAILURE! Enter DEBUG LOOP ───────────────────────────────────────────────
+
+─── TURN 2 — DIAGNOSE, FIX, RE-RUN ──────────────────────────────────────────────
+
+IDENTIFIED BUG: max_sum starts at 0. For all-negative arrays (like [-5,-3,-1]),
+the algorithm never sets max_sum > 0, so it returns 0 instead of the largest
+element (-1). Fix: initialize max_sum = cur_sum = arr[0], start loop from i=1.
+
+edit_file({ path: "/home/user/kadane.c",
+  old_str: "int max_subarray(int arr[], int n) {\n  int max_sum = 0, cur_sum = 0;\n  for (int i = 0; i < n; i++) {",
+  new_str: "int max_subarray(int arr[], int n) {\n  if (n == 0) return 0;\n  int max_sum = arr[0], cur_sum = arr[0];\n  for (int i = 1; i < n; i++) {"
+})
+
+run_bash({ command: "gcc -Wall -Wextra -o /home/user/out /home/user/kadane.c && /home/user/out" })
+
+[stdout:]
+Test 1 (mixed): PASS
+Test 2 (all neg): PASS (got -1)
+Test 3 (all pos): PASS
+Test 4 (single): PASS
+4/4 passed
+
+─── ALL 4/4 TESTS PASS → EXPLAIN with actual output ─────────────────────────────
+
+Fixed Kadane's algorithm: max_sum must start at arr[0] (not 0) so all-negative arrays correctly return the largest element (-1). Also added n==0 guard for empty input. After fix: all 4/4 test cases pass including edge cases — all negative, all positive, mixed positive/negative, single element. Time: O(n) single pass. Space: O(1).
+
+══════════════════════════════════════════════════════════════════════════════════
+  EXAMPLE 6 — Python data processing (INSTALL + ERROR + DISCOVER + FIX + RETRY cycle)
+══════════════════════════════════════════════════════════════════════════════════
+
+User: Write a script to download a webpage and extract all image URLs.
+
+─── TURN 1 ──────────────────────────────────────────────────────────────────────
+
+write_file({ path: "/home/user/extract.py", content: \`import requests
+from bs4 import BeautifulSoup
+r = requests.get("https://example.com")
+soup = BeautifulSoup(r.text, "html.parser")
+for img in soup.find_all("img"):
+    src = img.get("src")
+    if src: print(src)\` })
+
+run_bash({ command: "python3 /home/user/extract.py" })
+
+[stderr:]
+Traceback (most recent call last):
+  File "/home/user/extract.py", line 1, in <module>
+    import requests
+ModuleNotFoundError: No module named 'requests'
+
+─── DEPENDENCY ERROR! Install missing package, then re-run ───────────────────────
+
+run_bash({ command: "pip install requests beautifulsoup4 -q" })
+
+run_bash({ command: "python3 /home/user/extract.py" })
+
+[stdout:] (empty — no output)
+
+─── No errors but also no output. Script ran but produced nothing. Investigate. ──
+
+─── TURN 2 — Add debug output to verify script behavior ──────────────────────────
+
+edit_file({ path: "/home/user/extract.py",
+  old_str: "r = requests.get(\"https://example.com\")",
+  new_str: "r = requests.get(\"https://example.com\")\nprint(f\"Status: {r.status_code}, Content length: {len(r.text)} bytes\")"
+})
+
+edit_file({ path: "/home/user/extract.py",
+  old_str: "for img in soup.find_all(\"img\"):\n    src = img.get(\"src\")\n    if src: print(src)",
+  new_str: "imgs = soup.find_all(\"img\")\nprint(f\"Found {len(imgs)} image(s)\")\nfor img in imgs:\n    src = img.get(\"src\")\n    if src: print(src)"
+})
+
+run_bash({ command: "python3 /home/user/extract.py" })
+
+[stdout:]
+Status: 200, Content length: 1256 bytes
+Found 0 image(s)
+
+─── Script runs correctly. Confirmed: example.com has 0 images. → EXPLAIN ───────
+
+Script downloads example.com (status 200, 1256 bytes), parses with BeautifulSoup, and extracts all <img src> attributes. First attempt failed with ModuleNotFoundError — missing requests library. Installed with pip, re-ran. Got empty output (no errors but no results), added debug printing to verify. Confirmed: example.com contains 0 images (expected — it's a minimal placeholder site). Always verify output isn't silently empty.
+
+══════════════════════════════════════════════════════════════════════════════════
+  WEB APP WORKFLOW
+══════════════════════════════════════════════════════════════════════════════════
+
+Static app (pure HTML/CSS/JS, no backend server):
+  1. write_file({ path: "/home/user/index.html", content: "..." }) — all CSS in <style>, JS in <script>
+  2. For multi-file: create_project({ name: "app-name", files: [{path: "file.html", content: "..."}] })
+  3. Preview: get_generated_file({ path: "/home/user/index.html" }) → renders in iframe
+  4. CDN libraries only (Tailwind via CDN, Chart.js, Three.js) — NO npm, NO build tools
+  5. NO start_app needed for static HTML — get_generated_file is sufficient
+
+Dynamic app (has server/backend):
+  1. create_project({ name, files: [{path, content}] }) — scaffold ALL files at once
+  2. start_app({ name: "myapp", command: "node server.js", port: 3000 })
+  3. Wait ~2 seconds for server to start
+  4. get_app_url({ app_id }) → get public HTTPS URL
+  5. Give URL to user — tell them it's live
+
+Updating existing app:
+  1. edit_file to change specific parts of a file
+  2. Or write_file to overwrite an entire file
+  3. Tell user to refresh browser
+
+══════════════════════════════════════════════════════════════════════════════════
+  DATA ANALYSIS WORKFLOW
+══════════════════════════════════════════════════════════════════════════════════
+
+When user asks to analyze data, make a chart, or process a file:
+  Step 1 — File is at /home/user/&lt;filename&gt; (auto-uploaded by frontend)
+  Step 2 — run_python with pandas to load and explore data
+  Step 3 — matplotlib/seaborn charts → save to /home/user/chart.png → auto-downloads
+  Step 4 — Print df.describe(), df.info(), df.head() — output streams live
+  Step 5 — Explain findings concisely with actual numbers from the output
+  Step 6 — If file not found → use list_files to discover actual filename
+
+══════════════════════════════════════════════════════════════════════════════════
+  ERROR RECOVERY — COMPLETE COMPILE-AND-FIX CYCLE
+══════════════════════════════════════════════════════════════════════════════════
+
+When run_python or run_bash produces stderr OR test failures in stdout:
+  MUST: READ every line of output carefully
+  MUST: Identify the exact error (line number, variable, type mismatch, off-by-one, missing import)
+  MUST: Fix ONE bug at a time with edit_file
+  MUST: Re-run after each fix
+  MUST: Repeat until ALL tests pass (exit code 0, no FAIL lines)
+  NEVER: Say "it failed" and stop — always fix and retry
+  NEVER: Explain code during the debug loop — only after all tests pass
+
+<pattern name="compile-and-fix-cycle">
+On compilation error or test failure:
+  1. Read stderr or test output line by line — find exact error
+  2. Call edit_file to fix ONE specific bug
+  3. Re-run compilation/execution
+  4. If still failing → go back to step 1
+  5. Clean compile + all tests pass → explain with actual output
+</pattern>
 </error_recovery>
 `;
 
@@ -861,13 +1163,28 @@ function detectDocumentIntent(query: string): DocType {
 }
 
 function extractTopicFromQuery(query: string): string {
-    return query
+    const q = query.trim();
+    // For long multi-sentence prompts, extract the actual topic
+    if (q.length > 150 || q.includes('\n')) {
+        // Try topic after "about/on/for/covering/titled/called"
+        const tm = q.match(/(?:about|on|for|of|covering|titled|called)\s+["""]?([^""".\n]{5,120}?)["""]?(?:\s*[.\n]|$)/i);
+        if (tm) return tm[1]!.trim().slice(0, 100);
+        // Try task description after "Task:"
+        const taskM = q.match(/Task:\s*(.+?)(?:\.\s|$)/i);
+        if (taskM) return taskM[1]!.trim().slice(0, 100);
+        // First sentence
+        const firstSent = q.split(/[.\n]/)[0]?.trim();
+        if (firstSent && firstSent.length < 120) return firstSent;
+    }
+    // Standard cleanup for shorter queries
+    return q
         .replace(/\b(generate|create|make|build|write|give|produce|prepare)\s*(me\s+)?(a\s+|an\s+)?/gi, '')
-        .replace(/\b(docx?|pdf|pptx?|powerpoint|word\s+doc(?:ument)?|presentation|slide\s*deck|slides?|file|document|xlsx?|excel|spreadsheet|csv|tsv|markdown|md)\b/gi, '')
+        .replace(/\b(docx?|pdf|pptx?|powerpoint|word\s+doc(?:ument)?|presentation|slide\s*deck|slides?|file|document|report|xlsx?|excel|spreadsheet|csv|tsv|markdown|md)\b/gi, '')
         .replace(/\b(about|with\s+topic|with\s+the\s+topic\s+of|on\s+the\s+topic\s+of|on|regarding|for|covering|with)\b/gi, '')
         .replace(/\s+/g, ' ')
         .trim()
-        || query.trim().slice(0, 80);
+        .slice(0, 100)
+        || 'document';
 }
 
 // ─── Robust JSON parser (handles LLM truncation / trailing commas) ────────
@@ -1543,6 +1860,8 @@ interface AgentState {
     generatedFiles: any[];
     thoughtProcess: any[];
     searchContent?: string;
+    searchCount: number;
+    wikiSearchCount: number;
 }
 
 function isGenericQuery(q: string): boolean {
@@ -1566,6 +1885,47 @@ function isGenericQuery(q: string): boolean {
     return genericPatterns.some(pat => pat.test(clean));
 }
 
+// ── Query relevance guard ──────────────────────────────────────────
+// Prevents the model from searching for topics completely unrelated
+// to what the user actually asked (hallucination guard).
+const STOPWORDS = new Set([
+    'the','a','an','is','are','was','were','be','been','being',
+    'have','has','had','do','does','did','will','would','could',
+    'should','may','might','can','shall','to','of','in','for',
+    'on','with','at','by','from','as','into','through','during',
+    'before','after','above','below','between','out','off','over',
+    'under','again','further','then','once','here','there','when',
+    'where','why','how','all','each','every','both','few','more',
+    'most','other','some','such','no','nor','not','only','own',
+    'same','so','than','too','very','just','because','about',
+    'what','which','who','whom','this','that','these','those',
+    'it','its','it\'s','and','but','or','if','while','up','down',
+    'get','got','does','doesn\'t','don\'t','won\'t','can\'t',
+]);
+
+function extractTokens(s: string): string[] {
+    return s.toLowerCase()
+        .replace(/[^a-z0-9\s'-]/g, ' ')
+        .split(/\s+/)
+        .filter(t => t.length >= 3 && !STOPWORDS.has(t));
+}
+
+function isQueryRelevant(userQuery: string, modelQuery: string): boolean {
+    const uTokens = extractTokens(userQuery);
+    const mTokens = extractTokens(modelQuery);
+    if (uTokens.length === 0 || mTokens.length === 0) return true; // can't judge, let it through
+    // Check if any meaningful token from the user query appears in the model query
+    const hasOverlap = mTokens.some((t: string) => uTokens.includes(t));
+    // Also check bigram overlap for phrases
+    if (!hasOverlap) {
+        for (let i = 0; i < uTokens.length - 1; i++) {
+            const bigram = `${uTokens[i]} ${uTokens[i + 1]}`;
+            if (modelQuery.toLowerCase().includes(bigram)) return true;
+        }
+    }
+    return hasOverlap;
+}
+
 // ── TOOL FACTORY ───────────────────────────────────────────────────────────
 // Creates all 5 tools scoped to the current request (has access to res + state).
 function createFluxTools(res: any, model: any, state: AgentState, userQuery?: string, activeConversationId?: string, uid?: string, abortSignal?: AbortSignal) {
@@ -1579,11 +1939,14 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                 'CRITICAL: After this tool returns, IGNORE what your training data says and answer ONLY from these results. ' +
                 'Always include the current year/month in your query. ' +
                 'Do NOT use for general knowledge, logic, math, or basic greetings. ' +
-                'NEVER search for your own internal thoughts, self-talk, reasoning, or meta-commentary. Only search for what the user explicitly asked about.',
-            parameters: z.object({
+                'NEVER search for your own internal thoughts, self-talk, reasoning, or meta-commentary. Only search for what the user explicitly asked about. ' +
+                'CRITICAL: The query you provide MUST be directly related to the user\'s topic. If you search for something unrelated, it will be REJECTED. ' +
+                'CRITICAL: You may only call this tool ONCE per query. After results are returned, answer immediately — do not search again.',
+            inputSchema: z.object({
                 query: z.string().describe(
-                    'A precise, targeted search query derived from the user\'s explicit request. ' +
-                    'The query must relate to a real topic the user asked about — never your own thoughts, reasoning, or self-talk. ' +
+                    'A precise, targeted search query derived DIRECTLY from the user\'s explicit request. ' +
+                    'The query MUST contain the key nouns/topics the user asked about. Never replace the user\'s topic with a different one. ' +
+                    'If you search for an unrelated topic, the query will be silently dropped. ' +
                     'REQUIRED — always provide a specific query.'
                 ),
                 queries: z.array(z.string()).describe(
@@ -1592,16 +1955,42 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                 ).optional(),
             }),
             execute: async ({ query, queries: queriesArr }: any) => {
+                // ── Re-search guard: hard limit to prevent infinite loops ─────
+                if (state.searchCount >= 1 && state.searchContent) {
+                    console.warn(`[TOOL] web_search blocked (already searched ${state.searchCount}x) — model must answer from existing results`);
+                    sendStatus(res, 'error', 'Search skipped: already have results.', undefined, state.thoughtProcess);
+                    return `[SEARCH NOT ALLOWED] You already searched and have results below. DO NOT search again. Answer the user from the existing search content.\n\n${state.searchContent}`;
+                }
+                state.searchCount++;
+
+                // ALWAYS include the user's original query as the primary search.
+                // This prevents the model from hallucinating an unrelated query.
                 const queriesToRun: string[] = [];
-                if (Array.isArray(queriesArr) && queriesArr.length > 0) {
-                    queriesToRun.push(...queriesArr.filter((q: any) => typeof q === 'string').map((q: string) => q.trim()).filter(Boolean));
-                } else if (typeof query === 'string' && query.trim()) {
-                    queriesToRun.push(query.trim());
-                } else if (typeof userQuery === 'string' && userQuery.trim()) {
+                if (typeof userQuery === 'string' && userQuery.trim()) {
                     queriesToRun.push(userQuery.trim());
                 }
 
-                const safeQueries = queriesToRun.slice(0, 3);
+                // Collect model-generated queries, filtering out any that are
+                // completely unrelated to what the user asked (hallucination guard).
+                const modelQueries: string[] = [];
+                if (Array.isArray(queriesArr) && queriesArr.length > 0) {
+                    modelQueries.push(...queriesArr.filter((q: any) => typeof q === 'string').map((q: string) => q.trim()).filter(Boolean));
+                } else if (typeof query === 'string' && query.trim()) {
+                    modelQueries.push(query.trim());
+                }
+
+                for (const mq of modelQueries) {
+                    if (mq.toLowerCase() === userQuery?.toLowerCase()) continue; // duplicate
+                    if (userQuery && !isQueryRelevant(userQuery, mq)) {
+                        console.warn(`[TOOL] web_search dropped hallucinated query — model query "${mq}" has no relation to user query "${userQuery}"`);
+                        continue;
+                    }
+                    queriesToRun.push(mq);
+                }
+
+                // Tavily rejects queries over 400 chars — truncate
+                const TAVILY_MAX_QUERY = 395;
+                const safeQueries = queriesToRun.slice(0, 3).map(q => q.length > TAVILY_MAX_QUERY ? q.slice(0, TAVILY_MAX_QUERY) : q);
 
                 if (safeQueries.length === 0) {
                     console.warn('[TOOL] web_search called with no query — skipping');
@@ -1720,7 +2109,7 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
             description:
                 'Load the generation rules/skill file for a document type. ' +
                 'ALWAYS call this before generate_document.',
-            parameters: z.object({
+            inputSchema: z.object({
                 doc_type: z
                     .enum(['pdf', 'pptx', 'docx', 'xlsx', 'csv', 'tsv', 'md', 'json', 'sql', 'html', 'tech', 'finance', 'coder', 'creative', 'legal'])
                     .describe('The document type to load rules for'),
@@ -1755,7 +2144,7 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
             description:
                 'Generate a downloadable document file. Do NOT use this tool for requests to create charts, graphs, diagrams, or flowcharts, unless the user explicitly requested a document file format (like "create a chart PDF" or "put the chart in a Word document"). For standard chart/diagram requests, render them inline instead. ' +
                 'Always call read_skill first and pass the content here.',
-            parameters: z.object({
+            inputSchema: z.object({
                 doc_type: z.enum(['pdf', 'pptx', 'docx', 'xlsx', 'csv', 'tsv', 'md', 'json', 'sql', 'html', 'tech', 'finance', 'coder', 'creative', 'legal']),
                 topic: z.string().describe(
                     'The detailed topic, content, research findings, and data to be included in the document. ' +
@@ -1817,7 +2206,7 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
         // ── get_weather ───────────────────────────────────────────────────
         get_weather: (tool as any)({
             description: 'Fetch real-time weather data for a specific city.',
-            parameters: z.object({
+            inputSchema: z.object({
                 city: z.string().describe('The city name to get weather for'),
             }),
             execute: async ({ city }: any) => {
@@ -1856,7 +2245,7 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
                 'Generate an AI image, illustration, photo, or artwork. ' +
                 'Use when user asks to create, draw, or generate an image. ' +
                 'Do NOT use this tool for charts, graphs, or diagrams (which should be rendered inline using CHART or MERMAID tags).',
-            parameters: z.object({
+            inputSchema: z.object({
                 prompt: z.string().describe('Description of the image to generate'),
             }),
             execute: async ({ prompt }: any) => {
@@ -1916,7 +2305,7 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
         // ── run_python ────────────────────────────────────────────────────
         run_python: (tool as any)({
             description: 'Execute Python code in an isolated sandbox. Use for data analysis, visualization, file processing, calculations. Has pandas, numpy, matplotlib, seaborn, plotly, scipy, scikit-learn pre-installed.',
-            parameters: z.object({
+            inputSchema: z.object({
                 code: z.string().describe('Complete, runnable Python code to execute'),
             }),
             execute: async ({ code }: any) => {
@@ -1946,7 +2335,14 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
                     }
                     sendStatus(res, 'sandbox_success',
                         `Python finished (exit ${result.exitCode}, ${(result.duration / 1000).toFixed(1)}s)`,
-                        { tool: 'run_python', exitCode: result.exitCode },
+                        {
+                            tool: 'run_python',
+                            exitCode: result.exitCode,
+                            code,
+                            stdout: result.stdout.join('\n'),
+                            stderr: result.stderr.join('\n'),
+                            duration: result.duration
+                        },
                         state.thoughtProcess);
                     const outFull = result.stdout.join('\n');
                     const errFull = result.stderr.join('\n');
@@ -1956,7 +2352,7 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
                     const errTruncated = errFull.length > 2000 ? '\n[output truncated]' : '';
                     return `Exit code: ${result.exitCode} (${(result.duration / 1000).toFixed(1)}s)\n${out ? `STDOUT:\n${out}${outTruncated}\n` : ''}${err ? `STDERR:\n${err}${errTruncated}\n` : ''}${result.generatedFiles.length ? `Generated files: ${result.generatedFiles.join(', ')} (sent to user)\n` : ''}${result.error ? `Error: ${result.error}` : ''}`;
                 } catch (e: any) {
-                    sendStatus(res, 'sandbox_error', `Python execution failed: ${e.message}`, { tool: 'run_python' }, state.thoughtProcess);
+                    sendStatus(res, 'sandbox_error', `Python execution failed: ${e.message}`, { tool: 'run_python', code, error: e.message }, state.thoughtProcess);
                     return `Python execution failed: ${e.message}`;
                 }
             },
@@ -1964,8 +2360,8 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
 
         // ── run_bash ──────────────────────────────────────────────────────
         run_bash: (tool as any)({
-            description: 'Run a bash command in the sandbox. For file operations, installing tools, checking system info.',
-            parameters: z.object({
+            description: 'Run a bash command in the sandbox. Used for compiling/running code (gcc, python3, node, etc.), file operations, installing packages, and checking system info. After write_file creates a code file, call this to compile and test it.',
+            inputSchema: z.object({
                 command: z.string().describe('Bash command to execute'),
             }),
             execute: async ({ command }: any) => {
@@ -1999,7 +2395,14 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
                     }
                     sendStatus(res, 'sandbox_success',
                         `Bash finished (exit ${result.exitCode}, ${(result.duration / 1000).toFixed(1)}s)`,
-                        { tool: 'run_bash', exitCode: result.exitCode },
+                        {
+                            tool: 'run_bash',
+                            exitCode: result.exitCode,
+                            command,
+                            stdout: result.stdout.join('\n'),
+                            stderr: result.stderr.join('\n'),
+                            duration: result.duration
+                        },
                         state.thoughtProcess);
                     const outFull = result.stdout.join('\n');
                     const errFull = result.stderr.join('\n');
@@ -2009,7 +2412,7 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
                     const errTruncated = errFull.length > 2000 ? '\n[output truncated]' : '';
                     return `Exit code: ${result.exitCode} (${(result.duration / 1000).toFixed(1)}s)\n${out ? `STDOUT:\n${out}${outTruncated}\n` : ''}${err ? `STDERR:\n${err}${errTruncated}\n` : ''}${result.generatedFiles.length ? `Generated files: ${result.generatedFiles.join(', ')} (sent to user)\n` : ''}`;
                 } catch (e: any) {
-                    sendStatus(res, 'sandbox_error', `Bash failed: ${e.message}`, { tool: 'run_bash' }, state.thoughtProcess);
+                    sendStatus(res, 'sandbox_error', `Bash failed: ${e.message}`, { tool: 'run_bash', command, error: e.message }, state.thoughtProcess);
                     return `Bash failed: ${e.message}`;
                 }
             },
@@ -2018,7 +2421,7 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
         // ── read_file ─────────────────────────────────────────────────────
         read_file: (tool as any)({
             description: 'Read contents of a file from the sandbox.',
-            parameters: z.object({
+            inputSchema: z.object({
                 path: z.string().describe('Absolute path like /home/user/data.csv'),
             }),
             execute: async ({ path }: any) => {
@@ -2034,8 +2437,8 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
 
         // ── write_file ────────────────────────────────────────────────────
         write_file: (tool as any)({
-            description: 'Create or overwrite a file in the sandbox. AFTER writing code files (.c, .cpp, .py, .js, .ts, etc.), you MUST IMMEDIATELY ALSO call run_bash to compile and execute them — do NOT stop after write_file.',
-            parameters: z.object({
+            description: 'Create or overwrite a file in the sandbox. After writing a code file, call run_bash next to compile and execute it — do NOT explain yet, do NOT output bash commands as text, just call run_bash.',
+            inputSchema: z.object({
                 path: z.string().describe('File path like /home/user/output.csv'),
                 content: z.string().describe('Full file content'),
             }),
@@ -2049,7 +2452,11 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
                 try {
                     await codeExecutor.writeFile(cid, path, content);
                     sendStatus(res, 'generating_file_success', `Wrote ${filename}`, { path, filename, content, language }, state.thoughtProcess);
-                    return `File written to ${path}`;
+                    const codeExts = ['c', 'cpp', 'py', 'js', 'ts', 'rs', 'go', 'java'];
+                    const isCode = codeExts.includes(ext);
+                    return isCode
+                        ? `File written to ${path}. Now call run_bash to compile and test it. Do NOT explain yet — just call run_bash.`
+                        : `File written to ${path}.`;
                 } catch (e: any) {
                     sendStatus(res, 'generating_file_error', `Failed to write ${filename}: ${e.message}`, { path }, state.thoughtProcess);
                     return `Failed to write ${path}: ${e.message}`;
@@ -2060,7 +2467,7 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
         // ── list_files ────────────────────────────────────────────────────
         list_files: (tool as any)({
             description: 'List files in a sandbox directory.',
-            parameters: z.object({
+            inputSchema: z.object({
                 path: z.string().optional().describe('Directory path, default /home/user'),
             }),
             execute: async ({ path }: any) => {
@@ -2077,7 +2484,7 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
         // ── install_package ───────────────────────────────────────────────
         install_package: (tool as any)({
             description: 'Install a Python package via pip in the sandbox.',
-            parameters: z.object({
+            inputSchema: z.object({
                 package: z.string().describe('Package name e.g. tensorflow or opencv-python'),
             }),
             execute: async ({ package: pkg }: any) => {
@@ -2100,8 +2507,8 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
 
         // ── edit_file ─────────────────────────────────────────────────────
         edit_file: (tool as any)({
-            description: 'Surgically edit a file by replacing a specific string. ALWAYS read_file first.',
-            parameters: z.object({
+            description: 'Surgically edit a file by replacing a specific string. ALWAYS read_file first. After editing code, call run_bash to re-compile and re-run.',
+            inputSchema: z.object({
                 path: z.string().describe('File path'),
                 old_str: z.string().describe('EXACT string to replace (must be unique)'),
                 new_str: z.string().describe('Replacement string'),
@@ -2114,7 +2521,7 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
                     const result = await codeExecutor.editFile(cid, path, old_str || '', new_str || '');
                     if (result.success) {
                         sendStatus(res, 'generating_file_success', `Edited ${filename}`, { path }, state.thoughtProcess);
-                        return `File ${path} edited successfully.`;
+                        return `File ${path} edited successfully. After editing code, call run_bash to re-compile and re-run to verify the fix.`;
                     }
                     sendStatus(res, 'generating_file_error', `Edit failed on ${filename}: ${result.error}`, { path }, state.thoughtProcess);
                     return `Edit failed: ${result.error}`;
@@ -2127,12 +2534,16 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
 
         // ── wiki_search ───────────────────────────────────────────────────
         wiki_search: (tool as any)({
-            description: 'Search the knowledge graph / wiki for concepts, entities, and topics extracted from this conversation. Returns related nodes and their relationships. Use this when the user asks about topics or concepts previously discussed.',
-            parameters: z.object({
+            description: 'Search the knowledge graph / wiki for concepts, entities, and topics extracted from this conversation. Returns related nodes and their relationships. Use this when the user asks about topics or concepts previously discussed. May only be called ONCE per query.',
+            inputSchema: z.object({
                 query: z.string().describe('The concept or topic to search for in the wiki'),
             }),
             execute: async ({ query }: any) => {
                 if (!uid || !query) return 'No user or query provided.';
+                if (state.wikiSearchCount >= 1) {
+                    return '[WIKI SKIPPED] You already searched the wiki. Answer from the results you have.';
+                }
+                state.wikiSearchCount++;
                 try {
                     const nodes = await wikiManager.searchConcepts(uid, query);
                     if (!nodes.length) return `No wiki entries found for "${query}".`;
@@ -2146,7 +2557,7 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
         // ── create_project ────────────────────────────────────────────────
         create_project: (tool as any)({
             description: 'Scaffold a full project directory with files in the sandbox. Use this when building a complete app (HTML/CSS/JS, React, Python web app, etc.). Provide the project name and an array of { path, content } objects.',
-            parameters: z.object({
+            inputSchema: z.object({
                 name: z.string().describe('Project name (folder name under /home/user)'),
                 files: z.array(z.object({
                     path: z.string().describe('Relative file path within the project, e.g. src/index.js'),
@@ -2179,7 +2590,7 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
         // ── start_app ─────────────────────────────────────────────────────
         start_app: (tool as any)({
             description: 'Start a long-running background process (web server, dev server, API) in the sandbox. Use this after creating project files with create_project or write_file. The process runs in the background — use stop_app to kill it and get_app_url for the public URL.',
-            parameters: z.object({
+            inputSchema: z.object({
                 name: z.string().describe('A human-readable name for this app/process'),
                 command: z.string().describe('The command to run (e.g. "python3 app.py", "npm start", "node server.js")'),
                 cwd: z.string().optional().describe('Working directory (default: /home/user)'),
@@ -2202,7 +2613,7 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
         // ── stop_app ──────────────────────────────────────────────────────
         stop_app: (tool as any)({
             description: 'Stop a running background app by its ID (returned by start_app).',
-            parameters: z.object({
+            inputSchema: z.object({
                 app_id: z.string().describe('The app ID returned by start_app'),
             }),
             execute: async ({ app_id }: any) => {
@@ -2219,7 +2630,7 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
         // ── list_apps ─────────────────────────────────────────────────────
         list_apps: (tool as any)({
             description: 'List all running background apps in the current sandbox session.',
-            parameters: z.object({}),
+            inputSchema: z.object({}),
             execute: async () => {
                 const cid = activeConversationId || 'default';
                 const apps = codeExecutor.listApps(cid);
@@ -2233,7 +2644,7 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
         // ── get_app_logs ──────────────────────────────────────────────────
         get_app_logs: (tool as any)({
             description: 'Get the stdout/stderr output from a running or finished app. Returns whatever output has been buffered so far.',
-            parameters: z.object({
+            inputSchema: z.object({
                 app_id: z.string().describe('The app ID returned by start_app'),
             }),
             execute: async ({ app_id }: any) => {
@@ -2253,7 +2664,7 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
         // ── get_app_url ───────────────────────────────────────────────────
         get_app_url: (tool as any)({
             description: 'Get the public HTTPS URL for a running web app started with start_app. The app must have been started with a port number. Use this to provide the user with a clickable link to their app.',
-            parameters: z.object({
+            inputSchema: z.object({
                 app_id: z.string().describe('The app ID returned by start_app'),
             }),
             execute: async ({ app_id }: any) => {
@@ -2277,7 +2688,7 @@ Do NOT just stop after calling this tool. Provide a full answer based on the dat
         // ── get_generated_file ────────────────────────────────────────────
         get_generated_file: (tool as any)({
             description: 'Download a file from the sandbox and return its base64-encoded content with MIME type. Use this to return files (images, PDFs, CSVs) directly to the user in chat.',
-            parameters: z.object({
+            inputSchema: z.object({
                 path: z.string().describe('Absolute path to the file in the sandbox, e.g. /home/user/output.png'),
             }),
             execute: async ({ path }: any) => {
@@ -2922,7 +3333,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
         });
 
         // ── Per-request agent state ──────────────────────────────────────
-        const agentState: AgentState = { sources: [], generatedFiles: [], thoughtProcess: [] };
+        const agentState: AgentState = { sources: [], generatedFiles: [], thoughtProcess: [], searchCount: 0, wikiSearchCount: 0 };
         const tools = createFluxTools(res, model, agentState, nq, activeConversationId, uid, abortController.signal);
         if (hasAnyFile) {
             delete (tools as any).web_search;
@@ -3054,17 +3465,21 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                 system: dynSys,
                 messages,
                 tools,
-                maxSteps: 8,
+                stopWhen: stepCountIs(10),
                 toolChoice: 'auto',
                 temperature: 0.35,
                 providerOptions: getProviderOptions(pref),
                 onStepFinish: (step: any) => {
-                    if (step.toolCalls?.length) {
+                    const hasToolCalls = step.toolCalls?.length > 0;
+                    const textLen = step.text?.length ?? 0;
+                    const reason = step.finishReason ?? 'unknown';
+                    if (hasToolCalls) {
                         step.toolCalls.forEach((tc: any) => {
-                            // tc.args is the parsed object in AI SDK; tc.input is used in some versions
                             const args = tc.args ?? tc.input ?? '(no args)';
-                            console.log(`[TOOL-CALL] ${tc.toolName}`, args);
+                            console.log(`[STEP] finish=${reason} tools=${step.toolCalls.length} text=${textLen} tool=${tc.toolName}`);
                         });
+                    } else {
+                        console.log(`[STEP] finish=${reason} tools=0 text=${textLen}`);
                     }
                 }
             } as any);
@@ -3262,6 +3677,63 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                             console.warn(`[MISTRAL] Auto-chain generate_document failed:`, e?.message);
                         }
                     }
+                }
+            }
+
+            // ── Markdown bash code block fallback handler ─────────────────────
+            // Some NIM models output shell commands as markdown code blocks
+            // instead of calling the run_bash function. We detect them here
+            // and execute them automatically.
+            if (!closedRef.v) {
+                const bashRe = /```bash\s*\n([\s\S]*?)```/gi;
+                const matches: Array<{ index: number; fullMatch: string; cmd: string }> = [];
+                let bm: RegExpExecArray | null;
+                while ((bm = bashRe.exec(fullText)) !== null) {
+                    let cmd = (bm[1] ?? '').trim();
+                    cmd = cmd.replace(/^[$%#]\s*/, '').trim();
+                    if (cmd && cmd.length < 2000) {
+                        matches.push({ index: bm.index, fullMatch: bm[0], cmd });
+                    }
+                }
+                if (matches.length > 0) {
+                    console.log(`[BASH-FALLBACK] Found ${matches.length} bash blocks, executing...`);
+                    const cid = activeConversationId || 'default';
+                    for (let i = matches.length - 1; i >= 0; i--) {
+                        const { index, fullMatch, cmd } = matches[i]!;
+                        try {
+                            if (!res.writableEnded) {
+                                res.write(`event: code_execution\ndata: ${JSON.stringify({ code: cmd, language: 'bash' })}\n\n`);
+                            }
+                            sendStatus(res, 'sandbox_start', `$ ${cmd.slice(0, 80)}`, { tool: 'bash_fallback', command: cmd }, agentState.thoughtProcess);
+                            const result = await codeExecutor.runBash(cid, cmd, (type: string, line: string) => {
+                                if (!res.writableEnded) {
+                                    res.write(`event: code_output\ndata: ${JSON.stringify({ type, content: line })}\n\n`);
+                                }
+                            }, abortController.signal);
+                            if (!res.writableEnded) {
+                                res.write(`event: code_done\ndata: ${JSON.stringify({ exitCode: result.exitCode, duration: result.duration })}\n\n`);
+                            }
+                            let replacement = `\n\`\`\`\n$ ${cmd}\n`;
+                            if (result.stdout.length) replacement += result.stdout.join('\n') + '\n';
+                            if (result.stderr.length) replacement += result.stderr.join('\n') + '\n';
+                            replacement += `exit code: ${result.exitCode}\n\`\`\`\n`;
+                            fullText = fullText.slice(0, index) + replacement + fullText.slice(index + fullMatch.length);
+                            writeSafeSSE(res, replacement);
+                            charsSent += replacement.length;
+                            hasToolCall = true;
+                        } catch (e: any) {
+                            console.warn(`[BASH-FALLBACK] Failed:`, e?.message);
+                            const errMsg = `\n\n[Command failed: ${e?.message ?? 'error'}]\n\n`;
+                            fullText = fullText.slice(0, index) + errMsg + fullText.slice(index + fullMatch.length);
+                            writeSafeSSE(res, errMsg);
+                            charsSent += errMsg.length;
+                        }
+                        if (typeof (res as any).flush === 'function') (res as any).flush();
+                    }
+                    sendStatus(res, 'sandbox_success',
+                        `Bash fallback finished (${matches.length} commands)`,
+                        { tool: 'bash_fallback', count: matches.length },
+                        agentState.thoughtProcess);
                 }
             }
 
@@ -3566,7 +4038,7 @@ app.post('/api/chat-sdk', middleware, async (req: any, res: any) => {
             flush: () => { },
             on: () => { },
         };
-        const agentState: AgentState = { sources: [], generatedFiles: [], thoughtProcess: [] };
+        const agentState: AgentState = { sources: [], generatedFiles: [], thoughtProcess: [], searchCount: 0, wikiSearchCount: 0 };
         const tools = createFluxTools(noopRes, model, agentState, nq, '');
 
         const memCtx = '';
@@ -3582,7 +4054,7 @@ app.post('/api/chat-sdk', middleware, async (req: any, res: any) => {
             system: dynSys,
             messages,
             tools,
-            maxSteps: 8,
+            stopWhen: stepCountIs(10),
             toolChoice: 'auto',
             temperature: 0.35,
             providerOptions: getProviderOptions(pref),

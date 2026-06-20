@@ -719,23 +719,10 @@ export function StatusMessage({
 
   // ─── web search ──────────────────────────────────────────────────────────
   if (status.subtype === "searching") {
-    const query: string = status.data?.query ?? "";
     return (
-      <div className="flex gap-2.5">
-        <TimelineNode
-          icon={<SearchIcon cls={isActive ? "text-[var(--accent)]" : "text-[var(--text-secondary)]/40"} />}
-          isFirst={isFirst} isLast={isLast}
-        />
-        <div className="py-2 min-w-0 flex-1">
-          <span className="text-[13px] text-[var(--text-secondary)] leading-snug font-medium">{status.message}</span>
-          {rightSlot && <span className="inline-flex shrink-0 align-middle ml-1">{rightSlot}</span>}
-          {query && (
-            <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-md border border-[var(--surface-border)] bg-[var(--surface-bg)] px-2.5 py-1 text-[12px] text-[var(--text-secondary)] font-mono">
-              <SearchIcon cls="size-3 text-[var(--text-muted)]" />
-              <span className="truncate max-w-[260px]">{query}</span>
-            </div>
-          )}
-        </div>
+      <div className="py-2 min-w-0">
+        <span className="text-[13px] text-[var(--text-secondary)] leading-snug font-medium">{status.message}</span>
+        {rightSlot && <span className="inline-flex shrink-0 align-middle ml-1.5">{rightSlot}</span>}
       </div>
     );
   }
@@ -1097,9 +1084,15 @@ export function StatusMessage({
                 </span>
               );
 
-    // Pick command to show in terminal block
-    const terminalCmd = args?.command ?? args?.code ?? args?.path ?? "";
+    const isExecution = toolName.includes("bash") || toolName.includes("python") || toolName.includes("sandbox") || toolName.includes("terminal") || toolName.includes("package") || toolName.includes("run");
+    const terminalCmd = isExecution ? (args?.command ?? args?.code ?? args?.path ?? "") : "";
     const terminalLang = toolName.includes("python") ? "python" : "bash";
+
+    const isFileTool = toolName.includes("file") || toolName.includes("write") || toolName.includes("edit") || toolName.includes("read") || toolName.includes("generating");
+    const filePath = args?.path ?? "";
+    const filename = filePath.split(/[\\/]/).pop() ?? filePath;
+    const fileContent = args?.content ?? args?.code ?? args?.new_str ?? result ?? "";
+    const language = filename.split('.').pop() || 'text';
 
     return (
       <div className="flex gap-2.5">
@@ -1115,12 +1108,21 @@ export function StatusMessage({
             {rightSlot && <span className="inline-flex shrink-0 align-middle">{rightSlot}</span>}
           </div>
 
-          {terminalCmd ? (
+          {isExecution && terminalCmd ? (
             <TerminalBlock
               command={terminalCmd}
               language={terminalLang}
               isRunning={isRunning}
               output={result || undefined}
+            />
+          ) : isFileTool && filePath ? (
+            <FileCodeBlock
+              filename={filename}
+              content={fileContent || undefined}
+              language={language}
+              isRunning={isRunning}
+              isSuccess={isDone}
+              isError={isErrTool}
             />
           ) : Object.keys(args).length > 0 && (
             <div className="mt-2 rounded-lg border border-[var(--surface-border)] overflow-hidden" style={{ background: '#0f0f0e' }}>

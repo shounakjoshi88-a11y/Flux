@@ -86,9 +86,10 @@ type MessageItemProps = {
   }) => void;
   onFileDelete?: (messageId: string | number, filename: string, type: 'fileAttachment' | 'generatedFiles') => void;
   activeGenerationStatus?: { subtype: string; message: string } | null;
+  onHtmlPreview?: (html: string) => void;
 };
 
-import { StatusMessage } from "./StatusMessage";
+import { StatusMessage, TimelineNode } from "./StatusMessage";
 import PlanDisplay from "./PlanDisplay";
 import PermissionDialog from "./PermissionDialog";
 
@@ -546,7 +547,7 @@ function SearchStepsGroup({
             data: firstPart.input,
           }}
           isFirst={actualIsFirst}
-          isLast={!open ? actualIsLast : false}
+          isLast={false}
           isActive={isStreaming && firstPart.status === 'running'}
           showRail={true}
           onSourceClick={onSourceClick}
@@ -566,7 +567,7 @@ function SearchStepsGroup({
             data: part.input,
           }}
           isFirst={idx === 0}
-          isLast={idx === typedParts.length - 2}
+          isLast={idx === typedParts.length - 2 ? actualIsLast : false}
           isActive={isStreaming && part.status === 'running'}
           showRail={true}
           onSourceClick={onSourceClick}
@@ -591,6 +592,7 @@ function PartsRenderer({
   onFileDelete,
   onSourceClick,
   activeGenerationStatus,
+  onHtmlPreview,
 }: {
   parts: MessagePart[];
   isStreaming: boolean;
@@ -603,6 +605,7 @@ function PartsRenderer({
   onFileDelete?: (messageId: string | number, filename: string, type: 'fileAttachment' | 'generatedFiles') => void;
   onSourceClick?: (url: string | null) => void;
   activeGenerationStatus?: { subtype: string; message: string } | null;
+  onHtmlPreview?: (html: string) => void;
 }) {
   // Find the last text part index for typewriter treatment
   const lastTextPartIndex = (() => {
@@ -628,7 +631,7 @@ function PartsRenderer({
         if (text.trim()) {
           renderedParts.push(
             <div key={`text-${i}`} className="max-w-none text-foreground/90">
-              <MessageRenderer content={text} onCitationClick={onCitationClick} sources={sources} />
+              <MessageRenderer content={text} onCitationClick={onCitationClick} sources={sources} onHtmlPreview={onHtmlPreview} />
             </div>
           );
         }
@@ -681,16 +684,24 @@ function PartsRenderer({
           const partIndex = i - (toolParts.length - 1) + idx;
           const actualIsFirst = partIndex === 0 || parts[partIndex - 1]?.type !== "tool_call";
           const actualIsLast = !activeGenerationStatus && (partIndex === parts.length - 1 || parts[partIndex + 1]?.type !== "tool_call");
-          const derivedSubtype = tp.status === 'completed' ? `${tp.name}_success` : tp.status === 'error' ? `${tp.name}_error` : tp.name;
 
           renderedParts.push(
             <div key={`tool-${partIndex}`} className="mb-0.5">
               <StatusMessage
                 status={{
-                  type: tp.name,
-                  subtype: derivedSubtype,
+                  type: "tool_call",
+                  subtype: tp.name.includes("generating_file") ? tp.name : "tool_call",
                   message: tp.output || "",
-                  data: tp.input,
+                  data: {
+                    toolName: tp.name,
+                    args: tp.input,
+                    result: tp.output,
+                    status: tp.status,
+                    path: tp.input?.path,
+                    filename: tp.input?.filename,
+                    content: tp.input?.content,
+                    language: tp.input?.language,
+                  },
                 }}
                 isFirst={actualIsFirst}
                 isLast={actualIsLast}
@@ -826,9 +837,23 @@ function PartsRenderer({
         break;
       }
       case "code_execution": {
+        const termIconEl = (
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"
+            strokeLinecap="round" strokeLinejoin="round"
+            className="size-4 shrink-0 text-[var(--text-secondary)]/40">
+            <rect x="2" y="3.5" width="16" height="13" rx="2" />
+            <polyline points="5.5,8 8,10.5 5.5,13" strokeWidth="1.5" />
+            <line x1="9.5" y1="13" x2="14.5" y2="13" strokeWidth="1.3" />
+          </svg>
+        );
+        const actualIsFirst = i === 0 || parts[i - 1]?.type !== "tool_call";
+        const actualIsLast = i === parts.length - 1 || parts[i + 1]?.type !== "tool_call";
         renderedParts.push(
-          <div key={`code-${i}`} className="mt-2 w-full">
-            <CodeOutputBlock {...part.block} />
+          <div key={`code-${i}`} className="flex gap-2.5">
+            <TimelineNode icon={termIconEl} isFirst={actualIsFirst} isLast={actualIsLast} />
+            <div className="py-2 min-w-0 flex-1">
+              <CodeOutputBlock {...part.block} />
+            </div>
           </div>
         );
         break;
@@ -1118,6 +1143,7 @@ export function MessageItem({
   onPreview,
   onFileDelete,
   activeGenerationStatus,
+  onHtmlPreview,
 }: MessageItemProps) {
   const parsedContentBundle = useMemo(() => {
     const rawText = message.content || "";
@@ -1274,6 +1300,7 @@ export function MessageItem({
             onFileDelete={onFileDelete}
             onSourceClick={(url) => url && onSourceClick(url)}
             activeGenerationStatus={activeGenerationStatus}
+            onHtmlPreview={onHtmlPreview}
           />
         </>
       ) : (
@@ -1281,7 +1308,7 @@ export function MessageItem({
           {/* ─── RENDER ANSWER TEXT (backward compat) ─── */}
           {typewriterContent.trim() !== "" && (
             <div className="max-w-none text-foreground/90">
-              <MessageRenderer content={typewriterContent} onCitationClick={onCitationClick} sources={sources} />
+              <MessageRenderer content={typewriterContent} onCitationClick={onCitationClick} sources={sources} onHtmlPreview={onHtmlPreview} />
             </div>
           )}
 
