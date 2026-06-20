@@ -3,7 +3,7 @@ import { flushSync } from "react-dom";
 import { createClient } from "@/lib/client";
 import { BACKEND_URL } from "@/lib/config";
 import { extractLiveContent } from "@/lib/chat-utils";
-import type { Message, AttachedFile, Source, GeneratedFile, MessagePart, ExecutionPlan, PermissionRequest } from "@/types";
+import type { Message, AttachedFile, Source, GeneratedFile, MessagePart, PermissionRequest } from "@/types";
 
 const supabase = createClient();
 
@@ -18,7 +18,6 @@ type UseChatCallbacks = {
   onComplete?: () => void;
   onMessageId?: (id: string) => void;
   onPermissionRequest?: (request: PermissionRequest) => void;
-  onPlan?: (plan: ExecutionPlan) => void;
   onWikiUpdate?: (update: any) => void;
   fileContent?: string;
   attachedFiles?: { name: string; content?: string }[];
@@ -353,24 +352,7 @@ export function useChat(user: any) {
                 }
               } catch { }
             }
-            // ΓöÇΓöÇΓöÇ PLAN ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-            else if (eventType === "plan") {
-              try {
-                const parsed = JSON.parse(data);
-                flushPendingText();
-                const planPart: MessagePart = {
-                  type: "plan",
-                  steps: parsed.steps || [],
-                  userIntent: parsed.userIntent || "",
-                  reasoning: parsed.reasoning || "",
-                };
-                addPart(planPart);
-                const targetId = realMessageIdRef.current ?? assistantMsgId;
-                updateMessages(targetId);
-                callbacks?.onPlan?.(parsed);
-              } catch { }
-            }
-            // ΓöÇΓöÇΓöÇ PERMISSION ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+            //             // ΓöÇΓöÇΓöÇ PERMISSION ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             else if (eventType === "permission") {
               try {
                 const parsed = JSON.parse(data);

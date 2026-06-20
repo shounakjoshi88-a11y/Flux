@@ -59,7 +59,6 @@ export interface StreamWriter {
   writeFile(file: any): void;
   writeThought(content: string): void;
   writeTodos(items: { id: string; content: string; status: string }[]): void;
-  writePlan(plan: ExecutionPlan): void;
   writePermission(id: string, toolName: string, args: any, description: string): void;
   writeToolCall(toolName: string, args: any, status: "pending" | "running" | "completed" | "error", result?: any): void;
   writeToolGroup(tools: any[]): void;

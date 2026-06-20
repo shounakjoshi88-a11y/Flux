@@ -30,85 +30,6 @@
 
 ---
 
-<h2 id="preview">📸 Preview</h2>
-
-<table>
-  <tr>
-    <td width="50%" align="center">
-      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20162613.png" alt="Flux Dashboard" width="100%">
-      <br><em>Main chat interface with warm design system</em>
-    </td>
-    <td width="50%" align="center">
-      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163312.png" alt="Flux Chat UI" width="100%">
-      <br><em>Smooth Chat UI</em>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center">
-      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20162914.png" alt="Flux News" width="100%">
-      <br><em>Live News section with AI summary on article click</em>
-    </td>
-    <td width="50%" align="center">
-      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/AI%20news%20Summary.png" alt="Flux AI News Summary" width="100%">
-      <br><em>AI news summary for any article</em>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center">
-      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/image%20generation%20capability.png" alt="Flux Image Generation" width="100%">
-      <br><em>AI-powered image generation capability</em>
-    </td>
-    <td width="50%" align="center">
-      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20162856.png" alt="Flux Artifacts" width="100%">
-      <br><em>Artifacts Section — browse all uploaded & generated files</em>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center" colspan="2">
-      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163321.png" alt="Flux Links" width="50%">
-      <br><em>Links stored per prompt within a thread</em>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center">
-      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163412.png" alt="Flux Prompt History Card Open" width="100%">
-      <br><em>Prompt History card — quick access to past prompts</em>
-    </td>
-    <td width="50%" align="center">
-      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163423.png" alt="Flux Prompt History Closed" width="100%">
-      <br><em>Prompt History card closed — minimal UI</em>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center">
-      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163449.png" alt="Flux Settings" width="100%">
-      <br><em>Settings Panel — theme, model prefs & more</em>
-    </td>
-    <td width="50%" align="center">
-      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163459.png" alt="Flux Session Management" width="100%">
-      <br><em>Session management implementation</em>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center">
-      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163511.png" alt="Flux Memory" width="100%">
-      <br><em>Memory management — view all stored memories</em>
-    </td>
-    <td width="50%" align="center">
-      <img src="https://github.com/shounakjoshi88-a11y/Flux/raw/main/screenshots/Screenshot%202026-06-11%20163527.png" alt="Flux Memory Types" width="100%">
-      <br><em>Memories grouped by type</em>
-    </td>
-  </tr>
-</table>
-
----
-
-**Flux** is a full-stack AI chat application that connects you to 20+ large language models via NVIDIA NIM, with built-in document generation, real-time web search, long-term memory, voice I/O, news aggregation, and image generation — all wrapped in a warm, responsive interface inspired by Anthropic's design language.
-
-Whether you need a quick answer, a polished presentation deck, an Excel spreadsheet, a code review, or a deep research brief, Flux orchestrates tool use across multiple AI models to get it done.
-
----
-
 <h2 id="features">✨ Features</h2>
 
 <details open>
@@ -118,11 +39,11 @@ Switch between 20+ models from a unified chat interface:
 
 | Category | Models |
 |----------|--------|
-| **General Purpose** | Llama 4 Maverick, Mistral Large 675B, Nemotron 3 Ultra 550B, DeepSeek V4 Flash, Qwen 3.5 397B, GLM 5.1, Kimi K2.6, Step 3.7 Flash, MiniMax M2.7, Command R+ |
-| **Vision** | Nemotron Nano 12B V2 VL, Kimi K2.6 — handle image attachments |
+| **General Purpose** | Mistral Large 3 675B, GLM 5.1, Kimi K2.6, Nemotron 3 Ultra 550B, Mistral Medium 3.5 128B, DeepSeek V4 Flash/Pro, Qwen 3.5 397B, MiniMax M2.7/M3, Sarvam-M, Stockmark 2 100B, and more |
+| **Vision** | Nemotron Nano 12B V2 VL — handle image attachments |
 | **Coding** | Specialized models for code generation and review |
 
-Each model streams responses in real-time via SSE, with visible thought process and source attribution.
+Each model streams responses in real-time via SSE, with visible thought process, source attribution, and follow-up suggestions.
 </details>
 
 <details>
@@ -130,15 +51,15 @@ Each model streams responses in real-time via SSE, with visible thought process 
 <br>
 Generate professional documents from plain English descriptions:
 
-| Format | Templates | Library |
-|--------|-----------|---------|
-| **PDF** | Corporate (navy/blue), Minimal (clean white), Creative (teal/indigo), Report (academic) | pdf-lib |
-| **DOCX** | Professional headings & body sections | docx |
-| **PPTX** | Dark-theme slide decks with title, bullet, comparison, and section layouts | pptxgenjs |
-| **XLSX / CSV / TSV** | Formatted spreadsheets and delimited data | xlsx |
-| **Markdown / JSON / SQL / HTML** | Structured text documents | — |
+| Format | Capabilities |
+|--------|-------------|
+| **PDF** | Corporate (navy/blue), Minimal (clean white), Creative (teal/indigo), Report (academic) with custom fonts including CJK support |
+| **DOCX** | Professional headings & body sections |
+| **PPTX** | Dark-theme slide decks with title, bullet, comparison, and section layouts |
+| **XLSX / CSV / TSV** | Formatted spreadsheets and delimited data |
+| **Markdown / JSON / SQL / HTML** | Structured text documents |
 
-Documents are built server-side by LLM-driven generation with format-specific skill prompts, retry logic, and fallback data generation.
+Documents are built server-side by LLM-driven generation with format-specific skill prompts, retry logic, and fallback data generation. All generated files are downloadable and previewable in-browser.
 </details>
 
 <details>
@@ -146,13 +67,13 @@ Documents are built server-side by LLM-driven generation with format-specific sk
 <br>
 The AI autonomously orchestrates tool calls to answer your queries:
 
-- **Web Search** — Real-time search via Tavily with full-page content extraction and source attribution
+- **Web Search** — Real-time search via Tavily with full-page content extraction, query relevance filtering, topic extraction, anti-hallucination guards, and automatic query truncation (395 char limit)
 - **Document Generation** — Create files in 10 formats from natural language
 - **Weather Lookup** — Current conditions via OpenWeatherMap + Open-Meteo
 - **Image Generation** — Produce images via local Bonsai inference service
 - **Skill Reading** — Load format-specific skill prompts for better output quality
 
-Up to 8 autonomous reasoning steps per query, with plan-verify-iterate agentic loop, dynamic system prompting, forced answer fallback, and search guardrails to prevent spurious queries.
+Up to 10 autonomous reasoning steps per query (step limit enforced), with search loop guard (max 1 search per query), casual chat detection (skips search for personal/greeting prompts), wiki search guard, forced answer fallback, and topic extraction that prefers concise 3-10 word queries.
 </details>
 
 <details>
@@ -174,7 +95,7 @@ Flux remembers what matters:
 
 - **Speech-to-Text** — NVIDIA ASR (Parakeet 1.1B multilingual) for transcribing voice input
 - **Text-to-Speech** — Microsoft Edge TTS with 100+ voices across languages
-- **Browser Recording** — In-browser speech recognition via the Web Speech API
+- **Browser TTS** — Read-aloud button on messages via Web Speech API with voice selection (prefers Google US English, Microsoft female voices, macOS high-quality voices)
 </details>
 
 <details>
@@ -217,8 +138,17 @@ Multi-source news reader built right in:
 - **Dark Mode** — Dark navy surfaces on warm dark canvas with automatic theme detection
 - **Responsive** — Adaptive layout for desktop and tablet with animated sidebar (framer-motion spring)
 - **Auth** — Google and GitHub OAuth via Supabase with session management
-- **Settings** — Theme toggle, model preferences, and more in a slide-out panel
+- **Settings** — Theme toggle, model preferences, TTS voice selection, and more in a slide-out panel
+- **Citation Hover Cards** — Hover any `[domain]` citation to see the source snippet + favicon + full URL in a floating card
+- **CSV Export** — Download tables as CSV via hover button
+- **Read-Aloud** — TTS button on each message with natural voice selection
+- **Reputation Score** — Authoritative domain whitelist (80+ tech domains) scores sources as trusted/untrusted
+- **Copy / Rewrite** — Per-message action buttons for copy and regenerate
+- **Share Conversation** — Top bar share button with native Web Share API (copies page URL as fallback)
+- **Thumbs Up/Down** — Local toggle feedback with animated icon fill/scale
+- **Model Selector** — Dropdown with thin custom scrollbar, grouped by category
 - **Keyboard Navigation** — Search modal, quick actions, and keyboard shortcuts throughout
+- **Prompt History** — Scrollable card showing recent user prompts
 </details>
 
 ---
@@ -361,7 +291,7 @@ flowchart LR
         Voice[POST /api/tts - GET /api/tts/voices]
     end
 
-    subgraph agentic[Agentic Loop - max 8 steps]
+    subgraph agentic[Agentic Loop - max 10 steps]
         Plan[Plan - Intent analysis] --> Execute[Execute - Tool calls]
         Execute --> Verify[Verify - Check results]
         Verify --> Iterate[Iterate - Retry or fallback]
@@ -369,7 +299,7 @@ flowchart LR
     end
 
     subgraph nim[NVIDIA NIM]
-        LLM[20+ LLMs - Llama 4 - Mistral - DeepSeek - Qwen - Nemotron - GLM - Kimi]
+        LLM[20+ LLMs - Mistral - DeepSeek - Qwen - Nemotron - GLM - Kimi]
         RAG[Nemo Retriever - Embed + Rerank]
         Safety[Nemotron - Content safety]
     end
@@ -387,7 +317,7 @@ flowchart LR
     end
 
     frontend -->|chat request + JWT| backend
-    backend -->|up to 8 reasoning steps| agentic
+    backend -->|up to 10 reasoning steps| agentic
     backend -->|stream LLM calls| nim
     backend -->|persist + vector search| storage
     backend -->|tool execution| services
@@ -398,25 +328,25 @@ flowchart LR
 1. User types a message → frontend sends `POST /flux_ask` with query, model ID, conversation history, and optional attachments
 2. Server constructs a system prompt with memory context, datetime, location, and relevant skill files
 3. The LLM (via NVIDIA NIM) responds with streaming text, interleaved with tool call requests
-4. The server executes tool calls (web search, document generation, weather, image gen) and feeds results back to the model
-5. After up to 8 agentic steps, the final answer streams to the frontend with sources, thought process, follow-up questions, and any generated files
+4. The server executes tool calls (web search with query relevance guard, 1-search limit, casual chat skip, 395-char truncation; document generation; weather; image gen) and feeds results back to the model
+5. After up to 10 agentic steps, the final answer streams to the frontend with sources (domain-labeled citations with hover snippet cards), thought process, follow-up questions, and any generated files
 6. Messages and metadata are persisted to PostgreSQL; memories are extracted asynchronously
 
 ### Agentic Loop Details
 
-The `/flux_ask` endpoint orchestrates up to 8 reasoning steps:
+The `/flux_ask` endpoint orchestrates up to 10 reasoning steps:
 
 1. **Plan** — Analyze user intent via regex intent patterns and select appropriate workflow (code, analysis, weather, document, image, or simple QA)
-2. **Execute** — Run web search with Tavily, full-page content extraction via extract API, document generation, weather, image gen, or read skills
+2. **Execute** — Run web search with Tavily (guard: max 1 search, casual chat skip), full-page content extraction via extract API, document generation, weather, image gen, or read skills
 3. **Verify** — Independent verification phase that synthesizes search results into a cited answer; checks for URL-only output and retries with synthesis if needed
 4. **Iterate** — If verification fails, retry the same tool or try alternatives (up to 3 retries per phase)
-5. **Finalize** — Stream final answer with sources, follow-up questions, and artifacts
+5. **Finalize** — Stream final answer with reputation-scored sources, domain-labeled citations with hover preview cards, follow-up questions, and artifacts
 
 **SSE Events Streamed:**
 - `status` — Tool execution status (`searching`, `generating_document`, etc.)
 - `thought` — Visible reasoning process
 - `message` — Text chunks (streamed character-by-character)
-- `sources` — URLs with trust scores
+- `sources` — URLs with search snippets and reputation scores
 - `file` — Generated artifacts (PDF, PPTX, XLSX, etc.)
 - `follow_ups` — Suggested follow-up questions
 
@@ -480,7 +410,7 @@ flux/
 │   └── index.ts                        # Vercel serverless entry (wraps backend)
 │
 ├── backend/
-│   ├── index.ts                        # Express 5 server — all routes, tool system, SSE (3034 lines)
+│   ├── index.ts                        # Express 5 server — all routes, tool system, SSE
 │   ├── agent-tools.ts                  # Document builders (PDF, DOCX, PPTX, XLSX, CSV, TSV, MD, JSON, SQL, HTML)
 │   ├── prompt.ts                       # System prompt templates with placeholders
 │   ├── generationPrompt.ts             # Document gen prompt schemas
@@ -489,7 +419,7 @@ flux/
 │   ├── safety.ts                       # NVIDIA Nemotron content safety classifier
 │   ├── voice-client.ts                 # NVIDIA ASR (Parakeet) + Edge TTS
 │   ├── local-embedder.ts               # BGE-M3 local embeddings (Xenova Transformers)
-│   ├── middleware.ts                    # Supabase JWT verification + user upsert
+│   ├── middleware.ts                   # Supabase JWT verification + user upsert
 │   ├── client.ts                       # Supabase admin client (service_role)
 │   ├── db.ts                           # Prisma client singleton
 │   ├── nim-client.ts                   # NVIDIA NIM OpenAI-compatible client
@@ -502,22 +432,21 @@ flux/
 │   │   └── types.ts                    # Phase, ExecutionPlan, StreamWriter types
 │   ├── skills/                         # LLM skill prompts for document generation
 │   │   ├── SKILL.md                    # Master prompt with all skills
-│   │   ├── pdf-skill.md                # PDF generation prompt (layout, fonts, colors)
+│   │   ├── pdf-skill.md                # PDF generation prompt
 │   │   ├── docx-skill.md               # DOCX generation prompt
 │   │   ├── pptx-skill.md               # PowerPoint generation prompt
 │   │   ├── xlsx-skill.md               # Excel spreadsheet generation prompt
 │   │   ├── csv-skill.md, tsv-skill.md  # Delimited data generation
 │   │   ├── md-skill.md, json-skill.md, sql-skill.md, html-skill.md
 │   │   └── tech-writer-skill.md, finance-skill.md, coder-skill.md, creative-skill.md, legal-skill.md
-│   │       # Domain-specific prompts for specialized document generation
 │   ├── prisma/
-│   │   ├── schema.prisma                # 4 models: User, Conversation, Message, Memory (vector)
-│   │   ├── migrations/                  # SQL migration history
+│   │   ├── schema.prisma               # 4 models: User, Conversation, Message, Memory (vector)
+│   │   ├── migrations/                 # SQL migration history
 │   │   ├── add_artifacts_indexes.sql
 │   │   └── apply_indexes_now.sql
 │   ├── fonts/
-│   │   └── NotoSansSC-Regular.ttf       # CJK font for PDF generation
-│   ├── image_generation_backend/        # Local Bonsai diffusion service (Python/Flask)
+│   │   └── NotoSansSC-Regular.ttf      # CJK font for PDF generation
+│   ├── image_generation_backend/       # Local Bonsai diffusion service (Python/Flask)
 │   │   ├── image_service.py
 │   │   └── setup_image_models.py
 │   ├── package.json, tsconfig.json, Dockerfile, prisma.config.ts
@@ -525,74 +454,71 @@ flux/
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── frontend.tsx                 # React entry point (createRoot + HMR)
-│   │   ├── App.tsx                      # Router: "/" Dashboard, "/auth" Auth
-│   │   ├── index.ts                     # Bun dev server (static serve + SPA catch-all)
-│   │   ├── index.html                   # HTML shell (Inter, Newsreader, theme script)
-│   │   ├── index.css                    # Base CSS + Tailwind import
-│   │   ├── types.ts                     # TS definitions (Message, Source, ConversationListItem, etc.)
-│   │   ├── APITester.tsx                # Dev/debug API testing tool
+│   │   ├── frontend.tsx                # React entry point
+│   │   ├── App.tsx                     # Router: "/" Dashboard, "/auth" Auth
+│   │   ├── index.ts                    # Bun dev server (static serve + SPA catch-all)
+│   │   ├── index.html                  # HTML shell
+│   │   ├── index.css                   # Base CSS + Tailwind import
+│   │   ├── types.ts                    # TypeScript definitions
 │   │   ├── pages/
-│   │   │   ├── Dashboard.tsx            # Main chat (832 lines — auth, CRUD, SSE, tabs, previews)
-│   │   │   └── Auth.tsx                 # Login (Google + GitHub OAuth)
+│   │   │   ├── Dashboard.tsx           # Main chat — auth, CRUD, SSE, tabs, previews
+│   │   │   └── Auth.tsx                # Login (Google + GitHub OAuth)
 │   │   ├── hooks/
-│   │   │   ├── useChat.ts               # SSE stream handler (537 lines)
-│   │   │   ├── useTheme.ts              # Dark/light theme detection + toggle
-│   │   │   └── useSessionRevocationListener.ts  # Auto-redirect on session revoke
+│   │   │   ├── useChat.ts              # SSE stream handler
+│   │   │   ├── useTheme.ts             # Dark/light theme toggle
+│   │   │   └── useSessionRevocationListener.ts
 │   │   ├── components/
-│   │   │   ├── ChatInput.tsx            # Markdown editor, model selector, file attach, voice, search toggle
-│   │   │   ├── MessageList.tsx          # Streaming messages with Answer/Links/Images tabs
-│   │   │   ├── MessageItem.tsx          # Single message — typewriter, thoughts, sources, files (1202 lines)
-│   │   │   ├── MessageRenderer.tsx      # Rich renderer — markdown, code, math, mermaid, charts
-│   │   │   ├── Sidebar.tsx              # Animated sidebar — search, conv groups, settings, news
-│   │   │   ├── SidebarThread.tsx        # Individual conversation thread item
-│   │   │   ├── Settings.tsx             # Account, Preferences, TTS, Sessions tabs
-│   │   │   ├── ArtifactsModal.tsx       # File gallery with cache, prefetch, pagination
-│   │   │   ├── NewsModal.tsx            # Multi-source news reader (1784 lines)
-│   │   │   ├── PeekPanel.tsx            # URL/PDF/DOCX/PPTX/XLSX/MD preview panel
-│   │   │   ├── PptxPreview.tsx          # In-browser PPTX renderer (JSZip)
-│   │   │   ├── XlsxPreview.tsx          # In-browser XLSX renderer
-│   │   │   ├── MarkdownPreview.tsx       # Markdown file preview
-│   │   │   ├── FileDownloadButton.tsx    # Download + preview for generated files
-│   │   │   ├── SourceCard.tsx            # Source citation with trust score
-│   │   │   ├── StatusMessage.tsx         # Tool status (searching, generating…)
-│   │   │   ├── SuggestedActions.tsx      # Category-based suggestion prompts
-│   │   │   ├── TodoList.tsx              # Dynamic todo list component
-│   │   │   ├── PromptHistoryCard.tsx     # Scrollable user prompt history
-│   │   │   ├── ToolsDropdown.tsx         # Answer/Links/Images dropdown
-│   │   │   ├── ChartBlock.tsx            # Recharts bar, line, pie, doughnut charts
-│   │   │   ├── InputSeparator.tsx        # "Flux can make mistakes" divider
-│   │   │   └── ui/                      # Shadcn-style primitives
-│   │   │       ├── button.tsx, card.tsx, input.tsx, label.tsx
-│   │   │       ├── select.tsx, textarea.tsx
+│   │   │   ├── ChatInput.tsx           # Markdown editor, model selector, file attach, voice, web toggle
+│   │   │   ├── MessageList.tsx         # Streaming messages with Answer/Links/Images tabs
+│   │   │   ├── MessageItem.tsx         # Single message — typewriter, thoughts, sources, files, action bar
+│   │   │   ├── MessageRenderer.tsx     # Rich renderer — markdown, code, math, mermaid, charts, citations with hover cards
+│   │   │   ├── Sidebar.tsx             # Animated sidebar — search, conv groups, settings, news
+│   │   │   ├── SidebarThread.tsx       # Individual conversation thread item
+│   │   │   ├── Settings.tsx            # Account, Preferences, TTS, Sessions tabs
+│   │   │   ├── ArtifactsModal.tsx      # File gallery with cache, prefetch, pagination
+│   │   │   ├── NewsModal.tsx           # Multi-source news reader
+│   │   │   ├── PeekPanel.tsx           # URL/PDF/DOCX/PPTX/XLSX/MD preview panel
+│   │   │   ├── PptxPreview.tsx         # In-browser PPTX renderer (JSZip)
+│   │   │   ├── XlsxPreview.tsx         # In-browser XLSX renderer
+│   │   │   ├── MarkdownPreview.tsx     # Markdown file preview
+│   │   │   ├── FileDownloadButton.tsx  # Download + preview for generated files
+│   │   │   ├── SourceCard.tsx          # Source citation with reputation score
+│   │   │   ├── StatusMessage.tsx       # Tool status with search-suppressed messages
+│   │   │   ├── SuggestedActions.tsx    # Category-based suggestion prompts
+│   │   │   ├── TodoList.tsx            # Dynamic todo list component
+│   │   │   ├── PromptHistoryCard.tsx   # Scrollable user prompt history
+│   │   │   ├── ToolsDropdown.tsx       # Answer/Links/Images dropdown
+│   │   │   ├── ChartBlock.tsx          # Recharts bar, line, pie, doughnut charts
+│   │   │   ├── InputSeparator.tsx      # "Flux can make mistakes" divider
+│   │   │   └── ui/                     # Shadcn-style primitives
 │   │   ├── lib/
-│   │   │   ├── config.ts                # BACKEND_URL, UNSPLASH_ACCESS_KEY
-│   │   │   ├── client.ts                # Supabase browser client
-│   │   │   ├── server.ts                # Supabase SSR client (Vite)
-│   │   │   ├── chat-utils.ts            # Parse assistant content (sources, follow-ups)
-│   │   │   └── utils.ts                 # cn() helper (clsx + tailwind-merge)
+│   │   │   ├── config.ts               # BACKEND_URL
+│   │   │   ├── client.ts               # Supabase browser client
+│   │   │   ├── server.ts               # Supabase SSR client
+│   │   │   ├── chat-utils.ts           # Parse assistant content (sources, follow-ups)
+│   │   │   └── utils.ts                # cn() helper
 │   │   ├── data/
-│   │   │   └── suggestions.ts           # Categorized prompts (5 categories, 10 each)
+│   │   │   └── suggestions.ts          # Categorized prompts (5 categories, 10 each)
 │   │   ├── utils/
-│   │   │   ├── TrustScore.ts            # Domain-based URL trust scoring
-│   │   │   └── MathRenderer.tsx         # KaTeX inline/display math components
-│   │   ├── manifest.json                 # PWA manifest
-│   │   ├── sw.js                         # Service worker (network-first)
-│   │   └── icon-*.svg / *.png            # PWA icons (192, 512, maskable)
+│   │   │   ├── ReputationScore.ts      # Domain-based URL reputation scoring (80+ trusted domains)
+│   │   │   └── MathRenderer.tsx        # KaTeX inline/display math components
+│   │   ├── manifest.json               # PWA manifest
+│   │   ├── sw.js                       # Service worker (network-first)
+│   │   └── icon-*.svg / *.png          # PWA icons
 │   ├── styles/
-│   │   ├── globals.css                  # Tailwind v4 + CSS custom properties
-│   │   └── dashboard.css                # Dashboard-specific dark/light styles
+│   │   ├── globals.css                 # Tailwind v4 + CSS custom properties
+│   │   └── dashboard.css               # Dashboard-specific dark/light styles
 │   ├── scripts/
-│   │   └── generate-icons.ts            # PWA icon generation script
-│   ├── dist/                            # Built output (deployed)
+│   │   └── generate-icons.ts           # PWA icon generation script
+│   ├── dist/                           # Built output (deployed)
 │   ├── package.json, tsconfig.json, build.ts, bunfig.toml
 │   └── components.json, tailwind.config.js
 │
-├── api/index.ts                         # Vercel serverless entry
-├── vercel.json                          # Vercel deployment config
-├── flux.bat / flux.ps1                  # Dev launcher scripts (both servers)
-├── dashboard.txt                        # Dashboard.tsx snapshot reference
-└── .gitignore
+├── api/index.ts                        # Vercel serverless entry
+├── vercel.json                         # Vercel deployment config
+├── flux.bat / flux.ps1                 # Dev launcher scripts (both servers)
+├── .gitignore
+└── README.md
 ```
 
 ---
@@ -636,7 +562,7 @@ Flux uses a **warm, minimal design language** inspired by Anthropic's Claude:
 | **Auth** | Supabase | OAuth (Google, GitHub), JWT sessions |
 | **AI** | NVIDIA NIM | 20+ LLMs via OpenAI-compatible API |
 | **Search** | Tavily | Real-time web search API |
-| **Voice** | NVIDIA ASR + Edge TTS | Speech recognition + synthesis |
+| **Voice** | NVIDIA ASR + Edge TTS + Web Speech API | Speech recognition + synthesis + browser TTS |
 | **Image Gen** | Bonsai | Local diffusion model inference |
 | **Embeddings** | Xenova Transformers | BGE-M3: local 1024-dim embeddings |
 | **RAG** | NVIDIA Nemo Retriever | Embed + rerank for retrieval-augmented generation |
@@ -695,7 +621,7 @@ bun index.ts
 ```bash
 cd frontend
 bun dev
-# Vite dev server on http://localhost:3000
+# Dev server on http://localhost:3000
 ```
 
 ### Adding a New Tool

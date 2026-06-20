@@ -47,10 +47,7 @@ export class OrchestratorEngine {
   async process(input: OrchestratorInput): Promise<OrchestratorOutput> {
     const { plan, workflow } = this.planner.analyze(input.query, undefined, input.fileContent, input.isComputerMode);
 
-    // Always show the plan for transparency for non-trivial workflows
-    if (workflow !== "simple_qa") {
-      input.stream.writePlan(plan);
-    }
+    // Plan is generated internally but no longer sent to frontend
 
     const result = await this.executePlan(plan, input, workflow);
 
@@ -286,7 +283,6 @@ export class OrchestratorEngine {
       const prevResearch = previousResults.get("research");
       const researchText = prevResearch?.text ?? "";
       if (researchText) {
-        stream.writeStatus("analyzing", "Synthesizing answer from research...", {});
         try {
           const synthQuery = query.length > 300 ? query.slice(0, 300) + "..." : query;
           const synthResult = await generateText({
@@ -359,7 +355,9 @@ export class OrchestratorEngine {
 function detectSimpleDocType(query: string): string | null {
   const q = query.toLowerCase();
   if (/\bpptx\b|\bpowerpoint\b|\bpresentation\b|\bslide\b/.test(q)) return "pptx";
-  if (/\bdocx\b|\bword\b|\bdocument\b/.test(q)) return "docx";
+  if (/\bdocx\b|\bword\b/.test(q)) return "docx";
+  // "document" alone is too broad — require generation verb
+  if (/\b(?:create|generate|make|build|write|produce)\b.*\bdocument\b/.test(q)) return "docx";
   if (/\bxlsx\b|\bexcel\b|\bspreadsheet\b|\bsheet\b/.test(q)) return "xlsx";
   if (/\bcsv\b/.test(q)) return "csv";
   if (/\btsv\b/.test(q)) return "tsv";

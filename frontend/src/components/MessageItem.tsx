@@ -49,7 +49,7 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { MessageRenderer, InlineMath } from "./MessageRenderer";
+
 import { FileDownloadButton } from "./FileDownloadButton";
 import { CodeOutputBlock } from "./CodeOutputBlock";
 import { getDomain } from "../lib/chat-utils";
@@ -79,11 +79,11 @@ type MessageItemProps = {
   onRegenerate?: () => void;
   onSourceClick: (url: string) => void;
   onFileClick?: (file: { name: string; content: string }) => void;
-  onPreview?: (data: { 
-    type: 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'md'; 
-    base64?: string; 
-    html?: string; 
-    filename: string 
+  onPreview?: (data: {
+    type: 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'md';
+    base64?: string;
+    html?: string;
+    filename: string
   }) => void;
   onFileDelete?: (messageId: string | number, filename: string, type: 'fileAttachment' | 'generatedFiles') => void;
   activeGenerationStatus?: { subtype: string; message: string } | null;
@@ -91,7 +91,6 @@ type MessageItemProps = {
 };
 
 import { StatusMessage, TimelineNode } from "./StatusMessage";
-import PlanDisplay from "./PlanDisplay";
 import PermissionDialog from "./PermissionDialog";
 
 import { BACKEND_URL } from "../lib/config";
@@ -145,15 +144,15 @@ function InlineImageDisplay({
   }, [file.placeholder, fullBase64, file.thumbnail, messageId, index, isAutoLoading]);
 
   // The source is either the full high-res image OR the lightweight thumbnail
-  const displaySrc = fullBase64 
-    ? `data:${file.mime};base64,${fullBase64}` 
-    : file.thumbnail 
-      ? `data:image/jpeg;base64,${file.thumbnail}` 
+  const displaySrc = fullBase64
+    ? `data:${file.mime};base64,${fullBase64}`
+    : file.thumbnail
+      ? `data:image/jpeg;base64,${file.thumbnail}`
       : "";
 
   const handleDownload = async () => {
     let b64 = fullBase64;
-    
+
     // If we don't have the high-res version yet, fetch it on-demand
     if (!b64 && messageId !== -1) {
       try {
@@ -325,7 +324,7 @@ function ImageGenerationSkeleton({ stage }: { stage: "enhancing" | "generating" 
   const label = stage === "enhancing" ? "Crafting your prompt…" : IMAGE_GEN_LABELS[labelIdx];
 
   const canvasRef = useRef<HTMLDivElement>(null);
-  const frameRef  = useRef<number>(0);
+  const frameRef = useRef<number>(0);
 
   useEffect(() => {
     const dots = canvasRef.current
@@ -335,10 +334,10 @@ function ImageGenerationSkeleton({ stage }: { stage: "enhancing" | "generating" 
 
     // 4 corners in grid coords
     const CORNERS = [
-      { x: 0,        y: 0 },
+      { x: 0, y: 0 },
       { x: COLS - 1, y: 0 },
       { x: COLS - 1, y: ROWS - 1 },
-      { x: 0,        y: ROWS - 1 },
+      { x: 0, y: ROWS - 1 },
     ];
 
     // Blob state
@@ -764,18 +763,6 @@ function PartsRenderer({
         );
         break;
       }
-      case "plan": {
-        renderedParts.push(
-          <div key={`plan-${i}`} className="mb-0.5">
-            <PlanDisplay
-              steps={part.steps}
-              userIntent={part.userIntent}
-              reasoning={part.reasoning}
-            />
-          </div>
-        );
-        break;
-      }
       case "permission": {
         if (part.status === "pending") {
           renderedParts.push(
@@ -818,11 +805,10 @@ function PartsRenderer({
         renderedParts.push(
           <div key={`astatus-${i}`} className="mb-0.5">
             <div className="mt-2 flex items-center gap-2 text-xs text-zinc-500 border-l-2 border-zinc-700/30 pl-3 py-1">
-              <span className={`size-1.5 rounded-full ${
-                part.status === "connected" ? "bg-emerald-500" :
-                part.status === "processing" ? "bg-amber-500 animate-pulse" :
-                part.status === "error" ? "bg-red-500" : "bg-zinc-500"
-              }`} />
+              <span className={`size-1.5 rounded-full ${part.status === "connected" ? "bg-emerald-500" :
+                  part.status === "processing" ? "bg-amber-500 animate-pulse" :
+                    part.status === "error" ? "bg-red-500" : "bg-zinc-500"
+                }`} />
               {part.message}
             </div>
           </div>
@@ -1124,7 +1110,7 @@ function deepCleanAnswer(raw: string): string {
     .replace(/<\/?(?:thought|think|ANSWER|FOLLOW_UPS|question)>/gi, '')
     // 4. Clean up any trailing citations or artifact metadata lines
     .replace(/\n\d+ https?:\/\/[^\n]+(\n|$)/g, '');
-  
+
   // Explicitly strip multiple trailing newlines before the final trim
   return clean.replace(/\n+$/, "").trim();
 }
@@ -1148,14 +1134,14 @@ export function MessageItem({
 }: MessageItemProps) {
   const parsedContentBundle = useMemo(() => {
     const rawText = message.content || "";
-    
+
     // Extract internal thinking text safely
     const thoughtRegexMatch = rawText.match(/<(?:thought|think)>([\s\S]*?)(?:<\/(?:thought|think)>|$)/i);
     const reasoningText = (thoughtRegexMatch && thoughtRegexMatch[1]) ? thoughtRegexMatch[1].trim() : null;
-    
+
     // Clean display answer
     const cleanDisplayAnswer = deepCleanAnswer(rawText);
-    
+
     return { reasoningText, cleanDisplayAnswer };
   }, [message.content]);
 
@@ -1186,7 +1172,7 @@ export function MessageItem({
     const fileAttachments = message.fileAttachment;
     const cleanContent = content.replace(/\s*\[attached: [^\]]+\]\s*/g, "").trim();
 
-    
+
 
     const handleUserCopy = async () => {
       try {
@@ -1217,7 +1203,7 @@ export function MessageItem({
 
         <div className="group flex flex-col items-end w-full">
           <div className="user-message text-left w-fit max-w-[85%]">
-            <MessageRenderer content={cleanContent} onCitationClick={() => {}} sources={[]} />
+            <MessageRenderer content={cleanContent} onCitationClick={() => { }} sources={[]} />
           </div>
           <button
             onClick={handleUserCopy}
@@ -1279,25 +1265,52 @@ export function MessageItem({
     }
     const text = parsedContentBundle.cleanDisplayAnswer;
     if (!text) return;
+
+    // Check if local TTS is configured
+    const ttsProvider = (() => { try { return localStorage.getItem('tts_provider'); } catch { return null; } })();
+    if (ttsProvider === 'local') {
+      setIsSpeaking(true);
+      try {
+        const token = '';
+        const res = await fetch(`${BACKEND_URL}/api/tts/local`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        });
+        if (res.ok) {
+          const blob = await res.blob();
+          const audio = new Audio(URL.createObjectURL(blob));
+          audio.onended = () => { setIsSpeaking(false); };
+          audio.onerror = () => { setIsSpeaking(false); };
+          audio.play();
+        } else {
+          setIsSpeaking(false);
+          // Fall back to browser TTS
+          speakBrowserTTS(text);
+        }
+      } catch {
+        setIsSpeaking(false);
+        speakBrowserTTS(text);
+      }
+      return;
+    }
+
+    speakBrowserTTS(text);
+  };
+
+  function speakBrowserTTS(text: string) {
     const utterance = new SpeechSynthesisUtterance(text);
     let allVoices = voicesRef.current.length > 0 ? voicesRef.current : speechSynthesis.getVoices();
     if (allVoices.length === 0) {
-      await new Promise<void>(resolve => {
-        const onv = () => { allVoices = speechSynthesis.getVoices(); speechSynthesis.removeEventListener('voiceschanged', onv); resolve(); };
-        speechSynthesis.addEventListener('voiceschanged', onv);
-        setTimeout(resolve, 500);
-      });
+      const onv = () => { allVoices = speechSynthesis.getVoices(); speechSynthesis.removeEventListener('voiceschanged', onv); };
+      speechSynthesis.addEventListener('voiceschanged', onv);
     }
-    console.log('[TTS] Voices:', allVoices.map((v: SpeechSynthesisVoice) => `${v.name} (${v.lang})`));
     const preferred = allVoices.find((v: SpeechSynthesisVoice) => /google/i.test(v.name) && v.lang.startsWith('en'))
       ?? allVoices.find((v: SpeechSynthesisVoice) => /(zira|jenny|hazel|microsoft.*female)/i.test(v.name))
       ?? allVoices.find((v: SpeechSynthesisVoice) => /(samantha|karen|moira|tessa|alice|fiona)/i.test(v.name))
       ?? allVoices.find((v: SpeechSynthesisVoice) => v.lang.startsWith('en') && !/david/i.test(v.name) && !/default/i.test(v.name))
       ?? allVoices.find((v: SpeechSynthesisVoice) => v.lang.startsWith('en'));
-    if (preferred) {
-      utterance.voice = preferred;
-      console.log('[TTS] Selected:', preferred.name);
-    }
+    if (preferred) utterance.voice = preferred;
     utterance.rate = 0.9;
     utterance.pitch = 1.05;
     utterance.onend = () => { setIsSpeaking(false); speechRef.current = null; };
@@ -1305,7 +1318,7 @@ export function MessageItem({
     speechRef.current = utterance;
     speechSynthesis.speak(utterance);
     setIsSpeaking(true);
-  };
+  }
 
   // Detect live streaming: optimistic assistant messages use IDs like "temp-assistant-N"
   const isStreaming = String(message.id).startsWith("temp-");

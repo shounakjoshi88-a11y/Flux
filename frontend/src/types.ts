@@ -27,21 +27,6 @@ export type TodoItem = {
   status: "pending" | "in_progress" | "completed";
 };
 
-export type PlanStep = {
-  id: string;
-  type: string;
-  description: string;
-  required: boolean;
-  maxRetries: number;
-};
-
-export type ExecutionPlan = {
-  steps: PlanStep[];
-  userIntent: string;
-  reasoning: string;
-  estimatedSteps: number;
-};
-
 export type PermissionRequest = {
   id: string;
   toolName: string;
@@ -73,7 +58,6 @@ export type MessagePart =
   | { type: "file"; filename: string; mime: string; base64?: string }
   | { type: "source"; url: string; title?: string }
   | { type: "todos"; items: TodoItem[] }
-  | { type: "plan"; steps: PlanStep[]; userIntent: string; reasoning: string }
   | { type: "permission"; id: string; toolName: string; args: any; description: string; status: "pending" | "approved" | "denied" }
   | { type: "tool_group"; tools: { name: string; args: any }[] }
   | { type: "agent_status"; status: string; message: string }

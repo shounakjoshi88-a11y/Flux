@@ -243,7 +243,6 @@ export function useAgentSession(user: any) {
       case "tool_result": handleToolResult(payload); break;
       case "tool_group": handleToolGroup(payload); break;
       case "permission_request": handlePermissionRequest(payload); break;
-      case "plan": handlePlan(payload); break;
       case "context_usage": break;
       case "error": handleAgentError(payload); break;
       case "finish": handleFinish(); break;
@@ -405,20 +404,6 @@ export function useAgentSession(user: any) {
     setSessionState("awaiting_permission");
     flushPartsToMessage();
   }, [mode, flushPartsToMessage]);
-
-  const handlePlan = useCallback((payload: any) => {
-    flushPartsToMessage();
-    streamingPartsRef.current = [
-      ...streamingPartsRef.current,
-      {
-        type: "plan" as const,
-        steps: payload.steps || [],
-        userIntent: payload.userIntent || "",
-        reasoning: payload.reasoning || "",
-      },
-    ];
-    flushPartsToMessage();
-  }, [flushPartsToMessage]);
 
   const handleAgentStatus = useCallback((payload: any) => {
     switch (payload.status) {

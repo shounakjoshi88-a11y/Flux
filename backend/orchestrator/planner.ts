@@ -22,7 +22,7 @@ function hasFileContext(query: string, fileContent?: string): boolean {
 function detectDocType(query: string): string | null {
   const q = query.toLowerCase();
   if (/\bpptx\b|\bpowerpoint\b|\bpresentation\b|\bslide\b/.test(q)) return "pptx";
-  if (/\bdocx\b|\bword\b|\bdocument\b/.test(q)) return "docx";
+  if (/\bdocx\b|\bword\b/.test(q)) return "docx";
   if (/\bxlsx\b|\bexcel\b|\bspreadsheet\b|\bsheet\b/.test(q)) return "xlsx";
   if (/\bcsv\b/.test(q)) return "csv";
   if (/\btsv\b/.test(q)) return "tsv";
@@ -31,6 +31,8 @@ function detectDocType(query: string): string | null {
   if (/\bsql\b/.test(q)) return "sql";
   if (/\bhtml\b/.test(q)) return "html";
   if (/\bpdf\b/.test(q)) return "pdf";
+  // "document" alone is too broad — only match with generation verbs
+  if (/\b(?:create|generate|make|build|write|produce)\b.*\bdocument\b/.test(q)) return "docx";
   return null;
 }
 

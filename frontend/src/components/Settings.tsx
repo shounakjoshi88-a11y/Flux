@@ -53,8 +53,7 @@ function applyFont(fontValue: string) {
 // ─── TTS Provider definitions ──────────────────────────────
 const TTS_PROVIDERS = [
   { value: "browser",   label: "Browser Built‑in",       description: "Uses your OS speech engine" },
-  { value: "edge",      label: "Edge TTS (Microsoft)",   description: "200+ neural voices, free" },
-  { value: "kokoro",    label: "Kokoro (Local AI)",      description: "Self‑hosted, OpenAI‑compatible" },
+  { value: "local",     label: "Local (Piper)",      description: "On‑device neural TTS, no internet needed" },
   { value: "pollinations", label: "Pollinations (OpenAI)", description: "OpenAI TTS via Pollinations" },
 ];
 
@@ -86,13 +85,6 @@ type MemoryItem = {
   created_at: string;
 };
 
-interface VoiceOption {
-  name: string;
-  shortName: string;
-  locale: string;
-  gender: string;
-}
-
 export function Settings({
   isOpen,
   onClose,
@@ -118,10 +110,9 @@ export function Settings({
   const [chatFont, setChatFont] = useState("system");
   const [ttsProvider, setTtsProvider] = useState("browser");
   const [ttsVoice, setTtsVoice] = useState("");
-  const [availableVoices, setAvailableVoices] = useState<VoiceOption[]>([]);
+  const [browserVoices, setBrowserVoices] = useState<{ value: string; label: string }[]>([]);
   const [voicesLoading, setVoicesLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [kokoroUrl, setKokoroUrl] = useState("http://localhost:3000");
 
   // ─── Notifications State ──────────────────────────────────
   const [responseCompletions, setResponseCompletions] = useState(true);
@@ -146,22 +137,6 @@ export function Settings({
   const [loggingOutAllDevices, setLoggingOutAllDevices] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
 
-  // ─── Fetch Edge TTS voices ──────────────────────────────────
-  const fetchEdgeVoices = useCallback(async () => {
-    setVoicesLoading(true);
-    try {
-      const token = (await supabase.auth.getSession()).data.session?.access_token || '';
-      const res = await fetch(`${BACKEND_URL}/api/tts/voices`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setAvailableVoices(data.voices || []);
-      }
-    } catch { /* ignore */ }
-    finally { setVoicesLoading(false); }
-  }, []);
-
   // ─── Preview TTS with current settings ─────────────────────
   const previewVoice = useCallback(async () => {
     if (typeof window === 'undefined') return;
@@ -184,33 +159,14 @@ export function Settings({
       return;
     }
 
-    if (ttsProvider === "edge") {
+    if (ttsProvider === "local") {
       setIsSpeaking(true);
       try {
         const token = (await supabase.auth.getSession()).data.session?.access_token || '';
-        const res = await fetch(`${BACKEND_URL}/api/tts`, {
+        const res = await fetch(`${BACKEND_URL}/api/tts/local`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ text: sampleText, voice: ttsVoice || 'en-US-JennyNeural' }),
-        });
-        if (res.ok) {
-          const blob = await res.blob();
-          const audio = new Audio(URL.createObjectURL(blob));
-          audio.onended = () => setIsSpeaking(false);
-          audio.onerror = () => setIsSpeaking(false);
-          audio.play();
-        } else { setIsSpeaking(false); }
-      } catch { setIsSpeaking(false); }
-      return;
-    }
-
-    if (ttsProvider === "kokoro") {
-      setIsSpeaking(true);
-      try {
-        const res = await fetch(`${kokoroUrl}/api/v1/audio/speech`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: 'model_q8f16', input: sampleText, voice: ttsVoice || 'af_heart' }),
+          body: JSON.stringify({ text: sampleText }),
         });
         if (res.ok) {
           const blob = await res.blob();
@@ -253,7 +209,7 @@ export function Settings({
       } catch { setIsSpeaking(false); }
       return;
     }
-  }, [ttsProvider, ttsVoice, kokoroUrl]);
+  }, [ttsProvider, ttsVoice]);
 
   // ─── Load user data when opened ─────────────────────────────
   useEffect(() => {
@@ -270,7 +226,6 @@ export function Settings({
 
       setTtsProvider(metadata.tts_provider || "browser");
       setTtsVoice(metadata.tts_voice || "");
-      setKokoroUrl(metadata.kokoro_url || "http://localhost:3000");
 
       setResponseCompletions(metadata.response_completions ?? true);
       setDispatchMessages(metadata.dispatch_messages ?? false);
@@ -284,28 +239,27 @@ export function Settings({
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
   }, [user, isOpen]);
 
-  // ─── Fetch voices when Edge TTS provider is selected ────────
+  // ─── Load browser voices when selected ─────────────────────
   useEffect(() => {
-    if (ttsProvider === "edge") fetchEdgeVoices();
-    else if (ttsProvider === "browser" && typeof window !== 'undefined' && window.speechSynthesis) {
+    if (ttsProvider === "browser" && typeof window !== 'undefined' && window.speechSynthesis) {
       const loadBrowserVoices = () => {
         const voices = window.speechSynthesis.getVoices();
-        // De-duplicate matching voiceURI nodes to prevent duplicate key panics
         const uniqueVoices = Array.from(
           new Map(voices.map(v => [v.voiceURI, v])).values()
         );
-        setAvailableVoices(
+        setBrowserVoices(
           uniqueVoices
             .filter(v => v.lang.startsWith('en'))
             .map(v => ({
-              name: v.name, shortName: v.voiceURI, locale: v.lang, gender: 'Unknown',
+              value: v.voiceURI,
+              label: `${v.name} (${v.lang})`,
             }))
         );
       };
       loadBrowserVoices();
       window.speechSynthesis.onvoiceschanged = loadBrowserVoices;
     }
-  }, [ttsProvider, fetchEdgeVoices]);
+  }, [ttsProvider]);
 
   useEffect(() => {
     if (isOpen && activeTab === "Account") {
@@ -443,10 +397,14 @@ export function Settings({
       const metadata: Record<string, any> = {
         full_name: fullName, display_name: displayName, instructions: instructions,
         avatar_url: finalAvatarUrl, chat_font: chatFont,
-        tts_provider: ttsProvider, tts_voice: ttsVoice, kokoro_url: kokoroUrl,
+        tts_provider: ttsProvider, tts_voice: ttsVoice,
         response_completions: responseCompletions, dispatch_messages: dispatchMessages,
         enable_memory: enableMemory, tool_access_mode: toolAccessMode, connector_discovery: connectorDiscovery,
       };
+      try {
+        localStorage.setItem('tts_provider', ttsProvider);
+        localStorage.setItem('tts_voice', ttsVoice);
+      } catch { /* localStorage not available */ }
       if (overrides && typeof overrides === "object") {
         Object.assign(metadata, overrides);
       }
@@ -457,7 +415,7 @@ export function Settings({
       else if (data.user && onUserUpdate) onUserUpdate(data.user);
       setSavedMessage("Saved"); setTimeout(() => setSavedMessage(null), 1500);
     } catch (error: any) { console.error("Auto-save error:", error); setSavedMessage(`Error: ${error.message}`); setTimeout(() => setSavedMessage(null), 4000); }
-  }, [user, avatarUrl, avatarFile, fullName, displayName, instructions, chatFont, ttsProvider, ttsVoice, kokoroUrl, responseCompletions, dispatchMessages, enableMemory, toolAccessMode, connectorDiscovery, onUserUpdate]);
+  }, [user, avatarUrl, avatarFile, fullName, displayName, instructions, chatFont, ttsProvider, ttsVoice, responseCompletions, dispatchMessages, enableMemory, toolAccessMode, connectorDiscovery, onUserUpdate]);
 
   const debouncedSave = useCallback(() => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); saveTimerRef.current = setTimeout(() => saveSettings(), 800); }, [saveSettings]);
 
@@ -493,19 +451,14 @@ export function Settings({
   ], []);
 
   // ── Voice list for current provider ────────────────────────
+  // For browser: populated by useEffect listening to voiceschanged
+  // For local/pollinations: static lists
   const voiceList: { value: string; label: string }[] = useMemo(() => {
-    if (ttsProvider === "browser" || ttsProvider === "edge") {
-      return availableVoices.map(v => ({ value: v.shortName, label: `${v.name} (${v.locale})` }));
+    if (ttsProvider === "browser") {
+      return browserVoices;
     }
-    if (ttsProvider === "kokoro") {
-      return [
-        { value: "af_heart", label: "Heart (American F)" }, { value: "af_bella", label: "Bella (American F)" },
-        { value: "af_nicole", label: "Nicole (American F)" }, { value: "af_sarah", label: "Sarah (American F)" },
-        { value: "af_sky", label: "Sky (American F)" }, { value: "am_adam", label: "Adam (American M)" },
-        { value: "am_michael", label: "Michael (American M)" }, { value: "bf_emma", label: "Emma (British F)" },
-        { value: "bf_isabella", label: "Isabella (British F)" }, { value: "bm_george", label: "George (British M)" },
-        { value: "bm_lewis", label: "Lewis (British M)" },
-      ];
+    if (ttsProvider === "local") {
+      return [{ value: "", label: "Default (lessac-medium)" }];
     }
     if (ttsProvider === "pollinations") {
       return [
@@ -515,7 +468,7 @@ export function Settings({
       ];
     }
     return [];
-  }, [ttsProvider, availableVoices]);
+  }, [ttsProvider, browserVoices]);
 
   // ── Common select style that matches the theme ──────────────
   const selectClass = `
@@ -547,7 +500,7 @@ export function Settings({
                 <h2 className="text-lg font-semibold text-neutral-800 dark:text-neutral-100">Settings</h2>
                 <button onClick={onClose} className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-xl transition-all duration-200 text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-white"><X className="size-5" /></button>
               </div>
-              <div className="space-y-1 flex-1 overflow-y-auto">
+              <div className="space-y-1 flex-1 overflow-y-auto custom-scrollbar">
                 {tabs.map(tab => (
                   <button key={tab.id} onClick={() => { setActiveTab(tab.id); setShowMemoryManager(false); }}
                     className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${activeTab === tab.id ? "bg-blue-500/10 dark:bg-blue-400/10 text-blue-600 dark:text-blue-400 font-medium shadow-sm" : "text-neutral-600 dark:text-neutral-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-white"}`}>
@@ -568,7 +521,7 @@ export function Settings({
             </div>
 
             {/* Right Content */}
-            <div className="flex-1 overflow-y-auto p-8">
+            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
               {activeTab === "General" && (
                 <div className="space-y-10 max-w-2xl mx-auto">
                   {/* Profile */}
@@ -623,7 +576,7 @@ export function Settings({
                             <div className="flex items-center gap-2 text-xs text-neutral-500"><Loader2 className="size-3 animate-spin" />Loading voices...</div>
                           ) : (
                             <select value={ttsVoice} onChange={(e) => handleSelectChange("tts_voice", setTtsVoice, e.target.value)} className={`${selectClass} flex-1`}>
-                              <option value="">{ttsProvider === 'edge' ? 'Select voice...' : ttsProvider === 'kokoro' ? 'Select voice...' : ttsProvider === 'pollinations' ? 'Select voice...' : 'Default voice'}</option>
+                              <option value="">{ttsProvider === 'pollinations' ? 'Select voice...' : 'Default voice'}</option>
                               {voiceList.map(v => (<option key={v.value} value={v.value}>{v.label}</option>))}
                             </select>
                           )}
@@ -633,13 +586,6 @@ export function Settings({
                             {isSpeaking ? <Volume2 className="size-4 animate-pulse text-blue-500" /> : <Play className="size-4" />}
                           </button>
                         </div>
-                        {ttsProvider === "kokoro" && (
-                          <div className="mt-2">
-                            <label className="text-xs text-neutral-500 block mb-1">Kokoro server URL</label>
-                            <input type="text" value={kokoroUrl} onChange={(e) => { setKokoroUrl(e.target.value); debouncedSave(); }}
-                              className="w-full px-3 py-1.5 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-blue-500/40 outline-none text-xs" placeholder="http://localhost:3000" />
-                          </div>
-                        )}
                         <p className="text-[10px] text-neutral-400 mt-1.5">{TTS_PROVIDERS.find(p => p.value === ttsProvider)?.description}</p>
                       </div>
                     </div>

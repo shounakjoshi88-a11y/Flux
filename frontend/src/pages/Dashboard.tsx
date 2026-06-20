@@ -701,9 +701,6 @@ export default function Dashboard() {
               activeConversationIdRef.current = id;
             },
             onStreamUpdate: (parsed) => setActiveSources(parsed.sources),
-            onPlan: (plan) => {
-              console.log('[PLAN] Execution plan received:', plan);
-            },
             onPermissionRequest: (request) => {
               console.log('[PERMISSION] Tool permission requested:', request);
             },

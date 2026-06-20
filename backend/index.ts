@@ -184,6 +184,20 @@ function selectModel(preferredModel: string | undefined): any {
     return nim.chatModel('deepseek-ai/deepseek-v4-pro');
 }
 
+// ── routeModel — optionally route simple queries to cheap model
+function routeModel(preferredModel: string | undefined, query: string): {
+    modelId: string;
+    complexity: string;
+    wasRouted: boolean;
+} {
+    try {
+        const { routeModel: rm } = require('./query-router');
+        return rm(preferredModel, query);
+    } catch {
+        return { modelId: preferredModel || "deepseek-v4-pro", complexity: "complex", wasRouted: false };
+    }
+}
+
 // ── getProviderOptions – used only for thinking stream ──
 function getProviderOptions(modelId: string | undefined) {
     if (modelId === "deepseek-r1" || modelId === "deepseek-v4-flash") {
@@ -286,11 +300,6 @@ function sendProgress(res: any, subtype: string, progress: number, message: stri
 }
 
 // ── Enhanced SSE events (Flux-style) ─────────────────────
-
-function sendPlan(res: any, plan: any) {
-    if (res.writableEnded) return;
-    res.write(`event: plan\ndata: ${JSON.stringify({ type: "plan", steps: plan.steps, userIntent: plan.userIntent, reasoning: plan.reasoning, estimatedSteps: plan.estimatedSteps })}\n\n`);
-}
 
 function sendAgentStatus(res: any, status: string, message: string, data?: any) {
     if (res.writableEnded) return;
@@ -1954,12 +1963,29 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                     'Use ONLY when you need results from multiple angles; otherwise use query.'
                 ).optional(),
             }),
-            execute: async ({ query, queries: queriesArr }: any) => {
+                execute: async ({ query, queries: queriesArr }: any) => {
                 // ── Re-search guard: hard limit to prevent infinite loops ─────
                 if (state.searchCount >= 1 && state.searchContent) {
                     console.warn(`[TOOL] web_search blocked (already searched ${state.searchCount}x)`);
-                    return `__SEARCH_BLOCKED__ You already searched and have results below. Answer the user from the existing search content.\n\n${state.searchContent}`;
+                    return `__SEARCH_BLOCKED__ You already have search results below. Do NOT search again. Answer the user now using the existing results.`;
                 }
+
+                // ── Skip search if query doesn't ask for factual information ──
+                if (typeof userQuery === 'string') {
+                    const uq = userQuery.trim().toLowerCase();
+                    const words = uq.split(/\s+/).filter(Boolean);
+                    const isShort = words.length < 5;
+                    const hasQuestionWord = /\b(what|who|why|how|when|where)\b/.test(uq);
+                    const hasSearchWord = /\b(find|search|look\s*up|tell me about|latest|news|explain|define|compare|vs\b|versus|tutorial|guide|review|price|cost|specs|status|how to)\b/.test(uq);
+                    const isMetaChat = /\b(who are you|what can you|are you .{0,20}?|do you .{0,20}?)\b/.test(uq);
+                    const isPersonal = /\b(i|my|me|we)\b/.test(uq) && !hasQuestionWord && !hasSearchWord;
+
+                    if (!hasQuestionWord && !hasSearchWord && (isShort || isMetaChat || isPersonal)) {
+                        console.log(`[TOOL] web_search skipped — not a factual query`);
+                        return `__SEARCH_SKIPPED__ Answer naturally without searching.`;
+                    }
+                }
+
                 state.searchCount++;
 
                 // ALWAYS include the user's original query as the primary search.
@@ -2007,6 +2033,36 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                 sendStatus(res, 'searching',
                     `Searching for: ${safeQueries.map(q => `"${q}"`).join(', ')}...`,
                     undefined, state.thoughtProcess);
+
+                // ── Check search cache ────────────────────────────────────────
+                const { getCached, setCache } = await import('./search-cache');
+                const cacheKey = (userQuery || safeQueries[0] || '');
+                const cached = getCached(cacheKey);
+                if (cached) {
+                    console.log(`[TOOL] Using cached search results (${cached.sources.length} sources)`);
+                    const idxOffset = state.sources.length;
+                    const withIndex = cached.sources.map((s, i) => ({ url: s.url, index: idxOffset + i + 1 }));
+                    state.sources.push(...withIndex);
+                    if (cached.content) {
+                        state.searchContent = (state.searchContent || "") + "\n\n" + cached.content;
+                        return `[FINAL STEP: REPORT YOUR FINDINGS]
+[IMPORTANT: These search results are from the CURRENT DATE. You MUST answer using ONLY this data — do NOT rely on your training knowledge. Today is not 2024 or 2025. Ignore any dates in your training data that contradict these results.]
+
+${cached.content}
+
+---
+INSTRUCTION FOR FLUX: You have just received search results. 
+1. EXPLAIN what you found to the user immediately in a conversational tone.
+2. If there is recent news, summarize the key headlines.
+3. If no results were found, state that clearly.
+Do NOT just stop after calling this tool. Provide a full answer based on the data above.`;
+                    }
+                    const cacheText = cached.sources.map((s, i) =>
+                        `[${i + 1}] ${s.url}\n${(s.content || '').slice(0, 1500)}`
+                    ).join('\n\n');
+                    state.searchContent = (state.searchContent || "") + "\n\n[Search Results (cached)]\n\n" + cacheText;
+                    return `[Search Results (cached)]\n\n${cacheText}\n\n[IMPORTANT: Answer using ONLY these results.]`;
+                }
 
                 try {
                     const searchPromises = safeQueries.map(q => 
@@ -2085,6 +2141,9 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                     const safeQueryStr = safeQueries.join('; ');
                     const fullSearchRes = `[Search Results for "${safeQueryStr}"]\n\n${resultsText}${extraContent}`;
                     state.searchContent = (state.searchContent || "") + "\n\n" + fullSearchRes;
+
+                    // ── Cache search results (after building full text) ──────
+                    setCache(cacheKey, srcs, fullSearchRes);
 
                     return `[FINAL STEP: REPORT YOUR FINDINGS]
 [IMPORTANT: These search results are from the CURRENT DATE. You MUST answer using ONLY this data — do NOT rely on your training knowledge. Today is not 2024 or 2025. Ignore any dates in your training data that contradict these results.]
@@ -3304,8 +3363,9 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
             },
         });
 
-        // ── Build dynamic system prompt ──────────────────────────────────
-        model = selectModel(pref);
+        // ── Model routing — use cheap model for simple queries ──────────
+        const route = routeModel(pref, nq);
+        model = selectModel(route.modelId);
         const memCtx = memEnabled
             ? await retrieveMemories(uid, nq).then(buildMemoryContext).catch(() => '')
             : '';
@@ -3352,7 +3412,6 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
             writeTodos: (items) => {
                 if (!res.writableEnded) res.write(`event: todos\ndata: ${JSON.stringify({ type: 'todos', items })}\n\n`);
             },
-            writePlan: (plan) => sendPlan(res, plan),
             writePermission: (id, toolName, args, description) => sendPermissionRequest(res, id, toolName, args, description),
             writeToolCall: (toolName, args, status, result) => sendToolCall(res, toolName, args, status, result),
             writeToolGroup: (tools) => sendToolGroup(res, tools),
@@ -3485,6 +3544,57 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
             } as any);
 
             let seenFollowUpsTag = false;
+            let consecutiveBlockedCount = 0;
+            const MAX_BLOCKED_CALLS = 3;
+            let hasToolCallAfterText = false;
+            let repeatBuf = ''; // buffers small deltas from new steps for repeat detection
+
+            // Writes clean text to SSE, handling multi-step repeat dedup.
+            // When a tool call occurs after text has streamed, subsequent deltas from new
+            // steps are buffered and checked against the beginning of already-sent text.
+            // If they match, the model is repeating its answer — suppress the duplicate.
+            function writeClean(clean: string) {
+                if (!clean) return;
+                if (hasToolCallAfterText) {
+                    repeatBuf += clean;
+                    if (repeatBuf.length >= 40) {
+                        const prefix = fullText.slice(0, repeatBuf.length);
+                        if (repeatBuf === prefix) {
+                            // Full repeat — model restarted and output same text
+                            console.log(`[DEDUP] Suppressed ${repeatBuf.length} chars (full repeat)`);
+                            repeatBuf = '';
+                            return;
+                        }
+                        // Partial match: strip matching prefix
+                        let matchLen = 0;
+                        while (matchLen < Math.min(repeatBuf.length, prefix.length) &&
+                               repeatBuf[matchLen] === prefix[matchLen]) {
+                            matchLen++;
+                        }
+                        if (matchLen >= 25) {
+                            const deduped = repeatBuf.slice(matchLen).trim();
+                            repeatBuf = '';
+                            if (deduped) {
+                                writeSafeSSE(res, deduped);
+                                charsSent += deduped.length;
+                                if (typeof (res as any).flush === 'function') (res as any).flush();
+                            }
+                            console.log(`[DEDUP] Stripped ${matchLen} chars, wrote ${deduped.length} new`);
+                            return;
+                        }
+                        // No meaningful match — write the accumulated buffer
+                        writeSafeSSE(res, repeatBuf);
+                        charsSent += repeatBuf.length;
+                        if (typeof (res as any).flush === 'function') (res as any).flush();
+                        repeatBuf = '';
+                    }
+                    return;
+                }
+                // Normal path (no active dedup)
+                writeSafeSSE(res, clean);
+                charsSent += clean.length;
+                if (typeof (res as any).flush === 'function') (res as any).flush();
+            }
 
             for await (const event of agentStream.fullStream) {
                 if (res.writableEnded || closedRef.v) break;
@@ -3492,6 +3602,10 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                 if (event.type === 'tool-call') {
                     hasToolCall = true;
                     toolResultSeen = true;
+                    // If we already streamed text before this tool call, subsequent text-deltas
+                    // come from a new step where the model may repeat its earlier answer.
+                    // We'll use this flag to detect repeats in the text-delta handler.
+                    if (charsSent > 100) hasToolCallAfterText = true;
                 }
 
                 if (event.type === 'tool-result') {
@@ -3519,9 +3633,17 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                             searchContentLen: agentState.searchContent?.length ?? 0,
                         });
                         collectedToolResults.push({ name, args, result: String(txt ?? '').slice(0, 20000) });
-                        // Don't break the stream — model may still produce text after seeing blocked result
-                        if (txt.includes('__SEARCH_BLOCKED__') || txt.includes('__WIKI_BLOCKED__')) {
-                            console.log(`[STREAM] ${name} blocked — model can still continue`);
+                        // Hard limit on blocked/skipped calls — prevents infinite loop
+                        if (txt.includes('__SEARCH_BLOCKED__') || txt.includes('__WIKI_BLOCKED__') || txt.includes('__SEARCH_SKIPPED__')) {
+                            consecutiveBlockedCount++;
+                            console.log(`[STREAM] ${name} blocked/skipped (${consecutiveBlockedCount}/${MAX_BLOCKED_CALLS})`);
+                            if (consecutiveBlockedCount >= MAX_BLOCKED_CALLS) {
+                                console.log(`[STREAM] Too many blocked calls — killing stream`);
+                                closedRef.v = true;
+                                break;
+                            }
+                        } else {
+                            consecutiveBlockedCount = 0;
                         }
                     } catch (toolErr) {
                         console.warn('[ASK] tool-result handler error:', (toolErr as any)?.message);
@@ -3551,22 +3673,24 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                             const charsFromDeltaBeforeTag = followUpsIndex - oldLength;
                             if (charsFromDeltaBeforeTag > 0) {
                                 const prefix = delta.slice(0, charsFromDeltaBeforeTag);
-                                const clean = prefix
-                                    .replace(/<THOUGHT>[\s\S]*?<\/THOUGHT>/gi, '')
-                                    .replace(/<\/?THOUGHT>/gi, '')
-                                    .replace(/<\/?ANSWER>/gi, '')
-                                    .replace(/<FOLLOW_UPS>[\s\S]*?<\/FOLLOW_UPS>/gi, '')
-                                    .replace(/<FOLLOW_UPS>[\s\S]*/gi, '')
-                                    .replace(/<\/?FOLLOW_UPS>/gi, '')
-                                    .replace(/<\/?question>/gi, '');
+                                    const clean = prefix
+                                        .replace(/<\|tool_calls_section_begin\|>[\s\S]*?(?:<\|tool_calls_section_end\|>|$)/gi, '')
+                                        .replace(/<\|tool_call_begin\|>[\s\S]*?(?:<\|tool_call_end\|>|$)/gi, '')
+                                        .replace(/<THOUGHT>[\s\S]*?<\/THOUGHT>/gi, '')
+                                        .replace(/<\/?THOUGHT>/gi, '')
+                                        .replace(/<\/?ANSWER>/gi, '')
+                                        .replace(/<FOLLOW_UPS>[\s\S]*?<\/FOLLOW_UPS>/gi, '')
+                                        .replace(/<FOLLOW_UPS>[\s\S]*/gi, '')
+                                        .replace(/<\/?FOLLOW_UPS>/gi, '')
+                                        .replace(/<\/?question>/gi, '');
                                 if (clean) {
-                                    writeSafeSSE(res, clean);
-                                    charsSent += clean.length;
-                                    if (typeof (res as any).flush === 'function') (res as any).flush();
+                                    writeClean(clean);
                                 }
                             }
                         } else {
                             const clean = delta
+                                .replace(/<\|tool_calls_section_begin\|>[\s\S]*?(?:<\|tool_calls_section_end\|>|$)/gi, '')
+                                .replace(/<\|tool_call_begin\|>[\s\S]*?(?:<\|tool_call_end\|>|$)/gi, '')
                                 .replace(/<THOUGHT>[\s\S]*?<\/THOUGHT>/gi, '')
                                 .replace(/<\/?THOUGHT>/gi, '')
                                 .replace(/<\/?ANSWER>/gi, '')
@@ -3575,9 +3699,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                                 .replace(/<\/?FOLLOW_UPS>/gi, '')
                                 .replace(/<\/?question>/gi, '');
                             if (clean) {
-                                writeSafeSSE(res, clean);
-                                charsSent += clean.length;
-                                if (typeof (res as any).flush === 'function') (res as any).flush();
+                                writeClean(clean);
                             }
                         }
                     }
@@ -3748,10 +3870,11 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                 const safeQ = (query ?? '').toLowerCase();
                 const docIntent = safeQ.includes('pdf') ? 'pdf'
                     : safeQ.includes('pptx') || safeQ.includes('powerpoint') || safeQ.includes('presentation') || safeQ.includes('slide') ? 'pptx'
-                        : safeQ.includes('docx') || safeQ.includes('word') || safeQ.includes('document') ? 'docx'
-                            : safeQ.includes('xlsx') || safeQ.includes('excel') || safeQ.includes('spreadsheet') || safeQ.includes('sheet') ? 'xlsx'
-                                : safeQ.includes('csv') ? 'csv'
-                                    : null;
+                        : (safeQ.includes('docx') || safeQ.includes('word')) ? 'docx'
+                            : (safeQ.includes('create') || safeQ.includes('generate') || safeQ.includes('make') || safeQ.includes('build') || safeQ.includes('write') || safeQ.includes('produce')) && safeQ.includes('document') ? 'docx'
+                                : safeQ.includes('xlsx') || safeQ.includes('excel') || safeQ.includes('spreadsheet') || safeQ.includes('sheet') ? 'xlsx'
+                                    : safeQ.includes('csv') ? 'csv'
+                                        : null;
 
                 const hasSources = agentState.sources.length > 0;
                 const hasFiles = agentState.generatedFiles.length > 0;
@@ -3815,8 +3938,8 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                 }
                 nonUrlLen = stripped.length;
             }
-            const isUrlOnly = containsSources && charsSent > 0 && (nonUrlLen < 200 || nonUrlLen / fullText.length < 0.3);
-            const shouldSynthesize = (!charsSent || isUrlOnly) && hadSources && !res.writableEnded;
+            const isUrlOnly = containsSources && charsSent > 0 && nonUrlLen < 200 && (nonUrlLen / fullText.length < 0.3);
+            const shouldSynthesize = (!charsSent || (isUrlOnly && charsSent < 300)) && hadSources && !res.writableEnded;
 
             if (shouldSynthesize) {
                 console.log(`[ASK] ${charsSent ? 'url-only echo detected' : 'charsSent=0'} with sources — attempting answer synthesis`);
@@ -4032,7 +4155,8 @@ app.post('/api/chat-sdk', middleware, async (req: any, res: any) => {
         const nq = query.trim().slice(0, 10_000);
         const nowStr = new Date().toISOString().replace('T', ' ').slice(0, 16);
         const locInfo = sanitizeLocation(location ?? '');
-        const model = selectModel(pref);
+        const { modelId: routedModel } = routeModel(pref, nq);
+        const model = selectModel(routedModel);
 
         // Noop res so tool execute functions can run without side effects
         const noopRes: any = {
@@ -4118,45 +4242,27 @@ app.delete("/conversations/:conversationId", middleware, async (req, res) => {
 });
 
 // ── TTS PROXY ──────────────────────────────────────────────
-app.post("/api/tts", middleware, async (req, res) => {
+app.post("/api/tts/local", middleware, async (req, res) => {
     try {
-        const { text, voice } = req.body as { text?: string; voice?: string };
-        if (!text || !voice) return res.status(400).json({ error: "text and voice are required" });
+        const { text } = req.body as { text?: string };
+        if (!text) return res.status(400).json({ error: "text is required" });
         const safeText = text.slice(0, 5000);
-        const safeVoice = voice.slice(0, 100);
-        // @ts-ignore
-        const { EdgeTTS } = await import('@edge-tts/universal');
-        const tts = new EdgeTTS(safeText, safeVoice);
-        res.setHeader('Content-Type', 'audio/mpeg');
-        res.setHeader('Transfer-Encoding', 'chunked');
-        for await (const chunk of (tts as any).stream()) {
-            if (res.writableEnded) break;
-            res.write(chunk);
-        }
-        res.end();
-    } catch (error) {
-        console.error("TTS error:", error);
-        if (!res.headersSent) res.status(500).json({ error: "TTS failed" });
-    }
-});
 
-app.get("/api/tts/voices", middleware, async (_req, res) => {
-    try {
-        // @ts-ignore
-        const { listVoices } = await import('@edge-tts/universal');
-        const voices = await listVoices();
-        const english = voices
-            .filter((v: any) => v.Locale?.startsWith('en'))
-            .map((v: any) => ({
-                name: v.FriendlyName || v.ShortName,
-                shortName: v.ShortName,
-                locale: v.Locale,
-                gender: v.Gender,
-            }));
-        return res.json({ voices: english });
-    } catch (error) {
-        console.error("Voice list error:", error);
-        return res.status(500).json({ error: "Failed to fetch voices" });
+        const { ensureModel, findPiperBinary, synthesizeToWav } = await import('./tts-local');
+        const piperPath = findPiperBinary();
+        if (!piperPath) {
+            return res.status(500).json({
+                error: "Piper TTS binary not found. Download it from https://github.com/rhasspy/piper/releases and place piper.exe in backend/tts/ or add it to PATH."
+            });
+        }
+
+        const wav = await synthesizeToWav(safeText, piperPath);
+        res.setHeader('Content-Type', 'audio/wav');
+        res.setHeader('Content-Length', wav.length);
+        res.end(wav);
+    } catch (error: any) {
+        console.error("Local TTS error:", error);
+        if (!res.headersSent) res.status(500).json({ error: error.message || "Local TTS failed" });
     }
 });
 
@@ -4715,6 +4821,36 @@ app.delete("/api/agents/custom/:id", (req, res) => {
 
 // ── SERVER START ─────────────────────────────────────────────
 const server = http.createServer(app);
+
+// Seed search cache from recent DB history (non-blocking)
+(async () => {
+    try {
+        const { seedCacheFromHistory } = await import('./search-cache');
+        const recentMsgs = await prisma.message.findMany({
+            where: { sources: { not: Prisma.DbNull }, role: 'Assistant' },
+            orderBy: { createdAt: 'desc' },
+            take: 100,
+            select: { id: true, sources: true, conversationId: true, createdAt: true },
+        });
+        const entries: { query: string; sources: { url: string; content?: string }[]; content: string }[] = [];
+        for (const msg of recentMsgs) {
+            const sources = (msg.sources as any[]) || [];
+            if (sources.length === 0) continue;
+            const prevUser = await prisma.message.findFirst({
+                where: { conversationId: msg.conversationId, role: 'User', createdAt: { lt: msg.createdAt } },
+                orderBy: { createdAt: 'desc' },
+                select: { content: true },
+            });
+            if (!prevUser) continue;
+            const query = prevUser.content.slice(0, 500);
+            const srcs = sources.map((s: any) => ({ url: s.url, content: s.content || '' }));
+            entries.push({ query, sources: srcs, content: '' });
+        }
+        seedCacheFromHistory(entries);
+    } catch (e) {
+        console.warn('[CACHE] Seed from history skipped:', (e as any)?.message ?? e);
+    }
+})();
 
 // Attach Agent Protocol WebSocket handler
 createAgentWebSocket(server);
