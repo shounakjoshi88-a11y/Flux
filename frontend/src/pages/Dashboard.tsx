@@ -324,8 +324,11 @@ export default function Dashboard() {
           const finalFollowUps =
             storedFollowUps && storedFollowUps.length > 0 ? storedFollowUps : parsedFollowUps;
 
-          // Reconstruct parts from thoughtProcess for backward compatibility
-          if (!(msg as any).parts && Array.isArray(storedThoughtProcess) && storedThoughtProcess.length) {
+          // Check localStorage for persisted parts first
+          const storedParts = msg.id ? (() => { try { const p = localStorage.getItem(`flux-parts-${msg.id}`); return p ? JSON.parse(p) : null; } catch { return null; } })() : null;
+          if (storedParts && Array.isArray(storedParts) && storedParts.length > 0) {
+            (msg as any).parts = storedParts;
+          } else if (!(msg as any).parts && Array.isArray(storedThoughtProcess) && storedThoughtProcess.length) {
             const parts: MessagePart[] = [];
             let lastTodosIdx = -1;
             for (let tpi = 0; tpi < storedThoughtProcess.length; tpi++) {
@@ -546,27 +549,29 @@ export default function Dashboard() {
 
       const isImage = fileType.startsWith('image/');
       const isVideo = fileType.startsWith('video/');
+      const isPdf = fileName.toLowerCase().endsWith('.pdf') || fileType.includes('pdf');
+      const isDocx = fileName.toLowerCase().endsWith('.docx') || fileType.includes('wordprocessingml');
+      const isBinaryFormatted = isPdf || isDocx;
       const isMedia = isImage || isVideo;
-      const limit = isMedia ? 10 * 1024 * 1024 : 2 * 1024 * 1024;
+      const limit = (isMedia || isBinaryFormatted) ? 10 * 1024 * 1024 : 2 * 1024 * 1024;
 
       if (fileSize > limit) {
-        alert(`File "${fileName}" exceeds the ${isMedia ? '10MB' : '2MB'} limit.`);
+        alert(`File "${fileName}" exceeds the ${(isMedia || isBinaryFormatted) ? '10MB' : '2MB'} limit.`);
         continue;
       }
       
       try {
-        if (isMedia) {
+        if (isMedia || isBinaryFormatted) {
           const base64 = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result as string);
             reader.onerror = reject;
             reader.readAsDataURL(file);
           });
-          newFiles.push({ name: fileName, content: base64, type: fileType });
+          newFiles.push({ name: fileName, content: base64, type: isPdf ? 'application/pdf' : isDocx ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : fileType });
         } else {
           const rawText = await file.text();
           if (typeof rawText !== 'string' || rawText.includes("\0")) {
-             // Basic binary check
              alert(`File "${fileName}" is not a valid text-based file.`);
              continue;
           }
@@ -739,9 +744,9 @@ export default function Dashboard() {
     }
   }, [activeTransport, ws, stop]);
 
-  const handleRetry = useCallback(() => {
-    if (activeTransport !== "ws") retry();
-  }, [activeTransport, retry]);
+  const handleRetry = useCallback((prompt?: string) => {
+    retry(prompt);
+  }, [retry]);
 
   // ── Jump to prompt ──
   const handleJumpToPrompt = useCallback((messageId: string | number) => {

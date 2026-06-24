@@ -4,6 +4,7 @@ const DOC_INTENT_RE =
   /(?:\b(?:create|generate|make|build|write|produce)\b.*\b(pdf|pptx|docx|xlsx|csv|tsv|md|json|sql|html|powerpoint|presentation|slide|word|excel|spreadsheet|document)\b)|(?:\b(pdf|pptx|docx|xlsx|csv|tsv|md|json|sql|html)\b.*\b(?:about|on|for|of)\b)/i;
 
 const WEATHER_RE = /\bweather\b|\btemperature\b|\bforecast\b|\bhow.*hot\b|\bhow.*cold\b/i;
+const SYSTEM_WORDS_RE = /\b(architecture|prototype|router|codebase|classify|tier|regex|embedding|classifier|pipeline|workflow|orchestrat|diagram)\b/i;
 
 const IMAGE_RE = /\b(?:generate|create|draw|make|render)\b.*\b(?:image|picture|photo|art|illustration|drawing)\b|\b(?:image|picture|photo|art|illustration)\b.*\b(?:of|about|with)\b/i;
 
@@ -93,7 +94,7 @@ export class Planner {
       };
     }
 
-    if (WEATHER_RE.test(query)) {
+    if (WEATHER_RE.test(query) && !SYSTEM_WORDS_RE.test(query)) {
       return {
         workflow: "weather",
         plan: {

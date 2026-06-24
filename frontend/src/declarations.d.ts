@@ -93,6 +93,23 @@ declare module "@office-ai/platform" {
 
 declare module "katex/dist/contrib/mhchem.min.js";
 
+declare module "smiles-drawer" {
+  interface DrawerOptions {
+    width?: number;
+    height?: number;
+    padding?: number;
+  }
+  class Drawer {
+    constructor(options?: DrawerOptions);
+    draw(tree: any, element: HTMLElement, theme?: string, clear?: boolean): void;
+  }
+  export function clean(smiles: string): string;
+  export function parse(smiles: string, callback: (tree: any) => void, errorCallback?: (err: any) => void): void;
+  export { Drawer };
+  const smilesDrawer: { clean: typeof clean; parse: typeof parse; Drawer: typeof Drawer };
+  export default smilesDrawer;
+}
+
 // Image asset declarations
 declare module "*.png" {
   const src: string;

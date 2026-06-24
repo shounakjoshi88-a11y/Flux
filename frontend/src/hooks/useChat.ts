@@ -21,6 +21,7 @@ type UseChatCallbacks = {
   onWikiUpdate?: (update: any) => void;
   fileContent?: string;
   attachedFiles?: { name: string; content?: string }[];
+  replaceLastAssistant?: boolean;
 };
 
 let nextId = 1;
@@ -80,11 +81,28 @@ export function useChat(user: any) {
   }, []);
 
   function cleanThoughtText(raw: string): string {
-    const closeIdx = raw.indexOf("</THOUGHT>");
+    // Handle both <THOUGHT> and <think> tags
+    const closeIdx = Math.max(raw.indexOf("</THOUGHT>"), raw.indexOf("</think>"));
     if (closeIdx === -1) return "";
-    const openIdx = raw.indexOf("<THOUGHT>");
+    const openThought = raw.lastIndexOf("<THOUGHT>", closeIdx);
+    const openThink = raw.lastIndexOf("<think>", closeIdx);
+    const openIdx = Math.max(openThought, openThink);
     if (openIdx === -1) return "";
-    return raw.slice(openIdx + 9, closeIdx).trim();
+    const openTagLen = openIdx === openThought ? 9 : 7; // "<THOUGHT>".length=9, "<think>".length=7
+    return raw.slice(openIdx + openTagLen, closeIdx).trim();
+  }
+
+  function stripTags(s: string): string {
+    return s
+      .replace(/<THOUGHT>[\s\S]*?<\/THOUGHT>/gi, "")
+      .replace(/<\/?THOUGHT>/gi, "")
+      .replace(/<\/?ANSWER>/gi, "")
+      .replace(/<\/?FOLLOW_UPS>/gi, "")
+      .replace(/<\/?question>/gi, "")
+      .replace(/<\/?SEARCH_QUERY>/gi, "")
+      // Strip any truncated/incomplete tag left at the end (e.g. "<F", "<FOLLOW_UPS")
+      .replace(/<\/?[A-Za-z][A-Za-z0-9]*(?:\s[^>]*)?$/g, "")
+      .trim();
   }
 
   function cleanAnswerText(raw: string): string {
@@ -92,19 +110,12 @@ export function useChat(user: any) {
     const openIdx = raw.indexOf("<ANSWER>");
     const closeIdx = raw.indexOf("</ANSWER>");
     if (openIdx !== -1 && closeIdx !== -1 && closeIdx > openIdx) {
-      return raw.slice(openIdx + 8, closeIdx).trim();
+      return stripTags(raw.slice(openIdx + 8, closeIdx));
     }
     if (openIdx !== -1) {
-      return raw.slice(openIdx + 8).trim();
+      return stripTags(raw.slice(openIdx + 8));
     }
-    return raw
-      .replace(/<THOUGHT>[\s\S]*?<\/THOUGHT>/gi, "")
-      .replace(/<\/?THOUGHT>/gi, "")
-      .replace(/<\/?ANSWER>/gi, "")
-      .replace(/<\/?FOLLOW_UPS>/gi, "")
-      .replace(/<\/?question>/gi, "")
-      .replace(/<\/?SEARCH_QUERY>/gi, "")
-      .trim();
+    return stripTags(raw);
   }
 
   function flushPendingText() {
@@ -201,7 +212,20 @@ export function useChat(user: any) {
         generatedFiles: [],
       };
 
-      setMessages((prev) => [...prev, optimisticUser, optimisticAssistant]);
+      setMessages((prev) => {
+        if (callbacks?.replaceLastAssistant) {
+          const replaced = [...prev];
+          for (let i = replaced.length - 1; i >= 0; i--) {
+            const m = replaced[i];
+            if (m && m.role === "Assistant") {
+              replaced[i] = optimisticAssistant;
+              return replaced;
+            }
+          }
+          return [...replaced, optimisticAssistant];
+        }
+        return [...prev, optimisticUser, optimisticAssistant];
+      });
 
       let finalAssistantId: string | null = null;
 
@@ -281,10 +305,10 @@ export function useChat(user: any) {
                 const parsed = JSON.parse(data);
                 flushPendingText();
                 const sub = parsed.subtype as string;
-                const isTerminal = sub.endsWith('_success') || sub.endsWith('_error') || sub.endsWith('_complete');
+                const isTerminal = sub.endsWith('_success') || sub.endsWith('_error') || sub.endsWith('_complete') || sub.endsWith('_done');
                 if (isTerminal) {
                   setActiveGenerationStatus(null);
-                  const baseSub = sub.replace(/_(?:success|error|complete)$/, '');
+                  const baseSub = sub.replace(/_(?:success|error|complete|done)$/, '');
                   let idx = streamingPartsRef.current.findIndex(
                     p => p.type === 'tool_call' && p.name === baseSub
                   );
@@ -329,7 +353,8 @@ export function useChat(user: any) {
                   sub === 'image_enhancing' ||
                   sub === 'image_generating' ||
                   sub === 'reading_skill' ||
-                  sub === 'sandbox_start'
+                  sub === 'sandbox_start' ||
+                  sub === 'parsing'
                 ) {
                   setActiveGenerationStatus({ subtype: sub, message: parsed.message });
                 }
@@ -567,8 +592,8 @@ export function useChat(user: any) {
                 hasReceivedFinalAnswer = true;
                 const targetId = realMessageIdRef.current ?? assistantMsgId;
                 setMessages((prev) =>
-                  prev.map((m) =>
-                    String(m.id) === String(targetId) || String(m.id) === String(assistantMsgId) || String(m.id) === "-1"
+                  prev.map((m) => {
+                    const updated = String(m.id) === String(targetId) || String(m.id) === String(assistantMsgId) || String(m.id) === "-1"
                       ? {
                         ...m,
                         id: realMessageIdRef.current ?? m.id,
@@ -580,8 +605,15 @@ export function useChat(user: any) {
                           : m.generatedFiles,
                         parts: allParts,
                       }
-                      : m
-                  )
+                      : m;
+                    // Persist parts to localStorage so they survive page refresh
+                    if (updated.parts && updated.id && updated.id !== "-1" && updated.id !== -1) {
+                      try {
+                        localStorage.setItem(`flux-parts-${updated.id}`, JSON.stringify(updated.parts));
+                      } catch {}
+                    }
+                    return updated;
+                  })
                 );
               }
             } catch (innerErr) {
@@ -651,20 +683,22 @@ export function useChat(user: any) {
     abortControllerRef.current?.abort();
   }, []);
 
-  const retry = useCallback(() => {
+  const retry = useCallback((promptOverride?: string) => {
     const last = lastRequestRef.current;
-    if (!last || isLoading) return;
+    const prompt = promptOverride ?? last?.prompt;
+    if (!prompt || isLoading) return;
     setMessages((prev) => prev.filter((m) => !m.error));
     const originalCallbacks = lastCallbacksRef.current;
     const callbacksForRetry: UseChatCallbacks = {
       ...(originalCallbacks || {}),
-      fileContent: last.fileContent,
+      fileContent: last?.fileContent ?? "",
+      replaceLastAssistant: true,
     };
     handleSubmit(
-      last.prompt,
-      last.activeConversationId,
-      last.selectedModel,
-      last.attachedFiles,
+      prompt,
+      last?.activeConversationId ?? "",
+      last?.selectedModel ?? "",
+      last?.attachedFiles ?? null,
       callbacksForRetry
     );
   }, [isLoading, handleSubmit]);

@@ -59,11 +59,15 @@ export class WikiManager {
 
     const pairs: { user: string; assistant: string }[] = [];
     for (let i = 0; i < messages.length; i++) {
-      if (messages[i].role === 'User' && i + 1 < messages.length && messages[i + 1].role === 'Assistant') {
-        pairs.push({
-          user: messages[i].content.slice(0, 1200),
-          assistant: messages[i + 1].content.slice(0, 2500),
-        });
+      const msg = messages[i]!;
+      if (msg.role === 'User' && i + 1 < messages.length) {
+        const next = messages[i + 1]!;
+        if (next.role === 'Assistant') {
+          pairs.push({
+            user: msg.content.slice(0, 1200),
+            assistant: next.content.slice(0, 2500),
+          });
+        }
       }
     }
 

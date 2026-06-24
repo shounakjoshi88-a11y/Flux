@@ -18,7 +18,7 @@ type MessageListProps = {
   setActiveCitationIndex: (index: number | null) => void;
   onFollowUpClick: (query: string) => void;
   setPeekUrl: (url: string | null) => void;
-  onRetry?: () => void;
+  onRetry?: (prompt?: string) => void;
   onFileClick?: (file: { name: string; content: string }) => void;
   showPromptHistory: boolean;
   onJumpToPrompt: (messageId: string | number) => void;
@@ -192,7 +192,19 @@ export function MessageList({
     >
       {messages.length > 0 && (
         <div className="space-y-0.2">
-          {messages.map((message, index) => (
+          {messages.map((message, index) => {
+            // Find previous user message for retry/rewrite
+            let retryPrompt: string | undefined;
+            if (message.role === "Assistant") {
+              for (let j = index - 1; j >= 0; j--) {
+                const prev = messages[j];
+                if (prev && prev.role === "User") {
+                  retryPrompt = prev.content;
+                  break;
+                }
+              }
+            }
+            return (
             <div key={index} data-message-id={message.id}>
               <div className="mx-auto max-w-[700px] animate-in fade-in duration-500">
                 <MessageItem
@@ -204,7 +216,7 @@ export function MessageList({
                   }
                   onCitationClick={(index) => setActiveCitationIndex(index)}
                   onFollowUpClick={onFollowUpClick}
-                  onRetry={onRetry}
+                  onRetry={() => onRetry?.(retryPrompt)}
                   onSourceClick={setPeekUrl}
                   onFileClick={onFileClick}
                   onPreview={onPreview}
@@ -214,7 +226,7 @@ export function MessageList({
                 />
               </div>
             </div>
-          ))}
+          );})}
         </div>
       )}
 

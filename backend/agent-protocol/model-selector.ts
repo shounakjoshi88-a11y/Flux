@@ -9,7 +9,6 @@ const NIM_MODELS: Record<string, string> = {
   "nemotron-3-ultra-550b": "nvidia/nemotron-3-ultra-550b-a55b",
   "nemotron-3-nano-omni-30b-a3b-reasoning": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
   "mistral-medium-3.5-128b": "mistralai/mistral-medium-3.5-128b",
-  "nemotron-mini-4b": "nvidia/nemotron-mini-4b-instruct",
   "nemotron-3-super-120b-a12b": "nvidia/nemotron-3-super-120b-a12b",
   "deepseek-v4-flash": "deepseek-ai/deepseek-v4-flash",
   "step-3.7-flash": "stepfun-ai/step-3.7-flash",

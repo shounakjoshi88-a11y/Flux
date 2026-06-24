@@ -75,7 +75,7 @@ type MessageItemProps = {
   sources?: Source[];
   onCitationClick: (index: number) => void;
   onFollowUpClick: (question: string) => void;
-  onRetry?: () => void;
+  onRetry?: (prompt?: string) => void;
   onRegenerate?: () => void;
   onSourceClick: (url: string) => void;
   onFileClick?: (file: { name: string; content: string }) => void;
@@ -90,7 +90,7 @@ type MessageItemProps = {
   onHtmlPreview?: (html: string) => void;
 };
 
-import { StatusMessage, TimelineNode } from "./StatusMessage";
+import { StatusMessage, TimelineNode, ThoughtBlock } from "./StatusMessage";
 import PermissionDialog from "./PermissionDialog";
 import { MessageRenderer, InlineMath } from "./MessageRenderer";
 
@@ -505,7 +505,7 @@ function InlineGenerationIndicator({
 }
 
 /* ─── Search steps group (searching → found_sources → reading) ────── */
-const SEARCH_SUBTYPES = new Set(['searching', 'found_sources', 'reading']);
+const SEARCH_SUBTYPES = new Set(['searching', 'found_sources', 'reading', 'extracting', 'no_results', 'error', 'web_search', 'done']);
 
 function isSearchStep(part: MessagePart | undefined): boolean {
   return !!part && part.type === 'tool_call' && SEARCH_SUBTYPES.has(part.name);
@@ -526,16 +526,30 @@ function SearchStepsGroup({
   onSourceClick?: (url: string | null) => void;
   hasActiveStatus?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
 
   const typedParts = groupParts as (MessagePart & { type: 'tool_call' })[];
   const firstPart = typedParts[0];
 
   const actualIsFirst = groupStartIndex === 0 || allParts[groupStartIndex - 1]?.type !== 'tool_call';
-  const groupEndIndex = groupStartIndex + groupParts.length - 1;
-  const actualIsLast = !hasActiveStatus && (groupEndIndex === allParts.length - 1 || allParts[groupEndIndex + 1]?.type !== 'tool_call');
 
   if (!firstPart) return null;
+
+  const searchQuery = firstPart.input?.query ?? '';
+
+  const innerParts = typedParts.slice(1);
+
+  const lastVisibleIdx = useMemo(() => {
+    for (let k = innerParts.length - 1; k >= 0; k--) {
+      const p = innerParts[k];
+      if (p && p.name !== 'done') return k;
+    }
+    return -1;
+  }, [innerParts]);
+
+  const chevron = (
+    <ChevronDown className={`size-3 text-[var(--text-muted)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+  );
 
   return (
     <div className="mb-0.5">
@@ -552,13 +566,11 @@ function SearchStepsGroup({
           isActive={isStreaming && firstPart.status === 'running'}
           showRail={true}
           onSourceClick={onSourceClick}
-          rightSlot={
-            <ChevronDown className={`size-3 text-[var(--text-muted)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
-          }
+          rightSlot={chevron}
         />
       </div>
 
-      {open && typedParts.slice(1).map((part, idx) => (
+      {open && innerParts.map((part, idx) => (
         <StatusMessage
           key={idx}
           status={{
@@ -567,8 +579,9 @@ function SearchStepsGroup({
             message: part.output || '',
             data: part.input,
           }}
+          searchQuery={part.name === 'found_sources' ? searchQuery : undefined}
           isFirst={idx === 0}
-          isLast={idx === typedParts.length - 2 ? actualIsLast : false}
+          isLast={lastVisibleIdx >= 0 && idx === lastVisibleIdx}
           isActive={isStreaming && part.status === 'running'}
           showRail={true}
           onSourceClick={onSourceClick}
@@ -639,24 +652,27 @@ function PartsRenderer({
         break;
       }
       case "tool_call": {
-        // Group consecutive search steps into collapsible section
+        // Group consecutive search steps into collapsible section.
+        // Split on each new 'searching' — each search cycle gets its own collapsible.
         if (isSearchStep(part)) {
           const groupParts: MessagePart[] = [part];
           let j = i + 1;
           while (j < parts.length && isSearchStep(parts[j])) {
             const nextP = parts[j];
             if (nextP) {
+              if (nextP.type === 'tool_call' && nextP.name === 'searching') break;
               groupParts.push(nextP);
             }
             j++;
           }
+          const groupStartIndex = i;
           i = j - 1;
 
           renderedParts.push(
             <SearchStepsGroup
-              key={`search-${i}`}
+              key={`search-${groupStartIndex}`}
               parts={groupParts}
-              groupStartIndex={i - (groupParts.length - 1)}
+              groupStartIndex={groupStartIndex}
               allParts={parts}
               isStreaming={isStreaming}
               onSourceClick={onSourceClick}
@@ -691,7 +707,7 @@ function PartsRenderer({
               <StatusMessage
                 status={{
                   type: "tool_call",
-                  subtype: tp.name.includes("generating_file") ? tp.name : "tool_call",
+                  subtype: tp.name.includes("generating_file") || tp.name === 'parsing' || tp.name === 'parsing_done' ? tp.name : "tool_call",
                   message: tp.output || "",
                   data: {
                     toolName: tp.name,
@@ -716,9 +732,16 @@ function PartsRenderer({
       }
       case "thought": {
         if (part.content?.trim()) {
+          const thoughtIsLast = !activeGenerationStatus && (i === parts.length - 1 || parts[i + 1]?.type !== "thought");
+          const thoughtIsFirst = i === 0 || parts[i - 1]?.type !== "thought";
           renderedParts.push(
             <div key={`thought-${i}`} className="mb-0.5">
-              <div className="text-xs text-muted-foreground italic">{part.content}</div>
+              <ThoughtBlock
+                content={part.content}
+                isFirst={thoughtIsFirst}
+                isLast={thoughtIsLast}
+                isActive={isStreaming && thoughtIsLast}
+              />
             </div>
           );
         }
@@ -1110,7 +1133,9 @@ function deepCleanAnswer(raw: string): string {
     // 3. Strip structural tags
     .replace(/<\/?(?:thought|think|ANSWER|FOLLOW_UPS|question)>/gi, '')
     // 4. Clean up any trailing citations or artifact metadata lines
-    .replace(/\n\d+ https?:\/\/[^\n]+(\n|$)/g, '');
+    .replace(/\n\d+ https?:\/\/[^\n]+(\n|$)/g, '')
+    // 5. Strip truncated/incomplete tags at end (e.g. "<F", "<FOLLOW_UPS")
+    .replace(/<\/?[A-Za-z][A-Za-z0-9]*(?:\s[^>]*)?$/g, '');
 
   // Explicitly strip multiple trailing newlines before the final trim
   return clean.replace(/\n+$/, "").trim();
@@ -1226,7 +1251,7 @@ export function MessageItem({
           <span className="text-sm">{message.errorMessage || "An error occurred"}</span>
           {onRetry && (
             <button
-              onClick={onRetry}
+              onClick={() => onRetry!()}
               className="ml-auto flex items-center gap-1 text-xs text-white bg-red-500 hover:bg-red-600 px-3 py-1 rounded-full transition"
             >
               <RefreshCw className="size-3" />
@@ -1412,7 +1437,7 @@ export function MessageItem({
               <button onClick={handleTTS} className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/8 transition text-muted-foreground/60 hover:text-foreground" title={isSpeaking ? "Stop" : "Read aloud"}>
                 {isSpeaking ? <VolumeX className="size-3.5" /> : <Volume2 className="size-3.5" />}
               </button>
-              <button onClick={() => onRegenerate?.()} className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/8 transition text-muted-foreground/60 hover:text-foreground" title="Rewrite">
+              <button onClick={() => onRetry?.()} className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/8 transition text-muted-foreground/60 hover:text-foreground" title="Rewrite">
                 <RefreshCw className="size-3.5" />
               </button>
             </>
