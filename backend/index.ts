@@ -4030,6 +4030,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
 
             let seenFollowUpsTag = false;
             let consecutiveBlockedCount = 0;
+            let consecutiveSkippedCount = 0;
             const MAX_BLOCKED_CALLS = 1;
             let hasToolCallAfterText = false;
             let repeatBuf = '';
@@ -4129,10 +4130,15 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                                 forceSynthesis = true;
                             }
                         } else if (isSoftSkip) {
-                            console.log(`[STREAM] ${name} skipped — model should answer from knowledge`);
-                            // Don't increment blocked count — let the model continue answering
+                            consecutiveSkippedCount++;
+                            console.log(`[STREAM] ${name} skipped (${consecutiveSkippedCount}/3) — model should answer from knowledge`);
+                            if (consecutiveSkippedCount >= 3) {
+                                console.log(`[STREAM] Too many consecutive skips — forcing answer synthesis`);
+                                forceSynthesis = true;
+                            }
                         } else {
                             consecutiveBlockedCount = 0;
+                            consecutiveSkippedCount = 0;
                             // After 3 successful searches, force synthesis — model should answer, not call more tools
                             if (name === 'web_search' && agentState.searchCount >= 2) {
                                 console.log(`[STREAM] 2 searches completed — forcing answer synthesis`);
