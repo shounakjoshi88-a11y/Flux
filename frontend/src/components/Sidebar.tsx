@@ -338,7 +338,7 @@ export const Sidebar = memo(function Sidebar({
     debounceRef.current = setTimeout(async () => {
       try {
         const token = await (window as any).getAccessToken?.();
-        const res = await fetch(`${(window as any).BACKEND_URL || 'http://localhost:3001'}/search?q=${encodeURIComponent(search.trim())}`, {
+        const res = await fetch(`${(window as any).BACKEND_URL || 'https://localhost:3001'}/search?q=${encodeURIComponent(search.trim())}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await res.json();

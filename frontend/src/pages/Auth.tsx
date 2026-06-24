@@ -673,7 +673,10 @@ export default function Auth() {
 
   async function login(provider: "github" | "google") {
     setLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({ provider });
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: "https://localhost:3000" },
+    });
     if (error) {
       alert("Authentication failed. Please try again.");
       setLoading(false);

@@ -288,7 +288,10 @@ function repairLatex(formula: string): string {
   // ── 4. Map Unicode math symbols to LaTeX ──
   s = mapUnicodeMath(s);
 
-  // ── 5. Balance unbalanced braces (last resort safety net) ──
+  // ── 5. Escape # (macro parameter character breaks KaTeX) ──
+  s = s.replace(/(?<!\\)#/g, '\\#');
+
+  // ── 6. Balance unbalanced braces (last resort safety net) ──
   s = balanceBraces(s);
 
   return s.trim();
@@ -589,8 +592,8 @@ function DisplayMath({ formula }: { formula: string }) {
     return <MathJaxRenderer formula={formula} display={true} />;
   }
   return (
-    <div
-      className="my-4 text-center overflow-x-auto max-w-full py-2"
+    <span
+      className="my-4 text-center overflow-x-auto max-w-full py-2 block"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

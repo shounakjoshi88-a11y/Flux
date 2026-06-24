@@ -3,7 +3,6 @@ import index from "./index.html";
 
 const SRC = import.meta.dir;
 
-// Static files must come BEFORE the catch-all or Bun routes everything to index.html
 const STATIC_ROUTES: Record<string, any> = {
   "/manifest.json": file(SRC + "/manifest.json"),
   "/sw.js": file(SRC + "/sw.js"),
@@ -17,6 +16,13 @@ const STATIC_ROUTES: Record<string, any> = {
   "/apple-touch-icon.png": file(SRC + "/apple-touch-icon.png"),
 };
 
+const certPath = import.meta.dir + "/../../certs";
+const certFile = Bun.file(certPath + "/cert.pem");
+const keyFile = Bun.file(certPath + "/key.pem");
+
+const [certExists, keyExists] = await Promise.all([certFile.exists(), keyFile.exists()]);
+const tls = certExists && keyExists ? { cert: certFile, key: keyFile } : undefined;
+
 const server = serve({
   routes: {
     ...STATIC_ROUTES,
@@ -27,6 +33,8 @@ const server = serve({
     hmr: true,
     console: true,
   },
+
+  ...(tls ? { tls } : {}),
 });
 
 console.log(`Server running at ${server.url}`);

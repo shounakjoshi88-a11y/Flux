@@ -42,6 +42,9 @@ DESIGN.md
 data/
 the_app_i_copied_folders_from/
 
+# TLS certs (local dev only)
+certs/
+
 # Electron
 dist-electron/
 release/

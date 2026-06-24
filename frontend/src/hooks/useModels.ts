@@ -24,7 +24,7 @@ interface ModelDiscoveryResult {
 
 // Backend host for direct API calls
 function getApiHost(): string {
-  return BACKEND_URL || "http://localhost:3001";
+  return BACKEND_URL || "https://localhost:3001";
 }
 
 export function useModels(): ModelDiscoveryResult {

@@ -785,8 +785,8 @@ function SpinnerIcon({ cls = "" }: IProps) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ThoughtBlock v2 — brain icon, live elapsed timer, word-by-word typewriter,
-// smooth collapsible, polished step rail.
+// ThoughtBlock — header like "Searched the web", clock icon per step,
+// single main rail, no clock in timeline icon.
 // Exported so MessageItem.tsx can use it for `thought` parts.
 // ─────────────────────────────────────────────────────────────────────────────
 function cleanThoughtText(text: string): string {
@@ -858,68 +858,61 @@ export function ThoughtBlock({
 
   const railIcon = isThinking ? (
     <span className="size-4 flex items-center justify-center">
-      <span className="relative size-3.5">
-        <ClockIcon className="size-3.5 text-[var(--accent)]" />
-        <span className="absolute inset-0 rounded-full bg-[var(--accent)]/20 animate-ping opacity-60" />
-      </span>
+      <span className="size-2 rounded-full bg-[var(--accent)] animate-pulse" />
     </span>
   ) : (
     <span className="size-4 flex items-center justify-center">
-      <ClockIcon className="size-3.5 text-[var(--text-secondary)]" />
+      <svg viewBox="0 0 16 16" className="size-4 text-emerald-400/70" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="8" cy="8" r="6" />
+        <polyline points="5.5,8 7.5,10 10.5,6" />
+      </svg>
     </span>
   );
 
   return (
     <div className="flex gap-2.5">
       <TimelineNode icon={railIcon} isFirst={isFirst} isLast={isLast} showRail={true} />
-      <div className="min-w-0 flex-1 flex flex-col pt-3 pb-2">
+      <div className="min-w-0 flex-1 flex flex-col py-2">
         <button
           onClick={() => setOpen(v => !v)}
           aria-expanded={open}
           className="flex items-center gap-1.5 w-full text-left select-none"
         >
-          {isThinking ? (
-            <span className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--text-secondary)]">
-              <span>Thinking</span>
-              {displayElapsed != null && (
-                <span className="text-[11px] font-mono text-[var(--text-muted)] tabular-nums">
-                  · {displayElapsed}s
-                </span>
-              )}
-              <span className="inline-flex gap-0.5 ml-0.5">
+          <span className="text-[13px] font-medium text-[var(--text-secondary)]">
+            {isThinking ? 'Thinking' : `Thought${displayElapsed != null ? ` · ${displayElapsed}s` : ''}`}
+          </span>
+          <span className="ml-auto shrink-0 flex items-center gap-1.5">
+            {isThinking && (
+              <span className="inline-flex gap-0.5">
                 {[0, 1, 2].map(i => (
                   <span key={i} className="size-1 rounded-full bg-[var(--accent)]/70"
                     style={{ animation: `thoughtDot 1.2s ease-in-out ${i * 0.2}s infinite` }} />
                 ))}
               </span>
-            </span>
-          ) : (
-            <span className="flex items-center gap-1.5">
-              <span className="text-[13px] font-medium text-[var(--text-secondary)]">
-                Thought{displayElapsed != null ? ` · ${displayElapsed}s` : ''}
-              </span>
-              <ChevronDown className={`size-3 text-[var(--text-muted)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
-            </span>
-          )}
+            )}
+            <ChevronDown className={`size-3 text-[var(--text-muted)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+          </span>
         </button>
 
         {open && stepsToRender.length > 0 && (
-          <div className="mt-2.5 flex flex-col">
+          <div className="mt-2 flex flex-col">
             {stepsToRender.map((step, i) => {
               const isLastShown = i === stepsToRender.length - 1;
               const isAnimating = isThinking && isLastShown;
               const text = isAnimating ? animatedActive : step;
               return (
-                <div key={i} className="flex gap-2 items-start pl-1"
+                <div key={i} className="flex gap-2.5 items-start pl-1"
                   style={{
                     animation: !isThinking ? "thoughtStepIn 0.3s ease both" : undefined,
                     animationDelay: !isThinking ? `${i * 0.1}s` : undefined,
                   }}>
-                  <div className="flex flex-col items-center shrink-0 w-2.5 self-stretch">
-                    <span className={`mt-[5px] size-[4px] rounded-full shrink-0 ${isAnimating ? "bg-[var(--accent)]" : "bg-[var(--text-secondary)]/40"}`} />
-                    {i < stepsToRender.length - 1 && <div className="w-px flex-1 mt-1 min-h-[10px] bg-[var(--text-muted)]/15" />}
+                  <div className="flex flex-col items-center w-4 shrink-0 self-stretch">
+                    <div className="flex items-center justify-center h-4 w-4 shrink-0 relative">
+                      <ClockIcon className={`size-3.5 ${isAnimating ? "text-[var(--accent)]" : "text-[var(--text-secondary)]/60"}`} />
+                    </div>
+                    {i < stepsToRender.length - 1 && <div className="w-px flex-1 mt-px min-h-[10px] bg-[var(--text-muted)]/15" />}
                   </div>
-                  <div className={`text-[13px] leading-relaxed pb-2.5 min-w-0 flex-1 ${isAnimating ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]/80"}`}>
+                  <div className={`text-[13px] leading-relaxed pb-2.5 min-w-0 flex-1 pt-[2px] ${isAnimating ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]/80"}`}>
                     <MessageRenderer content={text || ""} onCitationClick={() => { }} sources={[]} />
                     {isAnimating && (
                       <span className="inline-block w-px h-[13px] bg-[var(--text-secondary)] ml-0.5 align-middle" style={{ animation: "blink 1s step-end infinite" }} />
@@ -930,8 +923,12 @@ export function ThoughtBlock({
             })}
           </div>
         )}
-        {isLast && (
-          <div className="flex items-center h-4 mt-10 mb-2">
+
+        {isLast && !isThinking && (
+          <div className="flex items-center gap-1.5 mt-3 mb-1">
+            <svg viewBox="0 0 16 16" className="size-3.5 text-emerald-400/70" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="4,8 7,11 12,5" />
+            </svg>
             <span className="text-[13px] text-[var(--text-secondary)] leading-snug font-medium">Done</span>
           </div>
         )}

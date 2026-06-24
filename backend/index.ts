@@ -21,6 +21,7 @@ import type { GeneratedFileResult } from './agent-tools';
 import { retrieveMemories, extractMemories, buildMemoryContext, pruneMemories } from './memory';
 import { toolRegistry } from './tool-registry';
 import http from "http";
+import https from "https";
 import { createAgentWebSocket } from './agent-protocol';
 import { codeExecutor } from './tools/codeExecutor';
 import { sandboxManager } from './sandbox/sandboxManager';
@@ -1513,7 +1514,8 @@ const SKILL_REGISTRY: Record<string, { fileName: string; label: string }> = {
 async function fetchSkillFile(skillName: string): Promise<string> {
     try {
         const port = process.env.PORT || '3001';
-        const r = await fetch(`http://localhost:${port}/skills/${skillName}`);
+        const proto = fs.existsSync(path.join(__dirname, '..', 'certs', 'cert.pem')) ? 'https' : 'http';
+        const r = await fetch(`${proto}://localhost:${port}/skills/${skillName}`);
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const text = await r.text();
         console.log(`[SKILL] "${skillName}" loaded — ${text.length} chars`);
@@ -5387,7 +5389,19 @@ app.delete("/api/agents/custom/:id", (req, res) => {
 });
 
 // ── SERVER START ─────────────────────────────────────────────
-const server = http.createServer(app);
+const certPath = path.join(__dirname, '..', 'certs');
+let server: http.Server | https.Server;
+if (fs.existsSync(path.join(certPath, 'cert.pem')) && fs.existsSync(path.join(certPath, 'key.pem'))) {
+  const tlsOpts = {
+    cert: fs.readFileSync(path.join(certPath, 'cert.pem')),
+    key: fs.readFileSync(path.join(certPath, 'key.pem')),
+  };
+  server = https.createServer(tlsOpts, app);
+  console.log('[TLS] HTTPS enabled');
+} else {
+  server = http.createServer(app);
+  console.log('[TLS] HTTPS disabled — cert.pem/key.pem not found in ../certs');
+}
 
 // Seed search cache from recent DB history (non-blocking)
 (async () => {
@@ -5422,4 +5436,5 @@ const server = http.createServer(app);
 // Attach Agent Protocol WebSocket handler
 createAgentWebSocket(server);
 
-server.listen(3001, () => { console.log("Flux backend running on port 3001"); });
+const proto = server instanceof https.Server ? "https" : "http";
+server.listen(3001, () => { console.log(`Flux backend running on ${proto}://localhost:3001`); });
