@@ -407,7 +407,8 @@ The `/flux_ask` endpoint orchestrates up to 10 reasoning steps:
 ```
 flux/
 ├── api/
-│   └── index.ts                        # Vercel serverless entry (wraps backend)
+│   ├── index.ts                        # Vercel serverless entry (wraps backend)
+│   └── tsconfig.json
 │
 ├── backend/
 │   ├── index.ts                        # Express 5 server — all routes, tool system, SSE
@@ -415,6 +416,7 @@ flux/
 │   ├── prompt.ts                       # System prompt templates with placeholders
 │   ├── generationPrompt.ts             # Document gen prompt schemas
 │   ├── memory.ts                       # Vector memory extraction, retrieval, pruning
+│   ├── memory-enhanced.ts              # Enhanced memory module
 │   ├── retriever.ts                    # NVIDIA Nemo RAG (embed + rerank)
 │   ├── safety.ts                       # NVIDIA Nemotron content safety classifier
 │   ├── voice-client.ts                 # NVIDIA ASR (Parakeet) + Edge TTS
@@ -424,33 +426,52 @@ flux/
 │   ├── db.ts                           # Prisma client singleton
 │   ├── nim-client.ts                   # NVIDIA NIM OpenAI-compatible client
 │   ├── nim-openai-client.ts            # Raw OpenAI client for NIM (fallback)
+│   ├── query-router.ts                 # Query routing logic
+│   ├── tool-registry.ts                # Central tool registration
+│   ├── search-cache.ts                 # Search result caching
+│   ├── huggingface-client.ts           # HuggingFace API client
+│   ├── tts-local.ts                    # Local TTS fallback
 │   ├── orchestrator/
 │   │   ├── index.ts                    # Re-exports
 │   │   ├── orchestrator.ts             # Plan-execute-verify agentic loop
 │   │   ├── planner.ts                  # Intent analysis + execution plans
 │   │   ├── verifier.ts                 # Phase result verification
 │   │   └── types.ts                    # Phase, ExecutionPlan, StreamWriter types
+│   ├── agent-protocol/                 # AG-UI protocol implementation
+│   │   ├── index.ts
+│   │   ├── types.ts
+│   │   ├── session.ts
+│   │   ├── team.ts
+│   │   ├── websocket.ts
+│   │   ├── model-selector.ts
+│   │   └── errors.ts
 │   ├── skills/                         # LLM skill prompts for document generation
 │   │   ├── SKILL.md                    # Master prompt with all skills
 │   │   ├── pdf-skill.md                # PDF generation prompt
 │   │   ├── docx-skill.md               # DOCX generation prompt
 │   │   ├── pptx-skill.md               # PowerPoint generation prompt
 │   │   ├── xlsx-skill.md               # Excel spreadsheet generation prompt
-│   │   ├── csv-skill.md, tsv-skill.md  # Delimited data generation
+│   │   ├── csv-skill.md                # Delimited data generation
+│   │   ├── tsv-skill.md
 │   │   ├── md-skill.md, json-skill.md, sql-skill.md, html-skill.md
 │   │   └── tech-writer-skill.md, finance-skill.md, coder-skill.md, creative-skill.md, legal-skill.md
 │   ├── prisma/
-│   │   ├── schema.prisma               # 4 models: User, Conversation, Message, Memory (vector)
+│   │   ├── schema.prisma               # Models: User, Conversation, Message, Memory, WikiNode, WikiEdge
 │   │   ├── migrations/                 # SQL migration history
 │   │   ├── add_artifacts_indexes.sql
 │   │   └── apply_indexes_now.sql
 │   ├── fonts/
 │   │   └── NotoSansSC-Regular.ttf      # CJK font for PDF generation
+│   ├── sandbox/
+│   │   └── sandboxManager.ts           # Isolated code execution sandbox
+│   ├── tools/
+│   │   └── codeExecutor.ts             # Code execution tool
+│   ├── wiki/
+│   │   └── wikiManager.ts              # Wiki knowledge graph manager
 │   ├── image_generation_backend/       # Local Bonsai diffusion service (Python/Flask)
 │   │   ├── image_service.py
 │   │   └── setup_image_models.py
-│   ├── package.json, tsconfig.json, Dockerfile, prisma.config.ts
-│   └── express.d.ts, .npmrc
+│   └── package.json, tsconfig.json, Dockerfile, prisma.config.ts, express.d.ts, .npmrc
 │
 ├── frontend/
 │   ├── src/
@@ -460,18 +481,25 @@ flux/
 │   │   ├── index.html                  # HTML shell
 │   │   ├── index.css                   # Base CSS + Tailwind import
 │   │   ├── types.ts                    # TypeScript definitions
+│   │   ├── i18n.ts                     # Internationalization
+│   │   ├── APITester.tsx               # API test component
+│   │   ├── declarations.d.ts           # Ambient type declarations
+│   │   ├── logo.svg, react.svg         # Brand + UI icons
 │   │   ├── pages/
 │   │   │   ├── Dashboard.tsx           # Main chat — auth, CRUD, SSE, tabs, previews
 │   │   │   └── Auth.tsx                # Login (Google + GitHub OAuth)
 │   │   ├── hooks/
 │   │   │   ├── useChat.ts              # SSE stream handler
 │   │   │   ├── useTheme.ts             # Dark/light theme toggle
+│   │   │   ├── useModels.ts            # Model list fetching
+│   │   │   ├── useCustomAgents.ts      # Custom agent management
+│   │   │   ├── useAgentSession.ts      # Agent session (WebSocket) management
 │   │   │   └── useSessionRevocationListener.ts
 │   │   ├── components/
 │   │   │   ├── ChatInput.tsx           # Markdown editor, model selector, file attach, voice, web toggle
 │   │   │   ├── MessageList.tsx         # Streaming messages with Answer/Links/Images tabs
 │   │   │   ├── MessageItem.tsx         # Single message — typewriter, thoughts, sources, files, action bar
-│   │   │   ├── MessageRenderer.tsx     # Rich renderer — markdown, code, math, mermaid, charts, citations with hover cards
+│   │   │   ├── MessageRenderer.tsx     # Rich renderer — markdown, code, math, mermaid, charts, citations
 │   │   │   ├── Sidebar.tsx             # Animated sidebar — search, conv groups, settings, news
 │   │   │   ├── SidebarThread.tsx       # Individual conversation thread item
 │   │   │   ├── Settings.tsx            # Account, Preferences, TTS, Sessions tabs
@@ -483,40 +511,58 @@ flux/
 │   │   │   ├── MarkdownPreview.tsx     # Markdown file preview
 │   │   │   ├── FileDownloadButton.tsx  # Download + preview for generated files
 │   │   │   ├── SourceCard.tsx          # Source citation with reputation score
-│   │   │   ├── StatusMessage.tsx       # Tool status with search-suppressed messages
+│   │   │   ├── StatusMessage.tsx       # Tool status with search-suppressed messages & thought steps
 │   │   │   ├── SuggestedActions.tsx    # Category-based suggestion prompts
 │   │   │   ├── TodoList.tsx            # Dynamic todo list component
 │   │   │   ├── PromptHistoryCard.tsx   # Scrollable user prompt history
 │   │   │   ├── ToolsDropdown.tsx       # Answer/Links/Images dropdown
 │   │   │   ├── ChartBlock.tsx          # Recharts bar, line, pie, doughnut charts
 │   │   │   ├── InputSeparator.tsx      # "Flux can make mistakes" divider
+│   │   │   ├── WikiGraph.tsx           # 3D knowledge graph visualization
+│   │   │   ├── CustomAgentsPanel.tsx   # Custom agent configuration
+│   │   │   ├── CodeOutputBlock.tsx     # Code execution output display
+│   │   │   ├── AgentStatusBar.tsx      # Multi-agent status bar
+│   │   │   ├── PermissionDialog.tsx    # Permission request dialog
+│   │   │   ├── TeamPanel.tsx           # Multi-agent team panel
+│   │   │   ├── ToolSummary.tsx         # Tool call summary display
 │   │   │   └── ui/                     # Shadcn-style primitives
 │   │   ├── lib/
 │   │   │   ├── config.ts               # BACKEND_URL
 │   │   │   ├── client.ts               # Supabase browser client
 │   │   │   ├── server.ts               # Supabase SSR client
 │   │   │   ├── chat-utils.ts           # Parse assistant content (sources, follow-ups)
-│   │   │   └── utils.ts                # cn() helper
+│   │   │   ├── utils.ts                # cn() helper
+│   │   │   ├── tool-normalizer.ts      # Tool call normalization
+│   │   │   ├── message-index.ts        # Message indexing
+│   │   │   └── approval-store.ts       # Tool approval state
 │   │   ├── data/
 │   │   │   └── suggestions.ts          # Categorized prompts (5 categories, 10 each)
 │   │   ├── utils/
-│   │   │   ├── ReputationScore.ts      # Domain-based URL reputation scoring (80+ trusted domains)
+│   │   │   ├── ReputationScore.ts      # Domain-based URL reputation scoring
 │   │   │   └── MathRenderer.tsx        # KaTeX inline/display math components
 │   │   ├── manifest.json               # PWA manifest
 │   │   ├── sw.js                       # Service worker (network-first)
-│   │   └── icon-*.svg / *.png          # PWA icons
+│   │   └── icon-*.svg, icon-*.png      # PWA icons
 │   ├── styles/
 │   │   ├── globals.css                 # Tailwind v4 + CSS custom properties
 │   │   └── dashboard.css               # Dashboard-specific dark/light styles
 │   ├── scripts/
 │   │   └── generate-icons.ts           # PWA icon generation script
 │   ├── dist/                           # Built output (deployed)
-│   ├── package.json, tsconfig.json, build.ts, bunfig.toml
-│   └── components.json, tailwind.config.js
+│   ├── package.json, tsconfig.json, build.ts, bunfig.toml, components.json
+│   └── tailwind.config.js
 │
-├── api/index.ts                        # Vercel serverless entry
+├── electron/                           # Desktop app (Electron)
+│   ├── main.ts                         # Main process
+│   ├── preload.ts                      # Preload script
+│   └── tsconfig.json
+│
+├── screenshots/                        # App screenshots for README
 ├── vercel.json                         # Vercel deployment config
-├── flux.bat / flux.ps1                 # Dev launcher scripts (both servers)
+├── electron-builder.yml                # Electron build config
+├── AGENTS.md                           # Agent instructions
+├── DESIGN.md                           # Design system documentation
+├── FluxMap.md                          # Project map
 ├── .gitignore
 └── README.md
 ```
