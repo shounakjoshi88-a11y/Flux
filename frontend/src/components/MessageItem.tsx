@@ -48,6 +48,7 @@ import {
   Trash2,
   Volume2,
   VolumeX,
+  Pencil,
 } from "lucide-react";
 
 import { FileDownloadButton } from "./FileDownloadButton";
@@ -86,6 +87,7 @@ type MessageItemProps = {
     filename: string
   }) => void;
   onFileDelete?: (messageId: string | number, filename: string, type: 'fileAttachment' | 'generatedFiles') => void;
+  onEdit?: (messageId: string | number, newContent: string) => void;
   activeGenerationStatus?: { subtype: string; message: string } | null;
   onHtmlPreview?: (html: string) => void;
 };
@@ -1155,6 +1157,7 @@ export function MessageItem({
   onFileClick,
   onPreview,
   onFileDelete,
+  onEdit,
   activeGenerationStatus,
   onHtmlPreview,
 }: MessageItemProps) {
@@ -1197,8 +1200,16 @@ export function MessageItem({
     const content = message.content;
     const fileAttachments = message.fileAttachment;
     const cleanContent = content.replace(/\s*\[attached: [^\]]+\]\s*/g, "").trim();
+    const [isEditing, setIsEditing] = useState(false);
+    const [editText, setEditText] = useState(cleanContent);
+    const editRef = useRef<HTMLTextAreaElement>(null);
 
-
+    useEffect(() => {
+      if (isEditing && editRef.current) {
+        editRef.current.focus();
+        editRef.current.setSelectionRange(editRef.current.value.length, editRef.current.value.length);
+      }
+    }, [isEditing]);
 
     const handleUserCopy = async () => {
       try {
@@ -1207,6 +1218,28 @@ export function MessageItem({
         setTimeout(() => setUserCopied(false), 2000);
       } catch (err) {
         console.error("Copy failed:", err);
+      }
+    };
+
+    const handleSaveEdit = () => {
+      const trimmed = editText.trim();
+      if (trimmed && trimmed !== cleanContent) {
+        onEdit?.(message.id, trimmed);
+      }
+      setIsEditing(false);
+    };
+
+    const handleCancelEdit = () => {
+      setEditText(cleanContent);
+      setIsEditing(false);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+        handleSaveEdit();
+      }
+      if (e.key === 'Escape') {
+        handleCancelEdit();
       }
     };
 
@@ -1228,16 +1261,53 @@ export function MessageItem({
         )}
 
         <div className="group flex flex-col items-end w-full">
-          <div className="user-message text-left w-fit max-w-[85%]">
-            <MessageRenderer content={cleanContent} onCitationClick={() => { }} sources={[]} />
+          {isEditing ? (
+            <div className="w-full max-w-[85%]">
+              <textarea
+                ref={editRef}
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="w-full min-h-[80px] p-3 rounded-xl border border-border bg-background text-sm resize-y focus:outline-none focus:ring-2 focus:ring-accent/40"
+              />
+              <div className="flex items-center gap-2 mt-2 justify-end">
+                <button
+                  onClick={handleCancelEdit}
+                  className="px-3 py-1.5 text-xs rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-accent/10 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEdit}
+                  className="px-3 py-1.5 text-xs rounded-lg bg-accent text-accent-foreground hover:opacity-90 transition-opacity"
+                >
+                  Save & Resend
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="user-message text-left w-fit max-w-[85%]">
+              <MessageRenderer content={cleanContent} onCitationClick={() => { }} sources={[]} />
+            </div>
+          )}
+          <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {onEdit && !isEditing && (
+              <button
+                onClick={() => { setEditText(cleanContent); setIsEditing(true); }}
+                className="p-1.5 rounded-lg bg-black/20 dark:bg-white/5 hover:bg-black/40 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"
+                title="Edit message"
+              >
+                <Pencil className="size-3.5" />
+              </button>
+            )}
+            <button
+              onClick={handleUserCopy}
+              className="p-1.5 rounded-lg bg-black/20 dark:bg-white/5 hover:bg-black/40 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"
+              title="Copy message"
+            >
+              {userCopied ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+            </button>
           </div>
-          <button
-            onClick={handleUserCopy}
-            className="mt-1 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 dark:bg-white/5 hover:bg-black/40 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"
-            title="Copy message"
-          >
-            {userCopied ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
-          </button>
         </div>
       </div>
     );

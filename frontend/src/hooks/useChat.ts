@@ -531,8 +531,14 @@ export function useChat(user: any) {
                   block.generatedFiles = [...block.generatedFiles, { filename: parsed.filename, downloadUrl: parsed.downloadUrl }];
                   updated[lastIdx] = { ...last, block };
                   streamingPartsRef.current = updated;
-                  updateMessages(realMessageIdRef.current ?? assistantMsgId);
+                } else {
+                  flushPendingText();
+                  const filePart: MessagePart = parsed.mime?.startsWith("image/")
+                    ? { type: "image", url: parsed.base64 || "", filename: parsed.filename, mime: parsed.mime }
+                    : { type: "file", filename: parsed.filename, mime: parsed.mime, base64: parsed.base64 };
+                  addPart(filePart);
                 }
+                updateMessages(realMessageIdRef.current ?? assistantMsgId)
               } catch {}
             }
             // ΓöÇΓöÇΓöÇ WIKI_UPDATE ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
@@ -573,14 +579,22 @@ export function useChat(user: any) {
                 }
               } catch { }
             }
-            // ΓöÇΓöÇΓöÇ TEXT ANSWER (default) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+            // ─── REPLACE_TEXT — synthesis is replacing a partial stream ───
+            else if (eventType === "replace_text") {
+              // Backend fired synthesis after a partial answer was already streamed.
+              // Discard the partial text so synthesis renders as a clean replacement.
+              assistantRawRef.current = "";
+              textAccumRef.current = "";
+              streamingPartsRef.current = streamingPartsRef.current.filter(p => p.type !== "text");
+            }
+            // ─── TEXT ANSWER (default) ───────────────
             else {
               if (data === "[DONE]") continue;
               assistantRawRef.current += data;
               textAccumRef.current += data;
             }
 
-            // ΓöÇΓöÇΓöÇ Update assistant message ΓöÇΓöÇ
+            // ─── Update assistant message ───
             try {
               const cleanAns = cleanAnswerText(assistantRawRef.current);
               const cleanCurrentText = cleanAnswerText(textAccumRef.current);

@@ -173,8 +173,8 @@ async function handleSessionStart(ws: AuthenticatedSocket, payload: any) {
   send(ws, makeMsg(session, "agent_status", { status: "warming_up", message: "Warming up model..." }));
 
   const caps: AgentCapabilities = {
-    maxTools: 10,
-    maxSteps: 8,
+    maxTools: 25,
+    maxSteps: 30,
     supportsStreaming: true,
     supportsVision: ["kimi-k2.6", "nemotron-nano-12b-v2-vl"].includes(config.model),
     supportsThinking: ["deepseek-v4-flash", "step-3.7-flash"].includes(config.model),

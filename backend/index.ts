@@ -384,9 +384,21 @@ function getUrlTitle(url: string): string {
 // ── SSE helper ──────────────────────────────────────────────
 function writeSafeSSE(res: any, content: string) {
     if (res.writableEnded) return;
-    const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    let deglitched = content;
+    const cjkGlitchRe = /([a-zA-Z\u2019\s,.'!?;:()\-–])([\u4e00-\u9fff\u3040-\u30ff\u30a0-\u30ff\uff00-\uffef]{1,8})([a-zA-Z\s,.'!?;:()\-–])/g;
+    let prev = '';
+    while (prev !== deglitched) {
+        prev = deglitched;
+        deglitched = deglitched.replace(cjkGlitchRe, '$1$3');
+    }
+    const normalized = deglitched.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     const escaped = normalized.replace(/\n/g, '\ndata: ');
     res.write(`data: ${escaped}\n\n`);
+}
+
+function writeReplaceText(res: any) {
+    if (res.writableEnded) return;
+    res.write(`event: replace_text\ndata: {}\n\n`);
 }
 
 function sendStatus(res: any, subtype: string, message: string, data?: any, track?: any[]) {
@@ -421,6 +433,166 @@ function sendToolGroup(res: any, tools: any[]) {
 function sendToolCall(res: any, toolName: string, args: any, status: string, result?: any) {
     if (res.writableEnded) return;
     res.write(`event: tool_call\ndata: ${JSON.stringify({ type: "tool_call", toolName, args, status, result })}\n\n`);
+}
+
+// ── File analysis helpers (used by synthesis path) ──────────────────────────
+
+type FileCategory = 'code' | 'document' | 'data' | 'config';
+
+function detectFileCategory(name: string, content: string): FileCategory {
+    const ext = name.split('.').pop()?.toLowerCase() ?? '';
+    if (['ts','tsx','js','jsx','py','go','rs','java','c','cpp','cs','rb','php','swift','kt','vue','svelte'].includes(ext)) return 'code';
+    if (['json','jsonl','csv','tsv','xml','yaml','yml','toml'].includes(ext)) return 'data';
+    if (['env','sh','bash','zsh','dockerfile','makefile'].includes(ext) || name.toLowerCase().startsWith('.env')) return 'config';
+    if (['md','txt','html','htm','rst','tex'].includes(ext)) return 'document';
+    const snip = content.slice(0, 200).trim();
+    if (snip.startsWith('{') || snip.startsWith('[')) return 'data';
+    if (/\b(function|const|class|import|export|def |fn |pub fn)\b/.test(snip)) return 'code';
+    return 'document';
+}
+
+function extractCodeSymbols(content: string, maxSymbols = 45): string {
+    const lines = content.split('\n');
+    const importLines: string[] = [];
+    const symbols: string[] = [];
+
+    for (let i = 0; i < Math.min(lines.length, 1200); i++) {
+        const line = (lines[i] ?? '').trim();
+        if (!line || line.startsWith('//') || line.startsWith('*') || line.startsWith('#')) continue;
+
+        // Imports — first 25 lines only, cap at 6
+        if (i < 25 && importLines.length < 6 &&
+            (line.startsWith('import ') || line.startsWith('from ') || /^const .* = require/.test(line))) {
+            importLines.push(`  ${line.slice(0, 90)}`);
+            continue;
+        }
+        // Express/Hono routes
+        const route = line.match(/(?:app|router|server)\.(get|post|put|delete|patch)\s*\(\s*['"`]([^'"`\s]+)/);
+        if (route && route[1] && route[2]) { symbols.push(`  route  ${route[1].toUpperCase().padEnd(6)} ${route[2]} — line ${i + 1}`); continue; }
+        // Classes
+        const cls = line.match(/^(?:export\s+)?(?:abstract\s+)?class\s+(\w+)/);
+        if (cls) { symbols.push(`  class  ${cls[1]} — line ${i + 1}`); continue; }
+        // Interfaces / Types
+        const iface = line.match(/^(?:export\s+)?(?:interface|type)\s+(\w+)/);
+        if (iface) { symbols.push(`  type   ${iface[1]} — line ${i + 1}`); continue; }
+        // Named functions
+        const fn = line.match(/^(?:export\s+)?(?:async\s+)?function\s+(\w+)/);
+        if (fn) { symbols.push(`  fn     ${fn[1]} — line ${i + 1}`); continue; }
+        // Arrow / const lambdas (camelCase only)
+        const arrow = line.match(/^(?:export\s+)?const\s+([a-z]\w+)\s*(?::[^=]+)?\s*=\s*(?:async\s+)?\(/);
+        if (arrow) { symbols.push(`  fn     ${arrow[1]} — line ${i + 1}`); continue; }
+        // React / PascalCase components
+        const comp = line.match(/^(?:export\s+)?(?:default\s+)?(?:const|function)\s+([A-Z]\w+)/);
+        if (comp) { symbols.push(`  cmp    ${comp[1]} — line ${i + 1}`); continue; }
+    }
+
+    const parts: string[] = [];
+    if (importLines.length) parts.push('Imports:\n' + importLines.join('\n'));
+    if (symbols.length) parts.push('Symbols:\n' + symbols.slice(0, maxSymbols).join('\n'));
+    return parts.join('\n');
+}
+
+function scoreSectionRelevance(sectionText: string, query: string): number {
+    const words = query.toLowerCase().split(/\W+/).filter(w => w.length > 3);
+    const lower = sectionText.toLowerCase();
+    return words.reduce((acc, w) => acc + (lower.split(w).length - 1), 0);
+}
+
+/**
+ * Converts raw file data into a structured, section-labeled representation
+ * that mirrors careful sequential file reading:
+ *   metadata → structural outline → header section → query-relevant body → tail
+ */
+function buildStructuredFileContext(
+    files: Array<{ name: string; content: string }>,
+    query: string,
+    totalBudget = 36_000,
+    onStatus?: (filename: string, section: string) => void
+): string {
+    if (!files.length) return '';
+    const perFile = Math.floor(totalBudget / files.length);
+    const out: string[] = [];
+
+    for (let fi = 0; fi < files.length; fi++) {
+        const file = files[fi];
+        if (!file) continue;
+        const { name, content } = file;
+        if (!content?.trim()) continue;
+
+        const lines = content.split('\n');
+        const n = lines.length;
+        const kb = (content.length / 1024).toFixed(1);
+        const cat = detectFileCategory(name, content);
+
+        onStatus?.(name, 'outline');
+
+        // ── File banner ───────────────────────────────────────────────────
+        out.push(`━━━ FILE ${fi + 1}/${files.length}: ${name}  (${n} lines · ${kb} KB · ${cat}) ━━━`);
+
+        // ── Structural outline (code only) ────────────────────────────────
+        if (cat === 'code') {
+            const symbols = extractCodeSymbols(content);
+            if (symbols) out.push(`OUTLINE (auto-extracted):\n${symbols}`);
+        }
+
+        const budget = Math.max(perFile - 600, 4000); // 600 chars reserved for labels/outline
+
+        if (content.length <= budget) {
+            // Small enough: include the whole file verbatim
+            onStatus?.(name, 'full');
+            out.push(`[FULL CONTENT · lines 1–${n}]\n${content}`);
+        } else {
+            // Strategic 3-section sampling ─────────────────────────────────
+            const secBudget = Math.floor(budget / 3);
+
+            // Section 1 — Header/Imports (first ~15 %, max 100 lines)
+            onStatus?.(name, 'section 1/3: header/imports');
+            const s1End = Math.min(Math.ceil(n * 0.15), 100);
+            out.push(
+                `[SECTION 1/3 · Header / Imports · lines 1–${s1End}]\n` +
+                lines.slice(0, s1End).join('\n').slice(0, secBudget)
+            );
+
+            // Section 2 — Query-relevant body chunk
+            onStatus?.(name, 'section 2/3: query-relevant body');
+            const bodyStart = s1End;
+            const bodyEnd = Math.floor(n * 0.85);
+            const step = 80;
+            let bestScore = -1, bestStart = bodyStart;
+            for (let c = bodyStart; c < bodyEnd - step; c += step) {
+                const score = scoreSectionRelevance(lines.slice(c, c + step).join('\n'), query);
+                if (score > bestScore) { bestScore = score; bestStart = c; }
+            }
+            const s2End = Math.min(bestStart + 140, bodyEnd);
+            out.push(
+                `[SECTION 2/3 · Most relevant to query · lines ${bestStart + 1}–${s2End}]\n` +
+                lines.slice(bestStart, s2End).join('\n').slice(0, secBudget)
+            );
+
+            // Section 3 — Tail/Exports (last ~10 %, max 80 lines)
+            onStatus?.(name, 'section 3/3: tail/exports');
+            const s3Start = Math.max(n - 80, s2End);
+            if (s3Start < n) {
+                out.push(
+                    `[SECTION 3/3 · Tail / Exports · lines ${s3Start + 1}–${n}]\n` +
+                    lines.slice(s3Start).join('\n').slice(0, secBudget)
+                );
+            }
+
+            const shownLines = s1End + (s2End - bestStart) + (n - s3Start);
+            const skipped = n - shownLines;
+            if (skipped > 30) {
+                out.push(
+                    `[⚠ ${skipped} lines in mid-body not shown here — ` +
+                    `full file was passed to the primary model context.]`
+                );
+            }
+        }
+
+        out.push(`━━━ END: ${name} ━━━`);
+    }
+
+    return out.join('\n\n');
 }
 
 // ── Permission approval store (in-memory, per-session) ────
@@ -553,7 +725,7 @@ AVAILABLE FUNCTIONS — call these via function calling, do NOT describe them in
     Public URL of running app. Call after start_app.
 
   get_generated_file({ path: "/home/user/chart.png" })
-    Download file to user. Images render inline.
+    Download file to user. Images render inline. Call this AFTER editing/verifying/generating any file the user needs — code, images, PDFs, CSVs — to send it in chat.
 
 REMEMBER: Writing bash commands as text does NOT execute them. Only function calls execute.
 </sandbox_environment>
@@ -1509,6 +1681,7 @@ const SKILL_REGISTRY: Record<string, { fileName: string; label: string }> = {
     coder: { fileName: 'coder-skill', label: 'Software engineering' },
     creative: { fileName: 'creative-skill', label: 'Creative copywriting' },
     legal: { fileName: 'legal-skill', label: 'Legal drafting' },
+    design: { fileName: 'frontend-design', label: 'Frontend design & styling' },
 };
 
 async function fetchSkillFile(skillName: string): Promise<string> {
@@ -2042,23 +2215,211 @@ function extractTokens(s: string): string[] {
         .filter(t => t.length >= 3 && !STOPWORDS.has(t));
 }
 
+/** Returns proper nouns: PascalCase words (not at position 0) + known Indian city/landmark names */
+function extractProperNouns(text: string): string[] {
+    const words = text.split(/\s+/);
+    const out: string[] = [];
+    for (let i = 0; i < words.length; i++) {
+        const w = (words[i] ?? '').replace(/[^a-zA-Z0-9]/g, '');
+        if (!w) continue;
+        // PascalCase (not first word, length > 2)
+        if (/^[A-Z][a-z]{1,}/.test(w) && i > 0) out.push(w.toLowerCase());
+        // Indian geography / landmark names
+        if (/^(nagpur|mumbai|delhi|pune|gujarat|kerala|goa|rajasthan|agra|jaipur|varanasi|chennai|kolkata|bangalore|hyderabad|ahmedabad|vadodara|baroda|kevadiya|statue|unity|patel|sardar|ajanta|ellora|shirdi|aurangabad|lonavala|mahabaleshwar|manali|shimla|rishikesh|haridwar|mathura|dwarka|coorg|ooty|munnar|alleppey|kasauli|darjeeling|gangtok|leh|ladakh)$/i.test(w)) {
+            out.push(w.toLowerCase());
+        }
+    }
+    return [...new Set(out)];
+}
+
 function isQueryRelevant(userQuery: string, modelQuery: string): boolean {
     const uTokens = extractTokens(userQuery);
     const mTokens = extractTokens(modelQuery);
-    // If model query has no meaningful tokens (all stopwords/short words), it's junk — reject
+
     if (mTokens.length === 0) return false;
-    // If user query has no meaningful tokens, can't judge — let it through
     if (uTokens.length === 0) return true;
-    // Check if any meaningful token from the user query appears in the model query
-    const hasOverlap = mTokens.some((t: string) => uTokens.includes(t));
-    // Also check bigram overlap for phrases
-    if (!hasOverlap) {
-        for (let i = 0; i < uTokens.length - 1; i++) {
-            const bigram = `${uTokens[i]} ${uTokens[i + 1]}`;
-            if (modelQuery.toLowerCase().includes(bigram)) return true;
-        }
+
+    const mLower = modelQuery.toLowerCase();
+
+    // Hard gate: user query has ≥2 proper nouns but model query has ZERO of them
+    // This is the instruction-echo signature — reject it
+    const uProperNouns = extractProperNouns(userQuery);
+    if (uProperNouns.length >= 2) {
+        const hits = uProperNouns.filter(pn => mLower.includes(pn));
+        if (hits.length === 0) return false;
     }
-    return hasOverlap;
+
+    // Require stricter overlap for long user queries (more entities = higher bar)
+    const overlapping = mTokens.filter((t: string) => uTokens.includes(t));
+    const minRequired = uTokens.length > 5 ? 2 : 1;
+    if (overlapping.length >= minRequired) return true;
+
+    // Bigram phrase check
+    for (let i = 0; i < uTokens.length - 1; i++) {
+        const bigram = `${uTokens[i]} ${uTokens[i + 1]}`;
+        if (mLower.includes(bigram)) return true;
+    }
+
+    return false;
+}
+
+// ── Smart query rewriting ────────────────────────────────────────────────────
+
+const INSTRUCTION_ECHO_RE = /^(search\s+(for|up|about|the|on|regarding)?\s*|look\s+up\s+|find\s+(out\s+)?(about\s+)?|tell\s+me\s+(about\s+|the\s+)?|show\s+me\s+|get\s+(me\s+)?|what\s+(is|are|does|were)\s+|can\s+you\s+(find|search|tell|show)\s+|please\s+(search|find|look\s+up)?\s+|i\s+(want|need)\s+to\s+(find|know|search)(\s+about)?\s+)/gi;
+const TRAVEL_FILLER_RE = /^(tours?\s+and\s+travels?\s+(for\s+(visiting|going\s+to)?\s*|to\s+)?|travel\s+(to|for)\s+|visit(?:ing)?\s+(to\s+)?)/i;
+const TRAILING_NOISE_RE = /\s*(,\s*)?(and\s+)?(please|for\s+me|right\s+now|asap|as\s+well|also|too|with\s+details?|in\s+detail)\.?$/gi;
+const PRICE_SUFFIX_RE = /\s+(and\s+)?(prices?|costs?|pricing|fees?|charges?|rates?)\s+too\.?$/i;
+
+/**
+ * Strips instruction-echo prefixes and travel filler from a model-generated query.
+ * Returns cleaned query string, or null if nothing meaningful remains or the
+ * query is missing key proper nouns from the original user request.
+ */
+function cleanAndValidateModelQuery(modelQuery: string, userQuery: string): string | null {
+    let q = modelQuery.trim();
+
+    // Strip instruction prefixes iteratively
+    let prev = '';
+    while (prev !== q) {
+        prev = q;
+        q = q.replace(INSTRUCTION_ECHO_RE, '').trim();
+        q = q.replace(TRAVEL_FILLER_RE, '').trim();
+    }
+    q = q.replace(TRAILING_NOISE_RE, '').trim();
+
+    // Preserve price intent: if original had "prices" but we stripped it, add back
+    if (PRICE_SUFFIX_RE.test(modelQuery) && !/\bpric/i.test(q)) q += ' prices';
+
+    q = q.replace(/\s{2,}/g, ' ').trim();
+    if (!q || q.length < 5) return null;
+
+    const cleanedTokens = extractTokens(q);
+    if (cleanedTokens.length < 2) return null;
+
+    // Reject if user query has ≥2 proper nouns and cleaned query contains none of them
+    const userProperNouns = extractProperNouns(userQuery);
+    if (userProperNouns.length >= 2) {
+        const qLower = q.toLowerCase();
+        const hits = userProperNouns.filter(pn => qLower.includes(pn));
+        if (hits.length === 0) return null;
+    }
+
+    return q;
+}
+
+/**
+ * Entity-priority query extraction from the raw user message.
+ * Used when the model generates instruction echo or missing-entity queries.
+ */
+function extractEntityQuery(userQuery: string): string {
+    const currentYear = new Date().getFullYear().toString();
+
+    // Strip instruction preamble from user query
+    let q = userQuery.trim();
+    let prev = '';
+    while (prev !== q) { prev = q; q = q.replace(INSTRUCTION_ECHO_RE, '').trim(); }
+    q = q
+        .replace(TRAVEL_FILLER_RE, '')
+        .replace(/\s+and\s+travels?\s+/i, ' ')
+        .replace(/\s+for\s+visiting\s+/i, ' ')
+        .replace(PRICE_SUFFIX_RE, (m) => /pric/i.test(m) ? ' prices' : '')
+        .replace(/\s+(please|for\s+me)\.?$/i, '')
+        .replace(/\s{2,}/g, ' ').trim();
+
+    const words = q.split(/\s+/).filter(Boolean);
+
+    // Score each word for search-query usefulness
+    const scored = words.map((word, i) => {
+        const lower = word.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (!lower || lower.length < 2) return { word, score: -99, i };
+
+        let score = 0;
+        if (STOPWORDS.has(lower)) return { word, score: -5, i };
+
+        // Proper noun (PascalCase, not position 0)
+        if (/^[A-Z]/.test(word) && i > 0) score += 8;
+        // Known Indian cities / landmarks
+        if (/^(nagpur|mumbai|delhi|pune|gujarat|kerala|goa|rajasthan|agra|jaipur|varanasi|chennai|kolkata|bangalore|hyderabad|ahmedabad|vadodara|baroda|kevadiya|statue|unity|patel|sardar|ajanta|ellora|shirdi|aurangabad|lonavala|manali|shimla|rishikesh|haridwar|mathura|dwarka|coorg|ooty|munnar|alleppey|kasauli|darjeeling|ladakh)$/i.test(lower)) score += 14;
+        // Tourism / product nouns
+        if (/^(tour|tours|package|packages|ticket|tickets|hotel|resort|bus|train|flight|price|prices|cost|costs|entry|visit|trip|travel|stay|booking|itinerary)$/i.test(lower)) score += 5;
+        // Verification / fact-check intent
+        if (/^(verify|check|confirm|validate|prove|disprove|debunk|legitimate|authentic|true|false|claim|rumor)$/i.test(lower)) score += 6;
+        // Word immediately after "from" or "to" in travel context
+        if (i > 0 && /^(from|to|via)$/i.test(words[i - 1] ?? '')) score += 7;
+        // Year
+        if (/^20[0-9]{2}$/.test(word)) score += 4;
+        // Generic prepositions
+        if (/^(from|to|via|and|or|in|at|near|around|for)$/i.test(lower)) score -= 2;
+        // Length bonus
+        if (lower.length >= 4) score += 1;
+
+        return { word, score, i };
+    });
+
+    const kept = scored
+        .filter(s => s.score > -4)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 9)
+        .sort((a, b) => a.i - b.i)
+        .map(s => s.word);
+
+    // Add year for time-sensitive queries
+    const resultStr = kept.join(' ');
+    const hasYear = /\b20[0-9]{2}\b/.test(resultStr);
+    const isTimeSensitive = /\b(price|cost|tour|package|hotel|travel|news|latest|current|today|now|recent|deal|offer|rate|schedule|ticket)\b/i.test(resultStr);
+    if (!hasYear && isTimeSensitive && kept.length < 9) kept.push(currentYear);
+
+    return kept.join(' ');
+}
+
+/**
+ * Master query rewriter. Takes the raw model query + original user message.
+ * Returns 1 clean, entity-rich, Tavily-ready query string.
+ *
+ * Flow: try to salvage model query → if instruction echo, extract from user query.
+ */
+function smartRewriteQuery(rawModelQuery: string, userQuery: string): string {
+    const TAVILY_MAX = 395;
+    const currentYear = new Date().getFullYear().toString();
+
+    // 1. Try to salvage model's query
+    const cleaned = cleanAndValidateModelQuery(rawModelQuery, userQuery ?? rawModelQuery);
+
+    let finalQuery: string;
+    if (cleaned) {
+        finalQuery = cleaned;
+        // Add year for time-sensitive queries if absent
+        const hasYear = /\b20[0-9]{2}\b/.test(finalQuery);
+        const isTimeSensitive = /\b(price|cost|tour|package|hotel|deal|latest|news|current|ticket|schedule)\b/i.test(finalQuery);
+        if (!hasYear && isTimeSensitive) {
+            const words = finalQuery.split(/\s+/);
+            if (words.length < 9) finalQuery += ` ${currentYear}`;
+        }
+        // Smart truncation to 10 words: preserve entity-dense words
+        const words = finalQuery.split(/\s+/).filter(Boolean);
+        if (words.length > 10) {
+            const scored = words.map((w, i) => ({
+                w, i,
+                s: (STOPWORDS.has(w.toLowerCase()) ? -2 : 0)
+                 + (/^[A-Z]/.test(w) ? 4 : 0)
+                 + (/^20[0-9]{2}$/.test(w) ? 3 : 0)
+                 + (/\b(price|tour|package|hotel|from|nagpur|statue|unity)\b/i.test(w) ? 3 : 0)
+                 + (i < 3 || i >= words.length - 2 ? 1 : 0),
+            }));
+            finalQuery = scored
+                .sort((a, b) => b.s - a.s)
+                .slice(0, 10)
+                .sort((a, b) => a.i - b.i)
+                .map(s => s.w)
+                .join(' ');
+        }
+    } else {
+        // 2. Model query was instruction echo or missing entities — extract from user query
+        finalQuery = extractEntityQuery(userQuery ?? rawModelQuery);
+        console.log(`[TOOL] web_search — rewrote instruction echo to entity query: "${finalQuery}"`);
+    }
+
+    return finalQuery.slice(0, TAVILY_MAX);
 }
 
 // ── TOOL FACTORY ───────────────────────────────────────────────────────────
@@ -2080,19 +2441,22 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                 'If you call web_search a second time it will be BLOCKED and your entire response will be discarded.',
             inputSchema: z.object({
                 query: z.string().describe(
-                    'A precise, targeted search query (5 to 7 words max). ' +
-                    'Extract ONLY the core NOUNS from the user\'s request. ' +
-                    'NEVER include verification words (true, false, claim, verify, confirm, fact, real, actually, legit). ' +
-                    'Example: user asks "Is it true Meta is cancelling AI projects?" → search "Meta cancelling AI projects 2026" (omit "is it true"). ' +
-                    'Example: "Hey can you find out about 2nd year courses at RBU Nagpur Btech CSE 2026" → "RBU Nagpur Btech CSE 2nd year courses 2026". ' +
-                    'The query MUST contain only the topic\'s key nouns — the words that would appear on a real results page about this topic. ' +
-                    'If you search for an unrelated topic, the query will be silently dropped. ' +
-                    'REQUIRED — always provide a specific query, 5-7 words only.'
+                    'A precise, targeted search query (6–10 words). ' +
+                    'Extract ONLY the KEY ENTITIES: place names, product names, brand names, specific topics, years. ' +
+                    'CRITICAL — NEVER echo the user\'s instruction preamble. If the user says "search for tours to X", the query is "tours X", NOT "search for tours to X". ' +
+                    'NEVER include: instruction words (search for, find, tell me, look up), filler (tours and travels for visiting, information about), or verification words (true, false, verify, confirm, legit). ' +
+                    'Example: user says "search for tours and travels for visiting Statue of Unity from Nagpur and prices too" → query "Statue Unity tour packages Nagpur prices 2026". ' +
+                    'Example: user says "Is it true Meta is cancelling AI projects?" → query "Meta cancelling AI projects 2026". ' +
+                    'Example: user says "Hey can you find 2nd year courses at RBU Nagpur Btech CSE" → query "RBU Nagpur Btech CSE 2nd year courses 2026". ' +
+                    'Rule: your query should look like what appears in a browser address bar for this topic, not like a sentence. ' +
+                    'For travel/price/product queries, always append the current year. ' +
+                    'REQUIRED — always provide a specific query.'
                 ),
                 queries: z.array(z.string()).describe(
-                    'Alternative to query: multiple search queries to run in parallel (each 5-7 words max). ' +
-                    'Same rules as query — only key nouns, no verification words. ' +
-                    'Use ONLY when you need results from multiple angles; otherwise use query.'
+                    'Run multiple search queries in parallel (each 6–10 words, same rules as query). ' +
+                    'USE THIS for: travel routes (query origin + destination separately), product comparisons, multi-part questions. ' +
+                    'Example: "tours Nagpur to Statue of Unity prices" + "Kevadiya Statue Unity entry ticket 2026". ' +
+                    'Do NOT use for single-topic queries — use query instead.'
                 ).optional(),
             }),
                 execute: async ({ query, queries: queriesArr }: any) => {
@@ -2101,6 +2465,18 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                     console.warn(`[TOOL] web_search blocked (already searched ${state.searchCount}x)`);
                     const blockedMsg = `__SEARCH_BLOCKED__ SEARCH LIMIT REACHED. You already performed ${state.searchCount} search(es). Do NOT call any more tools. Answer the user IMMEDIATELY using the search results already in context. If you call web_search again, your response will be discarded.`;
                     return blockedMsg;
+                }
+
+                // Block re-search when we already have results from the first search
+                if (state.searchCount >= 1 && (state.searchContent?.length ?? 0) > 500) {
+                    console.warn(
+                        `[TOOL] web_search — re-search blocked; already have ` +
+                        `${state.searchContent!.length} chars from first search. Forcing synthesis.`
+                    );
+                    return (
+                        `__SEARCH_SKIPPED__ Already have comprehensive search results ` +
+                        `${state.searchContent!.length} chars. Answer using the information you already have.`
+                    );
                 }
 
                 // ── Skip search if query doesn't ask for factual information ──
@@ -2151,36 +2527,11 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                     queriesToRun.push(userQuery.trim());
                 }
 
-                // Enforce max query length: first 7 meaningful words
-                const FILLER = /^(hey|hi|hello|can|could|would|will|shall|do|does|did|find|get|tell|show|give|need|want|know|about|for|the|a|an|is|are|was|were|please|regarding|looking|some|information|details|tell\s+me)\s+/i;
-                const MAX_QUERY_WORDS = 7;
-                const MIN_QUERY_WORDS = 3;
-                const TAVILY_MAX_QUERY = 395;
-                let safeQueries = queriesToRun.slice(0, 3).map(q => {
-                    // Strip leading filler words iteratively
-                    let stripped = q.trim();
-                    while (FILLER.test(stripped)) {
-                        stripped = stripped.replace(FILLER, '').trim();
-                    }
-                    const words = stripped.split(/\s+/).filter(Boolean);
-                    if (words.length < MIN_QUERY_WORDS) {
-                        // Filtered too aggressively — use original query minimally cleaned
-                        const raw = q.replace(FILLER, '').trim();
-                        const rawWords = raw.split(/\s+/).filter(Boolean);
-                        const rawTrunc = rawWords.length > MAX_QUERY_WORDS
-                            ? rawWords.slice(0, MAX_QUERY_WORDS).join(' ')
-                            : rawWords.join(' ');
-                        return rawTrunc.length > TAVILY_MAX_QUERY
-                            ? rawTrunc.slice(0, TAVILY_MAX_QUERY)
-                            : rawTrunc;
-                    }
-                    const truncated = words.length > MAX_QUERY_WORDS
-                        ? words.slice(0, MAX_QUERY_WORDS).join(' ')
-                        : words.join(' ');
-                    return truncated.length > TAVILY_MAX_QUERY
-                        ? truncated.slice(0, TAVILY_MAX_QUERY)
-                        : truncated;
-                });
+                // Rewrite each query: strip instruction echo, extract key entities,
+                // add year for time-sensitive queries, smart-truncate to ≤10 words.
+                let safeQueries = queriesToRun.slice(0, 3).map(q =>
+                    smartRewriteQuery(q, userQuery ?? q)
+                );
                 // Deduplicate and remove empty/stopword-only queries
                 safeQueries = [...new Set(safeQueries.filter((q: string) => {
                     if (q.trim().length === 0) return false;
@@ -2251,8 +2602,10 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
                 try {
                     const searchPromises = safeQueries.map(q => 
                         (client as any).search(q, {
-                            search_depth: 'basic',
-                            max_results: 6,
+                            search_depth: /\b(price|cost|tour|package|hotel|restaurant|book|buy|ticket|deal|offer|rate|schedule|review|itinerary|resort|flight|train|bus)\b/i.test(q)
+                                ? 'advanced'
+                                : 'basic',
+                            max_results: 7,
                         }).catch((err: any) => {
                             console.error(`[TOOL] Tavily search failed for "${q}":`, err);
                             return null;
@@ -2347,12 +2700,13 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
         // ── read_skill ────────────────────────────────────────────────────
         read_skill: (tool as any)({
             description:
-                'Load the generation rules/skill file for a document type. ' +
-                'ALWAYS call this before generate_document.',
+                'Load a skill file. Skills include generation rules for document types (pdf, docx, etc.) ' +
+                'AND design/styling rules (design). ' +
+                'Call this before generate_document for doc types, or to load design rules when the user wants UI improvements on an uploaded file.',
             inputSchema: z.object({
                 doc_type: z
-                    .enum(['pdf', 'pptx', 'docx', 'xlsx', 'csv', 'tsv', 'md', 'json', 'sql', 'html', 'tech', 'finance', 'coder', 'creative', 'legal'])
-                    .describe('The document type to load rules for'),
+                    .enum(['pdf', 'pptx', 'docx', 'xlsx', 'csv', 'tsv', 'md', 'json', 'sql', 'html', 'tech', 'finance', 'coder', 'creative', 'legal', 'design'])
+                    .describe('The skill type to load rules for'),
             }),
             execute: async ({ doc_type }: any) => {
                 if (state.searchCount >= 2 && (state.searchContent?.length ?? 0) > 100) {
@@ -2967,9 +3321,9 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
 
         // ── get_generated_file ────────────────────────────────────────────
         get_generated_file: (tool as any)({
-            description: 'Download a file from the sandbox and return its base64-encoded content with MIME type. Use this to return files (images, PDFs, CSVs) directly to the user in chat.',
+            description: 'Download a file from the sandbox and return its base64-encoded content with MIME type. Use this to return files (images, PDFs, CSVs, code files, edited documents) directly to the user in chat. Call this AFTER you finish editing or generating a file the user should receive.',
             inputSchema: z.object({
-                path: z.string().describe('Absolute path to the file in the sandbox, e.g. /home/user/output.png'),
+                path: z.string().describe('Absolute path to the file in the sandbox, e.g. /home/user/MessageRenderer.tsx'),
             }),
             execute: async ({ path }: any) => {
                 const cid = activeConversationId || 'default';
@@ -3786,9 +4140,38 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
         const memCtx = memEnabled
             ? await retrieveMemories(uid, nq).then(buildMemoryContext).catch(() => '')
             : '';
+
+        // Auto-write attached text files to the E2B sandbox so run_bash can reference them
+        let sandboxFileNotice = '';
+        if (hasAnyFile && activeConversationId) {
+            try {
+                const cid = activeConversationId;
+                const paths: string[] = [];
+                if (safeFile) {
+                    const fn = safeAtt.find(a => a.name)?.name || 'attached.txt';
+                    await codeExecutor.writeFile(cid, `/home/user/${fn}`, safeFile);
+                    paths.push(`/home/user/${fn}`);
+                }
+                for (const att of safeAtt) {
+                    if (!att.content || att.type?.startsWith('image/') || att.type?.startsWith('video/')) continue;
+                    const fn = att.name || 'attached.txt';
+                    const raw = typeof att.content === 'string' ? att.content : '';
+                    if (raw) {
+                        await codeExecutor.writeFile(cid, `/home/user/${fn}`, raw);
+                        paths.push(`/home/user/${fn}`);
+                    }
+                }
+                if (paths.length) {
+                    sandboxFileNotice = `\n📁 Files written to sandbox:\n${paths.map(p => `  - ${p}`).join('\n')}\nReference these paths in run_bash. Do NOT read_url them — they're already here.\n`;
+                }
+            } catch (e: any) {
+                console.warn('[SANDBOX_WRITE] Could not write attached files:', e.message);
+            }
+        }
+
         // When the user provides a file, prepend a hard instruction to stop the model searching
         const fileGuard = hasAnyFile
-            ? `\n⚠️ FILE ATTACHED: The user has provided file content in this message. You MUST NOT call web_search or any search tool. Analyze the provided file content directly and answer from it. Searching the web for user-provided code or documents is forbidden.\n`
+            ? `\n⚠️ FILE ATTACHED: The user has provided file content in this message${sandboxFileNotice ? ' and it has been written to the sandbox' : ''}. You MUST NOT call web_search or read_url for the attached file (it's already in context).${sandboxFileNotice}You MUST only work on the uploaded file(s) — do NOT create, scaffold, or generate any new files or projects unless the user explicitly asks. After you finish editing or verifying, call get_generated_file to send the result to the user. To verify/analyze code: use run_bash to run type-checkers (npx tsc --noEmit), linters (npx eslint), tests, or other analysis commands directly on the sandbox file paths. If the user asks you to improve the design/styling, call read_skill({ doc_type: 'design' }) to load the frontend design rules.\n`
             : '';
 
         // Detect system/architecture/code-review questions — strip execution tools
@@ -3808,9 +4191,37 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
         const codeExecRE = /\b(write|create|build|develop|implement|code|program|script|compile|run|execute|debug|fix|refactor|deploy)\s+(a|an|the|this|my|some|a\s+simple|a\s+basic|a\s+Python|a\s+JavaScript|a\s+React)\b/i;
         let isSearchQuery = searchQueryRE.test(nq) && !codeExecRE.test(nq) && !isSystemQuery;
         if (!isSearchQuery && previousQuery) isSearchQuery = searchQueryRE.test(previousQuery) && !codeExecRE.test(previousQuery);
+
+        // When a file is attached and the query mentions verifying/analyzing it,
+        // don't force system or research mode — the model needs sandbox tools (run_bash, etc.)
+        const isFileVerificationQuery = hasAnyFile && (
+          safeAtt.some(f => f.name && nq.toLowerCase().includes(f.name.toLowerCase())) ||
+          /\b(verify|analyze|review|check|examine|inspect|audit|look\s*(at|over)|debug|test|read)\s+(this|the|my|that)\s*(file|code|function|component|script|class|message|router)\b/i.test(nq) ||
+          /\b(this|the|my|that)\s*(file|code|function|component|script|class)\b/i.test(nq)
+        );
+        if (isFileVerificationQuery) {
+          isSystemQuery = false;
+          isSearchQuery = false;
+        }
+
         const searchGuard = isSearchQuery
             ? `\n🔍 RESEARCH MODE: The user is asking a factual/research question. Your ONLY allowed tools are web_search and read_url. Do NOT call run_bash, run_python, write_file, edit_file, install_package, create_project, start_app, stop_app, or any sandbox/execution tools. Use web_search first to find sources, then read_url to fetch full content from important URLs (especially PDFs).\n`
             : '';
+
+        // When a file is attached and the user asks to design/style it, auto-load the design skill
+        let designSkillGuard = '';
+        if (hasAnyFile && /\b(design|style|beautify|make it (look|prett|better|nice)|improve.*(look|ui|design|style|appearance)|redesign|rethink|polish|spruce|refine|restyle|beautiful|modern|sleek|elegant|clean up|touch up|pretty)\b/i.test(nq)) {
+            isSystemQuery = false;
+            isSearchQuery = false;
+            try {
+                const designContent = await fetchSkillFile('frontend-design');
+                if (designContent) {
+                    designSkillGuard = `\n🎨 DESIGN SKILL LOADED — follow these rules when modifying the uploaded file:\n${designContent.slice(0, 7000)}\n\n`;
+                }
+            } catch (e: any) {
+                console.warn('[DESIGN_SKILL] Could not fetch:', e.message);
+            }
+        }
 
         const dynSys = [
             SYSTEM_PROMPT
@@ -3818,6 +4229,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                 .replaceAll('{{LOCATION_INFO}}', locInfo)
                 .replaceAll('{{MEMORY_CONTEXT}}', memCtx),
             fileGuard,
+            designSkillGuard,
             systemGuard,
             searchGuard,
             VISUAL_INSTRUCTIONS,
@@ -4008,7 +4420,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                 system: dynSys,
                 messages,
                 tools,
-                stopWhen: stepCountIs(10),
+                stopWhen: stepCountIs(30),
                 toolChoice: 'auto',
                 temperature: 0.35,
                 abortSignal: abortController.signal,
@@ -4035,11 +4447,30 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
             let hasToolCallAfterText = false;
             let repeatBuf = '';
             let dedupSkipLen = 0;
+            let preToolBuf = '';
+            let preToolHandled = false;
             // synthesisWritten is declared in outer scope
+
+            function drainPreToolBuf(keep: boolean) {
+                if (preToolHandled) return;
+                preToolHandled = true;
+                if (keep && preToolBuf.trim()) {
+                    writeSafeSSE(res, preToolBuf);
+                    sentText += preToolBuf;
+                    charsSent += preToolBuf.length;
+                    if (typeof (res as any).flush === 'function') (res as any).flush();
+                }
+                preToolBuf = '';
+            }
 
             // Writes clean text to SSE, handling multi-step repeat dedup.
             function writeClean(clean: string) {
                 if (!clean || synthesisWritten) return;
+                if (!preToolHandled) {
+                    preToolBuf += clean;
+                    if (preToolBuf.length >= 80) drainPreToolBuf(true);
+                    return;
+                }
                 if (hasToolCallAfterText) {
                     repeatBuf += clean;
                     if (repeatBuf.length >= 40) {
@@ -4085,6 +4516,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                 if (res.writableEnded || closedRef.v || forceSynthesis) break;
 
                 if (event.type === 'tool-call') {
+                    drainPreToolBuf(false); // discard pre-tool preamble
                     hasToolCall = true;
                     toolResultSeen = true;
                     // If we already streamed text before this tool call, subsequent text-deltas
@@ -4132,8 +4564,11 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                         } else if (isSoftSkip) {
                             consecutiveSkippedCount++;
                             console.log(`[STREAM] ${name} skipped (${consecutiveSkippedCount}/3) — model should answer from knowledge`);
-                            if (consecutiveSkippedCount >= 3) {
-                                console.log(`[STREAM] Too many consecutive skips — forcing answer synthesis`);
+                            // Force synthesis immediately if we already have search content
+                            // — the model already has the info it needs, no reason to keep looping
+                            const alreadyHasSearch = agentState.searchContent && agentState.searchContent.length > 200;
+                            if (consecutiveSkippedCount >= 2 || (name === 'web_search' && alreadyHasSearch)) {
+                                console.log(`[STREAM] Already have search results — forcing answer synthesis`);
                                 forceSynthesis = true;
                             }
                         } else {
@@ -4269,6 +4704,8 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                 }
             }
 
+            drainPreToolBuf(true); // flush buffer if no tool call ever arrived
+
             // ── Mistral-style inline tool call parser ─────────────────────────────
             // Some NIM models (e.g. Mistral) output tool calls as raw text in
             // Mistral format instead of using OpenAI-compatible function calling.
@@ -4308,6 +4745,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                             else if (q.includes('word') || q.includes('docx')) normArgs.doc_type = 'docx';
                             else if (q.includes('excel') || q.includes('xlsx') || q.includes('spreadsheet')) normArgs.doc_type = 'xlsx';
                             else if (q.includes('csv')) normArgs.doc_type = 'csv';
+                            else if (q.includes('design') || q.includes('style') || q.includes('beautify') || q.includes('ui') || q.includes('make it look')) normArgs.doc_type = 'design';
                             else normArgs.doc_type = 'pdf';
                         }
                         calls.push({ name: toolName, args: normArgs });
@@ -4351,6 +4789,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                 }
                 // Auto-trigger generate_document after read_skill if model didn't
                 for (const gen of mistralDocGen) {
+                    if (gen.docType === 'design') continue; // design skill is for file editing, not doc generation
                     const genDef = (tools as any)['generate_document'];
                     if (genDef && typeof genDef.execute === 'function') {
                         console.log(`[MISTRAL] Auto-chaining generate_document(${gen.docType}, ${gen.topic})`);
@@ -4502,7 +4941,8 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                 nonUrlLen = stripped.length;
             }
             const isUrlOnly = containsSources && charsSent > 0 && nonUrlLen < 200 && (nonUrlLen / fullText.length < 0.3);
-            const shouldSynthesize = (forceSynthesis || !charsSent || (isUrlOnly && charsSent < 300) || (fullText.trim().length < 100 && hadSources)) && hadSources && !res.writableEnded;
+            const hasSubstantialText = !forceSynthesis && !isUrlOnly && charsSent > 400;
+            const shouldSynthesize = !hasSubstantialText && (forceSynthesis || !charsSent || (isUrlOnly && charsSent < 300) || (fullText.trim().length < 100 && hadSources)) && hadSources && !res.writableEnded;
 
             if (shouldSynthesize) {
                 console.log(`[ASK] ${charsSent ? 'url-only echo detected' : 'charsSent=0'} with sources — attempting answer synthesis`);
@@ -4522,13 +4962,23 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                 // Build context: prefer search result text, fall back to agentState.searchContent, then source URLs
                 const searchText = (joinedSearch || agentState.searchContent || '').trim();
 
-                // Also include the user's file if they attached one (this is the key fix
-                // for "searched user's code then got no answer" situations)
-                const fileCtx = safeFile
-                    ? `\n\nUser's attached file content:\n${safeFile.slice(0, 16000)}`
-                    : safeAtt.filter(f => f.content && !f.type?.startsWith('image/')).length > 0
-                        ? `\n\nUser's attached files:\n${safeAtt.filter(f => f.content && !f.type?.startsWith('image/')).map(f => `[${f.name}]\n${(f.content ?? '').slice(0, 12000)}`).join('\n\n')}`
-                        : '';
+                // Build structured file context — metadata + outline + sections instead of raw blob
+                const synthTextFiles: Array<{ name: string; content: string }> = [];
+                if (safeFile) synthTextFiles.push({ name: 'attached-file', content: safeFile });
+                for (const f of safeAtt.filter(f => f.content && !f.type?.startsWith('image/'))) {
+                    synthTextFiles.push({ name: f.name, content: f.content ?? '' });
+                }
+                const fileCtx = synthTextFiles.length > 0
+                    ? `\n\n${buildStructuredFileContext(synthTextFiles, nq, 36000, (name, section) => {
+                        sendStatus(res, 'sandbox_start', `Reading ${name} — ${section}`,
+                            { tool: 'file_analysis', filename: name },
+                            agentState.thoughtProcess);
+                    })}`
+                    : '';
+                if (synthTextFiles.length > 0) {
+                    sendStatus(res, 'sandbox_success', `File analysis complete (${synthTextFiles.length} file${synthTextFiles.length > 1 ? 's' : ''})`,
+                        { tool: 'file_analysis' }, agentState.thoughtProcess);
+                }
 
                 const combinedContext = [searchText, fileCtx].filter(Boolean).join('\n\n');
 
@@ -4536,17 +4986,41 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                     try {
                         const synthRes = await generateText({
                             model,
-                            system: `You are a research analyst. Produce a comprehensive, structured, detail-rich answer.
+                            system: `You are Flux's synthesis engine. Transform raw context into a precise, high-value answer.
 
-RULES:
-- ORGANIZE with sections, tables, bullet points, and bold highlights. Use markdown tables (with | pipes) when comparing items.
-- Include SPECIFIC details: names, numbers, dates, fees, URLs, course codes — every fact you can extract from the context.
-- Cite sources inline as [source-name](url) when the URL is available in the search results.
-- Use tables for comparison: specializations side-by-side, semester-wise course lists, fee structures, etc.
-- NEVER say "based on the search results" or "according to the sources". State facts directly.
-- Be exhaustive, not generic. If the context has 30 sources, use ALL of them.
-- If the context is insufficient for a detail, state what's available rather than making up data.
-${fileCtx ? '\nThe user attached a file — analyze it directly and answer from the file content.' : ''}`,
+STEP 1 — DETECT QUERY TYPE and adapt your output:
+• FACTUAL/DIRECT (confirmations, quick lookups): One bold direct answer → tight supporting table or 3–5 bullets.
+• RESEARCH (comparisons, how-to, multi-source): ## sections, inline citations [Name](url), tables for side-by-side data. Pull every specific fact: names, numbers, dates, codes, prices.
+• VERIFICATION (fact-checks, error detection): Open with a verdict — ✓ Correct / ✗ Incorrect / ⚠ Partially correct — then cite evidence line by line.
+• FILE ANALYSIS (code, documents, data): Follow the FILE READING PROTOCOL below.
+
+FORMATTING:
+- Open with the direct answer — never "Based on the search results" or "According to sources".
+- Bold (**) the key fact or verdict on first mention.
+- Markdown tables for ANY comparison of 2+ items.
+- Cite sources with numbered brackets [1], [2], [3] etc. — NEVER output full URLs or markdown links like [text](url) in the answer body.
+- If a detail isn't in the context, say what IS available — never guess.
+
+${fileCtx ? `━━━ FILE READING PROTOCOL ━━━
+Files are provided in structured sections: OUTLINE → Header → Query-Relevant Body → Tail.
+
+READ ORDER (follow this strictly):
+1. OUTLINE first — understand all functions, classes, routes, and types before reading any section.
+2. SECTION 1 (Header/Imports) — establish dependencies, framework, entry points.
+3. SECTION 2 (Most relevant) — deepest analysis here; this chunk was scored against the user's query.
+4. SECTION 3 (Tail/Exports) — check exports, final logic, return values, cleanup.
+
+ANALYSIS FORMAT per file:
+▸ **[filename]** — one-line summary of what this file does
+▸ **Structure**: list key symbols with their roles (from OUTLINE)
+▸ **Findings**: numbered list of observations, bugs, or answers — always include "line N:" references
+▸ **Issues** (if any): each issue on its own line — severity (🔴 critical / 🟡 warning / 🔵 note), location, explanation, suggested fix with a short code snippet
+▸ **Action list**: prioritised next steps
+
+CROSS-FILE RULES (when multiple files provided):
+- Note where file A calls or imports from file B
+- Flag mismatches: a function exported in one file that's missing/misnamed in the importer
+- Summarise the interaction between files before individual file breakdowns` : ''}`,
                             messages: [
                                 { role: 'user', content: `Context:\n${combinedContext.slice(0, 40000)}\n\nQuestion: ${nq}` },
                             ],
@@ -4567,6 +5041,13 @@ ${fileCtx ? '\nThe user attached a file — analyze it directly and answer from 
                         .replace(/<(?:THOUGHT|think)>[\s\S]*?<\/(?:THOUGHT|think)>/gi, '')
                         .replace(/<\/?(?:THOUGHT|think)>/gi, '')
                         .trim();
+                    // If partial text was already streamed (e.g. model started answering before
+                    // forceSynthesis kicked in), tell the client to discard it and use the
+                    // synthesis as a clean replacement instead of appending to the fragment.
+                    if (charsSent > 0) {
+                        writeReplaceText(res);
+                        console.log(`[ASK] replace_text sent — discarding ${charsSent} partial chars`);
+                    }
                     writeSafeSSE(res, cleanSynth);
                     console.log(`[ASK] synthesized answer (${cleanSynth.length} chars) — sent to client`);
                     charsSent += cleanSynth.length;
@@ -5330,8 +5811,8 @@ app.get("/api/acp/capabilities", (_req, res) => {
             supportsStreaming: true,
             supportsVision: true,
             supportsThinking: true,
-            maxTools: 10,
-            maxSteps: 8,
+            maxTools: 25,
+            maxSteps: 30,
             supportedModes: ["default", "plan", "yolo"],
             availableTools: toolRegistry.getToolList().map((t) => ({
                 name: t.name,

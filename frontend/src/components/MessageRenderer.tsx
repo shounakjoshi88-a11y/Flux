@@ -1120,10 +1120,10 @@ function renderPlainBlocks(text: string, onCitationClick: any, sources: Source[]
       if (rows.length > 1) {
         const tblIdx = elements.length;
         elements.push(
-          <div key={`tab-${parentIdx}-${i}`} className="group my-6 overflow-x-auto border border-white/10 rounded-lg shadow-sm relative">
-            <table className="min-w-full divide-y divide-white/10 text-sm">
-              <thead className="bg-white/5 text-left"><tr>{rows[0]!.map((cell, ci) => (<th key={ci} className="px-4 py-3 font-semibold">{formatInlineText(cell, onCitationClick, sources, `th-${parentIdx}-${i}-${ci}`)}</th>))}</tr></thead>
-              <tbody className="divide-y divide-white/5">{rows.slice(1).map((row, ri) => (<tr key={ri} className="hover:bg-white/[0.02] transition-colors">{row.map((cell, ci) => (<td key={ci} className="px-4 py-3 text-muted-foreground">{formatInlineText(cell, onCitationClick, sources, `td-${parentIdx}-${i}-${ri}-${ci}`)}</td>))}</tr>))}</tbody>
+          <div key={`tab-${parentIdx}-${i}`} className="group my-4 overflow-x-auto relative">
+            <table className="min-w-full text-sm">
+              <thead className="text-left border-b border-white/25"><tr>{rows[0]!.map((cell, ci) => (<th key={ci} className="px-4 py-3 font-semibold text-foreground text-sm">{formatInlineText(cell, onCitationClick, sources, `th-${parentIdx}-${i}-${ci}`)}</th>))}</tr></thead>
+              <tbody className="divide-y divide-white/30">{rows.slice(1).map((row, ri) => (<tr key={ri} className="hover:bg-white/[0.03] transition-colors">{row.map((cell, ci) => (<td key={ci} className="px-4 py-2.5 text-foreground/90 text-sm">{formatInlineText(cell, onCitationClick, sources, `td-${parentIdx}-${i}-${ri}-${ci}`)}</td>))}</tr>))}</tbody>
             </table>
             <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-1 right-1">
               <button

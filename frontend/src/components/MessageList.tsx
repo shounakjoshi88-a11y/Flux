@@ -19,6 +19,7 @@ type MessageListProps = {
   onFollowUpClick: (query: string) => void;
   setPeekUrl: (url: string | null) => void;
   onRetry?: (prompt?: string) => void;
+  onEdit?: (messageId: string | number, newContent: string) => void;
   onFileClick?: (file: { name: string; content: string }) => void;
   showPromptHistory: boolean;
   onJumpToPrompt: (messageId: string | number) => void;
@@ -74,6 +75,7 @@ export function MessageList({
   showPromptHistory,
   onJumpToPrompt,
   onFileDelete,
+  onEdit,
   activeGenerationStatus,
   onPreview,
   onHtmlPreview,
@@ -217,6 +219,7 @@ export function MessageList({
                   onCitationClick={(index) => setActiveCitationIndex(index)}
                   onFollowUpClick={onFollowUpClick}
                   onRetry={() => onRetry?.(retryPrompt)}
+                  onEdit={onEdit}
                   onSourceClick={setPeekUrl}
                   onFileClick={onFileClick}
                   onPreview={onPreview}

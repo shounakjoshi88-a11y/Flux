@@ -16,7 +16,7 @@ type Complexity = "simple" | "complex";
 
 const SEARCH_INTENT_RE = /\b(find|search|look\s*up|tell me about|latest|news|explain|define|compare|vs\b|versus|tutorial|guide|review|price|cost|specs|status|how to|what is|what are|who is|who are|where is|where are|when did|when was|why did|why is|how does|how do|how can|how to)\b/i;
 
-const COMPLEX_RE = /\b(?:analyze|compare|contrast|evaluate|summarize|break\s*down|research|investigate|deep\s*dive|generate|create.*document|write.*code|build.*app|implement|deploy|debug|refactor|fix.*bug)\b/i;
+const COMPLEX_RE = /\b(?:analyze|compare|contrast|evaluate|summarize|break\s*down|research|investigate|deep\s*dive|generate|create.*document|write.*code|build.*app|implement|deploy|debug|refactor|fix.*bug|verify|check|confirm|validate|prove|disprove|debunk|fact.?check|legitimate|review.*code|audit|inspect|examine)\b/i;
 
 export function classifyQuery(query: string): Complexity {
   const q = query.trim().toLowerCase();

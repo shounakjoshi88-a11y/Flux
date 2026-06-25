@@ -748,6 +748,13 @@ export default function Dashboard() {
     retry(prompt);
   }, [retry]);
 
+  const handleEdit = useCallback((messageId: string | number, newContent: string) => {
+    setMessages((prev) => prev.map((m) =>
+      String(m.id) === String(messageId) ? { ...m, content: newContent } : m
+    ));
+    retry(newContent);
+  }, [retry, setMessages]);
+
   // ── Jump to prompt ──
   const handleJumpToPrompt = useCallback((messageId: string | number) => {
     const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
@@ -1119,9 +1126,10 @@ export default function Dashboard() {
                   isLoading={isLoading}
                   activeCitationIndex={activeCitationIndex}
                   setActiveCitationIndex={setActiveCitationIndex}
-                  onFollowUpClick={(q) => handleSend(q)}
+                  onFollowUpClick={(q) => setQuery(q)}
                   setPeekUrl={setPeekUrl}
                   onRetry={handleRetry}
+                  onEdit={handleEdit}
                   onFileClick={(file) => setPeekFile(file)}
                   onPreview={handlePreview}
                   onHtmlPreview={handleHtmlPreview}
