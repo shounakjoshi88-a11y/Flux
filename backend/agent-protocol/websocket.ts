@@ -125,7 +125,7 @@ async function handleAuth(ws: AuthenticatedSocket, payload: any) {
   }
   ws.token = token;
   try {
-    const response = await fetch("http://localhost:3001/whoami", {
+    const response = await fetch(`http://localhost:${process.env.PORT || 3001}/whoami`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!response.ok) throw new AuthError("Authentication failed");
@@ -219,7 +219,7 @@ async function handleUserMessage(ws: AuthenticatedSocket, payload: any) {
   try {
     // Proxy to /flux_ask SSE endpoint — reuses all existing LLM+tools logic
     const isComputerMode = session.config.mode === "yolo";
-    const sseUrl = `http://localhost:3001/flux_ask`;
+    const sseUrl = `http://localhost:${process.env.PORT || 3001}/flux_ask`;
     const body = JSON.stringify({
       query: text,
       model: session.config.model,

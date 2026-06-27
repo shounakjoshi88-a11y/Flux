@@ -5994,4 +5994,5 @@ if (fs.existsSync(path.join(certPath, 'cert.pem')) && fs.existsSync(path.join(ce
 createAgentWebSocket(server);
 
 const proto = server instanceof https.Server ? "https" : "http";
-server.listen(3001, () => { console.log(`Flux backend running on ${proto}://localhost:3001`); });
+const PORT = parseInt(process.env.PORT || '3001', 10);
+server.listen(PORT, () => { console.log(`Flux backend running on ${proto}://localhost:${PORT}`); });
