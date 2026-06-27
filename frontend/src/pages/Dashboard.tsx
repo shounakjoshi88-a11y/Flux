@@ -13,7 +13,7 @@ import {
   Bot,
 } from "lucide-react";
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 import "../../styles/dashboard.css";
 
@@ -81,6 +81,14 @@ export default function Dashboard() {
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId;
   }, [activeConversationId]);
+  useEffect(() => {
+    if (activeConversationId) {
+      const conv = conversations.find(c => c.id === activeConversationId);
+      document.title = conv?.title ? `${conv.title} - Flux` : "Flux";
+    } else {
+      document.title = "New Chat - Flux";
+    }
+  }, [activeConversationId, conversations]);
   const isInitialMountRef = useRef(true);
 
   // ─── Conversation cache (avoids re-fetching recently opened threads) ──────
@@ -280,7 +288,8 @@ export default function Dashboard() {
     setActiveImages([]);
     setPeekPdf(null);
     setPeekUrl(null);
-  }, [resetMessages, ws]);
+    navigate("/new", { replace: true });
+  }, [resetMessages, ws, navigate]);
 
   // ── Search conversations ──
   const searchConversations = useCallback(async (query: string) => {
@@ -468,6 +477,8 @@ export default function Dashboard() {
       setActiveCitationIndex(null);
       setActiveTab("answer");
       setActiveImages([]);
+      const conv = conversations.find(c => c.id === id);
+      navigate(`/c/${conv?.slug || id}`, { replace: true });
 
       // ── 1. Serve instantly from cache if still fresh ───────────────────────
       const cached = conversationCacheRef.current.get(id);
@@ -510,6 +521,18 @@ export default function Dashboard() {
     },
     [getAccessToken, setMessages, enrichConversationMessages, createNewThread]
   );
+
+  // ── Open conversation from URL param ──
+  const { slug } = useParams<{ slug: string }>();
+  const slugHandled = useRef(false);
+  useEffect(() => {
+    if (slug && conversations.length > 0 && !slugHandled.current) {
+      slugHandled.current = true;
+      const match = conversations.find(c => c.slug === slug);
+      if (match) openConversation(match.id);
+      else navigate("/", { replace: true });
+    }
+  }, [slug, conversations, openConversation, navigate]);
 
   // ── Prefetch on hover (best-effort, fires before the user clicks) ─────────
   const prefetchConversation = useCallback(
@@ -575,7 +598,7 @@ export default function Dashboard() {
              alert(`File "${fileName}" is not a valid text-based file.`);
              continue;
           }
-          newFiles.push({ name: fileName, content: rawText.slice(0, 50000), type: fileType || 'text/plain' });
+          newFiles.push({ name: fileName, content: rawText.slice(0, 200000), type: fileType || 'text/plain' });
         }
       } catch {
         alert(`Unable to read file "${fileName}".`);

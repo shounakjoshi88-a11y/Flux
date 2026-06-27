@@ -536,6 +536,8 @@ function FileCodeBlock({
   isRunning = false,
   isSuccess = false,
   isError = false,
+  diffAdded,
+  diffRemoved,
 }: {
   filename: string;
   content?: string;
@@ -543,6 +545,8 @@ function FileCodeBlock({
   isRunning?: boolean;
   isSuccess?: boolean;
   isError?: boolean;
+  diffAdded?: number;
+  diffRemoved?: number;
 }) {
   const [open, setOpen] = useState(false);
   const lang = getLangStyle(language);
@@ -594,6 +598,13 @@ function FileCodeBlock({
         <span className="font-mono text-[12.5px] text-[#d4d1cb] truncate">{filename}</span>
 
         <div className="ml-auto flex items-center gap-2 shrink-0">
+          {/* Diff stats */}
+          {diffAdded !== undefined && diffRemoved !== undefined && !isRunning && (
+            <span className="text-[10px] font-mono">
+              <span className="text-emerald-400/80">+{diffAdded}</span>
+              <span className="text-red-400/80 ml-1">-{diffRemoved}</span>
+            </span>
+          )}
           {/* Writing shimmer */}
           {isRunning && (
             <span className="flex items-center gap-1 text-[10px] text-[var(--accent)]/80 font-mono">
@@ -1499,7 +1510,7 @@ export function StatusMessage({
     );
   }
 
-  // ─── file write / edit / create-project ──────────────────────────────────
+    // ─── file write / edit / create-project ──────────────────────────────────
   if (
     status.subtype === "generating_file" ||
     status.subtype === "generating_file_success" ||
@@ -1512,6 +1523,9 @@ export function StatusMessage({
     const isSuccess = status.subtype === "generating_file_success";
     const isError = status.subtype === "generating_file_error";
     const isWriting = status.subtype === "generating_file";
+    const isEdit = status.data?.diffAdded !== undefined;
+    const diffAdded = status.data?.diffAdded ?? 0;
+    const diffRemoved = status.data?.diffRemoved ?? 0;
 
     const fileIconColor = isWriting && isActive
       ? "text-[var(--accent)]"
@@ -1521,7 +1535,15 @@ export function StatusMessage({
           ? "text-red-400/70"
           : "text-[var(--text-secondary)]/40";
 
-    const fileIconEl = (
+    const fileIconEl = isEdit ? (
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"
+        strokeLinecap="round" strokeLinejoin="round"
+        className={`size-4 shrink-0 ${fileIconColor}`}>
+        <path d="M12.5 2.5l3 3L7 14H4v-3l8.5-8.5z" />
+        <line x1="10.5" y1="4.5" x2="13.5" y2="7.5" strokeWidth="1.1" />
+        <path d="M4 14v2h2l8.5-8.5" strokeWidth="1.1" />
+      </svg>
+    ) : (
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"
         strokeLinecap="round" strokeLinejoin="round"
         className={`size-4 shrink-0 ${fileIconColor}`}>
@@ -1550,6 +1572,8 @@ export function StatusMessage({
                 isRunning={isWriting && !!isActive}
                 isSuccess={isSuccess}
                 isError={isError}
+                diffAdded={isEdit ? diffAdded : undefined}
+                diffRemoved={isEdit ? diffRemoved : undefined}
               />
             )}
 
@@ -1561,6 +1585,62 @@ export function StatusMessage({
           </div>
         </div>
       </div>
+    );
+  }
+
+  // ─── reading_file ─────────────────────────────────────────────────────────
+  if (
+    status.subtype === "reading_file" ||
+    status.subtype === "reading_file_success" ||
+    status.subtype === "reading_file_error"
+  ) {
+    const filePath: string = status.data?.path ?? "";
+    const filename: string = status.data?.filename ?? filePath.split(/[\\/]/).pop() ?? filePath;
+    const fileSize: number = status.data?.size ?? 0;
+    const isSuccess = status.subtype === "reading_file_success";
+    const isError = status.subtype === "reading_file_error";
+    const isReading = status.subtype === "reading_file";
+
+    const readIconColor = isReading && isActive
+      ? "text-[var(--accent)]"
+      : isSuccess
+        ? "text-emerald-400/70"
+        : isError
+          ? "text-red-400/70"
+          : "text-[var(--text-secondary)]/40";
+
+    const readIconEl = (
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"
+        strokeLinecap="round" strokeLinejoin="round"
+        className={`size-4 shrink-0 ${readIconColor}`}>
+        <path d="M4 3h8l3 3v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+        <polyline points="12,3 12,6 15,6" />
+        <line x1="6" y1="8.5" x2="10" y2="8.5" strokeWidth="1.1" />
+        <line x1="6" y1="11" x2="8.5" y2="11" strokeWidth="1.1" />
+        <circle cx="15.5" cy="14.5" r="2.5" strokeWidth="1.2" />
+        <line x1="17.5" y1="16.5" x2="19" y2="18" strokeWidth="1.2" />
+      </svg>
+    );
+
+    return (
+      <StepRow rightSlot={rightSlot}
+        icon={readIconEl}
+        message={status.message}
+        isFirst={isFirst} isLast={isLast} pulse={isReading && isActive}
+      >
+        {filename && (
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            <span className="text-[12px] font-mono text-[var(--text-secondary)]/70">
+              {filename}
+              {fileSize > 0 && !isReading && (
+                <span className="ml-2 text-[11px] text-[var(--text-muted)]">
+                  ({fileSize > 1024 ? `${(fileSize / 1024).toFixed(1)}KB` : `${fileSize}B`})
+                </span>
+              )}
+            </span>
+          </div>
+        )}
+      </StepRow>
     );
   }
 

@@ -2,7 +2,7 @@ import { createClient } from "../lib/client";
 import { Button } from "../components/ui/button";
 import { Loader2, Search, Network, Brain, Layers, ChevronDown, ArrowRight, CheckCircle2, Globe, BookOpen, ExternalLink, Copy, Check, Volume2, RefreshCw, ThumbsUp, ThumbsDown } from "lucide-react";
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
 import { MessageRenderer } from "../components/MessageRenderer";
 import "../../styles/dashboard.css";
@@ -659,11 +659,13 @@ export default function Auth() {
   const [checking, setChecking] = useState(true);
   const reducedMotion = useReducedMotion();
 
+  useEffect(() => { document.title = "Sign In"; }, []);
+
   useEffect(() => {
     const run = async () => {
       const { data } = await supabase.auth.getUser();
       if (data.user) {
-        navigate("/");
+        navigate("/new");
       } else {
         setChecking(false);
       }
@@ -675,7 +677,7 @@ export default function Auth() {
     setLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: "https://localhost:3000" },
+      options: { redirectTo: "https://localhost:3000/new" },
     });
     if (error) {
       alert("Authentication failed. Please try again.");
@@ -785,12 +787,12 @@ export default function Auth() {
 
             <motion.div
               variants={itemVariants}
-              className="mt-10 flex w-full max-w-sm flex-col gap-3 sm:flex-row"
+              className="mt-10 flex flex-wrap justify-start gap-3"
             >
               <Button
                 disabled={loading}
                 onClick={() => login("google")}
-                className="group h-12 w-full rounded-xl transition-all duration-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] disabled:opacity-60"
+                className="group h-12 rounded-xl px-5 transition-all duration-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] disabled:opacity-60"
               >
                 <GoogleIcon className="mr-2 size-5 transition-transform group-hover:scale-110" />
                 Continue with Google
@@ -799,7 +801,7 @@ export default function Auth() {
                 disabled={loading}
                 variant="outline"
                 onClick={() => login("github")}
-                className="group h-12 w-full rounded-xl transition-all duration-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] disabled:opacity-60"
+                className="group h-12 rounded-xl px-5 transition-all duration-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] disabled:opacity-60"
               >
                 <GithubIcon className="mr-2 size-5 transition-transform group-hover:scale-110" />
                 Continue with GitHub
@@ -810,7 +812,7 @@ export default function Auth() {
               variants={itemVariants}
               className="mt-6 text-xs text-muted-foreground/60"
             >
-              By continuing, you agree to our Terms of Service and Privacy Policy.
+              By continuing, you agree to our <Link to="/terms" className="underline underline-offset-2 decoration-primary/40 hover:decoration-primary transition-colors">Terms of Service</Link> and <Link to="/privacy" className="underline underline-offset-2 decoration-primary/40 hover:decoration-primary transition-colors">Privacy Policy</Link>.
             </motion.p>
           </motion.div>
 

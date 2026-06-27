@@ -349,6 +349,7 @@ export function useChat(user: any) {
                 updateMessages(targetId);
                 if (
                   sub === 'generating_file' ||
+                  sub === 'reading_file' ||
                   sub === 'generating_chart' ||
                   sub === 'image_enhancing' ||
                   sub === 'image_generating' ||

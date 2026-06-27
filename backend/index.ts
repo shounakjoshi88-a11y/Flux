@@ -191,9 +191,9 @@ const VISION_MODELS = new Set([
 // ── selectModel returns a proper AI SDK model instance ──
 function createFallbackModel(primaryModel: any, preferredModelId: string | undefined, modelsMap: Record<string, string>): any {
     const getFallbackSequence = (prefId?: string) => {
-        const list = ["kimi-k2.6"];
+        const list = ["step-3.7-flash", "kimi-k2.6"];
         for (const key of Object.keys(modelsMap)) {
-            if (key !== prefId && key !== "kimi-k2.6") {
+            if (key !== prefId && key !== "kimi-k2.6" && key !== "step-3.7-flash") {
                 list.push(key);
             }
         }
@@ -226,11 +226,22 @@ function createFallbackModel(primaryModel: any, preferredModelId: string | undef
             }
             if (prop === 'doStream') {
                 return async function(options: any) {
+                    const FIRST_TOKEN_TIMEOUT = 10000;
                     try {
                         console.log(`[MODEL FALLBACK] Trying primary model stream: ${preferredModelId || target.modelId}`);
-                        return await target.doStream(options);
+                        const result = await Promise.race([
+                            target.doStream(options),
+                            new Promise<any>((_, reject) =>
+                                setTimeout(() => reject(new Error(`[TIMEOUT] ${preferredModelId || 'primary'} no response within ${FIRST_TOKEN_TIMEOUT}ms`)), FIRST_TOKEN_TIMEOUT)
+                            ),
+                        ]);
+                        return result;
                     } catch (primaryError: any) {
-                        console.warn(`[MODEL FALLBACK] Primary model stream failed:`, primaryError?.message ?? primaryError);
+                        if (primaryError.message?.includes('[TIMEOUT]')) {
+                            console.warn(`[MODEL FALLBACK] Primary model ${preferredModelId || 'primary'} timed out (>${FIRST_TOKEN_TIMEOUT}ms) — falling back`);
+                        } else {
+                            console.warn(`[MODEL FALLBACK] Primary model stream failed:`, primaryError?.message ?? primaryError);
+                        }
                         const fallbackIds = getFallbackSequence(preferredModelId);
                         for (const fallbackId of fallbackIds) {
                             try {
@@ -690,6 +701,22 @@ const AGENT_SYSTEM_EXTENSION = `
 You have a cloud-isolated Linux sandbox (E2B). Persistent per conversation — files survive across messages.
 All files at /home/user/. write_file and run_bash share the SAME filesystem — no cd needed.
 
+CRITICAL — NEVER install packages (npm install, pip install, apt, etc.). Everything needed is pre-installed.
+CRITICAL — NEVER run useless commands like "which", "echo", "ls", "cd", "pwd", "type", "--version", "npx <tool> --version", "tsc --noEmit", or any "2>&1 || true" error suppression. Jump straight to the actual work. All tools (node, tsx, tsc, gcc, rustc, python3, etc.) are pre-installed and verified — no need to check.
+CRITICAL — After editing/creating a file, ALWAYS call get_generated_file to deliver it to the user. Files left in the sandbox are invisible to the user.
+
+<file_reading>
+When the user uploads a file:
+- For TEXT and CODE files (.ts, .tsx, .js, .py, .rs, .go, .txt, .md, .json, .yaml, .css, .html, .log): use read_file.
+- For CSV/TSV: use run_bash with pandas (pd.read_csv with nrows=5 to preview).
+- For OFFICE files (.pdf, .docx, .xlsx, .pptx): do NOT use read_file. Use run_bash with Python: pymupdf for PDF, python-docx for DOCX, openpyxl for XLSX, python-pptx for PPTX.
+- For images (.jpg, .png, .gif, .webp): already visible in context — no read needed.
+- For archives (.zip, .tar): use run_bash with unzip -l / tar -tf to list, never blindly extract.
+- ALWAYS check file size with stat before loading large files.
+- NEVER install packages — everything (pandas, openpyxl, python-docx, python-pptx, pymupdf, Pillow) is pre-installed.
+- NEVER run "which", "echo", "ls", "cd", "pwd", "type", "--version", "npx <tool> --version", or "2>&1 || true" — jump straight to real work.
+</file_reading>
+
 CRITICAL RULE — NEVER output shell commands as text. Never write things like:
   /bin/bash -c "...",  $ command,  \`command\`,  gcc -o out file.c  (or any bash syntax)
 These commands do NOTHING when written as text. You MUST use the run_bash function call instead.
@@ -705,10 +732,12 @@ AVAILABLE FUNCTIONS — call these via function calling, do NOT describe them in
   write_file({ path: "/home/user/<filename>", content: "..." })
     Create/overwrite a file. AFTER writing code, you MUST IMMEDIATELY call run_bash next.
 
-  read_file({ path: "/home/user/<filename>" }) — Read file contents.
+  read_file({ path: "/home/user/<filename>" }) — Read file contents (TEXT/CODE only).
 
   edit_file({ path: "...", old_str: "...", new_str: "..." })
-    Replace a specific string in a file. ALWAYS read_file first.
+    WORKFLOW: read_file first to see the full content, then edit_file with enough surrounding
+    context in old_str to make the match unique. PREFER edit_file over write_file for targeted
+    changes — only use write_file for entirely new files.
 
   list_files({ path: "/home/user/" }) — List sandbox files.
 
@@ -1682,15 +1711,19 @@ const SKILL_REGISTRY: Record<string, { fileName: string; label: string }> = {
     creative: { fileName: 'creative-skill', label: 'Creative copywriting' },
     legal: { fileName: 'legal-skill', label: 'Legal drafting' },
     design: { fileName: 'frontend-design', label: 'Frontend design & styling' },
+    file: { fileName: 'file-reading', label: 'File reading & analysis per type' },
 };
 
 async function fetchSkillFile(skillName: string): Promise<string> {
     try {
-        const port = process.env.PORT || '3001';
-        const proto = fs.existsSync(path.join(__dirname, '..', 'certs', 'cert.pem')) ? 'https' : 'http';
-        const r = await fetch(`${proto}://localhost:${port}/skills/${skillName}`);
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const text = await r.text();
+        const safeName = (skillName || '').replace(/[^a-z0-9-]/g, '').slice(0, 80);
+        if (!safeName) return '';
+        const p = path.join(__dirname, 'skills', `${safeName}.md`);
+        if (!fs.existsSync(p)) {
+            console.warn(`[SKILL] File not found: ${p}`);
+            return '';
+        }
+        const text = fs.readFileSync(p, 'utf-8');
         console.log(`[SKILL] "${skillName}" loaded — ${text.length} chars`);
         return text;
     } catch (e) {
@@ -2700,12 +2733,12 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
         // ── read_skill ────────────────────────────────────────────────────
         read_skill: (tool as any)({
             description:
-                'Load a skill file. Skills include generation rules for document types (pdf, docx, etc.) ' +
-                'AND design/styling rules (design). ' +
+                'Load a skill file with rules for generating document types (pdf, docx, pptx, xlsx, etc.) ' +
+                'or for design/styling (design). ' +
                 'Call this before generate_document for doc types, or to load design rules when the user wants UI improvements on an uploaded file.',
             inputSchema: z.object({
                 doc_type: z
-                    .enum(['pdf', 'pptx', 'docx', 'xlsx', 'csv', 'tsv', 'md', 'json', 'sql', 'html', 'tech', 'finance', 'coder', 'creative', 'legal', 'design'])
+                    .enum(['pdf', 'pptx', 'docx', 'xlsx', 'csv', 'tsv', 'md', 'json', 'sql', 'html', 'tech', 'finance', 'coder', 'creative', 'legal', 'design', 'file'])
                     .describe('The skill type to load rules for'),
             }),
             execute: async ({ doc_type }: any) => {
@@ -2976,7 +3009,7 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
 
         // ── run_bash ──────────────────────────────────────────────────────
         run_bash: (tool as any)({
-            description: 'Run a bash command in the sandbox. Used for compiling/running code (gcc, python3, node, etc.), file operations, installing packages, and checking system info. After write_file creates a code file, call this to compile and test it.',
+            description: 'Run a bash command in the sandbox. Used for compiling/running code (gcc, python3, node, etc.), running linters/type-checkers, and file operations. NEVER run "which", "echo", "ls", "cd", "pwd", "type", "--version", or install packages — the sandbox already has everything pre-installed. After write_file creates a code file, call this to compile and test it.',
             inputSchema: z.object({
                 command: z.string().describe('Bash command to execute'),
             }),
@@ -3039,16 +3072,20 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
 
         // ── read_file ─────────────────────────────────────────────────────
         read_file: (tool as any)({
-            description: 'Read contents of a file from the sandbox.',
+            description: 'Read contents of a TEXT or CODE file from the sandbox. Do NOT use on binary files (PDF, DOCX, XLSX, PPTX, images, archives) — use run_bash with Python tools instead (pandas for CSV, pymupdf for PDF, openpyxl for XLSX, python-docx for DOCX, python-pptx for PPTX).',
             inputSchema: z.object({
                 path: z.string().describe('Absolute path like /home/user/data.csv'),
             }),
             execute: async ({ path }: any) => {
                 const cid = activeConversationId || 'default';
+                const filename = path.split('/').pop() || 'file';
+                sendStatus(res, 'reading_file', `Reading ${filename}...`, { path, filename }, state.thoughtProcess);
                 try {
                     const content = await codeExecutor.readFile(cid, path);
+                    sendStatus(res, 'reading_file_success', `Read ${filename}`, { path, filename, size: content.length }, state.thoughtProcess);
                     return `Contents of ${path}:\n\n${content}`;
                 } catch (e: any) {
+                    sendStatus(res, 'reading_file_error', `Failed to read ${filename}: ${e.message}`, { path, error: e.message }, state.thoughtProcess);
                     return `Failed to read ${path}: ${e.message}`;
                 }
             },
@@ -3056,7 +3093,7 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
 
         // ── write_file ────────────────────────────────────────────────────
         write_file: (tool as any)({
-            description: 'Create or overwrite a file in the sandbox. After writing a code file, call run_bash next to compile and execute it — do NOT explain yet, do NOT output bash commands as text, just call run_bash.',
+            description: 'ONLY use for NEW files (creating from scratch). For editing existing files, ALWAYS prefer edit_file (surgical string replacement) instead. After writing a code file, call run_bash next to compile and execute it.',
             inputSchema: z.object({
                 path: z.string().describe('File path like /home/user/output.csv'),
                 content: z.string().describe('Full file content'),
@@ -3074,7 +3111,7 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
                 try {
                     await codeExecutor.writeFile(cid, path, content);
                     sendStatus(res, 'generating_file_success', `Wrote ${filename}`, { path, filename, content, language }, state.thoughtProcess);
-                    const codeExts = ['c', 'cpp', 'py', 'js', 'ts', 'rs', 'go', 'java'];
+                    const codeExts = ['c', 'cpp', 'cs', 'py', 'js', 'ts', 'tsx', 'jsx', 'mjs', 'cjs', 'mts', 'cts', 'rs', 'go', 'java', 'kt', 'swift', 'rb', 'php'];
                     const isCode = codeExts.includes(ext);
                     return isCode
                         ? `File written to ${path}. Now call run_bash to compile and test it. Do NOT explain yet — just call run_bash.`
@@ -3132,7 +3169,7 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
 
         // ── edit_file ─────────────────────────────────────────────────────
         edit_file: (tool as any)({
-            description: 'Surgically edit a file by replacing a specific string. ALWAYS read_file first. After editing code, call run_bash to re-compile and re-run.',
+            description: 'Surgically edit a file by replacing the FIRST occurrence of old_str with new_str. ALWAYS read_file first to see the full content. Include enough surrounding context in old_str to make it unique. PREFER edit_file over write_file for targeted changes — only use write_file for entirely new files.',
             inputSchema: z.object({
                 path: z.string().describe('File path'),
                 old_str: z.string().describe('EXACT string to replace (must be unique)'),
@@ -3144,15 +3181,17 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
                 }
                 const cid = activeConversationId || 'default';
                 const filename = path.split('/').pop() || 'file';
-                sendStatus(res, 'generating_file', `Editing ${filename}...`, { path }, state.thoughtProcess);
+                const addedLines = (new_str?.match(/\n/g) || []).length;
+                const removedLines = (old_str?.match(/\n/g) || []).length;
+                sendStatus(res, 'generating_file', `Editing ${filename}...`, { path, old_str: old_str.slice(0, 80), diffAdded: addedLines, diffRemoved: removedLines }, state.thoughtProcess);
                 try {
                     const result = await codeExecutor.editFile(cid, path, old_str || '', new_str || '');
                     if (result.success) {
-                        sendStatus(res, 'generating_file_success', `Edited ${filename}`, { path }, state.thoughtProcess);
+                        sendStatus(res, 'generating_file_success', `Edited ${filename}`, { path, diffAdded: addedLines, diffRemoved: removedLines }, state.thoughtProcess);
                         return `File ${path} edited successfully. After editing code, call run_bash to re-compile and re-run to verify the fix.`;
                     }
                     sendStatus(res, 'generating_file_error', `Edit failed on ${filename}: ${result.error}`, { path }, state.thoughtProcess);
-                    return `Edit failed: ${result.error}`;
+                    return `Edit failed: ${result.error} -- read the file and try edit_file again with more surrounding context so the old_str is unique.`;
                 } catch (e: any) {
                     sendStatus(res, 'generating_file_error', `Edit failed on ${filename}: ${e.message}`, { path }, state.thoughtProcess);
                     return `Edit failed: ${e.message}`;
@@ -3327,14 +3366,18 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
             }),
             execute: async ({ path }: any) => {
                 const cid = activeConversationId || 'default';
+                const filename = path.split('/').pop() || 'file';
+                sendStatus(res, 'generating_file', `Delivering ${filename}...`, { path, filename }, state.thoughtProcess);
                 try {
                     const { base64, mimeType } = await codeExecutor.getGeneratedFile(cid, path);
                     const filename = path.split('/').pop() || 'file';
                     if (!res.writableEnded) {
-                        res.write(`event: file_generated\ndata: ${JSON.stringify({ filename, path, mime: mimeType, base64, downloadUrl: `/api/sandbox/download/${cid}/${filename}` })}\n\n`);
+                        res.write(`event: file\ndata: ${JSON.stringify({ filename, path, mime: mimeType, base64, downloadUrl: `/api/sandbox/download/${cid}/${filename}` })}\n\n`);
                     }
+                    sendStatus(res, 'generating_file_success', `Delivered ${filename}`, { path, filename, mime: mimeType }, state.thoughtProcess);
                     return `File "${filename}" (${mimeType}, ${Math.round(base64.length * 0.75 / 1024)}KB) has been sent to the user.`;
                 } catch (e: any) {
+                    sendStatus(res, 'generating_file_error', `Failed to deliver ${path.split('/').pop() || 'file'}: ${e.message}`, { path, error: e.message }, state.thoughtProcess);
                     return `Failed to get file: ${e.message}`;
                 }
             },
@@ -4147,22 +4190,20 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
             try {
                 const cid = activeConversationId;
                 const paths: string[] = [];
-                if (safeFile) {
-                    const fn = safeAtt.find(a => a.name)?.name || 'attached.txt';
-                    await codeExecutor.writeFile(cid, `/home/user/${fn}`, safeFile);
-                    paths.push(`/home/user/${fn}`);
-                }
+                // Ensure uploads directory exists
+                await codeExecutor.runBash(cid, 'mkdir -p /home/user/uploads');
                 for (const att of safeAtt) {
                     if (!att.content || att.type?.startsWith('image/') || att.type?.startsWith('video/')) continue;
                     const fn = att.name || 'attached.txt';
                     const raw = typeof att.content === 'string' ? att.content : '';
                     if (raw) {
-                        await codeExecutor.writeFile(cid, `/home/user/${fn}`, raw);
-                        paths.push(`/home/user/${fn}`);
+                        await codeExecutor.writeFile(cid, `/home/user/uploads/${fn}`, raw);
+                        paths.push(`/home/user/uploads/${fn}`);
                     }
                 }
                 if (paths.length) {
-                    sandboxFileNotice = `\n📁 Files written to sandbox:\n${paths.map(p => `  - ${p}`).join('\n')}\nReference these paths in run_bash. Do NOT read_url them — they're already here.\n`;
+                    sandboxFileNotice = `\n📁 Uploaded file(s) available in sandbox at:\n${paths.map(p => `  - ${p}`).join('\n')}\nUse read_file({ path: "/home/user/uploads/<filename>" }) to read the full content, or run_bash with the path for analysis.\n`;
+                    console.log(`[SANDBOX_WRITE] Successfully wrote ${paths.length} file(s) to sandbox:`, paths.join(', '));
                 }
             } catch (e: any) {
                 console.warn('[SANDBOX_WRITE] Could not write attached files:', e.message);
@@ -4171,7 +4212,28 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
 
         // When the user provides a file, prepend a hard instruction to stop the model searching
         const fileGuard = hasAnyFile
-            ? `\n⚠️ FILE ATTACHED: The user has provided file content in this message${sandboxFileNotice ? ' and it has been written to the sandbox' : ''}. You MUST NOT call web_search or read_url for the attached file (it's already in context).${sandboxFileNotice}You MUST only work on the uploaded file(s) — do NOT create, scaffold, or generate any new files or projects unless the user explicitly asks. After you finish editing or verifying, call get_generated_file to send the result to the user. To verify/analyze code: use run_bash to run type-checkers (npx tsc --noEmit), linters (npx eslint), tests, or other analysis commands directly on the sandbox file paths. If the user asks you to improve the design/styling, call read_skill({ doc_type: 'design' }) to load the frontend design rules.\n`
+            ? `\n⚠️ FILE ATTACHED: The user's file(s) are shown in the message below (may be truncated for context). The FULL file content is available in the sandbox — use read_file to read the complete file. You MUST NOT call web_search or read_url for the attached file.${sandboxFileNotice}CRITICAL RULES:
+- NEVER install packages (npm install, pip install, apt-get, etc.). The sandbox already has everything needed.
+- NEVER waste time with unnecessary commands like "which node", "node --version", "echo", "ls", "cd", "pwd", "type" — just run the actual analysis.
+- When editing: PREFER edit_file for small targeted changes over write_file which rewrites the entire file. Only use write_file for entirely new files.
+- ALWAYS call get_generated_file({ path: "/home/user/uploads/<filename>" }) after editing/generating a file — the user can only see files delivered through that tool, not files left in the sandbox. Do NOT just say "the file has been saved" in text without calling get_generated_file.
+- You MUST only work on the uploaded file(s) — do NOT create, scaffold, or generate any new files or projects unless the user explicitly asks.
+EDITING WORKFLOW (Claude-style):
+  1. To find where to edit: use run_bash with grep to search across files (e.g. grep -n function /home/user/uploads/*.ts)
+  2. read_file to see the full content around the target
+  3. edit_file with enough surrounding context in old_str to make the match unique
+  4. run_bash to re-compile/lint/verify the fix
+FILE READING — Correct approach per file type (no need to call read_skill):
+  • Code/text (.ts, .tsx, .js, .py, .rs, .go, .txt, .md, .json, .yaml, .css, .html, .log): read_file directly.
+  • CSV/TSV: use run_bash with Python pandas — pd.read_csv(path, nrows=5) to preview, wc -l for row count.
+  • PDF: NEVER read_file — use run_bash: python3 -c "import pymupdf; doc=pymupdf.open(path); [print(p.get_text()) for p in doc]"
+  • DOCX: NEVER read_file — use run_bash: python3 -c "from docx import Document; [print(p.text) for p in Document(path).paragraphs]"
+  • XLSX: NEVER read_file — use run_bash: python3 -c "from openpyxl import load_workbook; wb=load_workbook(path,read_only=True); [print(r) for r in wb.active.iter_rows(max_row=5,values_only=True)]"
+  • PPTX: NEVER read_file — use run_bash: python3 -c "from pptx import Presentation; [print(s.text) for s in Presentation(path).slides[0].shapes if s.has_text_frame]"
+  • Images (.jpg, .png, .gif, .webp): already visible in context — no read needed.
+  • Archives (.zip, .tar, .tar.gz): NEVER blindly extract — run_bash with "unzip -l" or "tar -tf" to list contents first.
+  • Unknown: run_bash with "file /path/to/file" to identify type, then decide.
+To verify/analyze code: use read_file first, then use run_bash to run type-checkers and linters directly. If the user asks you to improve the design/styling, the rules are already loaded — use them.\n`
             : '';
 
         // Detect system/architecture/code-review questions — strip execution tools
@@ -4357,7 +4419,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
 
         let attachedFilesText = '';
         if (safeFile) {
-            attachedFilesText += `[File content]\n${safeFile.slice(0, 100_000)}\n\n`;
+            attachedFilesText += `[File content]\n${safeFile.slice(0, 200_000)}\n\n`;
         }
         const textAttachments = safeAtt.filter(f => f.content && !f.type?.startsWith('image/') && !f.type?.startsWith('video/'));
         if (textAttachments.length > 0) {
@@ -4385,7 +4447,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                     }
                 }
 
-                attachedFilesText += `[File content: ${att.name}]\n${(parsedContent || '').slice(0, 80_000)}\n\n`;
+                attachedFilesText += `[File content: ${att.name}]\n${(parsedContent || '').slice(0, 200_000)}\n\n`;
             }
         }
 
@@ -4415,6 +4477,9 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
 
         // ── LLM streaming (skipped when orchestrator handled the workflow) ──
         if (!orchestratorHandled) {
+            const modelName = route.modelId || pref || 'unknown';
+            console.log(`[LLM_STREAM] Starting streamText with model=${modelName} at ${new Date().toISOString()}`);
+            const streamStart = Date.now();
             const agentStream = streamText({
                 model,
                 system: dynSys,
@@ -4423,6 +4488,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                 stopWhen: stepCountIs(30),
                 toolChoice: 'auto',
                 temperature: 0.35,
+                maxOutputTokens: 4096,
                 abortSignal: abortController.signal,
                 providerOptions: getProviderOptions(pref),
                 onStepFinish: (step: any) => {
@@ -4807,6 +4873,9 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                     }
                 }
             }
+
+            const streamElapsed = ((Date.now() - streamStart) / 1000).toFixed(1);
+            console.log(`[LLM_STREAM] streamText finished — model=${modelName} elapsed=${streamElapsed}s`);
 
             // ── Markdown bash code block fallback handler ─────────────────────
             // Some NIM models output shell commands as markdown code blocks
@@ -5242,6 +5311,7 @@ app.post('/api/chat-sdk', middleware, async (req: any, res: any) => {
             stopWhen: stepCountIs(10),
             toolChoice: 'auto',
             temperature: 0.35,
+            maxOutputTokens: 4096,
             providerOptions: getProviderOptions(pref),
         } as any);
 
@@ -5615,7 +5685,7 @@ app.post("/summarize", middleware, async (req: any, res: any) => {
             model,
             system,
             messages: [{ role: "user", content: userMsg }],
-            maxTokens: 1800,
+            maxOutputTokens: 1800,
             temperature: 0.2,
         } as any);
 

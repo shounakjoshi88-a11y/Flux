@@ -156,7 +156,7 @@ export function PeekPanel({ url, onClose, pdfData, docxData, pptxData, xlsxData,
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: "100%", opacity: 0 }}
             transition={{ type: "spring", damping: 30, stiffness: 280 }}
-            className="fixed top-0 right-0 h-full w-full sm:w-[600px] z-[110] shadow-2xl flex flex-col overflow-hidden"
+            className="fixed top-0 right-0 h-full w-full sm:w-[720px] z-[110] shadow-2xl flex flex-col overflow-hidden"
           >
             {pptxData && (
               <PptxPreview 
@@ -243,7 +243,7 @@ export function PeekPanel({ url, onClose, pdfData, docxData, pptxData, xlsxData,
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: "100%", opacity: 0 }}
             transition={{ type: "spring", damping: 30, stiffness: 280 }}
-            className="fixed top-0 right-0 h-full w-full sm:w-[480px] bg-white dark:bg-[#0d0d0d] border-l border-black/5 dark:border-white/5 z-[110] shadow-2xl flex flex-col"
+            className="fixed top-0 right-0 h-full w-full sm:w-[640px] bg-white dark:bg-[#0d0d0d] border-l border-black/5 dark:border-white/5 z-[110] shadow-2xl flex flex-col"
           >
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-black/5 dark:border-white/5 shrink-0 bg-white/80 dark:bg-[#0d0d0d]/80 backdrop-blur-md">

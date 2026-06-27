@@ -1,9 +1,23 @@
 // Team Panel — real-time multi-agent orchestration via NVIDIA NIM
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Users, UserCheck, UserCog, Play, Square, ListChecks,
-  ChevronDown, Network, LoaderCircle, CheckCircle2, XCircle, Bot,
+  Users,
+  UserCheck,
+  UserCog,
+  Play,
+  Square,
+  ListChecks,
+  ChevronDown,
+  Network,
+  LoaderCircle,
+  CheckCircle2,
+  XCircle,
+  Bot,
+  Sparkles,
+  ArrowRight,
+  Clock,
+  AlertCircle,
 } from "lucide-react";
 
 type TeamMemberStatus = "idle" | "working" | "waiting" | "completed" | "error";
@@ -35,43 +49,125 @@ type TeamPanelProps = {
   onWsEvent?: (callback: (event: any) => void) => () => void;
 };
 
-const STATUS_CONFIG: Record<string, { color: string; icon: any; label: string }> = {
-  idle: { color: "bg-zinc-600", icon: null, label: "Idle" },
-  working: { color: "bg-blue-500 animate-pulse", icon: LoaderCircle, label: "Working" },
-  waiting: { color: "bg-yellow-500", icon: null, label: "Waiting" },
-  completed: { color: "bg-emerald-500", icon: CheckCircle2, label: "Done" },
-  error: { color: "bg-red-500", icon: XCircle, label: "Error" },
+const STATUS_CONFIG: Record<
+  string,
+  { color: string; bg: string; label: string; icon: any }
+> = {
+  idle: {
+    color: "text-zinc-400",
+    bg: "bg-zinc-500/20",
+    label: "Idle",
+    icon: Clock,
+  },
+  working: {
+    color: "text-blue-400",
+    bg: "bg-blue-500/15",
+    label: "Working",
+    icon: LoaderCircle,
+  },
+  waiting: {
+    color: "text-amber-400",
+    bg: "bg-amber-500/15",
+    label: "Waiting",
+    icon: Clock,
+  },
+  completed: {
+    color: "text-emerald-400",
+    bg: "bg-emerald-500/15",
+    label: "Done",
+    icon: CheckCircle2,
+  },
+  error: {
+    color: "text-rose-400",
+    bg: "bg-rose-500/15",
+    label: "Error",
+    icon: XCircle,
+  },
 };
 
 function TeamMemberCard({ member }: { member: TeamMember }) {
   const cfg = STATUS_CONFIG[member.status]!;
+  const StatusIcon = cfg.icon;
 
   return (
-    <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-zinc-800/30 border border-zinc-700/30">
-      <div className="relative">
-        <div className={`size-8 rounded-full flex items-center justify-center ${
-          member.role === "leader" ? "bg-amber-500/15 text-amber-400" : "bg-blue-500/15 text-blue-400"
-        }`}>
-          {member.role === "leader" ? <UserCog className="size-4" /> : <UserCheck className="size-4" />}
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="group relative flex items-center gap-3 rounded-xl border border-zinc-700/40 bg-zinc-800/40 p-3 transition-all duration-200 hover:border-zinc-600/60 hover:bg-zinc-800/60"
+    >
+      {/* Status glow */}
+      <div
+        className={`absolute inset-0 rounded-xl opacity-0 transition-opacity duration-300 group-hover:opacity-100 ${cfg.bg}`}
+      />
+
+      <div className="relative shrink-0">
+        <div
+          className={`flex size-9 items-center justify-center rounded-full border border-zinc-700/50 ${
+            member.role === "leader"
+              ? "bg-gradient-to-br from-amber-500/20 to-amber-600/10 text-amber-400"
+              : "bg-gradient-to-br from-slate-500/20 to-slate-600/10 text-slate-300"
+          }`}
+        >
+          {member.role === "leader" ? (
+            <UserCog className="size-4" />
+          ) : (
+            <UserCheck className="size-4" />
+          )}
         </div>
-        <div className={`absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-zinc-900 ${cfg.color}`} />
+        {/* Status dot */}
+        <div
+          className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-zinc-800 ${
+            member.status === "working"
+              ? "bg-blue-500 shadow-lg shadow-blue-500/50"
+              : member.status === "completed"
+              ? "bg-emerald-500 shadow-lg shadow-emerald-500/50"
+              : member.status === "error"
+              ? "bg-rose-500 shadow-lg shadow-rose-500/50"
+              : member.status === "waiting"
+              ? "bg-amber-500 shadow-lg shadow-amber-500/50"
+              : "bg-zinc-500"
+          }`}
+        />
       </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-zinc-200">{member.name}</span>
-          <span className={`text-[10px] ${member.status === "working" ? "text-blue-400" : "text-zinc-500"}`}>
+
+      <div className="relative flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-medium text-zinc-200">
+            {member.name}
+          </span>
+          <span
+            className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium ${cfg.bg} ${cfg.color}`}
+          >
+            {member.status === "working" && (
+              <LoaderCircle className="size-3 animate-spin" />
+            )}
+            {member.status === "completed" && (
+              <CheckCircle2 className="size-3" />
+            )}
+            {member.status === "error" && <XCircle className="size-3" />}
             {cfg.label}
           </span>
         </div>
-        <div className="text-[10px] text-zinc-500 capitalize">{member.role}</div>
+        <div className="mt-0.5 flex items-center gap-2">
+          <span className="text-[11px] text-zinc-500 capitalize">
+            {member.role}
+          </span>
+          {member.task && (
+            <>
+              <span className="text-zinc-600">•</span>
+              <span className="text-[11px] text-zinc-500 truncate">
+                {member.task}
+              </span>
+            </>
+          )}
+        </div>
         {member.resultPreview && (
-          <div className="text-[10px] text-zinc-600 mt-1 truncate">{member.resultPreview}</div>
+          <div className="mt-1.5 text-[11px] text-zinc-500 line-clamp-2">
+            {member.resultPreview}
+          </div>
         )}
       </div>
-      {member.status === "working" && (
-        <LoaderCircle className="size-3 text-blue-400 animate-spin shrink-0" />
-      )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -81,25 +177,58 @@ function TaskItemView({ task }: { task: TaskItem }) {
   const isFailed = task.status === "failed";
 
   return (
-    <div className="flex items-start gap-2 text-xs">
+    <motion.div
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
+      className="group flex items-start gap-3 rounded-lg border border-zinc-700/30 bg-zinc-800/20 p-3 transition-all duration-200 hover:border-zinc-600/40 hover:bg-zinc-800/30"
+    >
       <div className="mt-0.5 shrink-0">
         {isInProgress ? (
-          <LoaderCircle className="size-3 text-blue-400 animate-spin" />
+          <div className="relative">
+            <LoaderCircle className="size-4 text-blue-400 animate-spin" />
+            <div className="absolute inset-0 blur-sm">
+              <LoaderCircle className="size-4 text-blue-400/50 animate-spin" />
+            </div>
+          </div>
         ) : isComplete ? (
-          <CheckCircle2 className="size-3 text-emerald-500" />
+          <div className="rounded-full bg-emerald-500/20 p-1">
+            <CheckCircle2 className="size-3.5 text-emerald-400" />
+          </div>
         ) : isFailed ? (
-          <XCircle className="size-3 text-red-500" />
+          <div className="rounded-full bg-rose-500/20 p-1">
+            <XCircle className="size-3.5 text-rose-400" />
+          </div>
         ) : (
-          <div className="size-3 rounded-full border-2 border-zinc-600" />
+          <div className="size-4 rounded-full border-2 border-zinc-600" />
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <div className={`${isComplete ? "text-zinc-400" : "text-zinc-300"} truncate`}>{task.description}</div>
+        <div
+          className={`text-sm ${
+            isComplete
+              ? "text-zinc-400 line-through"
+              : isFailed
+              ? "text-rose-300"
+              : "text-zinc-200"
+          }`}
+        >
+          {task.description}
+        </div>
+        <div className="mt-1 flex items-center gap-2">
+          <span className="text-[11px] text-zinc-500">
+            {task.assignedTo}
+          </span>
+          {isInProgress && (
+            <span className="text-[10px] text-blue-400">In progress</span>
+          )}
+        </div>
         {task.resultPreview && (
-          <div className="text-[10px] text-zinc-600 mt-0.5 truncate">{task.resultPreview}</div>
+          <div className="mt-2 rounded-md border border-zinc-700/30 bg-zinc-900/50 p-2 text-[11px] text-zinc-400 line-clamp-3">
+            {task.resultPreview}
+          </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -107,8 +236,14 @@ const EMPTY_MEMBERS: TeamMember[] = [];
 const EMPTY_TASKS: TaskItem[] = [];
 
 export default function TeamPanel({
-  isOpen, onClose, onStartTeam, members = EMPTY_MEMBERS,
-  tasks = EMPTY_TASKS, isRunning = false, streamedText = "", onWsEvent,
+  isOpen,
+  onClose,
+  onStartTeam,
+  members = EMPTY_MEMBERS,
+  tasks = EMPTY_TASKS,
+  isRunning = false,
+  streamedText = "",
+  onWsEvent,
 }: TeamPanelProps) {
   const [query, setQuery] = useState("");
   const [localMembers, setLocalMembers] = useState<TeamMember[]>(members);
@@ -117,8 +252,14 @@ export default function TeamPanel({
   const streamedTextRef = useRef(streamedText);
 
   // Sync props → state
-  useEffect(() => { setLocalMembers(members); }, [members]);
-  useEffect(() => { setLocalTasks(tasks); }, [tasks]);
+  useEffect(() => {
+    setLocalMembers(members);
+  }, [members]);
+
+  useEffect(() => {
+    setLocalTasks(tasks);
+  }, [tasks]);
+
   useEffect(() => {
     if (streamedText) {
       streamedTextRef.current = streamedText;
@@ -131,14 +272,17 @@ export default function TeamPanel({
     if (!onWsEvent) return;
     const unsub = onWsEvent((event: any) => {
       const { type, payload } = event;
-
       if (type === "agent_status") {
         // Update team member status
         if (payload.teammate) {
           setLocalMembers((prev) =>
             prev.map((m) =>
               m.name === payload.teammate
-                ? { ...m, status: mapStatus(payload.status), resultPreview: payload.result || m.resultPreview }
+                ? {
+                    ...m,
+                    status: mapStatus(payload.status),
+                    resultPreview: payload.result || m.resultPreview,
+                  }
                 : m
             )
           );
@@ -156,17 +300,19 @@ export default function TeamPanel({
           );
         }
       }
-
       if (type === "task_changed" && payload.taskId) {
         setLocalTasks((prev) =>
           prev.map((t) =>
             t.id === payload.taskId
-              ? { ...t, status: payload.status, resultPreview: payload.result || t.resultPreview }
+              ? {
+                  ...t,
+                  status: payload.status,
+                  resultPreview: payload.result || t.resultPreview,
+                }
               : t
           )
         );
       }
-
       if (type === "text") {
         streamedTextRef.current += payload.text || "";
         setLocalStreamedText(streamedTextRef.current);
@@ -177,111 +323,197 @@ export default function TeamPanel({
 
   const completedTasks = localTasks.filter((t) => t.status === "completed").length;
   const failedTasks = localTasks.filter((t) => t.status === "failed").length;
+  const progress =
+    localTasks.length > 0
+      ? Math.round((completedTasks / localTasks.length) * 100)
+      : 0;
 
   return (
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          initial={{ x: "100%" }}
-          animate={{ x: 0 }}
-          exit={{ x: "100%" }}
-          transition={{ type: "spring", damping: 25, stiffness: 200 }}
-          className="fixed top-0 right-0 h-full w-full sm:w-[420px] bg-zinc-900 border-l border-zinc-800 z-50 shadow-2xl flex flex-col"
+          initial={{ x: "100%", opacity: 0.8 }}
+          animate={{ x: 0, opacity: 1 }}
+          exit={{ x: "100%", opacity: 0.8 }}
+          transition={{ type: "spring", damping: 28, stiffness: 180 }}
+          className="fixed top-0 right-0 h-full w-full sm:w-[440px] bg-[#1a1a1f] border-l border-zinc-800/80 z-50 shadow-2xl shadow-black/40 flex flex-col"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
-            <div className="flex items-center gap-2">
-              <Network className="size-4 text-indigo-400" />
-              <span className="text-sm font-medium">Team Mode</span>
-              {isRunning && (
-                <span className="flex items-center gap-1 text-[10px] text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded-full">
-                  <LoaderCircle className="size-2.5 animate-spin" />
-                  Running
-                </span>
-              )}
+          <div className="relative flex items-center justify-between px-5 py-4 border-b border-zinc-800/60">
+            {/* Gradient accent line */}
+            <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent" />
+
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="flex size-9 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500/20 to-indigo-600/10 border border-indigo-500/20">
+                  <Network className="size-4 text-indigo-400" />
+                </div>
+                {isRunning && (
+                  <div className="absolute -top-1 -right-1 size-2 rounded-full bg-blue-500 animate-pulse shadow-lg shadow-blue-500/50" />
+                )}
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-zinc-100 tracking-tight">
+                  Team Mode
+                </h2>
+                <p className="text-[11px] text-zinc-500">
+                  Multi-agent orchestration
+                </p>
+              </div>
             </div>
-            <button onClick={onClose} className="p-1 rounded-lg hover:bg-zinc-800 transition-colors">
-              <ChevronDown className="size-4 text-zinc-400" />
-            </button>
+
+            <div className="flex items-center gap-2">
+              {isRunning && (
+                <motion.span
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex items-center gap-1.5 text-[10px] font-medium text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-full"
+                >
+                  <LoaderCircle className="size-3 animate-spin" />
+                  Running
+                </motion.span>
+              )}
+              <button
+                onClick={onClose}
+                className="group flex size-8 items-center justify-center rounded-lg border border-zinc-700/50 bg-zinc-800/40 transition-all duration-200 hover:border-zinc-600 hover:bg-zinc-800"
+              >
+                <ChevronDown className="size-4 text-zinc-400 transition-transform duration-200 group-hover:rotate-180" />
+              </button>
+            </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {/* Members */}
-            <div>
-              <div className="flex items-center gap-2 text-xs text-zinc-400 font-medium mb-2">
-                <Users className="size-3" />
-                Team Members ({localMembers.length})
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+            {/* Members Section */}
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Users className="size-3.5 text-zinc-500" />
+                  <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+                    Team Members
+                  </h3>
+                </div>
+                <span className="text-[11px] text-zinc-500 font-medium">
+                  {localMembers.length} active
+                </span>
               </div>
               <div className="space-y-2">
                 {localMembers.length === 0 ? (
-                  <p className="text-xs text-zinc-600 text-center py-4">
-                    No team members yet. Start a team task to add members.
-                  </p>
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="flex size-12 items-center justify-center rounded-full bg-zinc-800/50 border border-zinc-700/30 mb-3">
+                      <Users className="size-5 text-zinc-600" />
+                    </div>
+                    <p className="text-xs text-zinc-500 max-w-[200px]">
+                      No team members yet. Start a team task to add members.
+                    </p>
+                  </div>
                 ) : (
                   localMembers.map((m, i) => <TeamMemberCard key={i} member={m} />)
                 )}
               </div>
-            </div>
+            </section>
 
-            {/* Task Board */}
+            {/* Task Board Section */}
             {localTasks.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 text-xs text-zinc-400 font-medium mb-2">
-                  <ListChecks className="size-3" />
-                  Task Board ({completedTasks}/{localTasks.length}
-                  {failedTasks > 0 && `, ${failedTasks} failed`})
+              <section>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <ListChecks className="size-3.5 text-zinc-500" />
+                    <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+                      Task Board
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-zinc-500 font-medium">
+                      {completedTasks}/{localTasks.length}
+                    </span>
+                    {failedTasks > 0 && (
+                      <span className="text-[10px] text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded-full font-medium">
+                        {failedTasks} failed
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="space-y-2 bg-zinc-800/20 rounded-lg p-3">
+
+                {/* Progress bar */}
+                <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800/60">
+                  <motion.div
+                    className="h-full bg-gradient-to-r from-indigo-500 to-indigo-400"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${progress}%` }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                  />
+                </div>
+
+                <div className="space-y-2">
                   {localTasks.map((task) => (
                     <TaskItemView key={task.id} task={task} />
                   ))}
                 </div>
-              </div>
+              </section>
             )}
 
-            {/* Streaming results */}
+            {/* Streaming Results */}
             {localStreamedText && (
-              <div>
-                <div className="flex items-center gap-2 text-xs text-zinc-400 font-medium mb-2">
-                  <Bot className="size-3" />
-                  Results
+              <section>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="flex size-6 items-center justify-center rounded-md bg-indigo-500/10 border border-indigo-500/20">
+                    <Bot className="size-3.5 text-indigo-400" />
+                  </div>
+                  <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+                    Results
+                  </h3>
                 </div>
-                <div className="bg-zinc-800/20 rounded-lg p-3">
-                  <pre className="text-[11px] text-zinc-300 whitespace-pre-wrap font-sans leading-relaxed max-h-60 overflow-y-auto">
+                <div className="relative rounded-xl border border-zinc-700/40 bg-zinc-900/60 p-4">
+                  {/* Subtle grid pattern */}
+                  <div className="absolute inset-0 rounded-xl bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:16px_16px] opacity-50" />
+                  <pre className="relative text-[12px] text-zinc-300 whitespace-pre-wrap font-mono leading-relaxed max-h-72 overflow-y-auto">
                     {localStreamedText}
                   </pre>
                 </div>
-              </div>
+              </section>
             )}
 
             {/* Team Input */}
-            <div className="pt-2">
-              <textarea
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Describe a multi-step task for the team (e.g., 'research quantum computing and create a presentation')..."
-                className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 resize-none focus:outline-none focus:border-indigo-500/50"
-                rows={3}
-              />
-              <button
-                onClick={() => {
-                  if (query.trim()) {
-                    setLocalStreamedText("");
-                    streamedTextRef.current = "";
-                    onStartTeam(query.trim());
-                  }
-                }}
-                disabled={!query.trim() || isRunning}
-                className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 text-sm font-medium transition-colors disabled:opacity-50"
-              >
-                {isRunning ? (
-                  <div className="size-3 border-2 border-indigo-400/20 border-t-indigo-400 rounded-full animate-spin" />
-                ) : (
-                  <Play className="size-3.5" />
-                )}
-                {isRunning ? "Team Running..." : "Start Team Task"}
-              </button>
-            </div>
+            <section className="pt-2 pb-4">
+              <div className="relative rounded-xl border border-zinc-700/40 bg-zinc-800/30 p-1 transition-all duration-200 focus-within:border-indigo-500/50 focus-within:bg-zinc-800/50 focus-within:shadow-lg focus-within:shadow-indigo-500/5">
+                <textarea
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Describe a multi-step task for the team..."
+                  className="w-full bg-transparent px-3 py-2.5 text-sm text-zinc-200 placeholder-zinc-500 resize-none focus:outline-none"
+                  rows={3}
+                />
+                <div className="flex items-center justify-between px-3 pb-2">
+                  <span className="text-[10px] text-zinc-600">
+                    Press Enter to send
+                  </span>
+                  <button
+                    onClick={() => {
+                      if (query.trim()) {
+                        setLocalStreamedText("");
+                        streamedTextRef.current = "";
+                        onStartTeam(query.trim());
+                      }
+                    }}
+                    disabled={!query.trim() || isRunning}
+                    className="group flex items-center gap-2 rounded-lg bg-indigo-500 px-3 py-1.5 text-xs font-medium text-white transition-all duration-200 hover:bg-indigo-400 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-indigo-500"
+                  >
+                    {isRunning ? (
+                      <>
+                        <LoaderCircle className="size-3 animate-spin" />
+                        <span>Running...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="size-3 fill-current" />
+                        <span>Start Team Task</span>
+                        <ArrowRight className="size-3 transition-transform duration-200 group-hover:translate-x-0.5" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </section>
           </div>
         </motion.div>
       )}

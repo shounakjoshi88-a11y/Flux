@@ -49,6 +49,7 @@ import {
   Volume2,
   VolumeX,
   Pencil,
+  FileDown,
 } from "lucide-react";
 
 import { FileDownloadButton } from "./FileDownloadButton";
@@ -95,9 +96,51 @@ type MessageItemProps = {
 import { StatusMessage, TimelineNode, ThoughtBlock } from "./StatusMessage";
 import PermissionDialog from "./PermissionDialog";
 import { MessageRenderer, InlineMath } from "./MessageRenderer";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 import { BACKEND_URL } from "../lib/config";
 import { createClient } from "../lib/client";
+
+// ─── Code file detection ──────────────────────────────────────────────────
+const CODE_EXTENSIONS = new Set([
+  'ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs', 'mts', 'cts',
+  'py', 'rs', 'go', 'java', 'kt', 'scala',
+  'c', 'cpp', 'cc', 'cxx', 'h', 'hpp', 'hxx', 'cs',
+  'css', 'scss', 'sass', 'less', 'stylus',
+  'html', 'htm', 'svg', 'xml',
+  'json', 'yaml', 'yml', 'toml', 'ini', 'cfg',
+  'md', 'mdx', 'tex', 'rst',
+  'sql', 'graphql', 'prisma',
+  'sh', 'bash', 'zsh', 'ps1', 'bat', 'cmd',
+  'rb', 'php', 'pl', 'lua', 'r', 'dart', 'swift', 'zig', 'nim',
+  'vue', 'svelte', 'astro', 'sass', 'tf', 'dockerfile',
+  'env', 'gitignore', 'editorconfig',
+]);
+
+const EXT_TO_LANG: Record<string, string> = {
+  ts: 'typescript', tsx: 'tsx', js: 'javascript', jsx: 'jsx', mjs: 'javascript',
+  py: 'python', rs: 'rust', go: 'go', java: 'java',
+  c: 'c', cpp: 'cpp', h: 'c', hpp: 'cpp', cs: 'csharp',
+  css: 'css', scss: 'scss', html: 'html', svg: 'xml', xml: 'xml',
+  json: 'json', yaml: 'yaml', yml: 'yaml', toml: 'toml',
+  md: 'markdown', sql: 'sql', prisma: 'prisma',
+  sh: 'bash', bash: 'bash', zsh: 'bash', ps1: 'powershell',
+  rb: 'ruby', php: 'php', lua: 'lua', r: 'r', dart: 'dart',
+  swift: 'swift', zig: 'zig',
+  vue: 'vue', svelte: 'svelte', astro: 'astro',
+  dockerfile: 'dockerfile',
+};
+
+function isCodeFile(filename: string): boolean {
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  return CODE_EXTENSIONS.has(ext) || filename.toLowerCase() === 'dockerfile';
+}
+
+function extToLang(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  return EXT_TO_LANG[ext] || ext || 'text';
+}
 
 // ─── Inline image display for AI-generated images ────────────────────────
 function InlineImageDisplay({
@@ -766,19 +809,66 @@ function PartsRenderer({
         break;
       }
       case "file": {
-        renderedParts.push(
-          <div key={`file-${i}`} className="mt-2">
-            <FileDownloadButton
-              file={{
-                base64: part.base64 || "",
-                filename: part.filename,
-                mime: part.mime,
-              }}
-              onPreview={onPreview}
-              onDelete={onFileDelete ? () => onFileDelete(messageId, part.filename, 'generatedFiles') : undefined}
-            />
-          </div>
-        );
+        if (part.base64 && isCodeFile(part.filename)) {
+          const decoded = (() => {
+            try { return atob(part.base64); } catch { return ''; }
+          })();
+          const lang = extToLang(part.filename);
+          renderedParts.push(
+            <div key={`file-${i}`} className="mt-2">
+              <div className="rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-white/5">
+                  <span className="text-sm font-medium text-foreground truncate">{part.filename}</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={async () => {
+                        try { await navigator.clipboard.writeText(decoded); } catch {}
+                      }}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Copy className="size-3" /> Copy
+                    </button>
+                    <button
+                      onClick={() => {
+                        const blob = new Blob([decoded], { type: 'text/plain' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url; a.download = part.filename;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <FileDown className="size-3" /> Download
+                    </button>
+                  </div>
+                </div>
+                <SyntaxHighlighter
+                  language={lang}
+                  style={document.documentElement.classList.contains('light') ? oneLight : vscDarkPlus}
+                  customStyle={{ margin: 0, borderRadius: 0, background: 'transparent', padding: '0.75rem', fontSize: '12.5px', maxHeight: '600px' }}
+                  showLineNumbers
+                >
+                  {decoded}
+                </SyntaxHighlighter>
+              </div>
+            </div>
+          );
+        } else {
+          renderedParts.push(
+            <div key={`file-${i}`} className="mt-2">
+              <FileDownloadButton
+                file={{
+                  base64: part.base64 || "",
+                  filename: part.filename,
+                  mime: part.mime,
+                }}
+                onPreview={onPreview}
+                onDelete={onFileDelete ? () => onFileDelete(messageId, part.filename, 'generatedFiles') : undefined}
+              />
+            </div>
+          );
+        }
         break;
       }
       case "todos": {
