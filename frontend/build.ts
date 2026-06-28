@@ -8,6 +8,14 @@ await rm(outdir, { recursive: true, force: true });
 
 const entrypoints = [...new Bun.Glob("src/**/*.html").scanSync()];
 
+// Auto-inject all BUN_PUBLIC_* environment variables into the browser bundle
+const envDefine: Record<string, string> = {};
+for (const [key, value] of Object.entries(process.env)) {
+  if (key.startsWith("BUN_PUBLIC_")) {
+    envDefine[`process.env.${key}`] = JSON.stringify(value ?? "");
+  }
+}
+
 const result = await Bun.build({
   entrypoints,
   outdir,
@@ -17,11 +25,12 @@ const result = await Bun.build({
   sourcemap: "linked",
   define: {
     "process.env.NODE_ENV": JSON.stringify("production"),
-    "process.env.BUN_PUBLIC_BACKEND_URL": JSON.stringify(process.env.BUN_PUBLIC_BACKEND_URL ?? ""),
     "process.browser": "true",
     "process.version": JSON.stringify(""),
+    ...envDefine,
   },
 });
+
 
 
 // Copy PWA assets to dist
