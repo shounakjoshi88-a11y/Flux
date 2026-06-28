@@ -7,9 +7,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Flux" />
-    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="manifest" href="/manifest.json" />
+    <base href="/" />
+    <link rel="icon" type="image/svg+xml" href="./logo.svg" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="manifest" href="./manifest.json" />
     <title>Flux</title>
     
     <!-- Inter font for UI elements -->
@@ -46,14 +47,14 @@
     <script src="https://tikzjax.com/v1/tikzjax.js" defer></script>
     <!-- KaTeX extensions loaded via bundled katex package -->
 
-    <script type="module" src="/frontend.tsx" async></script>
+    <script type="module" src="./frontend.tsx" async></script>
   </head>
   <body>
     <div id="root"></div>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
-          navigator.serviceWorker.register("/sw.js").catch(() => {});
+          navigator.serviceWorker.register("./sw.js").catch(() => {});
         });
       }
     </script>
