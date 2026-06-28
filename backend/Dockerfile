@@ -16,6 +16,7 @@ RUN addgroup --system --gid 1001 flux && \
     adduser --system --uid 1001 flux
 
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/prisma/generated ./prisma/generated
 COPY . .
 
 RUN chown -R flux:flux /app
