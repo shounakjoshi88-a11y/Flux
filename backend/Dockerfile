@@ -12,8 +12,9 @@ FROM oven/bun:1-slim
 
 WORKDIR /app
 
-RUN addgroup --system --gid 1001 flux && \
-    adduser --system --uid 1001 flux
+RUN groupadd --system --gid 1001 flux && \
+    useradd --system --uid 1001 --gid flux flux
+
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma/generated ./prisma/generated
