@@ -34,16 +34,13 @@ jobs:
       - name: Build and push container image to registry
         uses: azure/container-apps-deploy-action@v2
         with:
-          appSourcePath: ${{ github.workspace }}
-          _dockerfilePathKey_: _dockerfilePath_
-          _targetLabelKey_: _targetLabel_
-          registryUrl: 
-          registryUsername: ${{ secrets.FLUXBACKEND_REGISTRY_USERNAME }}
-          registryPassword: ${{ secrets.FLUXBACKEND_REGISTRY_PASSWORD }}
+          appSourcePath: ${{ github.workspace }}/backend
+          dockerfilePath: Dockerfile
+          registryUrl: fluxacr987.azurecr.io
+          registryUsername: fluxacr987
+          registryPassword: 6HN0wk0ytZNujn2HwTfIHHOpJyQgd0tB6lXoQfM9hlvx7DSCVPibJQQJ99CFACGhslBEqg7NAAACAZCRGrfO
           containerAppName: flux-backend
           resourceGroup: flux-rg
-          imageToBuild: default/[parameters('containerAppName')]:${{ github.sha }}
-          _buildArgumentsKey_: |
-            _buildArgumentsValues_
+          imageToBuild: fluxacr987.azurecr.io/flux-backend:${{ github.sha }}
 
 
