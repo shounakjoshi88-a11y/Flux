@@ -677,7 +677,7 @@ export default function Auth() {
     setLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: "https://localhost:3000/new" },
+      options: { redirectTo: window.location.origin + "/new" },
     });
     if (error) {
       alert("Authentication failed. Please try again.");
