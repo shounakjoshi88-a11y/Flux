@@ -17,8 +17,12 @@ const result = await Bun.build({
   sourcemap: "linked",
   define: {
     "process.env.NODE_ENV": JSON.stringify("production"),
+    "process.env.BUN_PUBLIC_BACKEND_URL": JSON.stringify(process.env.BUN_PUBLIC_BACKEND_URL ?? ""),
+    "process.browser": "true",
+    "process.version": JSON.stringify(""),
   },
 });
+
 
 // Copy PWA assets to dist
 const PWA_FILES = [

@@ -37,12 +37,14 @@
       })();
     </script>
 
+    <!-- Node.js process polyfill for browser bundles -->
+    <script>window.process = window.process || { env: { NODE_ENV: 'production' }, browser: true, version: '' };</script>
+
     <!-- Advanced Rendering Support -->
     <!-- TikZ support via TikZJax -->
     <link rel="stylesheet" type="text/css" href="https://tikzjax.com/v1/fonts.css">
     <script src="https://tikzjax.com/v1/tikzjax.js" defer></script>
-    <!-- KaTeX extensions (mhchem included via script or build tool) -->
-    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/mhchem.min.js"></script>
+    <!-- KaTeX extensions loaded via bundled katex package -->
 
     <script type="module" src="./frontend.tsx" async></script>
   </head>
