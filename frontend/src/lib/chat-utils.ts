@@ -48,9 +48,11 @@ export function extractLiveContent(raw: string): {
   let answer = "";
   let followUps: string[] = [];
 
-  // 1. Remove thought blocks entirely before processing answer
+  // 1. Remove thought and follow-up blocks entirely from cleanRaw before processing fallback
   const cleanRaw = raw
     .replace(/<(?:thought|think|THOUGHT|THINK)>[\s\S]*?(?:<\/(?:thought|think|THOUGHT|THINK)>|$)/gi, "")
+    .replace(/<FOLLOW_UPS>[\s\S]*?(?:<\/FOLLOW_UPS>|$)/gi, "")
+    .replace(/<FOLLOW_UPS[\s\S]*/gi, "")
     .replace(/^\s*(?:\{[\s\S]*?\}|\[[\s\S]*?\])\s*/g, '')
     .trim();
 
@@ -61,7 +63,14 @@ export function extractLiveContent(raw: string): {
 
   if (answerStart !== -1) {
     const startIdx = answerStart + 8;
-    const endIdx = answerEnd !== -1 ? answerEnd : raw.length;
+    let endIdx = answerEnd !== -1 ? answerEnd : raw.length;
+    
+    // Slice up to FOLLOW_UPS if it starts before ANSWER ends (unclosed ANSWER tag case)
+    const followStartIdx = rawUpper.indexOf("<FOLLOW_UPS>");
+    if (followStartIdx !== -1 && followStartIdx < endIdx) {
+      endIdx = followStartIdx;
+    }
+
     answer = raw.slice(startIdx, endIdx)
       .replace(/^(?:assistant|[}\],:\s])+/gi, "")
       .trimStart();
@@ -81,8 +90,11 @@ export function extractLiveContent(raw: string): {
     answer = cleanRaw.replace(/^(?:assistant|[}\],:\s])+/gi, "");
   }
 
-  // 🔥 REMOVED: short answer filter – we keep answers of any length
-  // if (answer.length < 5) answer = "";
+  // Ensure no residual tag markup or follow-ups leak into answer
+  answer = answer
+    .replace(/<FOLLOW_UPS>[\s\S]*?(?:<\/FOLLOW_UPS>|$)/gi, "")
+    .replace(/<FOLLOW_UPS[\s\S]*/gi, "")
+    .replace(/<\/?(?:ANSWER|question)>/gi, "");
 
   // Extract follow‑up questions
   const followStart = rawUpper.indexOf("<FOLLOW_UPS>");

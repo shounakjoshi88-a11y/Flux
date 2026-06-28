@@ -94,10 +94,11 @@ export function useChat(user: any) {
 
   function stripTags(s: string): string {
     return s
+      .replace(/<FOLLOW_UPS>[\s\S]*?(?:<\/FOLLOW_UPS>|$)/gi, "")
+      .replace(/<FOLLOW_UPS[\s\S]*/gi, "")
       .replace(/<THOUGHT>[\s\S]*?<\/THOUGHT>/gi, "")
       .replace(/<\/?THOUGHT>/gi, "")
       .replace(/<\/?ANSWER>/gi, "")
-      .replace(/<\/?FOLLOW_UPS>/gi, "")
       .replace(/<\/?question>/gi, "")
       .replace(/<\/?SEARCH_QUERY>/gi, "")
       // Strip any truncated/incomplete tag left at the end (e.g. "<F", "<FOLLOW_UPS")
@@ -109,10 +110,16 @@ export function useChat(user: any) {
     if (!raw.trim()) return "";
     const openIdx = raw.indexOf("<ANSWER>");
     const closeIdx = raw.indexOf("</ANSWER>");
-    if (openIdx !== -1 && closeIdx !== -1 && closeIdx > openIdx) {
-      return stripTags(raw.slice(openIdx + 8, closeIdx));
-    }
+    const followIdx = raw.indexOf("<FOLLOW_UPS>");
+    
+    let endIdx = closeIdx;
     if (openIdx !== -1) {
+      if (endIdx === -1 || (followIdx !== -1 && followIdx < endIdx)) {
+        endIdx = followIdx;
+      }
+      if (endIdx !== -1 && endIdx > openIdx) {
+        return stripTags(raw.slice(openIdx + 8, endIdx));
+      }
       return stripTags(raw.slice(openIdx + 8));
     }
     return stripTags(raw);

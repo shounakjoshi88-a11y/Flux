@@ -1218,12 +1218,15 @@ function RenderFollowUpText({ text }: { text: string }) {
 function deepCleanAnswer(raw: string): string {
   if (typeof raw !== 'string' || !raw.trim()) return "";
   let clean = raw
+    // First, completely remove follow-up questions block and anything after it (including unclosed <FOLLOW_UPS)
+    .replace(/<FOLLOW_UPS>[\s\S]*?(?:<\/FOLLOW_UPS>|$)/gi, "")
+    .replace(/<FOLLOW_UPS[\s\S]*/gi, "")
     // 1. Remove JSON structures completely if they leaked
     .replace(/\{"type"[\s\S]*?\}/g, "")
     // 2. Strip thoughts/thinking blocks
     .replace(/<(?:thought|think)>[\s\S]*?(?:<\/(?:thought|think)>|$)/gi, '')
-    // 3. Strip structural tags
-    .replace(/<\/?(?:thought|think|ANSWER|FOLLOW_UPS|question)>/gi, '')
+    // 3. Strip remaining structural tags
+    .replace(/<\/?(?:thought|think|ANSWER|question)>/gi, '')
     // 4. Clean up any trailing citations or artifact metadata lines
     .replace(/\n\d+ https?:\/\/[^\n]+(\n|$)/g, '')
     // 5. Strip truncated/incomplete tags at end (e.g. "<F", "<FOLLOW_UPS")
