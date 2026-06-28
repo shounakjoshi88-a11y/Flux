@@ -1,8 +1,8 @@
-backend/
-electron/
-dist-electron/
-api/
-data/
-certs/
-release/
-screenshots/
+/backend
+/electron
+/dist-electron
+/api
+/data
+/certs
+/release
+/screenshots
