@@ -3,11 +3,12 @@ FROM oven/bun:1 AS builder
 WORKDIR /app
 
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile --ignore-scripts
-
-
+# Copy prisma schema BEFORE bun install so postinstall (prisma generate) succeeds
 COPY prisma ./prisma
-RUN bunx prisma generate
+
+# Now bun install can run ALL scripts including prisma generate and sharp's native build
+RUN bun install --frozen-lockfile
+
 
 FROM oven/bun:1-slim
 
