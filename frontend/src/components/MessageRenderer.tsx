@@ -148,169 +148,97 @@ function RawLatexFallback({ formula, display }: { formula: string; display: bool
 function convertCDtoMatrix(s: string): string {
   return s.replace(/\\begin\s*\{CD\}\s*([\s\S]*?)\s*\\end\s*\{CD\}/gi, (_match, body: string) => {
     const rawRows = body.split(/\\\\/).map((r: string) => r.trim()).filter((r: string) => r.length > 0);
-    const allCells: string[][] = [];
+    if (rawRows.length === 0) return s;
 
-    // First row establishes the grid column count (always odd: entries + arrows)
-    // Build a pattern: true = entry column, false = arrow column
-    const gridPattern: boolean[] = [true]; // col 0 is always entry
+    // Number of entries = number of @-separated parts in the first row
+    const numEntries = rawRows[0]!.split('@').length;
+    const targetCols = 2 * numEntries - 1;
+
+    const matrixRows: string[][] = [];
 
     for (const rawRow of rawRows) {
+      const parts = rawRow.split('@').map((p: string) => p.trim());
       const cells: string[] = [];
-      let remaining = rawRow.trim();
-      let colIdx = 0; // which grid column we're filling
 
-      // Read first content cell (col 0, always entry)
-      let content = '';
-      let i = 0;
-      while (i < remaining.length) {
-        if (remaining[i] === '@') break;
-        content += remaining[i];
-        i++;
+      // Part 0: entry before first @
+      const firstEntry = parts[0] ?? '';
+      if (/^[VA]/.test(firstEntry)) {
+        cells.push(parseCDArrow(firstEntry));
+      } else if (firstEntry === '.') {
+        cells.push('');
+      } else {
+        cells.push(firstEntry);
       }
-      cells.push(content.trim());
-      colIdx = 1;
 
-      // Process @ directives — each fills the next grid column
-      while (i < remaining.length) {
-        if (remaining[i] === '@') {
-          i++;
-
-          // Parse the @ directive content (arrow chars + labels)
-          const dirStart = i;
-          const firstChar = remaining[i] ?? '';
-          const isHorizontal = firstChar === '>' || firstChar === '<' || firstChar === '=';
-
-          // Consume the directive characters
-          while (i < remaining.length && /[><VA.={]/.test(remaining[i] ?? '')) {
-            if (remaining[i] === '{') {
-              const close = remaining.indexOf('}', i);
-              if (close < 0) break;
-              i = close + 1;
-            } else {
-              i++;
-            }
-          }
-          const dirStr = remaining.slice(dirStart, i);
-
-          // Read following content (up to next @ or end)
-          content = '';
-          while (i < remaining.length && remaining[i] !== '@') {
-            content += remaining[i];
-            i++;
-          }
-
-          // Place the directive in the correct grid column
-          // Horizontal arrows go to arrow columns (odd), vertical/empty go to entry columns (even)
-          if (firstChar === '.' || firstChar === 'V' || firstChar === 'A') {
-            // Vertical/empty → fill ENTRY column at even index
-            // Skip arrow column (colIdx+1) if we're at one, then fill entry
-            if (colIdx % 2 === 1) {
-              cells.push(''); // empty arrow column
-              colIdx++;
-            }
-            cells.push(parseCDArrow(dirStr));
-            colIdx++;
-            // Content after directive goes in the next column (arrow)
-            if (colIdx % 2 === 0) {
-              cells.push('');
-              colIdx++;
-            }
-            cells.push(content.trim());
-            colIdx++;
-          } else if (isHorizontal) {
-            // Horizontal → fill ARROW column at odd index
-            // Skip entry column (colIdx+1) if we're at one, then fill arrow
-            if (colIdx % 2 === 0) {
-              cells.push(''); // empty entry column
-              colIdx++;
-            }
-            cells.push(parseCDArrow(dirStr));
-            colIdx++;
-            // Content after directive goes in the next column (entry)
-            if (colIdx % 2 === 1) {
-              cells.push('');
-              colIdx++;
-            }
-            cells.push(content.trim());
-            colIdx++;
+      // Remaining @-parts: each provides arrow + next entry
+      const maxArrows = Math.min(parts.length - 1, numEntries - 1);
+      for (let pi = 1; pi <= maxArrows; pi++) {
+        const part = parts[pi] ?? '';
+        let arrowEnd = 0;
+        while (arrowEnd < part.length && /[><VA.={]/.test(part[arrowEnd]!)) {
+          if (part[arrowEnd] === '{') {
+            const close = part.indexOf('}', arrowEnd);
+            if (close < 0) break;
+            arrowEnd = close + 1;
           } else {
-            // Unknown — fill as entry
-            if (colIdx % 2 === 1) {
-              cells.push('');
-              colIdx++;
-            }
-            cells.push(content.trim());
-            colIdx++;
+            arrowEnd++;
           }
-
-          // Extend grid pattern
-          while (gridPattern.length < colIdx) {
-            gridPattern.push(gridPattern.length % 2 === 0);
-          }
-        } else {
-          i++;
         }
+        const arrowStr = part.slice(0, arrowEnd);
+        const entryStr = part.slice(arrowEnd).trim();
+        cells.push(parseCDArrow(arrowStr));
+        cells.push(entryStr);
       }
 
-      allCells.push(cells);
+      // Pad/truncate to target length
+      while (cells.length < targetCols) cells.push('');
+      if (cells.length > targetCols) cells.length = targetCols;
+
+      matrixRows.push(cells);
     }
 
-    // Align all rows to the same column count (from grid pattern)
-    const targetCols = gridPattern.length;
-    for (const row of allCells) {
-      while (row.length < targetCols) row.push('');
-      if (row.length > targetCols) row.splice(targetCols);
-    }
-
-    const matrixRows = allCells.map((row: string[]) => row.join(' & '));
-    return `\\begin{matrix}${matrixRows.join('\\\\')}\\end{matrix}`;
+    return '\\begin{matrix}' + matrixRows.map((r: string[]) => r.join(' & ')).join('\\\\') + '\\end{matrix}';
   });
 }
 
 function parseCDArrow(arrow: string): string {
   if (!arrow || arrow === '.') return '';
-  if (arrow === '=') return '\\doteq';
 
-  // Extract labels
+  // Extract all {...} labels and determine arrow type
   const labels: string[] = [];
-  const arrowChar = arrow[0]; // >, <, V, A
-  let i = 0;
-  while (i < arrow.length) {
-    if (arrow[i] === '{') {
+  let arrowType = '';
+  for (let i = 0; i < arrow.length; i++) {
+    const ch = arrow[i]!;
+    if (ch === '{') {
       const close = arrow.indexOf('}', i);
-      if (close < 0) break;
+      if (close < 0) { labels.push(arrow.slice(i + 1)); break; }
       labels.push(arrow.slice(i + 1, close));
-      i = close + 1;
-    } else if (arrow[i] === arrowChar) {
-      i++;
-    } else {
-      break;
+      i = close;
+    } else if (/[><VA=]/.test(ch)) {
+      if (!arrowType) arrowType = ch;
     }
   }
 
-  if (arrowChar === '>') {
-    if (labels.length === 0) return '\\to';
-    if (labels.length === 1) return `\\xrightarrow{${labels[0]}}`;
-    return `\\xrightarrow[${labels[1]}]{${labels[0]}}`;
-  }
+  if (!arrowType) return '';
 
-  if (arrowChar === '<') {
-    if (labels.length === 0) return '\\leftarrow';
-    if (labels.length === 1) return `\\xleftarrow{${labels[0]}}`;
-    return `\\xleftarrow[${labels[1]}]{${labels[0]}}`;
+  switch (arrowType) {
+    case '>':
+      if (labels.length === 0) return '\\to';
+      if (labels.length === 1) return `\\xrightarrow{${labels[0]}}`;
+      return `\\xrightarrow[${labels[1]}]{${labels[0]}}`;
+    case '<':
+      if (labels.length === 0) return '\\leftarrow';
+      if (labels.length === 1) return `\\xleftarrow{${labels[0]}}`;
+      return `\\xleftarrow[${labels[1]}]{${labels[0]}}`;
+    case 'V':
+      return labels.length > 0 ? `\\downarrow_{${labels[labels.length - 1]}}` : '\\downarrow';
+    case 'A':
+      return labels.length > 0 ? `\\uparrow^{${labels[labels.length - 1]}}` : '\\uparrow';
+    case '=':
+      return '\\doteq';
+    default:
+      return '';
   }
-
-  if (arrowChar === 'V') {
-    if (labels.length === 0) return '\\downarrow';
-    return `\\downarrow_{${labels[labels.length - 1]}}`;
-  }
-
-  if (arrowChar === 'A') {
-    if (labels.length === 0) return '\\uparrow';
-    return `\\uparrow^{${labels[labels.length - 1]}}`;
-  }
-
-  return '';
 }
 
 // ─── Conservative LaTeX repair ───────────────────────────
