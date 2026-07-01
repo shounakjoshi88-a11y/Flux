@@ -1189,7 +1189,8 @@ const CODE_MASK = '\x00CD';
 const CODE_MASK_END = '\x00';
 
 function maskCode(text: string, store: string[]): string {
-  return text.replace(/`[^`]+`/g, (m) => {
+  // Only match single-backtick spans, not triple-backtick fences
+  return text.replace(/(?<!``)`[^`]+`(?!`)/g, (m) => {
     const idx = store.length;
     store.push(m);
     return `${CODE_MASK}${idx}${CODE_MASK_END}`;
@@ -1207,8 +1208,9 @@ function renderBlocks(text: string, onCitationClick: any, sources: Source[], onH
   const codeStore: string[] = [];
   const masked = maskCode(text, codeStore);
   return splitWithDelimiters(masked, BLOCK_DELIM_REGEX).flatMap((part, pi) => {
-    // Restore inline code in text parts (delimiter parts won't have masks)
-    if (part.type === "text") part.value = restoreCode(part.value, codeStore);
+    // Restore inline code spans — text parts need it, and code-block delimiter
+    // parts may have placeholders if the code contained inline backtick spans.
+    part.value = restoreCode(part.value, codeStore);
     if (part.type === "delimiter") {
       const val = part.value;
       const tagMatch = val.match(/<(CHART|MERMAID|svg|TIKZ|LILYPOND|MUSIC|ABC|CHEMICAL|SMILES|MOL)/i);
