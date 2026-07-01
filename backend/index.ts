@@ -4733,6 +4733,8 @@ To verify/analyze code: use read_file first, then use run_bash to run type-check
                                         .replace(/<FOLLOW_UPS>[\s\S]*/gi, '')
                                         .replace(/<\/?FOLLOW_UPS>/gi, '')
                                         .replace(/<\/?question>/gi, '')
+                                        .replace(/<\|tool_calls_section_(?:begin|end)\|>/gi, '')
+                                        .replace(/<\|tool_call_(?:begin|end)\|>/gi, '')
                                         .replace(/<\/?[A-Za-z][A-Za-z0-9]*$/gm, '');
                                 if (clean) {
                                     writeClean(clean);
@@ -4766,6 +4768,8 @@ To verify/analyze code: use read_file first, then use run_bash to run type-check
                                 .replace(/<FOLLOW_UPS>[\s\S]*/gi, '')
                                 .replace(/<\/?FOLLOW_UPS>/gi, '')
                                 .replace(/<\/?question>/gi, '')
+                                .replace(/<\|tool_calls_section_(?:begin|end)\|>/gi, '')
+                                .replace(/<\|tool_call_(?:begin|end)\|>/gi, '')
                                 .replace(/<\/?[A-Za-z][A-Za-z0-9]*$/gm, '');
                             if (clean) {
                                 writeClean(clean);

@@ -1230,7 +1230,12 @@ function deepCleanAnswer(raw: string): string {
     // 4. Clean up any trailing citations or artifact metadata lines
     .replace(/\n\d+ https?:\/\/[^\n]+(\n|$)/g, '')
     // 5. Strip truncated/incomplete tags at end (e.g. "<F", "<FOLLOW_UPS")
-    .replace(/<\/?[A-Za-z][A-Za-z0-9]*(?:\s[^>]*)?$/g, '');
+    .replace(/<\/?[A-Za-z][A-Za-z0-9]*(?:\s[^>]*)?$/g, '')
+    // 6. Strip NIM inline tool call tokens that may have leaked through
+    .replace(/<\|tool_calls_section_begin\|>[\s\S]*?(?:<\|tool_calls_section_end\|>|$)/gi, '')
+    .replace(/<\|tool_call_begin\|>[\s\S]*?(?:<\|tool_call_end\|>|$)/gi, '')
+    .replace(/<\|tool_calls_section_(?:begin|end)\|>/gi, '')
+    .replace(/<\|tool_call_(?:begin|end)\|>/gi, '');
 
   // Explicitly strip multiple trailing newlines before the final trim
   return clean.replace(/\n+$/, "").trim();
