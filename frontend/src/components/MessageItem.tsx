@@ -54,7 +54,7 @@ import {
 
 import { FileDownloadButton } from "./FileDownloadButton";
 import { CodeOutputBlock } from "./CodeOutputBlock";
-import { getDomain } from "../lib/chat-utils";
+import { getDomain, deepCleanAnswer } from "../lib/chat-utils";
 import type { Message, MessagePart, Source } from "../types";
 
 type MessageItemProps = {
@@ -1212,36 +1212,6 @@ function RenderFollowUpText({ text }: { text: string }) {
       })}
     </>
   );
-}
-
-/* ─── Ultimate answer cleaner ─── */
-function deepCleanAnswer(raw: string): string {
-  if (typeof raw !== 'string' || !raw.trim()) return "";
-  let clean = raw
-    // First, completely remove follow-up questions block and anything after it (including unclosed <FOLLOW_UPS)
-    .replace(/<FOLLOW_UPS>[\s\S]*?(?:<\/FOLLOW_UPS>|$)/gi, "")
-    .replace(/<FOLLOW_UPS[\s\S]*/gi, "")
-    // 1. Remove JSON structures completely if they leaked
-    .replace(/\{"type"[\s\S]*?\}/g, "")
-    // 2. Strip thoughts/thinking blocks
-    .replace(/<(?:thought|think)>[\s\S]*?(?:<\/(?:thought|think)>|$)/gi, '')
-    // 3. Strip remaining structural tags
-    .replace(/<\/?(?:thought|think|ANSWER|question)>/gi, '')
-    // 4. Clean up any trailing citations or artifact metadata lines
-    .replace(/\n\d+ https?:\/\/[^\n]+(\n|$)/g, '')
-    // 5. Strip truncated/incomplete tags at end (e.g. "<F", "<FOLLOW_UPS")
-    .replace(/<\/?[A-Za-z][A-Za-z0-9]*(?:\s[^>]*)?$/g, '')
-    // 6. Strip NIM inline tool call tokens that may have leaked through
-    .replace(/<\|tool_calls_section_begin\|>[\s\S]*?(?:<\|tool_calls_section_end\|>|$)/gi, '')
-    .replace(/<\|tool_call_begin\|>[\s\S]*?(?:<\|tool_call_end\|>|$)/gi, '')
-    .replace(/<\|tool_calls_section_(?:begin|end)\|>/gi, '')
-    .replace(/<\|tool_call_(?:begin|end)\|>/gi, '')
-    // 7. Strip echoed code output from model answer (stdout/stderr restated in text)
-    .replace(/```(?:stdout|stderr|output|result|bash_output|python_output)\s*\n[\s\S]*?\n```/gi, '')
-    .replace(/^(?:Output|Result|Stdout|Stderr)\s*:\s*$/gim, '');
-
-  // Explicitly strip multiple trailing newlines before the final trim
-  return clean.replace(/\n+$/, "").trim();
 }
 
 /* ------------------------------------------------------------------ */

@@ -111,6 +111,25 @@ export function extractLiveContent(raw: string): {
   return { answer, followUps };
 }
 
+export function deepCleanAnswer(raw: string): string {
+  if (typeof raw !== 'string' || !raw.trim()) return "";
+  let clean = raw
+    .replace(/<FOLLOW_UPS>[\s\S]*?(?:<\/FOLLOW_UPS>|$)/gi, "")
+    .replace(/<FOLLOW_UPS[\s\S]*/gi, "")
+    .replace(/\{"type"[\s\S]*?\}/g, "")
+    .replace(/<(?:thought|think)>[\s\S]*?(?:<\/(?:thought|think)>|$)/gi, '')
+    .replace(/<\/?(?:thought|think|ANSWER|question)>/gi, '')
+    .replace(/\n\d+ https?:\/\/[^\n]+(\n|$)/g, '')
+    .replace(/<\/?[A-Za-z][A-Za-z0-9]*(?:\s[^>]*)?$/g, '')
+    .replace(/<\|tool_calls_section_begin\|>[\s\S]*?(?:<\|tool_calls_section_end\|>|$)/gi, '')
+    .replace(/<\|tool_call_begin\|>[\s\S]*?(?:<\|tool_call_end\|>|$)/gi, '')
+    .replace(/<\|tool_calls_section_(?:begin|end)\|>/gi, '')
+    .replace(/<\|tool_call_(?:begin|end)\|>/gi, '')
+    .replace(/```(?:stdout|stderr|output|result|bash_output|python_output)\s*\n[\s\S]*?\n```/gi, '')
+    .replace(/^(?:Output|Result|Stdout|Stderr)\s*:\s*$/gim, '');
+  return clean.replace(/\n+$/, "").trim();
+}
+
 export function getDomain(url: string) {
   try {
     return new URL(url).hostname.replace("www.", "");

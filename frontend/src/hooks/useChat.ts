@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { flushSync } from "react-dom";
 import { createClient } from "@/lib/client";
 import { BACKEND_URL } from "@/lib/config";
-import { extractLiveContent } from "@/lib/chat-utils";
+import { extractLiveContent, deepCleanAnswer } from "@/lib/chat-utils";
 import type { Message, AttachedFile, Source, GeneratedFile, MessagePart, PermissionRequest } from "@/types";
 
 const supabase = createClient();
@@ -604,8 +604,8 @@ export function useChat(user: any) {
 
             // ─── Update assistant message ───
             try {
-              const cleanAns = cleanAnswerText(assistantRawRef.current);
-              const cleanCurrentText = cleanAnswerText(textAccumRef.current);
+              const cleanAns = deepCleanAnswer(cleanAnswerText(assistantRawRef.current));
+              const cleanCurrentText = deepCleanAnswer(cleanAnswerText(textAccumRef.current));
               const allParts: MessagePart[] = cleanCurrentText
                 ? [...streamingPartsRef.current, { type: "text", text: cleanCurrentText }]
                 : streamingPartsRef.current;
@@ -648,7 +648,7 @@ export function useChat(user: any) {
           throw new Error(streamErrorRef.current);
         }
 
-        const finalAnswer = cleanAnswerText(assistantRawRef.current);
+        const finalAnswer = deepCleanAnswer(cleanAnswerText(assistantRawRef.current));
         const hasGeneratedFiles = latestGeneratedFilesRef.current.length > 0;
 
         if ((!finalAnswer || finalAnswer.startsWith("[Error")) && !hasGeneratedFiles) {
