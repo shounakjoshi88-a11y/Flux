@@ -154,47 +154,70 @@ function convertCDtoMatrix(s: string): string {
     const numEntries = rawRows[0]!.split('@').length;
     const targetCols = 2 * numEntries - 1;
 
+    function isArrowRow(parts: string[]): boolean {
+      for (let i = 1; i < Math.min(parts.length, numEntries); i++) {
+        if (/^[><=]/.test(parts[i] ?? '')) return true;
+      }
+      return false;
+    }
+
+    function extractArrowAndEntry(part: string): [string, string] {
+      let arrowEnd = 0;
+      while (arrowEnd < part.length && /[><VA.={]/.test(part[arrowEnd]!)) {
+        if (part[arrowEnd] === '{') {
+          const close = part.indexOf('}', arrowEnd);
+          if (close < 0) break;
+          arrowEnd = close + 1;
+        } else {
+          arrowEnd++;
+        }
+      }
+      return [part.slice(0, arrowEnd), part.slice(arrowEnd).trim()];
+    }
+
     const matrixRows: string[][] = [];
 
     for (const rawRow of rawRows) {
       const parts = rawRow.split('@').map((p: string) => p.trim());
-      const cells: string[] = [];
 
-      // Part 0: entry before first @
-      const firstEntry = parts[0] ?? '';
-      if (/^[VA]/.test(firstEntry)) {
-        cells.push(parseCDArrow(firstEntry));
-      } else if (firstEntry === '.') {
-        cells.push('');
+      if (isArrowRow(parts)) {
+        // ── Arrow row: each @-part is arrow + entry ──
+        const cells: string[] = [];
+        cells.push(parts[0] ?? '');
+        const maxArrows = Math.min(parts.length - 1, numEntries - 1);
+        for (let pi = 1; pi <= maxArrows; pi++) {
+          const [arrowStr, entryStr] = extractArrowAndEntry(parts[pi] ?? '');
+          cells.push(parseCDArrow(arrowStr));
+          cells.push(entryStr);
+        }
+        while (cells.length < targetCols) cells.push('');
+        if (cells.length > targetCols) cells.length = targetCols;
+        matrixRows.push(cells);
+
       } else {
-        cells.push(firstEntry);
-      }
+        // ── Entry row: @-parts fill entry cells; arrow cells are empty ──
+        // `.` adds 1 cell (empty arrow column)
+        // `VVV/AAA` adds 2 cells (entry column with vertical arrow + empty arrow column)
+        const cells: string[] = [];
+        cells.push(parts[0] ?? ''); // first entry
 
-      // Remaining @-parts: each provides arrow + next entry
-      const maxArrows = Math.min(parts.length - 1, numEntries - 1);
-      for (let pi = 1; pi <= maxArrows; pi++) {
-        const part = parts[pi] ?? '';
-        let arrowEnd = 0;
-        while (arrowEnd < part.length && /[><VA.={]/.test(part[arrowEnd]!)) {
-          if (part[arrowEnd] === '{') {
-            const close = part.indexOf('}', arrowEnd);
-            if (close < 0) break;
-            arrowEnd = close + 1;
+        const maxParts = Math.min(parts.length - 1, numEntries - 1);
+        for (let pi = 1; pi <= maxParts; pi++) {
+          const [arrowStr, _entryStr] = extractArrowAndEntry(parts[pi] ?? '');
+          const firstChar = arrowStr[0] ?? '';
+          if (firstChar === 'V' || firstChar === 'A') {
+            cells.push(parseCDArrow(arrowStr)); // entry column: vertical arrow
+            cells.push('');                     // arrow column: empty
           } else {
-            arrowEnd++;
+            // `.` or anything else → null arrow, 1 cell
+            cells.push('');
           }
         }
-        const arrowStr = part.slice(0, arrowEnd);
-        const entryStr = part.slice(arrowEnd).trim();
-        cells.push(parseCDArrow(arrowStr));
-        cells.push(entryStr);
+
+        while (cells.length < targetCols) cells.push('');
+        if (cells.length > targetCols) cells.length = targetCols;
+        matrixRows.push(cells);
       }
-
-      // Pad/truncate to target length
-      while (cells.length < targetCols) cells.push('');
-      if (cells.length > targetCols) cells.length = targetCols;
-
-      matrixRows.push(cells);
     }
 
     return '\\begin{matrix}' + matrixRows.map((r: string[]) => r.join(' & ')).join('\\\\') + '\\end{matrix}';
