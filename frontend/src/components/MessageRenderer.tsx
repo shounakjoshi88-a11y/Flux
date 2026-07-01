@@ -1096,16 +1096,32 @@ function renderList(items: any[], onCitationClick: any, sources: Source[], paren
   let i = 0;
   while (i < items.length) {
     const item = items[i];
-    const ListTag = item.type === "ol" ? "ol" : "ul";
-    const nested: any[] = [];
-    let j = i + 1;
-    while (j < items.length && items[j].level > item.level) { nested.push(items[j]); j++; }
+    const listType = item.type;
+    const ListTag = listType === "ol" ? "ol" : "ul";
+
+    // Collect all consecutive same-level items of the same type into one <ol>/<ul>
+    const listItems: any[] = [];
+    let j = i;
+    while (j < items.length && items[j].level === item.level && items[j].type === listType) {
+      listItems.push(items[j]);
+      j++;
+    }
+
     result.push(
-      <ListTag key={`${parentKey}-${i}`} className={`${item.type === "ol" ? "list-decimal" : "list-disc"} pl-6 my-2 space-y-1`}>
-        <li className="pl-1">
-          {formatInlineText(item.text, onCitationClick, sources, `${parentKey}-li-${i}`)}
-          {nested.length > 0 && renderList(nested, onCitationClick, sources, `${parentKey}-nested-${i}`)}
-        </li>
+      <ListTag key={`${parentKey}-${i}`} className={`${listType === "ol" ? "list-decimal" : "list-disc"} pl-6 my-2 space-y-1`}>
+        {listItems.map((li, idx) => {
+          // Collect nested items (higher level) after this item
+          const nested: any[] = [];
+          let k = j;
+          while (k < items.length && items[k].level > li.level) { nested.push(items[k]); k++; }
+          if (nested.length > 0) j = k; // skip nested in outer sweep
+          return (
+            <li key={`${parentKey}-li-${i + idx}`} className="pl-1">
+              {formatInlineText(li.text, onCitationClick, sources, `${parentKey}-li-${i + idx}`)}
+              {nested.length > 0 && renderList(nested, onCitationClick, sources, `${parentKey}-nested-${i + idx}`)}
+            </li>
+          );
+        })}
       </ListTag>
     );
     i = j;
@@ -1166,12 +1182,33 @@ function renderPlainBlocks(text: string, onCitationClick: any, sources: Source[]
   return elements;
 }
 
-// ── Block regex: also uses [a-zA-Z*]+ so \begin{CD} is captured ──
-const BLOCK_DELIM_REGEX = /(<(CHART|MERMAID|svg|TIKZ|LILYPOND|MUSIC|ABC|CHEMICAL|SMILES|MOL)(?:\s+[^>]*)?>[\s\S]*?<\/(?:CHART|MERMAID|svg|TIKZ|LILYPOND|MUSIC|ABC|CHEMICAL|SMILES|MOL)>|```[a-z]*[\s\S]*?```|(?<=\n|^)\s*\$\$[\s\S]*?\s*\$\$(?=\s*$|\n)|(?<!\\)\\\[(?!-?\d+pt)[\s\S]+?\\\]|\\begin\{([a-zA-Z*]+)\}[\s\S]*?\\end\{[a-zA-Z*]+\})/gim;
+// ── Inline code protection ────────────────────────────────
+// Mask backtick-delimited inline code before the block regex runs, so that
+// prose mentions of \begin{CD} inside `code` aren't captured as env starts.
+const CODE_MASK = '\x00CD';
+const CODE_MASK_END = '\x00';
+
+function maskCode(text: string, store: string[]): string {
+  return text.replace(/`[^`]+`/g, (m) => {
+    const idx = store.length;
+    store.push(m);
+    return `${CODE_MASK}${idx}${CODE_MASK_END}`;
+  });
+}
+function restoreCode(text: string, store: string[]): string {
+  return text.replace(new RegExp(`${CODE_MASK}(\\d+)${CODE_MASK_END}`, 'g'), (_, idx) => store[+idx] ?? '');
+}
+
+// ── Block regex: \3 backreference ensures \begin{CD} only matches \end{CD} ──
+const BLOCK_DELIM_REGEX = /(<(CHART|MERMAID|svg|TIKZ|LILYPOND|MUSIC|ABC|CHEMICAL|SMILES|MOL)(?:\s+[^>]*)?>[\s\S]*?<\/(?:CHART|MERMAID|svg|TIKZ|LILYPOND|MUSIC|ABC|CHEMICAL|SMILES|MOL)>|```[a-z]*[\s\S]*?```|(?<=\n|^)\s*\$\$[\s\S]*?\s*\$\$(?=\s*$|\n)|(?<!\\)\\\[(?!-?\d+pt)[\s\S]+?\\\]|\\begin\{([a-zA-Z*]+)\}[\s\S]*?\\end\{\3\})/gim;
 
 function renderBlocks(text: string, onCitationClick: any, sources: Source[], onHtmlPreview?: (html: string) => void) {
   if (typeof text !== "string") return [];
-  return splitWithDelimiters(text, BLOCK_DELIM_REGEX).flatMap((part, pi) => {
+  const codeStore: string[] = [];
+  const masked = maskCode(text, codeStore);
+  return splitWithDelimiters(masked, BLOCK_DELIM_REGEX).flatMap((part, pi) => {
+    // Restore inline code in text parts (delimiter parts won't have masks)
+    if (part.type === "text") part.value = restoreCode(part.value, codeStore);
     if (part.type === "delimiter") {
       const val = part.value;
       const tagMatch = val.match(/<(CHART|MERMAID|svg|TIKZ|LILYPOND|MUSIC|ABC|CHEMICAL|SMILES|MOL)/i);
