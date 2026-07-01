@@ -137,6 +137,182 @@ function RawLatexFallback({ formula, display }: { formula: string; display: bool
   );
 }
 
+// ─── Commutative diagram (\begin{CD}) → KaTeX matrix ─────
+// KaTeX doesn't support the CD environment. We convert it to
+// a \begin{matrix} with \xrightarrow / \xleftarrow / \downarrow / \uparrow.
+//
+// In amscd the first row defines a grid where columns alternate:
+//   [entry(0), arrow(1), entry(2), arrow(3), entry(4), …]
+// Horizontal arrows (@>>> @<<< @=) go in ODD columns (arrow positions).
+// Vertical arrows (@VVV @AAA) and @. go in EVEN columns (entry positions).
+function convertCDtoMatrix(s: string): string {
+  return s.replace(/\\begin\s*\{CD\}\s*([\s\S]*?)\s*\\end\s*\{CD\}/gi, (_match, body: string) => {
+    const rawRows = body.split(/\\\\/).map((r: string) => r.trim()).filter((r: string) => r.length > 0);
+    const allCells: string[][] = [];
+
+    // First row establishes the grid column count (always odd: entries + arrows)
+    // Build a pattern: true = entry column, false = arrow column
+    const gridPattern: boolean[] = [true]; // col 0 is always entry
+
+    for (const rawRow of rawRows) {
+      const cells: string[] = [];
+      let remaining = rawRow.trim();
+      let colIdx = 0; // which grid column we're filling
+
+      // Read first content cell (col 0, always entry)
+      let content = '';
+      let i = 0;
+      while (i < remaining.length) {
+        if (remaining[i] === '@') break;
+        content += remaining[i];
+        i++;
+      }
+      cells.push(content.trim());
+      colIdx = 1;
+
+      // Process @ directives — each fills the next grid column
+      while (i < remaining.length) {
+        if (remaining[i] === '@') {
+          i++;
+
+          // Parse the @ directive content (arrow chars + labels)
+          const dirStart = i;
+          const firstChar = remaining[i] ?? '';
+          const isHorizontal = firstChar === '>' || firstChar === '<' || firstChar === '=';
+
+          // Consume the directive characters
+          while (i < remaining.length && /[><VA.={]/.test(remaining[i] ?? '')) {
+            if (remaining[i] === '{') {
+              const close = remaining.indexOf('}', i);
+              if (close < 0) break;
+              i = close + 1;
+            } else {
+              i++;
+            }
+          }
+          const dirStr = remaining.slice(dirStart, i);
+
+          // Read following content (up to next @ or end)
+          content = '';
+          while (i < remaining.length && remaining[i] !== '@') {
+            content += remaining[i];
+            i++;
+          }
+
+          // Place the directive in the correct grid column
+          // Horizontal arrows go to arrow columns (odd), vertical/empty go to entry columns (even)
+          if (firstChar === '.' || firstChar === 'V' || firstChar === 'A') {
+            // Vertical/empty → fill ENTRY column at even index
+            // Skip arrow column (colIdx+1) if we're at one, then fill entry
+            if (colIdx % 2 === 1) {
+              cells.push(''); // empty arrow column
+              colIdx++;
+            }
+            cells.push(parseCDArrow(dirStr));
+            colIdx++;
+            // Content after directive goes in the next column (arrow)
+            if (colIdx % 2 === 0) {
+              cells.push('');
+              colIdx++;
+            }
+            cells.push(content.trim());
+            colIdx++;
+          } else if (isHorizontal) {
+            // Horizontal → fill ARROW column at odd index
+            // Skip entry column (colIdx+1) if we're at one, then fill arrow
+            if (colIdx % 2 === 0) {
+              cells.push(''); // empty entry column
+              colIdx++;
+            }
+            cells.push(parseCDArrow(dirStr));
+            colIdx++;
+            // Content after directive goes in the next column (entry)
+            if (colIdx % 2 === 1) {
+              cells.push('');
+              colIdx++;
+            }
+            cells.push(content.trim());
+            colIdx++;
+          } else {
+            // Unknown — fill as entry
+            if (colIdx % 2 === 1) {
+              cells.push('');
+              colIdx++;
+            }
+            cells.push(content.trim());
+            colIdx++;
+          }
+
+          // Extend grid pattern
+          while (gridPattern.length < colIdx) {
+            gridPattern.push(gridPattern.length % 2 === 0);
+          }
+        } else {
+          i++;
+        }
+      }
+
+      allCells.push(cells);
+    }
+
+    // Align all rows to the same column count (from grid pattern)
+    const targetCols = gridPattern.length;
+    for (const row of allCells) {
+      while (row.length < targetCols) row.push('');
+      if (row.length > targetCols) row.splice(targetCols);
+    }
+
+    const matrixRows = allCells.map((row: string[]) => row.join(' & '));
+    return `\\begin{matrix}${matrixRows.join('\\\\')}\\end{matrix}`;
+  });
+}
+
+function parseCDArrow(arrow: string): string {
+  if (!arrow || arrow === '.') return '';
+  if (arrow === '=') return '\\doteq';
+
+  // Extract labels
+  const labels: string[] = [];
+  const arrowChar = arrow[0]; // >, <, V, A
+  let i = 0;
+  while (i < arrow.length) {
+    if (arrow[i] === '{') {
+      const close = arrow.indexOf('}', i);
+      if (close < 0) break;
+      labels.push(arrow.slice(i + 1, close));
+      i = close + 1;
+    } else if (arrow[i] === arrowChar) {
+      i++;
+    } else {
+      break;
+    }
+  }
+
+  if (arrowChar === '>') {
+    if (labels.length === 0) return '\\to';
+    if (labels.length === 1) return `\\xrightarrow{${labels[0]}}`;
+    return `\\xrightarrow[${labels[1]}]{${labels[0]}}`;
+  }
+
+  if (arrowChar === '<') {
+    if (labels.length === 0) return '\\leftarrow';
+    if (labels.length === 1) return `\\xleftarrow{${labels[0]}}`;
+    return `\\xleftarrow[${labels[1]}]{${labels[0]}}`;
+  }
+
+  if (arrowChar === 'V') {
+    if (labels.length === 0) return '\\downarrow';
+    return `\\downarrow_{${labels[labels.length - 1]}}`;
+  }
+
+  if (arrowChar === 'A') {
+    if (labels.length === 0) return '\\uparrow';
+    return `\\uparrow^{${labels[labels.length - 1]}}`;
+  }
+
+  return '';
+}
+
 // ─── Conservative LaTeX repair ───────────────────────────
 //
 // Surgical fixes for common model hallucination patterns.
@@ -144,6 +320,9 @@ function RawLatexFallback({ formula, display }: { formula: string; display: bool
 function repairLatex(formula: string): string {
   if (!formula) return "";
   let s = formula;
+
+  // ── 0. Convert \begin{CD}...\end{CD} to KaTeX-compatible matrix ──
+  s = convertCDtoMatrix(s);
 
   // ── 1. Convert \big{ \Big{ \bigg{ \Bigg{ (and }) to explicit \bigl \bigr ──
   s = s
