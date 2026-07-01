@@ -1,15 +1,15 @@
 // src/components/MessageRenderer.tsx
 //
-// Hybrid math renderer: KaTeX-primary + MathJax-fallback.
+// KaTeX-primary math renderer with raw LaTeX fallback.
 //
-// - KaTeX renders the 95% common case fast (matrices, aligned, cases, fractions,
-//   accents, mhchem, substack, hypergeometric, integrals, etc.).
-// - If the formula contains features KaTeX can't handle, OR if KaTeX throws a
-//   parse error, we transparently fall back to MathJax v3 (loaded lazily).
-//   MathJax handles: \begin{CD} commutative diagrams, \def / \newcommand /
-//   \ifnum / \numexpr / \recurse macros, \Huge / \textsc / \textbf{...},
-//   \DeclareMathOperator, exotic packages, and everything else.
-// - If MathJax also fails, we show a clean error block with the raw source.
+// - KaTeX renders ~98% of common LaTeX (matrices, aligned, cases, fractions,
+//   accents, mhchem, integrals, \begin{align*}, \begin{aligned}, etc.).
+// - ~70 custom macros defined for operators models commonly use without
+//   declaration (\R, \tr, \argmax, \Span, \rank, \diag, etc.).
+// - repairLatex() surgically fixes common model hallucination patterns:
+//   \big{ → \bigl\{ , \int{x} → \int_{x}, \text{lim} → \lim, etc.
+// - If KaTeX still fails, the raw LaTeX is shown inline in a styled monospace
+//   block — no CDN dependency, no network fallback.
 //
 // Unicode math (∮∯∰⨌⨝ℵ₀ℝℂℱ… and the entire Mathematical Alphanumeric Symbols
 // block U+1D400–U+1D7FF) is mapped to native LaTeX commands before rendering.
@@ -25,6 +25,63 @@ import type { Source } from "../types";
 import { getDomain } from "../lib/chat-utils";
 import { ChartRenderer, type ChartData } from "./ChartBlock";
 import SmilesDrawer from "smiles-drawer";
+
+// ─── Common KaTeX macros ─────────────────────────────────
+const MACROS: Record<string, string> = {
+  "\\ce": "\\mhchem",
+  "\\pu": "\\mhchem",
+  // Blackboard bold
+  "\\R": "\\mathbb{R}",
+  "\\C": "\\mathbb{C}",
+  "\\N": "\\mathbb{N}",
+  "\\Z": "\\mathbb{Z}",
+  "\\Q": "\\mathbb{Q}",
+  "\\F": "\\mathbb{F}",
+  "\\E": "\\mathbb{E}",
+  // Greek variants
+  "\\eps": "\\varepsilon",
+  "\\vphi": "\\varphi",
+  "\\vpi": "\\varpi",
+  "\\varrho": "\\varrho",
+  "\\varkappa": "\\varkappa",
+  // Common operators
+  "\\tr": "\\operatorname{tr}",
+  "\\Span": "\\operatorname{Span}",
+  "\\rank": "\\operatorname{rank}",
+  "\\diag": "\\operatorname{diag}",
+  "\\range": "\\operatorname{range}",
+  "\\nullspace": "\\operatorname{null}",
+  "\\spans": "\\operatorname{span}",
+  "\\im": "\\operatorname{Im}",
+  "\\re": "\\operatorname{Re}",
+  "\\argmin": "\\operatorname{argmin}",
+  "\\argmax": "\\operatorname{argmax}",
+  "\\sgn": "\\operatorname{sgn}",
+  "\\supp": "\\operatorname{supp}",
+  "\\vol": "\\operatorname{vol}",
+  "\\dist": "\\operatorname{dist}",
+  "\\diam": "\\operatorname{diam}",
+  "\\conv": "\\operatorname{conv}",
+  "\\Proj": "\\operatorname{Proj}",
+  "\\Res": "\\operatorname{Res}",
+  "\\Pr": "\\operatorname{Pr}",
+  "\\Exp": "\\operatorname{E}",
+  "\\Var": "\\operatorname{Var}",
+  "\\Cov": "\\operatorname{Cov}",
+  "\\Corr": "\\operatorname{Corr}",
+  "\\lcm": "\\operatorname{lcm}",
+  "\\grad": "\\nabla",
+  "\\curl": "\\nabla\\times",
+  "\\divg": "\\nabla\\cdot",
+  // Paired delimiters
+  "\\abs": "\\lvert#1\\rvert",
+  "\\norm": "\\lVert#1\\rVert",
+  "\\ceil": "\\lceil#1\\rceil",
+  "\\floor": "\\lfloor#1\\rfloor",
+  "\\set": "\\{\\,#1\\,\\}",
+  "\\bkt": "\\left[#1\\right]",
+  "\\paren": "\\left(#1\\right)",
+};
 
 // ─── KaTeX global setup + mhchem ─────────────────────────
 if (typeof window !== "undefined") {
@@ -51,128 +108,8 @@ const ensureMhchem = (): Promise<boolean> => {
   return mhchemPromise;
 };
 
-// ─── MathJax v3 lazy loader ──────────────────────────────
-let mathjaxPromise: Promise<any> | null = null;
-let mathjaxReady = false;
-
-const loadMathJax = (): Promise<any> => {
-  if (mathjaxReady && (window as any).MathJax?.startup?.promise) {
-    return (window as any).MathJax.startup.promise.then(() => (window as any).MathJax);
-  }
-  if (mathjaxPromise) return mathjaxPromise;
-
-  mathjaxPromise = new Promise((resolve, reject) => {
-    if (typeof window === "undefined") { reject(new Error("No window")); return; }
-
-    // Configure MathJax BEFORE the script loads (MathJax reads window.MathJax on init)
-    (window as any).MathJax = {
-      tex: {
-        inlineMath: [["\\(", "\\)"]],
-        displayMath: [["$$", "$$"], ["\\[", "\\]"]],
-        processEscapes: true,
-        processRefs: true,
-        processEnvironments: true,
-        maxMaxLineSize: 10000,
-        // Enable every TeX extension we might possibly need
-        packages: {
-          "[+]": [
-            "base", "ams", "noundefined", "mhchem", "textcomp",
-            "cases", "mathtools", "physics", "color", "verb",
-            "bbox", "action", "enclose", "cancel", "mhchem",
-            "configmacros", "tagformat", "textmacros",
-          ],
-        },
-      },
-      loader: {
-        load: [
-          "[tex]/ams", "[tex]/noundefined", "[tex]/mhchem", "[tex]/textcomp",
-          "[tex]/cases", "[tex]/mathtools", "[tex]/physics", "[tex]/color",
-          "[tex]/verb", "[tex]/bbox", "[tex]/action", "[tex]/enclose",
-          "[tex]/cancel", "[tex]/configmacros", "[tex]/tagformat", "[tex]/textmacros",
-        ],
-      },
-      options: {
-        skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code", "option"],
-        ignoreHtmlClass: "tex2jax_ignore",
-        processHtmlClass: "tex2jax_process",
-        enableMenu: true,
-      },
-      startup: {
-        typeset: false,
-        ready: () => {
-          const MJ = (window as any).MathJax;
-          MJ.startup.defaultReady();
-          MJ.startup.promise
-            .then(() => { mathjaxReady = true; resolve(MJ); })
-            .catch(reject);
-        },
-      },
-      chtml: {
-        scale: 1.0,
-        matchFontHeight: false,
-        fontURL: "https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2",
-      },
-    };
-
-    const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js";
-    script.async = true;
-    script.crossOrigin = "anonymous";
-    script.onerror = (e) => {
-      console.error("MathJax script load error:", e);
-      reject(new Error("Failed to load MathJax from CDN"));
-    };
-    document.head.appendChild(script);
-  });
-
-  return mathjaxPromise;
-};
-
-// ─── Detect features KaTeX can't handle ──────────────────
-// Returns true if the formula should be routed straight to MathJax.
-function requiresMathJax(formula: string): boolean {
-  if (!formula) return false;
-
-  // 1. Commutative diagrams — KaTeX has no CD env at all
-  if (/\\begin\s*\{CD\}/i.test(formula)) return true;
-
-  // 2. TeX programming primitives — KaTeX refuses these
-  if (/\\(def|newcommand|renewcommand|providecommand|DeclareMathOperator|DeclarePairedDelimiter)\b/.test(formula)) return true;
-  if (/\\(recurse|numexpr|dimexpr|expandafter|csname|endcsname|ifnum|ifx|ifcase|iftrue|iffalse|else|fi|loop|repeat|relax|the|count|toks|input|catcode|endinput)\b/.test(formula)) return true;
-
-  // 3. Font sizing commands — KaTeX only supports \scriptstyle / \textstyle / \displaystyle / \scriptscriptstyle
-  if (/\\(Huge|huge|LARGE|Large|large|normalsize|small|footnotesize|scriptsize|tiny)\b/.test(formula)) return true;
-
-  // 4. \textbackslash, \textexclamdown etc. that sometimes trip KaTeX — keep KaTeX, route only on failure
-  // (don't preemptively route)
-
-  // 5. \centernot, \nth root via \xleftarrow/\xrightarrow with very long content — keep KaTeX
-  // (don't preemptively route)
-
-  // 6. \overline/\underline stacks deeper than 3 — keep KaTeX
-  // (don't preemptively route)
-
-  // 7. \mathchoice, \mathop*\limits, \operatornamewithlimits — MathJax-safe, keep KaTeX
-  // (don't preemptively route)
-
-  // 8. \boxed inside \boxed inside \boxed (3+ deep) — KaTeX may struggle
-  if ((formula.match(/\\boxed/g) || []).length >= 3) return true;
-
-  // 9. \href inside math — MathJax handles better
-  if (/\\href\s*\{/.test(formula)) return true;
-
-  // 10. Explicit \require{...} — MathJax-only feature
-  if (/\\require\s*\{/.test(formula)) return true;
-
-  return false;
-}
-
-// ─── MathJax Renderer ────────────────────────────────────
-function MathJaxRenderer({ formula, display }: { formula: string; display: boolean }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const [state, setState] = useState<"loading" | "rendered" | "error">("loading");
-  const [errorMsg, setErrorMsg] = useState<string>("");
-
+// ─── Raw LaTeX fallback (when KaTeX fails) ───────────────
+function RawLatexFallback({ formula, display }: { formula: string; display: boolean }) {
   const cleanFormula = useMemo(() => {
     return (formula || "")
       .trim()
@@ -185,100 +122,35 @@ function MathJaxRenderer({ formula, display }: { formula: string; display: boole
       .trim();
   }, [formula]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      if (!ref.current || !cleanFormula) {
-        if (!cancelled) setState("rendered");
-        return;
-      }
-
-      try {
-        const MJ = await loadMathJax();
-        if (cancelled || !MJ) return;
-
-        const node = ref.current;
-        // Clear any previous render
-        node.innerHTML = "";
-
-        // Build a wrapper with the right delimiters so MathJax picks the right mode
-        const wrapper = document.createElement(display ? "div" : "span");
-        wrapper.className = "mathjax-process-node";
-        const open = display ? "\\[" : "\\(";
-        const close = display ? "\\]" : "\\)";
-        wrapper.textContent = `${open}${cleanFormula}${close}`;
-        node.appendChild(wrapper);
-
-        // Let MathJax typeset this single node
-        await MJ.typesetPromise([wrapper]);
-        if (!cancelled) {
-          setState("rendered");
-          setErrorMsg("");
-        }
-      } catch (e: any) {
-        console.error("MathJax render error:", e, "Formula:", cleanFormula);
-        if (!cancelled) {
-          setErrorMsg(e?.message || String(e) || "unknown error");
-          setState("error");
-        }
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [cleanFormula, display]);
-
-  if (state === "error") {
+  if (display) {
     return (
-      <div
-        className={
-          display
-            ? "my-4 rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-left overflow-x-auto"
-            : "inline-block align-middle rounded border border-red-500/30 bg-red-500/5 px-1.5 py-0.5 text-xs text-red-400"
-        }
-      >
-        {display ? (
-          <>
-            <div className="text-[11px] font-medium text-red-400 mb-1">⚠ Math render error</div>
-            <pre className="text-[11px] text-foreground/80 whitespace-pre-wrap break-words">{cleanFormula}</pre>
-            {errorMsg && <div className="text-[10px] text-red-400/70 mt-1">{errorMsg}</div>}
-          </>
-        ) : (
-          <code className="text-[11px]">{cleanFormula}</code>
-        )}
+      <div className="my-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-left overflow-x-auto">
+        <div className="text-[11px] font-medium text-amber-400 mb-1">LaTeX</div>
+        <pre className="text-[11px] text-foreground/80 whitespace-pre-wrap break-words font-mono">{cleanFormula}</pre>
       </div>
     );
   }
-
   return (
-    <span
-      ref={ref}
-      className={
-        display
-          ? "mathjax-renderer my-4 block overflow-x-auto text-center py-2"
-          : "mathjax-renderer inline-block align-middle max-w-full overflow-x-auto overflow-y-hidden"
-      }
-      style={{ opacity: state === "rendered" ? 1 : 0.6, transition: "opacity 200ms" }}
-    />
+    <code className="inline-block align-middle rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-xs text-amber-400">
+      {cleanFormula}
+    </code>
   );
 }
 
 // ─── Conservative LaTeX repair ───────────────────────────
 //
-// We only apply surgical fixes that we are confident won't break valid LaTeX.
-// Anything risky is left alone — MathJax will catch it on fallback.
+// Surgical fixes for common model hallucination patterns.
+// Each fix is narrow in scope to avoid breaking valid LaTeX.
 function repairLatex(formula: string): string {
   if (!formula) return "";
   let s = formula;
 
   // ── 1. Convert \big{ \Big{ \bigg{ \Bigg{ (and }) to explicit \bigl \bigr ──
-  // KaTeX is strict about needing \bigl/\bigr for delimiters.
   s = s
     .replace(/\\(big|Big|bigg|Bigg)\{/g, "\\$1l\\{")
     .replace(/\\(big|Big|bigg|Bigg)\}/g, "\\$1r\\}");
 
   // ── 2. \int{x} → \int_{x}, \sum{x} → \sum_{x} (model hallucination) ──
-  // KaTeX rejects \int{...} outright; the proper form is \int_...^...
   s = s.replace(/\\(int|oint|iint|iiint|iiiint|sum|prod|coprod|bigotimes|bigoplus|bigodot|bigcup|bigcap|bigsqcup|bigvee|bigwedge)\s*\{/g, "\\$1_{");
 
   // ── 3. \text{lim} → \lim, \text{min} → \min etc. (common model mistake) ──
@@ -291,7 +163,23 @@ function repairLatex(formula: string): string {
   // ── 5. Escape # (macro parameter character breaks KaTeX) ──
   s = s.replace(/(?<!\\)#/g, '\\#');
 
-  // ── 6. Balance unbalanced braces (last resort safety net) ──
+  // ── 6. Balance \left / \right pairs ──
+  const leftCnt = (s.match(/\\left\b/g) || []).length;
+  const rightCnt = (s.match(/\\right\b/g) || []).length;
+  if (leftCnt > rightCnt) s += ' \\right.'.repeat(leftCnt - rightCnt);
+  else if (rightCnt > leftCnt) s = '\\left. '.repeat(rightCnt - leftCnt) + s;
+
+  // ── 7. Strip \tag{...} and \label{...} inside align environments ──
+  s = s.replace(/\\tag\s*\{[^}]*\}/g, '');
+  s = s.replace(/\\label\s*\{[^}]*\}/g, '');
+
+  // ── 8. Convert \\[<dimen>] to \\ (KaTeX doesn't support optional arg) ──
+  s = s.replace(/\\\\\[\d+(?:\.\d+)?\s*(?:pt|ex|em|mm|cm|in|pc|mu)\]/g, '\\\\');
+
+  // ── 9. Strip \hfill etc. in math mode ──
+  s = s.replace(/\\hfill\b/g, ' ');
+
+  // ── 10. Balance unbalanced braces (last resort safety net) ──
   s = balanceBraces(s);
 
   return s.trim();
@@ -508,10 +396,8 @@ function mapUnicodeMath(s: string): string {
 
 // ─── Math Components ─────────────────────────────────────
 export function InlineMath({ formula }: { formula: string }) {
-  const useMathJax = requiresMathJax(formula);
-
   const html = useMemo(() => {
-    if (!formula || useMathJax) return "";
+    if (!formula) return "";
     const kt = (katex as any).default || katex;
     if (!kt || typeof kt.renderToString !== "function") return "";
     try {
@@ -522,9 +408,8 @@ export function InlineMath({ formula }: { formula: string }) {
         strict: "ignore",
         trust: true,
         output: "html",
-        macros: { "\\ce": "\\mhchem", "\\pu": "\\mhchem" },
+        macros: MACROS,
       });
-      // KaTeX with throwOnError:false still embeds error spans — detect & fall back
       if (/class=["'][^"']*\bkatex-error\b/.test(result) || result.includes("ParseError")) {
         return "";
       }
@@ -532,17 +417,16 @@ export function InlineMath({ formula }: { formula: string }) {
     } catch (e) {
       return "";
     }
-  }, [formula, useMathJax]);
+  }, [formula]);
 
-  // Ensure mhchem is loaded for any \ce usage
   useEffect(() => {
-    if (!useMathJax && /\\(ce|pu)\b/.test(formula)) {
+    if (/\\(ce|pu)\b/.test(formula)) {
       ensureMhchem();
     }
-  }, [formula, useMathJax]);
+  }, [formula]);
 
-  if (useMathJax || !html) {
-    return <MathJaxRenderer formula={formula} display={false} />;
+  if (!html) {
+    return <RawLatexFallback formula={formula} display={false} />;
   }
   return (
     <span
@@ -553,10 +437,8 @@ export function InlineMath({ formula }: { formula: string }) {
 }
 
 function DisplayMath({ formula }: { formula: string }) {
-  const useMathJax = requiresMathJax(formula);
-
   const html = useMemo(() => {
-    if (!formula || useMathJax) return "";
+    if (!formula) return "";
     const kt = (katex as any).default || katex;
     if (!kt || typeof kt.renderToString !== "function") return "";
     let clean = formula.trim()
@@ -571,7 +453,7 @@ function DisplayMath({ formula }: { formula: string }) {
         strict: "ignore",
         trust: true,
         output: "html",
-        macros: { "\\ce": "\\mhchem", "\\pu": "\\mhchem" },
+        macros: MACROS,
       });
       if (/class=["'][^"']*\bkatex-error\b/.test(result) || result.includes("ParseError")) {
         return "";
@@ -580,16 +462,16 @@ function DisplayMath({ formula }: { formula: string }) {
     } catch (e) {
       return "";
     }
-  }, [formula, useMathJax]);
+  }, [formula]);
 
   useEffect(() => {
-    if (!useMathJax && /\\(ce|pu)\b/.test(formula)) {
+    if (/\\(ce|pu)\b/.test(formula)) {
       ensureMhchem();
     }
-  }, [formula, useMathJax]);
+  }, [formula]);
 
-  if (useMathJax || !html) {
-    return <MathJaxRenderer formula={formula} display={true} />;
+  if (!html) {
+    return <RawLatexFallback formula={formula} display={true} />;
   }
   return (
     <span

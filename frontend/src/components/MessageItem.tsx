@@ -1235,7 +1235,10 @@ function deepCleanAnswer(raw: string): string {
     .replace(/<\|tool_calls_section_begin\|>[\s\S]*?(?:<\|tool_calls_section_end\|>|$)/gi, '')
     .replace(/<\|tool_call_begin\|>[\s\S]*?(?:<\|tool_call_end\|>|$)/gi, '')
     .replace(/<\|tool_calls_section_(?:begin|end)\|>/gi, '')
-    .replace(/<\|tool_call_(?:begin|end)\|>/gi, '');
+    .replace(/<\|tool_call_(?:begin|end)\|>/gi, '')
+    // 7. Strip echoed code output from model answer (stdout/stderr restated in text)
+    .replace(/```(?:stdout|stderr|output|result|bash_output|python_output)\s*\n[\s\S]*?\n```/gi, '')
+    .replace(/^(?:Output|Result|Stdout|Stderr)\s*:\s*$/gim, '');
 
   // Explicitly strip multiple trailing newlines before the final trim
   return clean.replace(/\n+$/, "").trim();
