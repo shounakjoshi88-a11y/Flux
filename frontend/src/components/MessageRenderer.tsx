@@ -137,6 +137,88 @@ function RawLatexFallback({ formula, display }: { formula: string; display: bool
   );
 }
 
+// ─── MathJax fallback for features KaTeX can't handle ────
+// KaTeX doesn't support: \multicolumn, \intertext, \genfrac, \xymatrix, \halign.
+// We lazily load MathJax v3 from CDN only when needed.
+
+let mjPromise: Promise<any> | null = null;
+let mjReady = false;
+
+function needsMathJax(formula: string): boolean {
+  if (!formula) return false;
+  return /\\multicolumn\b/.test(formula) ||
+    /\\intertext\b/.test(formula) ||
+    /\\genfrac\b/.test(formula) ||
+    /\\xymatrix\b/.test(formula) ||
+    /\\halign\b/.test(formula);
+}
+
+function MathJaxRenderer({ formula, display }: { formula: string; display: boolean }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [state, setState] = useState<"loading" | "rendered" | "error">("loading");
+  const [errMsg, setErrMsg] = useState("");
+
+  const cleanFormula = useMemo(() => {
+    return (formula || "")
+      .trim()
+      .replace(/^\$\$/, "").replace(/\$\$$/, "")
+      .replace(/^\\\[/, "").replace(/\\\]$/, "")
+      .replace(/^\\\(/, "").replace(/\\\)$/, "")
+      .trim();
+  }, [formula]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!ref.current || !cleanFormula) { if (!cancelled) setState("rendered"); return; }
+      try {
+        if (!mjReady) {
+          setState("loading");
+          if (!mjPromise) {
+            (window as any).MathJax = {
+              tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["$$", "$$"], ["\\[", "\\]"]], processEscapes: true, processEnvironments: true, packages: { "[+]": ["xy"] } },
+              loader: { load: ["[tex]/xy"] },
+              options: { ignoreHtmlClass: "tex2jax_ignore", processHtmlClass: "tex2jax_process" },
+              startup: { typeset: false, ready: () => { (window as any).MathJax.startup.defaultReady(); (window as any).MathJax.startup.promise.then(() => { mjReady = true; }).catch(() => {}); } },
+              chtml: { scale: 1.0, fontURL: "https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2" },
+            };
+            const s = document.createElement("script");
+            s.src = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js";
+            s.async = true; s.crossOrigin = "anonymous";
+            mjPromise = new Promise((resolve, reject) => { s.onload = resolve; s.onerror = reject; });
+            document.head.appendChild(s);
+          }
+          await mjPromise;
+        }
+        if (cancelled || !ref.current) return;
+        const node = ref.current;
+        node.innerHTML = "";
+        const wrapper = document.createElement(display ? "div" : "span");
+        wrapper.className = "mathjax-node";
+        wrapper.textContent = `${display ? "\\[" : "\\("}${cleanFormula}${display ? "\\]" : "\\)"}`;
+        node.appendChild(wrapper);
+        await (window as any).MathJax.typesetPromise([wrapper]);
+        if (!cancelled) { setState("rendered"); setErrMsg(""); }
+      } catch (e: any) {
+        if (!cancelled) { setErrMsg(e?.message || String(e)); setState("error"); }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [cleanFormula, display]);
+
+  if (state === "loading") {
+    return display
+      ? <div className="my-4 text-center text-xs text-muted-foreground animate-pulse">Rendering complex formula…</div>
+      : <span className="text-xs text-muted-foreground animate-pulse">⋯</span>;
+  }
+  if (state === "error") {
+    return <RawLatexFallback formula={formula} display={display} />;
+  }
+  return display
+    ? <span ref={ref} className="my-4 text-center overflow-x-auto max-w-full py-2 block" />
+    : <span ref={ref} className="inline-math-container inline-block align-middle max-w-full overflow-x-auto overflow-y-hidden" />;
+}
+
 // ─── Commutative diagram (\begin{CD}) → KaTeX matrix ─────
 // KaTeX doesn't support the CD environment. We convert it to
 // a \begin{matrix} with \xrightarrow / \xleftarrow / \downarrow / \uparrow.
@@ -526,6 +608,11 @@ function mapUnicodeMath(s: string): string {
 
 // ─── Math Components ─────────────────────────────────────
 export function InlineMath({ formula }: { formula: string }) {
+  // Route directly to MathJax for features KaTeX doesn't support
+  if (needsMathJax(formula)) {
+    return <MathJaxRenderer formula={formula} display={false} />;
+  }
+
   const html = useMemo(() => {
     if (!formula) return "";
     const kt = (katex as any).default || katex;
@@ -567,6 +654,11 @@ export function InlineMath({ formula }: { formula: string }) {
 }
 
 function DisplayMath({ formula }: { formula: string }) {
+  // Route directly to MathJax for features KaTeX doesn't support
+  if (needsMathJax(formula)) {
+    return <MathJaxRenderer formula={formula} display={true} />;
+  }
+
   const html = useMemo(() => {
     if (!formula) return "";
     const kt = (katex as any).default || katex;
