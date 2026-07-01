@@ -772,11 +772,33 @@ export default function Dashboard() {
   }, [retry]);
 
   const handleEdit = useCallback((messageId: string | number, newContent: string) => {
-    setMessages((prev) => prev.map((m) =>
-      String(m.id) === String(messageId) ? { ...m, content: newContent } : m
-    ));
-    retry(newContent);
-  }, [retry, setMessages]);
+    // Use the SSE transport for edit; if WS is active it'll automatically
+    // be skipped (the edit goes through chatSubmit → SSE handleSubmit).
+    const filesToSend = [...attachedFiles];
+    chatSubmit(
+      newContent,
+      activeConversationId,
+      selectedModel,
+      filesToSend,
+      {
+        onNewConversationId: (id) => {
+          setActiveConversationId(id);
+          activeConversationIdRef.current = id;
+        },
+        onStreamUpdate: (parsed) => setActiveSources(parsed.sources),
+        onPermissionRequest: (request) => {
+          console.log('[PERMISSION] Tool permission requested:', request);
+        },
+        onComplete: () => {
+          const id = activeConversationIdRef.current;
+          if (id) conversationCacheRef.current.delete(id);
+          loadConversations();
+        },
+        editMessageId: messageId,
+        fileContent: "",
+      }
+    );
+  }, [chatSubmit, activeConversationId, selectedModel, attachedFiles, loadConversations]);
 
   // ── Jump to prompt ──
   const handleJumpToPrompt = useCallback((messageId: string | number) => {

@@ -22,6 +22,10 @@ type UseChatCallbacks = {
   fileContent?: string;
   attachedFiles?: { name: string; content?: string }[];
   replaceLastAssistant?: boolean;
+  /** When set, truncate all messages after the message with this ID,
+   *  replace its content with the incoming prompt, and append a new
+   *  optimistic assistant.  Used for "edit + resend". */
+  editMessageId?: string | number;
 };
 
 let nextId = 1;
@@ -220,6 +224,21 @@ export function useChat(user: any) {
       };
 
       setMessages((prev) => {
+        // ── Edit + resend: truncate at the edited message ──
+        if (callbacks?.editMessageId != null) {
+          const editId = String(callbacks.editMessageId);
+          const idx = prev.findIndex((m) => String(m.id) === editId);
+          if (idx >= 0) {
+            const prefix = prev.slice(0, idx);
+            return [
+              ...prefix,
+              { ...optimisticUser, id: prev[idx]!.id, content: prompt },
+              optimisticAssistant,
+            ];
+          }
+          // fallback: append normally
+        }
+        // ── Retry / rewrite: replace the last assistant ──
         if (callbacks?.replaceLastAssistant) {
           const replaced = [...prev];
           for (let i = replaced.length - 1; i >= 0; i--) {
@@ -231,6 +250,7 @@ export function useChat(user: any) {
           }
           return [...replaced, optimisticAssistant];
         }
+        // ── Normal: append user + assistant ──
         return [...prev, optimisticUser, optimisticAssistant];
       });
 
@@ -251,6 +271,12 @@ export function useChat(user: any) {
         const incomingConversationId = response.headers.get("X-Conversation-Id");
         if (incomingConversationId && callbacks?.onNewConversationId) {
           callbacks.onNewConversationId(incomingConversationId);
+          // Persist the real conversation ID into lastRequestRef so retry()
+          // doesn't pass "" to the backend (which would create a new thread).
+          lastRequestRef.current = {
+            ...lastRequestRef.current,
+            activeConversationId: incomingConversationId,
+          };
         }
 
         const reader = response.body.getReader();
