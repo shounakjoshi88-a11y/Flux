@@ -2959,6 +2959,10 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
                     return '__TOOL_BLOCKED__ You already have substantial search results from 3 searches. ANSWER THE USER NOW using the accumulated information. Do NOT call any more tools.';
                 }
                 const cid = activeConversationId || 'default';
+                // Emit code_execution FIRST so streaming output lines have a visible container
+                if (!res.writableEnded) {
+                    res.write(`event: code_execution\ndata: ${JSON.stringify({ code: code || '', language: 'python' })}\n\n`);
+                }
                 sendStatus(res, 'sandbox_start', 'Starting Python execution...', { tool: 'run_python' }, state.thoughtProcess);
                 try {
                     const result = await codeExecutor.runPython(cid, code || '', (type, line) => {

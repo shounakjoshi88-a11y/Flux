@@ -1,20 +1,22 @@
 {
   "name": "flux",
   "version": "1.0.0",
+  "description": "Flux — Your AI research companion",
+  "author": "Shounak Joshi",
   "private": true,
+  "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
-    "dev": "powershell -ExecutionPolicy Bypass -File flux.ps1",
-    "postinstall": "cd backend && bunx prisma generate && cd ..",
-    "electron:build-frontend": "cd frontend && bun run build",
-    "electron:build-backend": "bun build backend/index.ts --compile --outfile=dist-electron/backend/flux-backend.exe --external=@edge-tts/universal",
-    "electron:build-all": "bun run electron:build-frontend && bun run electron:build-backend",
-    "electron:dev": "bun run electron:build-all && electron .",
-    "electron:dist": "bun run electron:build-all && electron-builder --win --config electron-builder.yml"
+    "electron:compile": "tsc -p electron/tsconfig.json && copy electron\\splash.html dist-electron\\splash.html",
+    "electron:dev": "npm run electron:compile && electron .",
+    "electron:dist": "npm run electron:compile && electron-builder --win --config electron-builder.yml",
+    "electron:dist:mac": "npm run electron:compile && electron-builder --mac --config electron-builder.yml",
+    "postinstall": "cd backend && bunx prisma generate && cd .."
   },
   "devDependencies": {
-    "electron": "^35.0.0",
+    "electron": "^35.7.5",
     "electron-builder": "^26.0.0",
+    "png-to-ico": "^3.0.1",
     "typescript": "^5.8.0"
   }
 }

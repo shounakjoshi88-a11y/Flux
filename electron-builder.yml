@@ -1,24 +1,59 @@
-appId: com.flux.app
+appId: com.flux.desktop
 productName: Flux
-copyright: Copyright © 2026
+copyright: Copyright © 2026 Flux
 
 directories:
   output: release
   buildResources: build
 
+# Files to include in the app package
 files:
   - dist-electron/**/*
-  - frontend/dist/**/*
+  - electron/splash.html
+  - "!node_modules/**"
+  - "!backend/**"
+  - "!frontend/src/**"
+  - "!frontend/node_modules/**"
 
+extraResources:
+  - from: frontend/src/icon-512.png
+    to: icon-512.png
+
+# Windows
 win:
   target:
     - target: nsis
       arch:
         - x64
-  icon: frontend/src/icon-512.png
+  icon: build/icon.ico
 
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
+  createStartMenuShortcut: true
   shortcutName: Flux
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeader: build/icon.ico
+  deleteAppDataOnUninstall: false
+
+# macOS (future)
+mac:
+  category: public.app-category.productivity
+  icon: frontend/src/icon-512.png
+  target:
+    - dmg
+
+# Linux (future)
+linux:
+  category: Office
+  icon: frontend/src/icon-512.png
+  target:
+    - AppImage
+
+# Auto-update (GitHub Releases)
+publish:
+  provider: github
+  owner: shounakjoshi88-a11y
+  repo: Flux
