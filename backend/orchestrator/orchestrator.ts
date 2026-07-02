@@ -345,7 +345,7 @@ export class OrchestratorEngine {
       const loc = locLine ? locLine.replace(/^Live weather for\s+/, '').replace(/\s+\(via.*$/, '') : '';
       const temp = tempLine ? tempLine.replace(/^Temperature\s*:\s*/, '') : '';
       const cond = condLine ? condLine.replace(/^Conditions\s*:\s*/, '') : '';
-      const summary = [loc, temp, cond].filter(Boolean).join(' — ');
+      const summary = [temp && `Currently ${temp}`, cond && `with ${cond.toLowerCase()}`, loc && `in ${loc}`].filter(Boolean).join(' ');
       return {
         text: summary || weatherResult.text.slice(0, 120),
         sources: agentState.sources,
