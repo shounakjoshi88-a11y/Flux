@@ -2,7 +2,7 @@
 import { generateText } from 'ai';
 import * as crypto from 'crypto';
 import { prisma } from './db';
-import { getEmbedding } from './local-embedder';
+import { getEmbedding, getEmbeddings } from './local-embedder';
 
 async function getEmbeddingVector(text: string): Promise<number[]> {
   return getEmbedding(text);
@@ -129,11 +129,17 @@ ${messages.map(m => `${m.role}: ${m.content}`).join('\n')}`;
     return;
   }
 
-  // ── Store each fact ────────────────────────────────────────
-  for (const fact of facts) {
-    if (!fact.fact || !fact.category) continue;
+  // ── Store facts in batch ────────────────────────────────────
+  const factsToStore = facts.filter((f: any) => f.fact && f.category);
+  if (factsToStore.length === 0) return;
 
-    const embedding = await getEmbeddingVector(fact.fact);
+  // Batch-embed all facts at once via the Worker
+  const factTexts = factsToStore.map((f: any) => f.fact);
+  const embeddings = await getEmbeddings(factTexts);
+
+  // Upsert each fact in parallel
+  await Promise.all(factsToStore.map(async (fact: any, i: number) => {
+    const embedding = embeddings[i]!;
     const embeddingStr = `[${embedding.join(',')}]`;
 
     const similar = await prisma.$queryRawUnsafe<any[]>(
@@ -168,7 +174,7 @@ ${messages.map(m => `${m.role}: ${m.content}`).join('\n')}`;
         fact.importance,
       );
     }
-  }
+  }));
 }
 
 /**

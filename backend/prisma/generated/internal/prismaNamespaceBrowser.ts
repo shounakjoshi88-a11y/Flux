@@ -56,7 +56,9 @@ export const ModelName = {
   Message: 'Message',
   WikiNode: 'WikiNode',
   WikiEdge: 'WikiEdge',
-  Memory: 'Memory'
+  Memory: 'Memory',
+  Task: 'Task',
+  TaskStep: 'TaskStep'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -158,6 +160,48 @@ export const MemoryScalarFieldEnum = {
 } as const
 
 export type MemoryScalarFieldEnum = (typeof MemoryScalarFieldEnum)[keyof typeof MemoryScalarFieldEnum]
+
+
+export const TaskScalarFieldEnum = {
+  id: 'id',
+  conversationId: 'conversationId',
+  userId: 'userId',
+  sandboxId: 'sandboxId',
+  anchorMessageId: 'anchorMessageId',
+  status: 'status',
+  title: 'title',
+  goal: 'goal',
+  planApprovalMode: 'planApprovalMode',
+  contextSummary: 'contextSummary',
+  costEstimateSecs: 'costEstimateSecs',
+  maxDurationSecs: 'maxDurationSecs',
+  maxSteps: 'maxSteps',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  startedAt: 'startedAt',
+  completedAt: 'completedAt',
+  lastHeartbeatAt: 'lastHeartbeatAt'
+} as const
+
+export type TaskScalarFieldEnum = (typeof TaskScalarFieldEnum)[keyof typeof TaskScalarFieldEnum]
+
+
+export const TaskStepScalarFieldEnum = {
+  id: 'id',
+  taskId: 'taskId',
+  index: 'index',
+  title: 'title',
+  status: 'status',
+  dependsOn: 'dependsOn',
+  toolCalls: 'toolCalls',
+  result: 'result',
+  filesChanged: 'filesChanged',
+  startedAt: 'startedAt',
+  completedAt: 'completedAt',
+  retryCount: 'retryCount'
+} as const
+
+export type TaskStepScalarFieldEnum = (typeof TaskStepScalarFieldEnum)[keyof typeof TaskStepScalarFieldEnum]
 
 
 export const SortOrder = {

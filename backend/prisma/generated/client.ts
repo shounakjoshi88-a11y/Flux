@@ -71,3 +71,13 @@ export type WikiEdge = Prisma.WikiEdgeModel
  * 
  */
 export type Memory = Prisma.MemoryModel
+/**
+ * Model Task
+ * 
+ */
+export type Task = Prisma.TaskModel
+/**
+ * Model TaskStep
+ * 
+ */
+export type TaskStep = Prisma.TaskStepModel

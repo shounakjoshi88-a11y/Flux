@@ -151,6 +151,21 @@ export function useChat(user: any) {
     );
   };
 
+  const updateTaskPart = (taskId: string, updater: (part: any) => any) => {
+    const idx = streamingPartsRef.current.findIndex(p => p.type === 'task_ref' && p.taskId === taskId);
+    if (idx >= 0) {
+      streamingPartsRef.current = [
+        ...streamingPartsRef.current.slice(0, idx),
+        updater(streamingPartsRef.current[idx]),
+        ...streamingPartsRef.current.slice(idx + 1),
+      ];
+      const targetId = realMessageIdRef.current;
+      if (targetId) updateMessages(targetId);
+    }
+  };
+
+  const assistantMsgIdRef = useRef<string>("-1");
+
   const handleSubmit = useCallback(
     async (
       prompt: string,
@@ -213,6 +228,7 @@ export function useChat(user: any) {
       };
 
       const assistantMsgId = `temp-assistant-${nextId++}`;
+      assistantMsgIdRef.current = assistantMsgId;
       const optimisticAssistant: Message = {
         id: assistantMsgId,
         role: "Assistant",
@@ -612,6 +628,68 @@ export function useChat(user: any) {
                   updateMessages(targetId);
                 }
               } catch { }
+            }
+            // ─── TASK EVENTS — long-running multi-turn task system ───
+            else if (eventType === "task_created") {
+              try {
+                const parsed = JSON.parse(data);
+                flushPendingText();
+                const taskRef: MessagePart = { type: "task_ref", taskId: parsed.taskId, title: parsed.title, steps: parsed.existingSteps || [] };
+                const existingIdx = streamingPartsRef.current.findIndex(p => p.type === "task_ref" && p.taskId === parsed.taskId);
+                if (existingIdx >= 0) {
+                  streamingPartsRef.current = [
+                    ...streamingPartsRef.current.slice(0, existingIdx),
+                    taskRef,
+                    ...streamingPartsRef.current.slice(existingIdx + 1),
+                  ];
+                } else {
+                  addPart(taskRef);
+                }
+                updateMessages(realMessageIdRef.current ?? assistantMsgId);
+              } catch {}
+            }
+            else if (eventType === "task_step_started") {
+              try {
+                const parsed = JSON.parse(data);
+                updateTaskPart(parsed.taskId, part => ({ ...part, currentStep: parsed.stepIndex, currentStepTitle: parsed.title }));
+              } catch {}
+            }
+            else if (eventType === "task_step_completed") {
+              try {
+                const parsed = JSON.parse(data);
+                updateTaskPart(parsed.taskId, part => {
+                  const steps = [...part.steps];
+                  const existing = steps.find(s => s.index === parsed.stepIndex);
+                  if (existing) {
+                    existing.status = "done";
+                    existing.result = parsed.result;
+                  } else {
+                    steps.push({ index: parsed.stepIndex, title: parsed.title || '', status: "done" as const, result: parsed.result });
+                  }
+                  return { ...part, steps };
+                });
+              } catch {}
+            }
+            else if (eventType === "task_step_failed") {
+              try {
+                const parsed = JSON.parse(data);
+                updateTaskPart(parsed.taskId, part => {
+                  const steps = [...part.steps];
+                  const existing = steps.find(s => s.index === parsed.stepIndex);
+                  if (existing) existing.status = "failed";
+                  else steps.push({ index: parsed.stepIndex, title: '', status: "failed" as const });
+                  return { ...part, steps };
+                });
+              } catch {}
+            }
+            else if (eventType === "task_completed" || eventType === "task_failed" || eventType === "task_cancelled" || eventType === "task_timed_out") {
+              try {
+                const parsed = JSON.parse(data);
+                updateTaskPart(parsed.taskId, part => ({ ...part, status: eventType.replace('task_', ''), summary: parsed.summary || parsed.reason }));
+              } catch {}
+            }
+            else if (eventType === "task_step_progress") {
+              // Progress events update existing tool call display inside the task card
             }
             // ─── REPLACE_TEXT — synthesis is replacing a partial stream ───
             else if (eventType === "replace_text") {

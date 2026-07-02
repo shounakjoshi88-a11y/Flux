@@ -26,6 +26,10 @@ import { createAgentWebSocket } from './agent-protocol';
 import { codeExecutor } from './tools/codeExecutor';
 import { sandboxManager } from './sandbox/sandboxManager';
 import { wikiManager } from './wiki/wikiManager';
+import { isModelHealthy, recordFailure, recordSuccess, getShortTimeout } from './model-health';
+import { taskRouter, recoverInterruptedTasks } from './task-routes';
+import { classifyTaskIntent } from './task-detector';
+import { planTask, runTaskLoop } from './task-loop';
 
 // ── Lazy pdfjs-dist initializer (disables Web Workers for Bun) ─────────
 let pdfjsInit: Promise<void> | null = null;
@@ -191,13 +195,11 @@ const VISION_MODELS = new Set([
 // ── selectModel returns a proper AI SDK model instance ──
 function createFallbackModel(primaryModel: any, preferredModelId: string | undefined, modelsMap: Record<string, string>): any {
     const getFallbackSequence = (prefId?: string) => {
-        const list = ["step-3.7-flash", "kimi-k2.6"];
-        for (const key of Object.keys(modelsMap)) {
-            if (key !== prefId && key !== "kimi-k2.6" && key !== "step-3.7-flash") {
-                list.push(key);
-            }
-        }
-        return list;
+        // Exclude the already-failed primary; healthy models first, unhealthy last
+        const allKeys = Object.keys(modelsMap).filter(k => k !== prefId);
+        const healthy = allKeys.filter(k => isModelHealthy(k));
+        const unhealthy = allKeys.filter(k => !isModelHealthy(k));
+        return [...healthy, ...unhealthy];
     };
 
     return new Proxy(primaryModel, {
@@ -206,8 +208,11 @@ function createFallbackModel(primaryModel: any, preferredModelId: string | undef
                 return async function(options: any) {
                     try {
                         console.log(`[MODEL FALLBACK] Trying primary model: ${preferredModelId || target.modelId}`);
-                        return await target.doGenerate(options);
+                        const result = await target.doGenerate(options);
+                        if (preferredModelId) recordSuccess(preferredModelId);
+                        return result;
                     } catch (primaryError: any) {
+                        if (preferredModelId) recordFailure(preferredModelId);
                         console.warn(`[MODEL FALLBACK] Primary model failed:`, primaryError?.message ?? primaryError);
                         const fallbackIds = getFallbackSequence(preferredModelId);
                         for (const fallbackId of fallbackIds) {
@@ -215,8 +220,11 @@ function createFallbackModel(primaryModel: any, preferredModelId: string | undef
                                 console.log(`[MODEL FALLBACK] Trying fallback model: ${fallbackId}`);
                                 const fallbackModel = nim.chatModel(modelsMap[fallbackId]!);
                                 const fallbackOptions = { ...options, providerOptions: {} };
-                                return await fallbackModel.doGenerate(fallbackOptions);
+                                const result = await fallbackModel.doGenerate(fallbackOptions);
+                                recordSuccess(fallbackId);
+                                return result;
                             } catch (fallbackError: any) {
+                                recordFailure(fallbackId);
                                 console.warn(`[MODEL FALLBACK] Fallback model ${fallbackId} failed:`, fallbackError?.message ?? fallbackError);
                             }
                         }
@@ -226,30 +234,41 @@ function createFallbackModel(primaryModel: any, preferredModelId: string | undef
             }
             if (prop === 'doStream') {
                 return async function(options: any) {
-                    const FIRST_TOKEN_TIMEOUT = 10000;
+                    const modelTimeout = getShortTimeout(preferredModelId || 'unknown');
                     try {
-                        console.log(`[MODEL FALLBACK] Trying primary model stream: ${preferredModelId || target.modelId}`);
+                        console.log(`[MODEL FALLBACK] Trying primary model stream: ${preferredModelId || target.modelId} (timeout=${modelTimeout}ms)`);
                         const result = await Promise.race([
                             target.doStream(options),
                             new Promise<any>((_, reject) =>
-                                setTimeout(() => reject(new Error(`[TIMEOUT] ${preferredModelId || 'primary'} no response within ${FIRST_TOKEN_TIMEOUT}ms`)), FIRST_TOKEN_TIMEOUT)
+                                setTimeout(() => reject(new Error(`[TIMEOUT] ${preferredModelId || 'primary'} no response within ${modelTimeout}ms`)), modelTimeout)
                             ),
                         ]);
+                        if (preferredModelId) recordSuccess(preferredModelId);
                         return result;
                     } catch (primaryError: any) {
+                        if (preferredModelId) recordFailure(preferredModelId);
                         if (primaryError.message?.includes('[TIMEOUT]')) {
-                            console.warn(`[MODEL FALLBACK] Primary model ${preferredModelId || 'primary'} timed out (>${FIRST_TOKEN_TIMEOUT}ms) — falling back`);
+                            console.warn(`[MODEL FALLBACK] Primary model ${preferredModelId || 'primary'} timed out (>${modelTimeout}ms) — falling back`);
                         } else {
                             console.warn(`[MODEL FALLBACK] Primary model stream failed:`, primaryError?.message ?? primaryError);
                         }
                         const fallbackIds = getFallbackSequence(preferredModelId);
                         for (const fallbackId of fallbackIds) {
                             try {
-                                console.log(`[MODEL FALLBACK] Trying fallback model stream: ${fallbackId}`);
+                                const fbTimeout = getShortTimeout(fallbackId);
+                                console.log(`[MODEL FALLBACK] Trying fallback model stream: ${fallbackId} (timeout=${fbTimeout}ms)`);
                                 const fallbackModel = nim.chatModel(modelsMap[fallbackId]!);
                                 const fallbackOptions = { ...options, providerOptions: {} };
-                                return await fallbackModel.doStream(fallbackOptions);
+                                const result = await Promise.race([
+                                    fallbackModel.doStream(fallbackOptions),
+                                    new Promise<any>((_, reject) =>
+                                        setTimeout(() => reject(new Error(`[TIMEOUT] ${fallbackId} no response within ${fbTimeout}ms`)), fbTimeout)
+                                    ),
+                                ]);
+                                recordSuccess(fallbackId);
+                                return result;
                             } catch (fallbackError: any) {
+                                recordFailure(fallbackId);
                                 console.warn(`[MODEL FALLBACK] Fallback model stream ${fallbackId} failed:`, fallbackError?.message ?? fallbackError);
                             }
                         }
@@ -2457,6 +2476,31 @@ function smartRewriteQuery(rawModelQuery: string, userQuery: string): string {
 
 // ── TOOL FACTORY ───────────────────────────────────────────────────────────
 // Creates all 5 tools scoped to the current request (has access to res + state).
+// Wraps a tool's execute with a hard timeout (graceful degradation — returns error msg, doesn't hang)
+function withToolTimeout(tools: Record<string, any>, timeouts: Record<string, number>): void {
+    for (const [name, timeoutMs] of Object.entries(timeouts)) {
+        const tool = tools[name];
+        if (!tool || !tool.execute || typeof tool.execute !== 'function') continue;
+        const originalExecute = tool.execute;
+        tool.execute = async (args: any) => {
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => { ctrl.abort(); }, timeoutMs);
+            try {
+                return await Promise.race([
+                    originalExecute(args),
+                    new Promise<never>((_, reject) =>
+                        ctrl.signal.addEventListener('abort', () =>
+                            reject(new Error(`Tool "${name}" timed out after ${timeoutMs}ms`))
+                        )
+                    ),
+                ]);
+            } finally {
+                clearTimeout(timer);
+            }
+        };
+    }
+}
+
 function createFluxTools(res: any, model: any, state: AgentState, userQuery?: string, activeConversationId?: string, uid?: string, abortSignal?: AbortSignal) {
     return {
 
@@ -3712,6 +3756,9 @@ app.post('/api/wiki/rebuild', middleware, async (req: any, res: any) => {
     }
 });
 
+// ── Long-running Task System ──────────────────────────────────────
+app.use(taskRouter);
+
 // ═══════════════════════════════════════════════════════════
 // ROUTES
 // ═══════════════════════════════════════════════════════════
@@ -4103,6 +4150,52 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
         if (!query?.trim()) return res.status(400).json({ error: 'Query is required' });
         nq = query.trim().slice(0, 10_000);
 
+        // ── Long-running task detection (multi-step project builder) ──
+        const taskIntent = await classifyTaskIntent(nq).catch(() => 'SIMPLE' as const);
+        const isLongTask = taskIntent === 'LONG_TASK';
+
+        if (isLongTask) {
+            const uid = req.appUserId!;
+            const convId = conversationId ?? (
+                await prisma.conversation.create({
+                    data: { title: nq.slice(0, 120), slug: slugify(nq), userId: uid },
+                })
+            ).id;
+            activeConversationId = convId;
+
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+            res.setHeader('X-Conversation-Id', convId);
+
+            await prisma.message.create({
+                data: { content: nq, role: 'User', conversationId: convId },
+            });
+
+            const task = await prisma.task.create({
+                data: { conversationId: convId, userId: uid, title: nq.slice(0, 120), goal: nq },
+            });
+
+            const writer = {
+                writeStatus: (subtype: string, message: string, data?: any) => { if (!res.writableEnded) res.write(`event: status\ndata: ${JSON.stringify({ subtype, message, data })}\n\n`); },
+                writeText: (text: string) => { if (!res.writableEnded) res.write(`data: ${text}\n\n`); },
+                writeEvent: (event: string, data: any) => { if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); },
+                get writableEnded() { return res.writableEnded; },
+            };
+
+            writer.writeEvent('task_created', { taskId: task.id, title: nq.slice(0, 120) });
+
+            await planTask(task.id);
+            runTaskLoop(task.id, writer).catch(e => console.error('[TASK] Loop error:', e));
+
+            const safetyTimer = setTimeout(() => { if (!res.writableEnded) res.end(); }, 30_000);
+            if (typeof safetyTimer === 'object' && 'unref' in safetyTimer) (safetyTimer as any).unref();
+            req.on('close', () => { if (typeof safetyTimer === 'object' && 'unref' in safetyTimer) (safetyTimer as any).unref(); });
+
+            console.log(`[TASK] Long task created: ${task.id} — "${nq.slice(0, 80)}..."`);
+            return;
+        }
+
         const safeFile = typeof fileContent === 'string' ? fileContent.slice(0, 200_000) : '';
         const safeLoc = sanitizeLocation(location ?? '');
         if (attachedFiles && attachedFiles.length > 10)
@@ -4185,7 +4278,10 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
         const route = routeModel(pref, nq, previousQuery);
         model = selectModel(route.modelId);
         const memCtx = memEnabled
-            ? await retrieveMemories(uid, nq).then(buildMemoryContext).catch(() => '')
+            ? await Promise.race([
+                retrieveMemories(uid, nq).then(buildMemoryContext),
+                new Promise<string>(resolve => setTimeout(() => resolve(''), 300)),
+              ]).catch(() => '')
             : '';
 
         // Auto-write attached text files to the E2B sandbox so run_bash can reference them
@@ -4333,6 +4429,31 @@ To verify/analyze code: use read_file first, then use run_bash to run type-check
             }
         }
 
+        // ── Apply per-tool timeouts so no single tool can hang the response ──
+        const TOOL_TIMEOUTS: Record<string, number> = {
+            web_search: 15_000,
+            read_skill: 10_000,
+            generate_document: 60_000,
+            get_weather: 10_000,
+            generate_image: 90_000,
+            wiki_search: 10_000,
+            read_url: 10_000,
+            run_bash: 60_000,
+            run_python: 60_000,
+            shell_execute: 30_000,
+            create_project: 30_000,
+            start_app: 30_000,
+            stop_app: 10_000,
+            list_apps: 10_000,
+            get_app_logs: 10_000,
+            get_app_url: 10_000,
+            get_generated_file: 10_000,
+            file_list: 10_000,
+            file_read: 10_000,
+            file_write: 10_000,
+        };
+        withToolTimeout(tools, TOOL_TIMEOUTS);
+
         // ── StreamWriter adapter for orchestrator ──────────────────────────
         const orchStream: StreamWriter = {
             writeStatus: (subtype, message, data) => sendStatus(res, subtype, message, data, agentState.thoughtProcess),
@@ -4476,6 +4597,7 @@ To verify/analyze code: use read_file first, then use run_bash to run type-check
         // ── Close detection ──────────────────────────────────────────────
         const closedRef = { v: false };
         req.on('close', () => { closedRef.v = true; });
+        let hasBackgroundDocGen = false;
         let forceSynthesis = false;
         let partialThought = ''; // Buffer for <THOUGHT> blocks that span multiple text-delta chunks
         let synthesisWritten = false; // Suppress model output after fallback synthesis takes over
@@ -4943,9 +5065,7 @@ To verify/analyze code: use read_file first, then use run_bash to run type-check
                 }
             }
 
-            // ── Auto-document generation ─────────────────────────────────────
-            // When the user asked for a document AND the model searched the web
-            // but didn't chain to read_skill + generate_document, we do it here.
+            // ── Auto-document generation (fire-and-forget with 15s timeout) ──
             if (!closedRef.v) {
                 const safeQ = (query ?? '').toLowerCase();
                 const docIntent = safeQ.includes('pdf') ? 'pdf'
@@ -4960,42 +5080,11 @@ To verify/analyze code: use read_file first, then use run_bash to run type-check
                 const hasFiles = agentState.generatedFiles.length > 0;
 
                 if (docIntent && hasSources && !hasFiles && !res.writableEnded) {
-                    const topic = extractTopicFromQuery(query ?? '') || 'document';
-                    const searchUrls = agentState.sources.map((s: any) => s.url).join('\n');
-                    const docQuery = `Create a ${docIntent} about: ${topic}`;
-                    console.log(`[AUTO-DOC] Generating ${docIntent} for "${topic}" with ${agentState.sources.length} sources`);
-                    sendStatus(res, 'reading_skill', `Reading the ${docIntent.toUpperCase()} skill`, undefined, agentState.thoughtProcess);
-                    const skillFile = SKILL_REGISTRY[docIntent]?.fileName;
-                    const skillContent = skillFile ? await fetchSkillFile(skillFile) : '';
-                    sendStatus(res, 'reading_skill_success', `Reading the ${docIntent.toUpperCase()} skill`, undefined, agentState.thoughtProcess);
-                    sendStatus(res, 'generating_file', `Building your ${docIntent.toUpperCase()} on "${topic.slice(0, 30)}"...`, undefined, agentState.thoughtProcess);
-                    try {
-                        const searchContent = agentState.searchContent || `Search results for reference:\n${searchUrls}`;
-                        const file = await generateDocumentWithSkill(
-                            docIntent as any,
-                            docQuery,
-                            model,
-                            skillContent,
-                            searchContent
-                        );
-                        if (file) {
-                            agentState.generatedFiles.push(file);
-                            if (!res.writableEnded) {
-                                res.write(`event: file\ndata: ${JSON.stringify(file)}\n\n`);
-                            }
-                            sendStatus(res, 'generating_file_success', `Building your ${docIntent.toUpperCase()} on "${topic.slice(0, 30)}"...`, undefined, agentState.thoughtProcess);
-                            const msg = `\n\nI've created a ${docIntent.toUpperCase()} document about "${topic}" based on the search results. You can download it below.`;
-                            writeSafeSSE(res, msg);
-                            charsSent += msg.length;
-                            fullText += msg;
-                            if (typeof (res as any).flush === 'function') (res as any).flush();
-                        } else {
-                            sendStatus(res, 'generating_file_error', `Failed to build ${docIntent.toUpperCase()}`, undefined, agentState.thoughtProcess);
-                        }
-                    } catch (e: any) {
-                        console.warn('[AUTO-DOC] generation failed:', e?.message);
-                        sendStatus(res, 'generating_file_error', `Failed to build ${docIntent.toUpperCase()}: ${e.message}`, undefined, agentState.thoughtProcess);
-                    }
+                    hasBackgroundDocGen = true;
+                    const bgTopic = extractTopicFromQuery(query ?? '') || 'document';
+                    const bgSearchUrls = agentState.sources.map((s: any) => s.url).join('\n');
+                    console.log(`[AUTO-DOC] Background generating ${docIntent} for "${bgTopic}" with ${agentState.sources.length} sources`);
+                    sendStatus(res, 'generating_file', `Building your ${docIntent.toUpperCase()} on "${bgTopic.slice(0, 30)}"... (background)`, undefined, agentState.thoughtProcess);
                 }
             }
         } // end if (!orchestratorHandled)
@@ -5201,20 +5290,34 @@ CROSS-FILE RULES (when multiple files provided):
             res.write(`event: follow_ups\ndata: ${JSON.stringify(followUps)}\n\n`);
         }
 
+        // ── Send [DONE] immediately — answer stream is complete ─────────
+        // The frontend considers the answer finished; background events
+        // (file_generated, wiki_update) can still arrive on this SSE connection.
+        if (!res.writableEnded) {
+            res.write('data: [DONE]\n\n');
+        }
+
         // ── Clean text for DB (remove <FOLLOW_UPS> block) ───────────────
         const cleanAnswer = fullText
             .replace(/<FOLLOW_UPS>[\s\S]*?<\/FOLLOW_UPS>/gi, '')
             .replace(/<FOLLOW_UPS>[\s\S]*/gi, '')
             .trim();
 
-        // ── Save to database ─────────────────────────────────────────────
-        let savedMid: string | null = null;
+        // Schedule connection close: after DB save completes, or 100ms if none needed.
+        // Background jobs (auto-doc gen, wiki updates) may still fire events before close.
+        const closeConnection = () => {
+            if (!res.writableEnded) res.end();
+        };
+
         if (cleanAnswer || agentState.generatedFiles.length) {
-            try {
-                const convExists = await prisma.conversation.findUnique({
-                    where: { id: activeConversationId }, select: { id: true },
-                });
-                if (convExists) {
+            // ── Save to database (fire-and-forget — doesn't block) ────────
+            (async () => {
+                try {
+                    const convExists = await prisma.conversation.findUnique({
+                        where: { id: activeConversationId }, select: { id: true },
+                    });
+                    if (!convExists) { closeConnection(); return; }
+
                     const created = await prisma.message.create({
                         data: {
                             content: cleanAnswer,
@@ -5230,7 +5333,12 @@ CROSS-FILE RULES (when multiple files provided):
                                 : undefined,
                         },
                     });
-                    savedMid = created.id.toString();
+                    const savedMid = created.id.toString();
+
+                    if (!res.writableEnded) {
+                        res.write(`event: message_id\ndata: ${JSON.stringify({ id: savedMid })}\n\n`);
+                    }
+
                     if (!isFollowUp) autoRenameConversation(activeConversationId, nq).catch(() => { });
                     if (memEnabled && cleanAnswer) {
                         extractMemories([{ role: 'user', content: nq }, { role: 'assistant', content: cleanAnswer }], uid, activeConversationId, model)
@@ -5238,7 +5346,6 @@ CROSS-FILE RULES (when multiple files provided):
                             .catch(e => console.warn('[MEMORY]', e));
                     }
 
-                    // ── Wiki graph extraction (async, non-blocking) ────
                     if (cleanAnswer && activeConversationId && uid) {
                         wikiManager.updateGraph(uid, cleanAnswer, nq)
                             .then(result => {
@@ -5248,19 +5355,80 @@ CROSS-FILE RULES (when multiple files provided):
                             })
                             .catch(e => console.warn('[WIKI]', e));
                     }
+
+                    // ── Auto-document generation (fire-and-forget, runs after DB save so files persist) ──
+                    if (hasBackgroundDocGen) {
+                        const bgSafeQ = (query ?? '').toLowerCase();
+                        const bgDocIntent = bgSafeQ.includes('pdf') ? 'pdf'
+                            : bgSafeQ.includes('pptx') || bgSafeQ.includes('powerpoint') || bgSafeQ.includes('presentation') || bgSafeQ.includes('slide') ? 'pptx'
+                                : (bgSafeQ.includes('docx') || bgSafeQ.includes('word')) ? 'docx'
+                                    : (bgSafeQ.includes('create') || bgSafeQ.includes('generate') || bgSafeQ.includes('make') || bgSafeQ.includes('build') || bgSafeQ.includes('write') || bgSafeQ.includes('produce')) && bgSafeQ.includes('document') ? 'docx'
+                                        : bgSafeQ.includes('xlsx') || bgSafeQ.includes('excel') || bgSafeQ.includes('spreadsheet') || bgSafeQ.includes('sheet') ? 'xlsx'
+                                            : bgSafeQ.includes('csv') ? 'csv'
+                                                : null;
+                        if (bgDocIntent) {
+                            const bgTopic = extractTopicFromQuery(query ?? '') || 'document';
+                            const bgSearchUrls = agentState.sources.map((s: any) => s.url).join('\n');
+                            (async () => {
+                                try {
+                                    const skillFile = SKILL_REGISTRY[bgDocIntent]?.fileName;
+                                    const skillContent = skillFile ? await fetchSkillFile(skillFile) : '';
+                                    if (!skillContent || res.writableEnded) return;
+
+                                    const searchContent = agentState.searchContent || `Search results for reference:\n${bgSearchUrls}`;
+                                    const docQuery = `Create a ${bgDocIntent} about: ${bgTopic}`;
+
+                                    const file = await Promise.race([
+                                        generateDocumentWithSkill(bgDocIntent as any, docQuery, model, skillContent, searchContent),
+                                        new Promise<any>(resolve => setTimeout(() => { console.warn(`[AUTO-DOC] Timed out after 15s for ${bgDocIntent}`); resolve(null); }, 15_000)),
+                                    ]);
+
+                                    if (file && !res.writableEnded) {
+                                        agentState.generatedFiles.push(file);
+                                        res.write(`event: file\ndata: ${JSON.stringify(file)}\n\n`);
+                                        sendStatus(res, 'generating_file_success', `${bgDocIntent.toUpperCase()} document generated`, undefined, agentState.thoughtProcess);
+                                        const msg = `\n\nI've created a ${bgDocIntent.toUpperCase()} document about "${bgTopic}" based on the search results.`;
+                                        writeSafeSSE(res, msg);
+                                        charsSent += msg.length;
+                                        fullText += msg;
+                                        if (typeof (res as any).flush === 'function') (res as any).flush();
+                                        // Persist the generated file reference in the DB
+                                        prisma.message.update({
+                                            where: { id: created.id },
+                                            data: { generatedFiles: agentState.generatedFiles },
+                                        }).catch(e => console.warn('[AUTO-DOC] DB update failed:', e?.message));
+                                    }
+                                } catch (e: any) {
+                                    console.warn('[AUTO-DOC] Background generation failed:', e?.message);
+                                    if (!res.writableEnded) {
+                                        sendStatus(res, 'generating_file_error', `${bgDocIntent.toUpperCase()} document generation failed`, undefined, agentState.thoughtProcess);
+                                    }
+                                }
+                            })();
+                        }
+                    }
+
+                    // Keep connection open for background events (wiki + optional auto-doc gen)
+                    const closeDelay = hasBackgroundDocGen ? 16_000 : 2000;
+                    setTimeout(closeConnection, closeDelay);
+                } catch (dbe: any) {
+                    if (dbe?.code !== 'P2025') console.error('DB save error:', dbe?.message ?? dbe);
+                    if (hasBackgroundDocGen) {
+                        setTimeout(closeConnection, 16_000);
+                    } else {
+                        closeConnection();
+                    }
                 }
-            } catch (dbe: any) {
-                if (dbe?.code !== 'P2025') console.error('DB save error:', dbe?.message ?? dbe);
-            }
+            })();
+        } else {
+            // No DB save needed — close after a brief delay for any late file events
+            const noSaveDelay = hasBackgroundDocGen ? 16_000 : 100;
+            setTimeout(closeConnection, noSaveDelay);
         }
 
-        if (savedMid && !res.writableEnded) {
-            res.write(`event: message_id\ndata: ${JSON.stringify({ id: savedMid })}\n\n`);
-        }
-        if (!res.writableEnded) {
-            res.write('data: [DONE]\n\n');
-            res.end();
-        }
+        // Safety timer: force-close after 30s regardless (handles hung background jobs)
+        const safetyTimer = setTimeout(closeConnection, 30_000);
+        if (typeof safetyTimer === 'object' && 'unref' in safetyTimer) (safetyTimer as any).unref();
 
         console.log(
             `[ASK] uid=${uid} chars=${charsSent} ` +
@@ -5303,6 +5471,23 @@ app.post('/api/chat-sdk', middleware, async (req: any, res: any) => {
         };
         const agentState: AgentState = { sources: [], generatedFiles: [], thoughtProcess: [], searchCount: 0, wikiSearchCount: 0 };
         const tools = createFluxTools(noopRes, model, agentState, nq, '');
+        withToolTimeout(tools, {
+            web_search: 15_000,
+            generate_document: 60_000,
+            get_weather: 10_000,
+            generate_image: 90_000,
+            wiki_search: 10_000,
+            read_url: 10_000,
+            run_bash: 60_000,
+            run_python: 60_000,
+            shell_execute: 30_000,
+            create_project: 30_000,
+            start_app: 30_000,
+            stop_app: 10_000,
+            get_app_logs: 10_000,
+            file_read: 10_000,
+            file_write: 10_000,
+        });
 
         const memCtx = '';
         const dynSys = [
@@ -5998,6 +6183,9 @@ if (fs.existsSync(path.join(certPath, 'cert.pem')) && fs.existsSync(path.join(ce
         console.warn('[CACHE] Seed from history skipped:', (e as any)?.message ?? e);
     }
 })();
+
+// Recover any interrupted long-running tasks from previous server instances
+recoverInterruptedTasks().then(count => console.log('[TASK] Recovery pass complete'));
 
 // Attach Agent Protocol WebSocket handler
 createAgentWebSocket(server);

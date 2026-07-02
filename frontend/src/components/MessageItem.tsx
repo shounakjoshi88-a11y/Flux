@@ -931,6 +931,60 @@ function PartsRenderer({
         );
         break;
       }
+      case "task_ref": {
+        const doneCount = part.steps.filter((s: any) => s.status === "done").length;
+        const totalCount = part.steps.length;
+        const isComplete = part.status === "completed";
+        const isFailed = part.status === "failed" || part.status === "cancelled" || part.status === "timed_out";
+        const isRunning = !isComplete && !isFailed;
+        renderedParts.push(
+          <div key={`task-${i}`} className="mb-1 mt-1">
+            <div className={`rounded-lg border px-3 py-2.5 ${isComplete ? 'border-emerald-600/30 bg-emerald-950/10' :
+              isFailed ? 'border-red-600/30 bg-red-950/10' :
+                'border-zinc-700/50 bg-zinc-800/20'
+              }`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-2">
+                  {isRunning && <span className="size-2 rounded-full bg-amber-500 animate-pulse" />}
+                  {isComplete && <span className="size-2 rounded-full bg-emerald-500" />}
+                  {isFailed && <span className="size-2 rounded-full bg-red-500" />}
+                  <span className="text-sm font-medium text-zinc-200">{part.title}</span>
+                </div>
+                {totalCount > 0 && (
+                  <span className="text-xs text-zinc-500">{doneCount}/{totalCount} steps</span>
+                )}
+              </div>
+              {part.currentStepTitle && isRunning && (
+                <div className="text-xs text-zinc-400 mb-1.5 pl-4 border-l-2 border-amber-500/40">
+                  {part.currentStepTitle}
+                </div>
+              )}
+              {isComplete && part.summary && (
+                <div className="text-xs text-emerald-400/80">{part.summary}</div>
+              )}
+              {isFailed && part.summary && (
+                <div className="text-xs text-red-400/80">{part.summary}</div>
+              )}
+              {totalCount > 0 && (
+                <div className="mt-1.5 space-y-0.5">
+                  {part.steps.map((s: any) => (
+                    <div key={s.index} className="flex items-center gap-1.5 text-xs">
+                      {s.status === "done" && <span className="text-emerald-500">✓</span>}
+                      {s.status === "running" && <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />}
+                      {s.status === "failed" && <span className="text-red-500">✗</span>}
+                      {s.status === "pending" && <span className="text-zinc-600">○</span>}
+                      <span className={s.status === "done" ? "text-zinc-400" : s.status === "failed" ? "text-red-400" : "text-zinc-500"}>
+                        {s.title || `Step ${s.index + 1}`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+        break;
+      }
       case "terminal": {
         renderedParts.push(
           <div key={`terminal-${i}`} className="mt-2 w-full">

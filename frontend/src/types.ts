@@ -50,6 +50,13 @@ export type CodeExecutionBlock = {
   generatedFiles: { filename: string; downloadUrl: string }[];
 };
 
+export type TaskStepRef = {
+  index: number;
+  title: string;
+  status: "pending" | "running" | "done" | "failed" | "skipped";
+  result?: string;
+};
+
 export type MessagePart =
   | { type: "text"; text: string }
   | { type: "tool_call"; name: string; input?: any; output?: any; status: "pending" | "running" | "completed" | "error" }
@@ -62,7 +69,8 @@ export type MessagePart =
   | { type: "tool_group"; tools: { name: string; args: any }[] }
   | { type: "agent_status"; status: string; message: string }
   | { type: "terminal"; content: string }
-  | { type: "code_execution"; block: CodeExecutionBlock };
+  | { type: "code_execution"; block: CodeExecutionBlock }
+  | { type: "task_ref"; taskId: string; title: string; steps: TaskStepRef[]; currentStep?: number; currentStepTitle?: string; status?: string; summary?: string };
 
 export type Message = {
   id: string | number;

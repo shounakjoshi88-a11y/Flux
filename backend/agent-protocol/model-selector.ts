@@ -1,5 +1,6 @@
 // Model selector — shared between WebSocket and REST handlers
 import { nim } from '../nim-client';
+import { isModelHealthy, recordFailure, recordSuccess, getShortTimeout } from '../model-health';
 
 const NIM_MODELS: Record<string, string> = {
   "llama-4-maverick": "meta/llama-4-maverick-17b-128e-instruct",
@@ -23,13 +24,10 @@ const VISION_MODELS = new Set(["nemotron-nano-12b-v2-vl", "kimi-k2.6"]);
 
 function createFallbackModel(primaryModel: any, preferredModelId: string | undefined, modelsMap: Record<string, string>): any {
   const getFallbackSequence = (prefId?: string) => {
-    const list = ["kimi-k2.6"];
-    for (const key of Object.keys(modelsMap)) {
-      if (key !== prefId && key !== "kimi-k2.6") {
-        list.push(key);
-      }
-    }
-    return list;
+    const allKeys = Object.keys(modelsMap).filter(k => k !== prefId);
+    const healthy = allKeys.filter(k => isModelHealthy(k));
+    const unhealthy = allKeys.filter(k => !isModelHealthy(k));
+    return [...healthy, ...unhealthy];
   };
 
   return new Proxy(primaryModel, {
@@ -38,8 +36,11 @@ function createFallbackModel(primaryModel: any, preferredModelId: string | undef
         return async function(options: any) {
           try {
             console.log(`[MODEL FALLBACK] Trying primary model: ${preferredModelId || target.modelId}`);
-            return await target.doGenerate(options);
+            const result = await target.doGenerate(options);
+            if (preferredModelId) recordSuccess(preferredModelId);
+            return result;
           } catch (primaryError: any) {
+            if (preferredModelId) recordFailure(preferredModelId);
             console.warn(`[MODEL FALLBACK] Primary model failed:`, primaryError?.message ?? primaryError);
             const fallbackIds = getFallbackSequence(preferredModelId);
             for (const fallbackId of fallbackIds) {
@@ -47,8 +48,11 @@ function createFallbackModel(primaryModel: any, preferredModelId: string | undef
                 console.log(`[MODEL FALLBACK] Trying fallback model: ${fallbackId}`);
                 const fallbackModel = nim.chatModel(modelsMap[fallbackId]!);
                 const fallbackOptions = { ...options, providerOptions: {} };
-                return await fallbackModel.doGenerate(fallbackOptions);
+                const result = await fallbackModel.doGenerate(fallbackOptions);
+                recordSuccess(fallbackId);
+                return result;
               } catch (fallbackError: any) {
+                recordFailure(fallbackId);
                 console.warn(`[MODEL FALLBACK] Fallback model ${fallbackId} failed:`, fallbackError?.message ?? fallbackError);
               }
             }
@@ -58,19 +62,41 @@ function createFallbackModel(primaryModel: any, preferredModelId: string | undef
       }
       if (prop === 'doStream') {
         return async function(options: any) {
+          const modelTimeout = getShortTimeout(preferredModelId || 'unknown');
           try {
-            console.log(`[MODEL FALLBACK] Trying primary model stream: ${preferredModelId || target.modelId}`);
-            return await target.doStream(options);
+            console.log(`[MODEL FALLBACK] Trying primary model stream: ${preferredModelId || target.modelId} (timeout=${modelTimeout}ms)`);
+            const result = await Promise.race([
+              target.doStream(options),
+              new Promise<any>((_, reject) =>
+                setTimeout(() => reject(new Error(`[TIMEOUT] ${preferredModelId || 'primary'} no response within ${modelTimeout}ms`)), modelTimeout)
+              ),
+            ]);
+            if (preferredModelId) recordSuccess(preferredModelId);
+            return result;
           } catch (primaryError: any) {
-            console.warn(`[MODEL FALLBACK] Primary model stream failed:`, primaryError?.message ?? primaryError);
+            if (preferredModelId) recordFailure(preferredModelId);
+            if (primaryError.message?.includes('[TIMEOUT]')) {
+              console.warn(`[MODEL FALLBACK] Primary model ${preferredModelId || 'primary'} timed out (>${modelTimeout}ms) — falling back`);
+            } else {
+              console.warn(`[MODEL FALLBACK] Primary model stream failed:`, primaryError?.message ?? primaryError);
+            }
             const fallbackIds = getFallbackSequence(preferredModelId);
             for (const fallbackId of fallbackIds) {
               try {
-                console.log(`[MODEL FALLBACK] Trying fallback model stream: ${fallbackId}`);
+                const fbTimeout = getShortTimeout(fallbackId);
+                console.log(`[MODEL FALLBACK] Trying fallback model stream: ${fallbackId} (timeout=${fbTimeout}ms)`);
                 const fallbackModel = nim.chatModel(modelsMap[fallbackId]!);
                 const fallbackOptions = { ...options, providerOptions: {} };
-                return await fallbackModel.doStream(fallbackOptions);
+                const result = await Promise.race([
+                  fallbackModel.doStream(fallbackOptions),
+                  new Promise<any>((_, reject) =>
+                    setTimeout(() => reject(new Error(`[TIMEOUT] ${fallbackId} no response within ${fbTimeout}ms`)), fbTimeout)
+                  ),
+                ]);
+                recordSuccess(fallbackId);
+                return result;
               } catch (fallbackError: any) {
+                recordFailure(fallbackId);
                 console.warn(`[MODEL FALLBACK] Fallback model stream ${fallbackId} failed:`, fallbackError?.message ?? fallbackError);
               }
             }
