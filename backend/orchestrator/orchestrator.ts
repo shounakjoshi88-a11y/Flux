@@ -338,20 +338,12 @@ export class OrchestratorEngine {
   ): OrchestratorOutput {
     const weatherResult = phaseResults.get("weather_lookup");
     if (weatherResult?.text) {
-      const lines = weatherResult.text.split('\n').map(l => l.trim()).filter(Boolean);
-      const tempLine = lines.find(l => l.startsWith('Temperature'));
-      const condLine = lines.find(l => l.startsWith('Conditions'));
-      const locLine = lines.find(l => l.startsWith('Live weather'));
-      const loc = locLine ? locLine.replace(/^Live weather for\s+/, '').replace(/\s+\(via.*$/, '') : '';
-      const temp = tempLine ? tempLine.replace(/^Temperature\s*:\s*/, '') : '';
-      const cond = condLine ? condLine.replace(/^Conditions\s*:\s*/, '') : '';
-      const summary = [temp && `Currently ${temp}`, cond && `with ${cond.toLowerCase()}`, loc && `in ${loc}`].filter(Boolean).join(' ');
       return {
-        text: summary || weatherResult.text.slice(0, 120),
+        text: '',
         sources: agentState.sources,
         files: agentState.generatedFiles,
         thoughtProcess: agentState.thoughtProcess,
-        executedPlan: true,
+        executedPlan: false,
       };
     }
     const docResult = phaseResults.get("generate_doc") || phaseResults.get("image_gen") || phaseResults.get("execute");
