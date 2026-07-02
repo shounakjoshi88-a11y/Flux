@@ -395,15 +395,32 @@ function retryQuery(original: string, attempt: number): string {
 }
 
 function extractCityFromQuery(query: string): string {
-  // Find "weather" in the query, take everything after it
-  const idx = query.toLowerCase().indexOf("weather");
-  if (idx < 0) return "unknown";
-  let after = query.slice(idx + 7).trim();
-  // Strip leading noise words
-  after = after.replace(/^(?:(?:info|information|details|data|forecast|report|conditions?)\s+)?(?:in|at|for|of|about|on|regarding|around|near)\s+/i, "").trim();
-  // Strip trailing punctuation and noise
+  const q = query.toLowerCase().slice(0, 200);
+  const weatherWords = /\b(weather|temperature|forecast|how.*hot|how.*cold|humidity|rain|sunny|cloudy|wind)\b/i;
+  const m = q.match(weatherWords);
+  if (!m) return "unknown";
+  const matchWord = m[0];
+  const idx = q.indexOf(matchWord.toLowerCase());
+  // Try "weather/temperature WORD in/at/for CITY" pattern first
+  const afterWeather = q.slice(idx + matchWord.length).trim();
+  const locMatch = afterWeather.match(/^(?:(?:info|information|details|data|forecast|report|conditions?)\s+)?(?:in|at|for|of|about|on|regarding|around|near)\s+((?:[a-z]+(?:\s+[a-z]+){0,2}))/i);
+  if (locMatch?.[1]) {
+    const city = locMatch[1].trim();
+    const stopWords = /^(the|current|today|now|outside|here|local|right|what|is|how)$/i;
+    if (!stopWords.test(city.split(' ')[0]!)) return city;
+  }
+  // Fallback: try "CITY weather" pattern
+  const beforeWord = q.slice(0, idx).trim();
+  const words = beforeWord.split(/\s+/);
+  const lastTwo = words.slice(-2).filter(w => w.length > 1);
+  if (lastTwo.length > 0) {
+    const stopWords = /^(the|current|today|now|outside|here|local|right|what|is|how|in|at|for)$/i;
+    const candidates = lastTwo.filter(w => !stopWords.test(w));
+    if (candidates.length > 0) return candidates.join(' ');
+  }
+  // Last resort: take everything after the weather word
+  let after = afterWeather.replace(/^(?:(?:info|information|details|data|forecast|report|conditions?)\s+)?(?:in|at|for|of|about|on|regarding|around|near)\s+/i, "").trim();
   after = after.replace(/[?.!;,].*$/, "").trim();
-  // Take up to 3 words (covers "New York City", "Buenos Aires", etc.)
-  const words = after.split(/\s+/).filter(Boolean).slice(0, 3);
-  return words.length > 0 ? words.join(" ") : "unknown";
+  const words2 = after.split(/\s+/).filter(Boolean).slice(0, 3);
+  return words2.length > 0 ? words2.join(" ") : "unknown";
 }

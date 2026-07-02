@@ -165,6 +165,29 @@ export class Planner {
       };
     }
 
+    if (WEATHER_RE.test(query)) {
+      return {
+        workflow: "weather",
+        plan: {
+          steps: [
+            {
+              id: "weather_lookup",
+              type: "weather",
+              description: "Fetch real-time weather data",
+              tools: ["get_weather"],
+              dependsOn: [],
+              required: true,
+              criteria: [{ type: "has_text_output", label: "Weather data fetched" }],
+              maxRetries: 1,
+            },
+          ],
+          userIntent: "Weather query",
+          reasoning: "Routing to dedicated weather tool for real-time conditions.",
+          estimatedSteps: 1,
+        },
+      };
+    }
+
     if (ANALYSIS_RE.test(query)) {
       return {
         workflow: "analysis",

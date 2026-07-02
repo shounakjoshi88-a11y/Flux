@@ -4195,8 +4195,23 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
 
             writer.writeEvent('task_created', { taskId: task.id, title: nq.slice(0, 120) });
 
-            await planTask(task.id);
+            const taskText = `I'll start building "${nq.slice(0, 120)}" for you. Follow the progress in the task card above.`;
+            writer.writeText(taskText);
+            writer.writeText('[DONE]');
+
+            await planTask(task.id).catch(e => {
+                console.error('[TASK] planTask error:', e);
+                writer.writeText('[TASK] Failed to create plan. Please try a simpler request.');
+            });
             runTaskLoop(task.id, writer).catch(e => console.error('[TASK] Loop error:', e));
+
+            await prisma.message.create({
+                data: {
+                    content: taskText,
+                    role: 'Assistant',
+                    conversationId: convId,
+                },
+            });
 
             const safetyTimer = setTimeout(() => { if (!res.writableEnded) res.end(); }, 30_000);
             if (typeof safetyTimer === 'object' && 'unref' in safetyTimer) (safetyTimer as any).unref();

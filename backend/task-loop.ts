@@ -41,25 +41,28 @@ export async function planTask(taskId: string): Promise<void> {
 
   await prisma.task.update({ where: { id: taskId }, data: { status: 'PLANNING' } });
 
-  const model = nim.chatModel('moonshotai/kimi-k2.6');
-  const res = await generateText({
-    model,
-    system: TASK_PLANNER_SYSTEM,
-    prompt: `Goal: ${task.goal}`,
-    maxTokens: 4096,
-  } as any);
-
   let steps: { title: string; description: string }[];
   try {
-    const cleaned = res.text
-      .replace(/```(?:json)?\s*/gi, '')
-      .trim();
-    steps = JSON.parse(cleaned);
-    if (!Array.isArray(steps)) throw new Error('Not an array');
+    const model = nim.chatModel('moonshotai/kimi-k2.6');
+    const res = await generateText({
+      model,
+      system: TASK_PLANNER_SYSTEM,
+      prompt: `Goal: ${task.goal}`,
+      maxTokens: 4096,
+    } as any);
+    try {
+      const cleaned = res.text
+        .replace(/```(?:json)?\s*/gi, '')
+        .trim();
+      steps = JSON.parse(cleaned);
+      if (!Array.isArray(steps)) throw new Error('Not an array');
+    } catch {
+      steps = res.text.split('\n')
+        .filter((l: string) => /^\d+[\.\)]/.test(l.trim()))
+        .map((l: string, i: number) => ({ title: l.trim().replace(/^\d+[\.\)]\s*/, '').slice(0, 120), description: l.trim() }));
+    }
   } catch {
-    steps = res.text.split('\n')
-      .filter((l: string) => /^\d+[\.\)]/.test(l.trim()))
-      .map((l: string, i: number) => ({ title: l.trim().replace(/^\d+[\.\)]\s*/, '').slice(0, 120), description: l.trim() }));
+    steps = [{ title: 'Build the project', description: task.goal }];
   }
 
   if (steps.length === 0) steps = [{ title: 'Build the project', description: task.goal }];
