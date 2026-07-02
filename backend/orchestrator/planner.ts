@@ -3,8 +3,7 @@ import type { ExecutionPlan, Phase, WorkflowKind } from "./types";
 const DOC_INTENT_RE =
   /(?:\b(?:create|generate|make|build|write|produce)\b.*\b(pdf|pptx|docx|xlsx|csv|tsv|md|json|sql|html|powerpoint|presentation|slide|word|excel|spreadsheet|document)\b)|(?:\b(pdf|pptx|docx|xlsx|csv|tsv|md|json|sql|html)\b.*\b(?:about|on|for|of)\b)/i;
 
-const WEATHER_RE = /\bweather\b|\btemperature\b|\bforecast\b|\bhow.*hot\b|\bhow.*cold\b/i;
-const SYSTEM_WORDS_RE = /\b(architecture|prototype|router|codebase|classify|tier|regex|embedding|classifier|pipeline|workflow|orchestrat|diagram)\b/i;
+const SYSTEM_WORDS_RE = /\b(architecture|prototype|router|codebase|classify|tier|regex|embedding|classifier|pipeline|workflow|orchestrat|diagram|api|sdk|integration|endpoint|middleware|deploy|debug|refactor|implementation|config|algorithm|variable|function|method)\b/i;
 
 const IMAGE_RE = /\b(?:generate|create|draw|make|render)\b.*\b(?:image|picture|photo|art|illustration|drawing)\b|\b(?:image|picture|photo|art|illustration)\b.*\b(?:of|about|with)\b/i;
 
@@ -51,6 +50,44 @@ function detectTopic(query: string): string {
   }
 
   return "document";
+}
+
+// Detects genuine weather ASKING intent — avoids false positives on
+// casual mentions ("the weather in this code"), metaphors ("temperature of the debate"),
+// and technical/system context ("weather API endpoint").
+function isWeatherQuery(query: string): boolean {
+  const q = query.toLowerCase().slice(0, 300);
+  const pre = query.slice(0, 300);
+
+  // Technical/system context — almost certainly not asking about real weather
+  if (SYSTEM_WORDS_RE.test(q)) return false;
+
+  // Must have a weather keyword
+  const WEATHER_WORD = /\b(weather|temperature|forecast|humidity|rain(?:fall|y)?|sunny|cloudy|wind(?:y)?)\b/;
+  if (!WEATHER_WORD.test(q)) return false;
+
+  // "how hot / how cold / how warm" — always a weather question
+  if (/\bhow\s+(hot|cold|warm|chilly|rainy|sunny|windy|humid)\b/i.test(q)) return true;
+
+  // Named entity (capitalized word) near weather word → strong signal for a location
+  if (/\b(?:weather|temperature|forecast|rain)\b.{0,40}\b([A-Z][a-z]{2,})\b/.test(pre)) return true;
+  if (/\b([A-Z][a-z]{2,})\b.{0,40}\b(?:weather|temperature|forecast|rain)\b/.test(pre)) return true;
+
+  // Question/request pattern asking about weather
+  if (/^(?:what(?:'s| is| are)|how (?:is|does|about)|is it|can (?:you|i)|tell me|show me|give me|check|find|do you)\b/.test(q) && WEATHER_WORD.test(q)) return true;
+
+  // Weather word + location preposition + word (not a generic filler)
+  if (/\b(?:weather|temperature|forecast|humidity|rain|sunny|cloudy|wind)\b\s*(?:info|information|details|data|report|conditions?)?\s*(?:in|at|for|of|about|on)\s+(?!my|your|our|their|this|that|the|a|an|some|any|no|its|his|her)\w+/i.test(q)) return true;
+
+  // Short query (2–10 words) with a weather keyword → likely direct ask
+  const words = q.trim().split(/\s+/).filter(Boolean);
+  if (words.length >= 2 && words.length <= 10) {
+    // Exclude personal statements ("I like hot weather", "It is rainy today")
+    const noIntent = /^(?:i\s+(?:like|love|enjoy|hate|prefer|think|guess|wonder|was|am)|(?:weather|temperature)\s+(?:is|was|has|can|will)|it(?:'s| is)\s+(?:hot|cold|warm|rainy|sunny|windy))\b/i;
+    if (!noIntent.test(q.trim())) return true;
+  }
+
+  return false;
 }
 
 export class Planner {
@@ -165,7 +202,7 @@ export class Planner {
       };
     }
 
-    if (WEATHER_RE.test(query)) {
+    if (isWeatherQuery(query)) {
       return {
         workflow: "weather",
         plan: {
