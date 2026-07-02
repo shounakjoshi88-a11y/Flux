@@ -27,7 +27,7 @@ import { ChartRenderer, type ChartData } from "./ChartBlock";
 import SmilesDrawer from "smiles-drawer";
 
 // ─── Common KaTeX macros ─────────────────────────────────
-const MACROS: Record<string, string> = {
+export const MACROS: Record<string, string> = {
   "\\ce": "\\mhchem",
   "\\pu": "\\mhchem",
   // Blackboard bold
@@ -144,7 +144,7 @@ function RawLatexFallback({ formula, display }: { formula: string; display: bool
 let mjPromise: Promise<any> | null = null;
 let mjReady = false;
 
-function needsMathJax(formula: string): boolean {
+export function needsMathJax(formula: string): boolean {
   if (!formula) return false;
   return /\\multicolumn\b/.test(formula) ||
     /\\intertext\b/.test(formula) ||
@@ -227,7 +227,7 @@ function MathJaxRenderer({ formula, display }: { formula: string; display: boole
 //   [entry(0), arrow(1), entry(2), arrow(3), entry(4), …]
 // Horizontal arrows (@>>> @<<< @=) go in ODD columns (arrow positions).
 // Vertical arrows (@VVV @AAA) and @. go in EVEN columns (entry positions).
-function convertCDtoMatrix(s: string): string {
+export function convertCDtoMatrix(s: string): string {
   return s.replace(/\\begin\s*\{CD\}\s*([\s\S]*?)\s*\\end\s*\{CD\}/gi, (_match, body: string) => {
     const rawRows = body.split(/\\\\/).map((r: string) => r.trim()).filter((r: string) => r.length > 0);
     if (rawRows.length === 0) return s;
@@ -350,7 +350,7 @@ function parseCDArrow(arrow: string): string {
 //
 // Surgical fixes for common model hallucination patterns.
 // Each fix is narrow in scope to avoid breaking valid LaTeX.
-function repairLatex(formula: string): string {
+export function repairLatex(formula: string): string {
   if (!formula) return "";
   let s = formula;
 
