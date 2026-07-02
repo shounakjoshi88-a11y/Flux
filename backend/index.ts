@@ -4377,8 +4377,12 @@ To verify/analyze code: use read_file first, then use run_bash to run type-check
         const searchQueryRE = /\b(find|search|look\s*up|tell\s+me\s+about|information\s+(about|on|regarding)|what\s+(is|are|was|were|does|do|can)|who\s+(is|are|was|were)|where\s+(is|are|was|were|can|does)|when\s+(is|are|was|were|does|did)|why\s+(is|are|was|were|does|did|can)|how\s+(is|are|was|were|does|did|can|do|to)|compare|vs\.?|versus|difference\s+(between|among)|list\s+(the|all|some|various|different)|explain|define|elaborate|details?\s+(about|on|of|regarding)|overview\s+(of|on)|curious\s+about|wondering\s+(about|if|what|why|how)|can\s+you\s+(find|search|look|tell|explain|show|provide|give|list)|summarize|in\s+detail|deep\s+dive|verify|verify\s+if|check|check\s+if|confirm|confirm\s+if|validate|prove|disprove|debunk|fact.?check|legitimate|is\s+it\s+true|is\s+this\s+true|is\s+that\s+true|is\s+it\s+real|tell\s+me\s+if)\b/i;
         const codeExecRE = /\b(write|create|build|develop|implement|code|program|script|compile|run|execute|debug|fix|refactor|deploy)\s+(a|an|the|this|my|some|a\s+simple|a\s+basic|a\s+Python|a\s+JavaScript|a\s+React)\b/i;
         const conversationalRE = /\b(hello|hi\b|hey\b|greetings|thanks|thank\s+you|who\s+are\s+you|what\s+can\s+you|what\s+do\s+you\s+do|your\s+name|how\s+are\s+you)\b/i;
-        let isSearchQuery = searchQueryRE.test(nq) && !codeExecRE.test(nq) && !isSystemQuery && !conversationalRE.test(nq);
-        if (!isSearchQuery && previousQuery) isSearchQuery = searchQueryRE.test(previousQuery) && !codeExecRE.test(previousQuery) && !conversationalRE.test(previousQuery);
+        const isWeatherIntent = /\b(weather|temperature|forecast|humidity|rain|sunny|cloudy|wind|how.*hot|how.*cold)\b/i.test(nq);
+        let isSearchQuery = searchQueryRE.test(nq) && !codeExecRE.test(nq) && !isSystemQuery && !conversationalRE.test(nq) && !isWeatherIntent;
+        if (!isSearchQuery && previousQuery) {
+            const prevWeather = /\b(weather|temperature|forecast|humidity|rain|sunny|cloudy|wind|how.*hot|how.*cold)\b/i.test(previousQuery);
+            isSearchQuery = searchQueryRE.test(previousQuery) && !codeExecRE.test(previousQuery) && !conversationalRE.test(previousQuery) && !prevWeather;
+        }
 
         // When a file is attached and the query mentions verifying/analyzing it,
         // don't force system or research mode — the model needs sandbox tools (run_bash, etc.)
@@ -4445,8 +4449,8 @@ To verify/analyze code: use read_file first, then use run_bash to run type-check
             }
         }
         if (isSearchQuery) {
-            // Research mode: only web_search + read_url allowed (no sandbox/execute tools)
-            const allowedResearchTools = new Set(['web_search', 'read_url']);
+            // Research mode: only search/weather tools allowed (no sandbox/execute tools)
+            const allowedResearchTools = new Set(['web_search', 'read_url', 'get_weather']);
             for (const name of Object.keys(tools)) {
                 if (!allowedResearchTools.has(name)) {
                     delete (tools as any)[name];
@@ -4528,16 +4532,19 @@ To verify/analyze code: use read_file first, then use run_bash to run type-check
             fullText = (orchResult.text ?? '').trim();
 
             // If orchestrator produced no visible text, synthesize a minimal
-            // user-facing answer so UI doesn't fall back to “sources only”.
+            // user-facing answer so UI doesn't fall back to "sources only".
             if (!fullText) {
                 const hasSources = agentState.sources.length > 0;
                 const hasFiles = agentState.generatedFiles.length > 0;
                 const topic = extractTopicFromQuery(query ?? '') || 'your requested document';
+                const isWeather = /\b(weather|temperature|forecast|humidity|rain|sunny|cloudy|wind)\b/i.test(query ?? '');
 
                 if (hasFiles) {
                     fullText = `I've created your document about "${topic}" based on the research. You can download it below.`;
                 } else if (hasSources) {
                     fullText = `I researched "${topic}" and found relevant sources. Please review them in the Sources tab above.`;
+                } else if (isWeather) {
+                    fullText = `I couldn't retrieve the live weather data right now. Please try checking a weather website for current conditions.`;
                 } else {
                     fullText = `I couldn't complete the requested workflow for "${topic}".`;
                 }

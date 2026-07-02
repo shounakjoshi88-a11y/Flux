@@ -225,12 +225,19 @@ export class OrchestratorEngine {
       if (weatherTool?.execute) {
         const city = extractCityFromQuery(query);
         const result = await weatherTool.execute({ city });
+        const text = typeof result === "string" ? result : JSON.stringify(result);
         return {
-          phaseId: phase.id, type: "weather", success: true,
-          text: typeof result === "string" ? result : JSON.stringify(result),
-          sources: [], files: [], skillContent: "", errors: [],
+          phaseId: phase.id, type: "weather", success: text.length > 0,
+          text,
+          sources: [], files: [], skillContent: "", errors: text ? [] : ["Weather tool returned empty result"],
         };
       }
+      return {
+        phaseId: phase.id, type: "weather", success: false,
+        text: "Weather lookup is unavailable in the current mode. Try asking without research mode enabled.",
+        sources: [], files: [], skillContent: "",
+        errors: ["get_weather tool not available"],
+      };
     }
 
     if (phase.type === "analyze") {
