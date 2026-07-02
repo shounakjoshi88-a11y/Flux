@@ -2199,6 +2199,7 @@ interface AgentState {
     searchContent?: string;
     searchCount: number;
     wikiSearchCount: number;
+    weatherDone?: boolean;
 }
 
 function isGenericQuery(q: string): boolean {
@@ -2904,6 +2905,9 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
                         return `__SEARCH_SKIPPED__ Answer naturally without searching. The user's request has nothing to do with weather.`;
                     }
                 }
+                if (state.weatherDone) {
+                    return `Weather already fetched for this conversation turn. Answer the user using that data.`;
+                }
                 sendStatus(res, 'weather', `Fetching weather for ${safeCity}...`, undefined, state.thoughtProcess);
                 const result = await fetchWeatherFromAPI(sanitizeLocation(safeCity));
                 if (!result) {
@@ -2927,6 +2931,7 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
                         feelsF: parseFloat(feelsF),
                     },
                     state.thoughtProcess);
+                state.weatherDone = true;
                 return [
                     `Live weather for ${result.resolvedCity} (via ${result.source}):`,
                     `  Temperature : ${result.temperature}°C  (${fahrenheit}°F)`,
