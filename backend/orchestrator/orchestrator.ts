@@ -233,26 +233,31 @@ export class OrchestratorEngine {
             sources: [], files: [], skillContent: "", errors: ["Weather tool returned empty result"],
           };
         }
-        try {
-          const synth = await generateText({
-            model,
-            system: `You are a friendly weather presenter. Given raw weather data, write a short, natural, conversational description of the current weather. Use personality — be warm and engaging. Include the temperature, conditions, and a practical tip if relevant (e.g. "grab a jacket", "perfect for a walk"). Keep it to 3-5 sentences. Do NOT use markdown, tags, tables, or lists. Just plain conversational text.`,
-            prompt: `The user asked: "${query}"\n\nRaw weather data:\n${rawText}`,
-            maxTokens: 300,
-          } as any);
-          const text = synth.text?.trim() || rawText;
-          return {
-            phaseId: phase.id, type: "weather", success: true,
-            text,
-            sources: [], files: [], skillContent: "", errors: [],
-          };
-        } catch {
-          return {
-            phaseId: phase.id, type: "weather", success: true,
-            text: rawText,
-            sources: [], files: [], skillContent: "", errors: [],
-          };
-        }
+        const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
+        const locLine = lines.find(l => l.startsWith('Live weather'));
+        const tempLine = lines.find(l => l.startsWith('Temperature'));
+        const condLine = lines.find(l => l.startsWith('Conditions'));
+        const humLine = lines.find(l => l.startsWith('Humidity'));
+        const windLine = lines.find(l => l.startsWith('Wind'));
+        const loc = locLine ? locLine.replace(/^Live weather for\s+/, '').replace(/\s+\(via.*$/, '').trim() : '';
+        const temp = tempLine ? tempLine.replace(/^Temperature\s*:\s*/, '').trim() : '';
+        const cond = condLine ? condLine.replace(/^Conditions\s*:\s*/, '').trim() : '';
+        const hum = humLine ? humLine.replace(/^Humidity\s*:\s*/, '').trim() : '';
+        const wind = windLine ? windLine.replace(/^Wind\s*:\s*/, '').trim() : '';
+        const tip = cond?.toLowerCase().includes('clear') ? 'Perfect weather to get outside!' :
+                    cond?.toLowerCase().includes('rain') ? 'Might want to grab an umbrella.' :
+                    cond?.toLowerCase().includes('cloud') ? 'A bit grey out there, but still pleasant.' :
+                    cond?.toLowerCase().includes('fog') || cond?.toLowerCase().includes('mist') || cond?.toLowerCase().includes('haze') ? 'Visibility is reduced — drive carefully.' :
+                    cond?.toLowerCase().includes('thunder') ? 'Stay safe — keep an eye on the sky.' :
+                    cond?.toLowerCase().includes('snow') ? 'Bundle up — it\'s snowing out there!' :
+                    '';
+        const parts = [`It's ${temp}`, cond ? `with ${cond.toLowerCase()}` : '', loc ? `in ${loc}` : '', hum ? `humidity at ${hum}` : '', wind ? `wind ${wind}` : ''].filter(Boolean);
+        const text = `${parts.join(', ')}. ${tip}`;
+        return {
+          phaseId: phase.id, type: "weather", success: true,
+          text,
+          sources: [], files: [], skillContent: "", errors: [],
+        };
       }
       return {
         phaseId: phase.id, type: "weather", success: false,
