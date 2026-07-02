@@ -371,6 +371,7 @@ export function useChat(user: any) {
                     const updated = [...streamingPartsRef.current];
                     (updated[idx] as any).status = sub.endsWith('_error') ? 'error' : 'completed';
                     (updated[idx] as any).output = parsed.message;
+                    (updated[idx] as any).input = parsed.data ?? (updated[idx] as any).input;
                     streamingPartsRef.current = updated;
                   } else {
                     if (baseSub !== 'sandbox') {

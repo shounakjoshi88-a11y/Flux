@@ -1270,7 +1270,7 @@ export function StatusMessage({
   }
 
   // ─── weather ─────────────────────────────────────────────────────────────
-  if (status.subtype === "weather") {
+  if (status.subtype === "weather" && status.data?.status !== "completed" && status.data?.status !== "error") {
     const apiLabel = status.data?.hasKey ? "OpenWeatherMap" : "Open-Meteo";
     return (
       <StepRow rightSlot={rightSlot}
@@ -1280,7 +1280,7 @@ export function StatusMessage({
     );
   }
 
-  if (status.subtype === "weather_success") {
+  if (status.subtype === "weather" && status.data?.status === "completed") {
     const d = status.data;
     const isOWM = d?.source === "OpenWeatherMap";
 
@@ -1389,7 +1389,7 @@ export function StatusMessage({
     );
   }
 
-  if (status.subtype === "weather_error") {
+  if (status.subtype === "weather" && status.data?.status === "error") {
     return (
       <StepRow rightSlot={rightSlot}
         icon={<WeatherIcon state="error" cls="text-[var(--text-muted)]" />}
