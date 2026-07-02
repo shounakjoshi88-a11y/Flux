@@ -204,12 +204,23 @@ export class Planner {
 
     if (isWeatherQuery(query)) {
       return {
-        workflow: "simple_qa",
+        workflow: "weather",
         plan: {
-          steps: [],
+          steps: [
+            {
+              id: "weather_lookup",
+              type: "weather",
+              description: "Fetch real-time weather data",
+              tools: ["get_weather"],
+              dependsOn: [],
+              required: true,
+              criteria: [{ type: "has_text_output", label: "Weather data fetched" }],
+              maxRetries: 1,
+            },
+          ],
           userIntent: "Weather query",
-          reasoning: "Let the LLM handle weather naturally — it has the get_weather tool and can write an engaging response.",
-          estimatedSteps: 0,
+          reasoning: "Weather card is rendered from the status SSE event — no text answer needed.",
+          estimatedSteps: 1,
         },
       };
     }

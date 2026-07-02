@@ -4538,20 +4538,21 @@ To verify/analyze code: use read_file first, then use run_bash to run type-check
 
             // If orchestrator produced no visible text, synthesize a minimal
             // user-facing answer so UI doesn't fall back to "sources only".
+            // Weather is excluded — the card is rendered from the status SSE event.
             if (!fullText) {
-                const hasSources = agentState.sources.length > 0;
-                const hasFiles = agentState.generatedFiles.length > 0;
-                const topic = extractTopicFromQuery(query ?? '') || 'your requested document';
                 const isWeather = /\b(weather|temperature|forecast|humidity|rain|sunny|cloudy|wind)\b/i.test(query ?? '');
+                if (!isWeather) {
+                    const hasSources = agentState.sources.length > 0;
+                    const hasFiles = agentState.generatedFiles.length > 0;
+                    const topic = extractTopicFromQuery(query ?? '') || 'your requested document';
 
-                if (hasFiles) {
-                    fullText = `I've created your document about "${topic}" based on the research. You can download it below.`;
-                } else if (hasSources) {
-                    fullText = `I researched "${topic}" and found relevant sources. Please review them in the Sources tab above.`;
-                } else if (isWeather) {
-                    fullText = `I couldn't retrieve the live weather data right now. Please try checking a weather website for current conditions.`;
-                } else {
-                    fullText = `I couldn't complete the requested workflow for "${topic}".`;
+                    if (hasFiles) {
+                        fullText = `I've created your document about "${topic}" based on the research. You can download it below.`;
+                    } else if (hasSources) {
+                        fullText = `I researched "${topic}" and found relevant sources. Please review them in the Sources tab above.`;
+                    } else {
+                        fullText = `I couldn't complete the requested workflow for "${topic}".`;
+                    }
                 }
             }
 

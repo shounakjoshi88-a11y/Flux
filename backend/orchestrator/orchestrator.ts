@@ -225,12 +225,34 @@ export class OrchestratorEngine {
       if (weatherTool?.execute) {
         const city = extractCityFromQuery(query);
         const result = await weatherTool.execute({ city });
-        const text = typeof result === "string" ? result : JSON.stringify(result);
-        return {
-          phaseId: phase.id, type: "weather", success: text.length > 0,
-          text,
-          sources: [], files: [], skillContent: "", errors: text ? [] : ["Weather tool returned empty result"],
-        };
+        const rawText = typeof result === "string" ? result : JSON.stringify(result);
+        if (!rawText) {
+          return {
+            phaseId: phase.id, type: "weather", success: false,
+            text: "Weather data unavailable.",
+            sources: [], files: [], skillContent: "", errors: ["Weather tool returned empty result"],
+          };
+        }
+        try {
+          const synth = await generateText({
+            model,
+            system: `You are a friendly weather presenter. Given raw weather data, write a short, natural, conversational description of the current weather. Use personality — be warm and engaging. Include the temperature, conditions, and a practical tip if relevant (e.g. "grab a jacket", "perfect for a walk"). Keep it to 3-5 sentences. Do NOT use markdown, tags, tables, or lists. Just plain conversational text.`,
+            prompt: `The user asked: "${query}"\n\nRaw weather data:\n${rawText}`,
+            maxTokens: 300,
+          } as any);
+          const text = synth.text?.trim() || rawText;
+          return {
+            phaseId: phase.id, type: "weather", success: true,
+            text,
+            sources: [], files: [], skillContent: "", errors: [],
+          };
+        } catch {
+          return {
+            phaseId: phase.id, type: "weather", success: true,
+            text: rawText,
+            sources: [], files: [], skillContent: "", errors: [],
+          };
+        }
       }
       return {
         phaseId: phase.id, type: "weather", success: false,
@@ -339,11 +361,11 @@ export class OrchestratorEngine {
     const weatherResult = phaseResults.get("weather_lookup");
     if (weatherResult?.text) {
       return {
-        text: '',
+        text: weatherResult.text,
         sources: agentState.sources,
         files: agentState.generatedFiles,
         thoughtProcess: agentState.thoughtProcess,
-        executedPlan: false,
+        executedPlan: true,
       };
     }
     const docResult = phaseResults.get("generate_doc") || phaseResults.get("image_gen") || phaseResults.get("execute");
