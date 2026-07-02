@@ -5584,9 +5584,11 @@ app.delete("/conversations/:conversationId", middleware, async (req, res) => {
         });
         if (!conversation) return res.status(404).json({ message: "Conversation not found" });
         await prisma.$transaction([
+            prisma.task.deleteMany({ where: { conversationId } }),
             prisma.message.deleteMany({ where: { conversationId } }),
             prisma.conversation.delete({ where: { id: conversationId } }),
         ]);
+        sandboxManager.kill(conversationId);
         return res.status(200).json({ success: true });
     } catch (error) {
         console.error("Delete conversation error:", error);
