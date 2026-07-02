@@ -75,7 +75,7 @@ export async function classifyTaskIntent(query: string): Promise<TaskIntent> {
   if (heuristic) return heuristic;
 
   try {
-    const model = nim.chatModel('step-3.7-flash');
+    const model = nim.chatModel('nemotron-nano-12b-v2-vl');
     const res = await generateText({
       model,
       system: CLASSIFIER_SYSTEM,
