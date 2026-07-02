@@ -50,6 +50,10 @@ function heuristicCheck(query: string): TaskIntent | null {
   const longScore = LONG_TASK_HEURISTICS.reduce((s, rx) => s + (rx.test(query) ? 1 : 0), 0);
   if (longScore >= 2) return 'LONG_TASK';
   if (longScore === 1 && query.length > 100) return 'LONG_TASK';
+  // Short queries explicitly asking to build/make a game, app, or platform are LONG_TASK
+  if (/(make|build|create|develop).{0,30}(game|app|application|platform|clone)/i.test(query) && query.length < 200) return 'LONG_TASK';
+  // "make/build/create/develop a clone of X" or "clone X" is LONG_TASK
+  if (/(make|build|create|develop).{0,20}clone|clone\s+(of\s+)?(twitter|instagram|slack|discord|reddit|github|netflix|spotify|whatsapp|telegram|youtube)/i.test(query)) return 'LONG_TASK';
   return null;
 }
 
