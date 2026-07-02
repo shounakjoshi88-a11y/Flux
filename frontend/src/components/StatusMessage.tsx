@@ -1281,26 +1281,111 @@ export function StatusMessage({
   }
 
   if (status.subtype === "weather_success") {
-    const source: string = status.data?.source ?? "";
-    const isOWM = source === "OpenWeatherMap";
+    const d = status.data;
+    const isOWM = d?.source === "OpenWeatherMap";
+
+    function weatherGradient(desc: string): string {
+      const l = desc.toLowerCase();
+      if (l.includes("clear") || l.includes("sunny")) return "from-amber-500/20 via-orange-500/10 to-transparent";
+      if (l.includes("cloud") || l.includes("overcast")) return "from-slate-500/20 via-zinc-500/10 to-transparent";
+      if (l.includes("rain") || l.includes("drizzle") || l.includes("shower")) return "from-blue-500/20 via-indigo-500/10 to-transparent";
+      if (l.includes("thunder") || l.includes("storm")) return "from-violet-600/20 via-purple-600/10 to-transparent";
+      if (l.includes("snow") || l.includes("blizzard") || l.includes("ice")) return "from-cyan-400/20 via-blue-400/10 to-transparent";
+      if (l.includes("fog") || l.includes("mist") || l.includes("haze")) return "from-stone-500/20 via-neutral-500/10 to-transparent";
+      return "from-[var(--accent)]/15 via-transparent to-transparent";
+    }
+
+    function weatherEmoji(desc: string): string {
+      const l = desc.toLowerCase();
+      if (l.includes("clear")) return "☀️";
+      if (l.includes("few clouds") || l.includes("scattered clouds")) return "⛅";
+      if (l.includes("cloud") || l.includes("overcast")) return "☁️";
+      if (l.includes("rain") || l.includes("drizzle") || l.includes("shower")) return "🌧️";
+      if (l.includes("thunder")) return "⛈️";
+      if (l.includes("snow") || l.includes("blizzard")) return "🌨️";
+      if (l.includes("fog") || l.includes("mist") || l.includes("haze")) return "🌫️";
+      return "🌤️";
+    }
+
+    function conditionLabel(desc: string): string {
+      const l = desc.toLowerCase();
+      if (l.includes("clear")) return "Clear Sky";
+      if (l.includes("few clouds")) return "Few Clouds";
+      if (l.includes("scattered clouds")) return "Scattered Clouds";
+      if (l.includes("broken clouds") || l.includes("overcast")) return "Overcast";
+      if (l.includes("light rain")) return "Light Rain";
+      if (l.includes("moderate rain")) return "Rain";
+      if (l.includes("heavy rain")) return "Heavy Rain";
+      if (l.includes("drizzle")) return "Drizzle";
+      if (l.includes("thunder")) return "Thunderstorm";
+      if (l.includes("snow")) return "Snow";
+      if (l.includes("blizzard")) return "Blizzard";
+      if (l.includes("fog")) return "Fog";
+      if (l.includes("mist")) return "Mist";
+      if (l.includes("haze")) return "Haze";
+      return desc.charAt(0).toUpperCase() + desc.slice(1);
+    }
+
+    const temp = d?.temperature ?? 0;
+    const feels = d?.feelsLike ?? 0;
+    const hum = d?.humidity ?? 0;
+    const wind = d?.windSpeed ?? 0;
+    const desc = d?.description ?? "";
+    const city = d?.city ?? "";
+    const source = d?.source ?? "";
+
     return (
-      <StepRow rightSlot={rightSlot}
-        icon={<WeatherIcon state="success" cls="text-[var(--text-secondary)]" />}
-        message={status.message} isFirst={isFirst} isLast={isLast} pulse={false}
-      >
-        {source && (
-          <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium mt-1 ${isOWM
-            ? "border-[var(--accent)]/20 bg-[var(--accent)]/8 text-[var(--accent)]/80"
-            : "border-teal-500/30 bg-teal-500/8 text-teal-400/80"
-            }`}>
-            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className="size-3 shrink-0">
-              <circle cx="6" cy="4.5" r="2" />
-              <path d="M1.5 8.5c0-1.1.8-2 2-2h5c1.2 0 2 .9 2 2a1.2 1.2 0 0 1-1.2 1.2H2.7A1.2 1.2 0 0 1 1.5 8.5z" />
-            </svg>
-            {source}
-          </span>
-        )}
-      </StepRow>
+      <div className="my-2 animate-[fadeInUp_0.4s_ease-out]">
+        <div className={`relative overflow-hidden rounded-xl border border-[var(--surface-border)] bg-[var(--surface-bg)] bg-gradient-to-br ${weatherGradient(desc)}`}>
+          {/* Decorative glow */}
+          <div className="pointer-events-none absolute -top-6 -right-6 size-24 rounded-full bg-[var(--accent)]/5 blur-2xl" />
+
+          <div className="relative z-10 p-4">
+            {/* City + source */}
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-semibold text-[var(--text-primary)]">{city}</span>
+              <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium ${isOWM
+                ? "border-[var(--accent)]/20 bg-[var(--accent)]/8 text-[var(--accent)]/80"
+                : "border-teal-500/30 bg-teal-500/8 text-teal-400/80"
+                }`}>
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className="size-3 shrink-0">
+                  <circle cx="6" cy="4.5" r="2" />
+                  <path d="M1.5 8.5c0-1.1.8-2 2-2h5c1.2 0 2 .9 2 2a1.2 1.2 0 0 1-1.2 1.2H2.7A1.2 1.2 0 0 1 1.5 8.5z" />
+                </svg>
+                {source}
+              </span>
+            </div>
+
+            {/* Temperature + emoji row */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-baseline gap-1">
+                <span className="text-5xl font-light tracking-tight text-[var(--text-primary)]">{Math.round(temp)}</span>
+                <span className="text-2xl font-light text-[var(--text-muted)]">°C</span>
+              </div>
+              <div className="flex flex-col items-end gap-0.5">
+                <span className="text-3xl">{weatherEmoji(desc)}</span>
+                <span className="text-xs font-medium text-[var(--text-secondary)]">{conditionLabel(desc)}</span>
+              </div>
+            </div>
+
+            {/* Detail grid */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-lg border border-[var(--surface-border)] bg-black/10 px-2.5 py-2">
+                <div className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)] mb-0.5">Feels Like</div>
+                <div className="text-sm font-semibold text-[var(--text-primary)]">{Math.round(feels)}°C</div>
+              </div>
+              <div className="rounded-lg border border-[var(--surface-border)] bg-black/10 px-2.5 py-2">
+                <div className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)] mb-0.5">Humidity</div>
+                <div className="text-sm font-semibold text-[var(--text-primary)]">{hum}%</div>
+              </div>
+              <div className="rounded-lg border border-[var(--surface-border)] bg-black/10 px-2.5 py-2">
+                <div className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)] mb-0.5">Wind</div>
+                <div className="text-sm font-semibold text-[var(--text-primary)]">{wind} km/h</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     );
   }
 

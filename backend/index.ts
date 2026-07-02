@@ -2915,7 +2915,17 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
                 sendStatus(res, 'weather_success',
                     `${result.resolvedCity}: ${result.temperature}°C (${fahrenheit}°F), ` +
                     `feels like ${result.feelsLike}°C (${feelsF}°F) — ${result.description}`,
-                    { source: result.source },
+                    {
+                        source: result.source,
+                        city: result.resolvedCity,
+                        temperature: result.temperature,
+                        feelsLike: result.feelsLike,
+                        humidity: result.humidity,
+                        windSpeed: result.windSpeed,
+                        description: result.description,
+                        tempF: parseFloat(fahrenheit),
+                        feelsF: parseFloat(feelsF),
+                    },
                     state.thoughtProcess);
                 return [
                     `Live weather for ${result.resolvedCity} (via ${result.source}):`,

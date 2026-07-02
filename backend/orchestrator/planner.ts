@@ -94,29 +94,6 @@ export class Planner {
       };
     }
 
-    if (WEATHER_RE.test(query) && !SYSTEM_WORDS_RE.test(query)) {
-      return {
-        workflow: "weather",
-        plan: {
-          steps: [
-            {
-              id: "weather_lookup",
-              type: "weather",
-              description: "Fetch weather data",
-              tools: ["get_weather"],
-              dependsOn: [],
-              required: true,
-              criteria: [{ type: "has_text_output", label: "Weather data received" }],
-              maxRetries: 1,
-            },
-          ],
-          userIntent: "Weather query",
-          reasoning: "Simple single-step weather lookup.",
-          estimatedSteps: 1,
-        },
-      };
-    }
-
     if (IMAGE_RE.test(query)) {
       return {
         workflow: "image_generation",
