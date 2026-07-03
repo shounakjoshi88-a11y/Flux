@@ -71,6 +71,7 @@ export const MACROS: Record<string, string> = {
   "\\Corr": "\\operatorname{Corr}",
   "\\lcm": "\\operatorname{lcm}",
   "\\grad": "\\nabla",
+  "\\slashed": "\\not{#1}",
   "\\curl": "\\nabla\\times",
   "\\divg": "\\nabla\\cdot",
   // Paired delimiters
@@ -156,6 +157,9 @@ export function needsMathJax(formula: string): boolean {
   // (e.g. \text{(at 25°C)} or \text{25^{\circ}C}) break KaTeX
   // because \text is text-only. Route to MathJax which handles it.
   if (/\\text\{[^}]*(?:\\[a-zA-Z]|°|′|″|‴|µ|Ω|Å)/.test(formula)) return true;
+
+  // Commands from packages KaTeX doesn't support natively
+  if (/\\slashed\b/.test(formula)) return true;
 
   return false;
 }
