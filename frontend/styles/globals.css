@@ -65,3 +65,35 @@
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+@keyframes sunnyShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+@keyframes cloudShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 50% 50%; }
+}
+@keyframes rainShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+@keyframes stormShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+@keyframes snowShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+@keyframes fogShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 50% 50%; }
+}
+
+.animate-sunny-gradient { background-size: 200% 200%; animation: sunnyShift 6s ease-in-out infinite; }
+.animate-cloud-gradient { background-size: 200% 200%; animation: cloudShift 8s ease-in-out infinite; }
+.animate-rain-gradient  { background-size: 200% 200%; animation: rainShift 5s ease-in-out infinite; }
+.animate-storm-gradient { background-size: 200% 200%; animation: stormShift 4s ease-in-out infinite; }
+.animate-snow-gradient  { background-size: 200% 200%; animation: snowShift 7s ease-in-out infinite; }
+.animate-fog-gradient   { background-size: 200% 200%; animation: fogShift 9s ease-in-out infinite; }

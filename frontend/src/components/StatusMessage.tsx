@@ -4,6 +4,7 @@
 // Drop-in replacement: same props & exports as the previous version.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import { MessageRenderer } from "./MessageRenderer";
 import { calculateReputationScore } from "../utils/ReputationScore";
@@ -1295,6 +1296,17 @@ export function StatusMessage({
       return "from-[var(--accent)]/15 via-transparent to-transparent";
     }
 
+    function weatherGradientAnimate(desc: string): string {
+      const l = desc.toLowerCase();
+      if (l.includes("clear") || l.includes("sunny")) return "animate-sunny-gradient";
+      if (l.includes("cloud") || l.includes("overcast")) return "animate-cloud-gradient";
+      if (l.includes("rain") || l.includes("drizzle") || l.includes("shower")) return "animate-rain-gradient";
+      if (l.includes("thunder") || l.includes("storm")) return "animate-storm-gradient";
+      if (l.includes("snow") || l.includes("blizzard") || l.includes("ice")) return "animate-snow-gradient";
+      if (l.includes("fog") || l.includes("mist") || l.includes("haze")) return "animate-fog-gradient";
+      return "";
+    }
+
     function weatherEmoji(desc: string): string {
       const l = desc.toLowerCase();
       if (l.includes("clear")) return "☀️";
@@ -1334,15 +1346,55 @@ export function StatusMessage({
     const city = d?.city ?? "";
     const source = d?.source ?? "";
 
+    const [displayTemp, setDisplayTemp] = useState(0);
+    useEffect(() => {
+      let start = 0;
+      const end = Math.round(temp);
+      if (start === end) { setDisplayTemp(end); return; }
+      const duration = 600;
+      const step = Math.max(1, Math.abs(end - start) / (duration / 16));
+      const timer = setInterval(() => {
+        start += step;
+        if ((step > 0 && start >= end) || (step < 0 && start <= end)) {
+          start = end;
+          clearInterval(timer);
+        }
+        setDisplayTemp(Math.round(start));
+      }, 16);
+      return () => clearInterval(timer);
+    }, [temp]);
+
+    const containerVariants = {
+      hidden: { opacity: 0, y: 12 },
+      visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
+    };
+
+    const cardVariants = {
+      hidden: { opacity: 0, y: 8, scale: 0.95 },
+      visible: (i: number) => ({
+        opacity: 1, y: 0, scale: 1,
+        transition: { delay: 0.25 + i * 0.08, duration: 0.35, ease: "easeOut" },
+      }),
+    };
+
     return (
-      <div className="my-2 animate-[fadeInUp_0.4s_ease-out]">
-        <div className={`relative overflow-hidden rounded-xl border border-[var(--surface-border)] bg-[var(--surface-bg)] bg-gradient-to-br ${weatherGradient(desc)}`}>
+      <motion.div className="my-2" variants={containerVariants} initial="hidden" animate="visible">
+        <div className={`relative overflow-hidden rounded-xl border border-[var(--surface-border)] bg-[var(--surface-bg)] bg-gradient-to-br ${weatherGradient(desc)} ${weatherGradientAnimate(desc)}`}>
           {/* Decorative glow */}
-          <div className="pointer-events-none absolute -top-6 -right-6 size-24 rounded-full bg-[var(--accent)]/5 blur-2xl" />
+          <motion.div
+            className="pointer-events-none absolute -top-6 -right-6 size-24 rounded-full bg-[var(--accent)]/5 blur-2xl"
+            animate={{ scale: [1, 1.15, 1], opacity: [0.4, 0.7, 0.4] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+          />
 
           <div className="relative z-10 p-4">
             {/* City + source */}
-            <div className="flex items-center justify-between mb-3">
+            <motion.div
+              className="flex items-center justify-between mb-3"
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1, duration: 0.3 }}
+            >
               <span className="text-sm font-semibold text-[var(--text-primary)]">{city}</span>
               <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium ${isOWM
                 ? "border-[var(--accent)]/20 bg-[var(--accent)]/8 text-[var(--accent)]/80"
@@ -1354,38 +1406,71 @@ export function StatusMessage({
                 </svg>
                 {source}
               </span>
-            </div>
+            </motion.div>
 
             {/* Temperature + emoji row */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-baseline gap-1">
-                <span className="text-5xl font-light tracking-tight text-[var(--text-primary)]">{Math.round(temp)}</span>
+                <motion.span
+                  className="text-5xl font-light tracking-tight text-[var(--text-primary)]"
+                  key={displayTemp}
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {displayTemp}
+                </motion.span>
                 <span className="text-2xl font-light text-[var(--text-muted)]">°C</span>
               </div>
               <div className="flex flex-col items-end gap-0.5">
-                <span className="text-3xl">{weatherEmoji(desc)}</span>
-                <span className="text-xs font-medium text-[var(--text-secondary)]">{conditionLabel(desc)}</span>
+                <motion.span
+                  className="text-3xl inline-block"
+                  animate={{ y: [0, -5, 0] }}
+                  transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  {weatherEmoji(desc)}
+                </motion.span>
+                <motion.span
+                  className="text-xs font-medium text-[var(--text-secondary)]"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.15, duration: 0.3 }}
+                >
+                  {conditionLabel(desc)}
+                </motion.span>
               </div>
             </div>
 
             {/* Detail grid */}
             <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-lg border border-[var(--surface-border)] bg-black/10 px-2.5 py-2">
-                <div className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)] mb-0.5">Feels Like</div>
-                <div className="text-sm font-semibold text-[var(--text-primary)]">{Math.round(feels)}°C</div>
-              </div>
-              <div className="rounded-lg border border-[var(--surface-border)] bg-black/10 px-2.5 py-2">
-                <div className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)] mb-0.5">Humidity</div>
-                <div className="text-sm font-semibold text-[var(--text-primary)]">{hum}%</div>
-              </div>
-              <div className="rounded-lg border border-[var(--surface-border)] bg-black/10 px-2.5 py-2">
-                <div className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)] mb-0.5">Wind</div>
-                <div className="text-sm font-semibold text-[var(--text-primary)]">{wind} km/h</div>
-              </div>
+              {[
+                { label: "Feels Like", value: `${Math.round(feels)}°C` },
+                { label: "Humidity", value: `${hum}%` },
+                { label: "Wind", value: `${wind} km/h` },
+              ].map((item, i) => (
+                <motion.div
+                  key={item.label}
+                  className="rounded-lg border border-[var(--surface-border)] bg-black/10 px-2.5 py-2"
+                  custom={i}
+                  variants={cardVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  <div className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)] mb-0.5">{item.label}</div>
+                  <motion.div
+                    className="text-sm font-semibold text-[var(--text-primary)]"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.35 + i * 0.08, duration: 0.2 }}
+                  >
+                    {item.value}
+                  </motion.div>
+                </motion.div>
+              ))}
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
