@@ -113,11 +113,9 @@ Flux remembers what matters with vector-based memory extraction and retrieval:
 </details>
 
 <details>
-<summary><strong>🔬 RAG & Content Safety</strong></summary>
+<summary><strong>🔬 Content & Safety</strong></summary>
 <br>
 
-- **RAG Search** — NVIDIA Nemo Retriever models for embedding (`llama-3.2-nemoretriever-1b-vlm-embed-v1`) and reranking (`llama-3.2-nemoretriever-500m-rerank-v2`) with combined cosine + reranker scoring
-- **Content Safety** — NVIDIA Nemotron content safety classification filters unsafe inputs
 - **Article Summarization** — AI-powered summary of any URL with Tavily extraction
 - **Web Proxy** — In-app iframe preview with CSP stripping and paywall/cookie notice hiding
 - **Source Reputation Scoring** — 70+ trusted domains (`.gov`, `.edu`, reuters, arxiv, github, etc.) scored 0-100
@@ -420,8 +418,7 @@ flowchart LR
 
     subgraph nim[NVIDIA NIM]
         LLM[19+ LLMs - Mistral - DeepSeek - Qwen - Nemotron - GLM - Kimi - Step]
-        RAG[Nemo Retriever - Embed + Rerank]
-        SafetyN[Nemotron - Content safety]
+
         ASR[Parakeet - Speech-to-text]
         TTS[Magpie - Text-to-speech]
     end
@@ -602,8 +599,7 @@ flux/
 │   ├── memory-enhanced.ts              # Memory-aware tool execution
 │   ├── local-embedder.ts               # BGE-M3 embeddings via ONNX worker thread
 │   ├── embedder-worker.ts              # Worker thread for embedding inference
-│   ├── retriever.ts                    # NVIDIA Nemo RAG (embed + rerank)
-│   ├── safety.ts                       # NVIDIA Nemotron content safety
+
 │   ├── voice-client.ts                 # NVIDIA ASR (Parakeet) + TTS (Magpie)
 │   ├── tts-local.ts                    # Piper TTS offline fallback
 │   ├── nim-client.ts                   # NVIDIA NIM OpenAI-compatible client
@@ -813,8 +809,7 @@ flux/
 | **Image Gen** | Bonsai | Local diffusion model inference |
 | **Sandbox** | E2B Code Interpreter | Isolated Firecracker microVMs for code execution |
 | **Embeddings** | Xenova Transformers (ONNX) | BGE-M3: local 1024-dim embeddings via worker thread |
-| **RAG** | NVIDIA Nemo Retriever | Embed + rerank for retrieval-augmented generation |
-| **Safety** | NVIDIA Nemotron | Content safety classification |
+
 | **Desktop** | Electron 35 + electron-builder | Cross-platform desktop app with tray, deep links, auto-update |
 | **Charts** | Recharts | Bar, line, area, pie, doughnut, scatter |
 | **Math** | KaTeX | Inline/display math with 70+ custom LaTeX macros |
