@@ -2914,32 +2914,27 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
                     sendStatus(res, 'weather_error', `Weather unavailable for ${safeCity}.`, undefined, state.thoughtProcess);
                     return `Could not fetch weather for ${safeCity}.`;
                 }
-                const fahrenheit = ((result.temperature * 9 / 5) + 32).toFixed(1);
-                const feelsF = ((result.feelsLike * 9 / 5) + 32).toFixed(1);
+                const tempC = Math.round(result.temperature);
+                const feelsC = Math.round(result.feelsLike);
+                const tempF = Math.round((result.temperature * 9 / 5) + 32);
+                const feelsFRound = Math.round((result.feelsLike * 9 / 5) + 32);
                 sendStatus(res, 'weather_success',
-                    `${result.resolvedCity}: ${result.temperature}°C (${fahrenheit}°F), ` +
-                    `feels like ${result.feelsLike}°C (${feelsF}°F) — ${result.description}`,
+                    `${result.resolvedCity}: ${tempC}°C (${tempF}°F), ` +
+                    `feels like ${feelsC}°C (${feelsFRound}°F) — ${result.description}`,
                     {
                         source: result.source,
                         city: result.resolvedCity,
-                        temperature: result.temperature,
-                        feelsLike: result.feelsLike,
+                        temperature: tempC,
+                        feelsLike: feelsC,
                         humidity: result.humidity,
                         windSpeed: result.windSpeed,
                         description: result.description,
-                        tempF: parseFloat(fahrenheit),
-                        feelsF: parseFloat(feelsF),
+                        tempF,
+                        feelsF: feelsFRound,
                     },
                     state.thoughtProcess);
                 state.weatherDone = true;
-                return [
-                    `Live weather for ${result.resolvedCity} (via ${result.source}):`,
-                    `  Temperature : ${result.temperature}°C  (${fahrenheit}°F)`,
-                    `  Feels like  : ${result.feelsLike}°C  (${feelsF}°F)`,
-                    `  Humidity    : ${result.humidity}%`,
-                    `  Wind        : ${result.windSpeed} km/h`,
-                    `  Conditions  : ${result.description}`,
-                ].join('\n');
+                return `${result.resolvedCity} is ${tempC}°C (feels like ${feelsC}°C) with ${result.description}. Humidity ${result.humidity}%, wind ${result.windSpeed} km/h.`;
             },
         }),
 
