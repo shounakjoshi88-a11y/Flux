@@ -764,6 +764,7 @@ function PartsRenderer({
                     filename: tp.input?.filename,
                     content: tp.input?.content,
                     language: tp.input?.language,
+                    ...(tp.input || {}),
                   },
                 }}
                 isFirst={actualIsFirst}

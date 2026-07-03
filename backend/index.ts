@@ -2184,6 +2184,7 @@ interface AgentState {
     searchContent?: string;
     searchCount: number;
     wikiSearchCount: number;
+    weatherDone?: boolean;
 }
 
 function isGenericQuery(q: string): boolean {
@@ -2864,10 +2865,13 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
                         return `__SEARCH_SKIPPED__ Answer naturally without searching. The user's request has nothing to do with weather.`;
                     }
                 }
+                if (state.weatherDone) {
+                    return `Weather already fetched for this conversation turn. Answer the user using that data.`;
+                }
                 sendStatus(res, 'weather', `Fetching weather for ${safeCity}...`, undefined, state.thoughtProcess);
                 const result = await fetchWeatherFromAPI(sanitizeLocation(safeCity));
                 if (!result) {
-                    sendStatus(res, 'weather_error', `Weather unavailable for ${safeCity}.`, { status: 'error' }, state.thoughtProcess);
+                    sendStatus(res, 'weather_error', `Weather unavailable for ${safeCity}.`, undefined, state.thoughtProcess);
                     return `Could not fetch weather for ${safeCity}.`;
                 }
                 const fahrenheit = ((result.temperature * 9 / 5) + 32).toFixed(1);
@@ -2876,7 +2880,6 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
                     `${result.resolvedCity}: ${result.temperature}°C (${fahrenheit}°F), ` +
                     `feels like ${result.feelsLike}°C (${feelsF}°F) — ${result.description}`,
                     {
-                        status: 'completed',
                         source: result.source,
                         city: result.resolvedCity,
                         temperature: result.temperature,
@@ -2884,8 +2887,11 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
                         humidity: result.humidity,
                         windSpeed: result.windSpeed,
                         description: result.description,
+                        tempF: parseFloat(fahrenheit),
+                        feelsF: parseFloat(feelsF),
                     },
                     state.thoughtProcess);
+                state.weatherDone = true;
                 return [
                     `Live weather for ${result.resolvedCity} (via ${result.source}):`,
                     `  Temperature : ${result.temperature}°C  (${fahrenheit}°F)`,
@@ -4324,8 +4330,12 @@ To verify/analyze code: use read_file first, then use run_bash to run type-check
         const searchQueryRE = /\b(find|search|look\s*up|tell\s+me\s+about|information\s+(about|on|regarding)|what\s+(is|are|was|were|does|do|can)|who\s+(is|are|was|were)|where\s+(is|are|was|were|can|does)|when\s+(is|are|was|were|does|did)|why\s+(is|are|was|were|does|did|can)|how\s+(is|are|was|were|does|did|can|do|to)|compare|vs\.?|versus|difference\s+(between|among)|list\s+(the|all|some|various|different)|explain|define|elaborate|details?\s+(about|on|of|regarding)|overview\s+(of|on)|curious\s+about|wondering\s+(about|if|what|why|how)|can\s+you\s+(find|search|look|tell|explain|show|provide|give|list)|summarize|in\s+detail|deep\s+dive|verify|verify\s+if|check|check\s+if|confirm|confirm\s+if|validate|prove|disprove|debunk|fact.?check|legitimate|is\s+it\s+true|is\s+this\s+true|is\s+that\s+true|is\s+it\s+real|tell\s+me\s+if)\b/i;
         const codeExecRE = /\b(write|create|build|develop|implement|code|program|script|compile|run|execute|debug|fix|refactor|deploy)\s+(a|an|the|this|my|some|a\s+simple|a\s+basic|a\s+Python|a\s+JavaScript|a\s+React)\b/i;
         const conversationalRE = /\b(hello|hi\b|hey\b|greetings|thanks|thank\s+you|who\s+are\s+you|what\s+can\s+you|what\s+do\s+you\s+do|your\s+name|how\s+are\s+you)\b/i;
-        let isSearchQuery = searchQueryRE.test(nq) && !codeExecRE.test(nq) && !isSystemQuery && !conversationalRE.test(nq);
-        if (!isSearchQuery && previousQuery) isSearchQuery = searchQueryRE.test(previousQuery) && !codeExecRE.test(previousQuery) && !conversationalRE.test(previousQuery);
+        const isWeatherIntent = /\b(weather|temperature|forecast|humidity|rain|sunny|cloudy|wind|how.*hot|how.*cold)\b/i.test(nq);
+        let isSearchQuery = searchQueryRE.test(nq) && !codeExecRE.test(nq) && !isSystemQuery && !conversationalRE.test(nq) && !isWeatherIntent;
+        if (!isSearchQuery && previousQuery) {
+            const prevWeather = /\b(weather|temperature|forecast|humidity|rain|sunny|cloudy|wind|how.*hot|how.*cold)\b/i.test(previousQuery);
+            isSearchQuery = searchQueryRE.test(previousQuery) && !codeExecRE.test(previousQuery) && !conversationalRE.test(previousQuery) && !prevWeather;
+        }
 
         // When a file is attached and the query mentions verifying/analyzing it,
         // don't force system or research mode — the model needs sandbox tools (run_bash, etc.)
@@ -4393,7 +4403,7 @@ To verify/analyze code: use read_file first, then use run_bash to run type-check
         }
         if (isSearchQuery) {
             // Research mode: only web_search + read_url allowed (no sandbox/execute tools)
-            const allowedResearchTools = new Set(['web_search', 'read_url']);
+            const allowedResearchTools = new Set(['web_search', 'read_url', 'get_weather']);
             for (const name of Object.keys(tools)) {
                 if (!allowedResearchTools.has(name)) {
                     delete (tools as any)[name];
