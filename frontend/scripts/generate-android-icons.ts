@@ -8,14 +8,14 @@ const OUT_DIR = import.meta.dir + "/../android/app/src/main/res";
 function createIconSVG(size: number): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 108 108">
     <rect width="108" height="108" rx="13.5" fill="#ffffff" />
-    <path d="M22,67 C32,35 41,73 51,48 S70,35 86,54" fill="none" stroke="#cc785c" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M30,63 C37,40 44,68 52,49 S66,40 78,54" fill="none" stroke="#cc785c" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" />
   </svg>`;
 }
 
 function createAdaptiveForegroundSVG(size: number): string {
   // API 26+ adaptive icon foreground — transparent bg, safe-zone path only
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 108 108">
-    <path d="M22,67 C32,35 41,73 51,48 S70,35 86,54" fill="none" stroke="#cc785c" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M30,63 C37,40 44,68 52,49 S66,40 78,54" fill="none" stroke="#cc785c" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" />
   </svg>`;
 }
 

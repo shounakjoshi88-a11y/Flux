@@ -753,7 +753,7 @@ function PartsRenderer({
               <StatusMessage
                 status={{
                   type: "tool_call",
-                  subtype: tp.name.includes("generating_file") || tp.name === 'parsing' || tp.name === 'parsing_done' ? tp.name : "tool_call",
+                  subtype: tp.name,
                   message: tp.output || "",
                   data: {
                     toolName: tp.name,
