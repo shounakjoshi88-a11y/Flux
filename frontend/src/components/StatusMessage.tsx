@@ -1252,12 +1252,38 @@ export function StatusMessage({
 
   const [detailOpen, setDetailOpen] = useState(false);
 
+  const weatherTemp = status.subtype === "weather" && status.data?.status === "completed"
+    ? (status.data?.temperature ?? 0) : 0;
+  const [displayTemp, setDisplayTemp] = useState(0);
+  const prevTempKey = useRef(0);
+  useEffect(() => {
+    const end = Math.round(weatherTemp);
+    if (prevTempKey.current === end) return;
+    prevTempKey.current = end;
+    setDisplayTemp(0);
+    let start = 0;
+    if (start === end) { setDisplayTemp(end); return; }
+    const duration = 600;
+    const step = Math.max(1, Math.abs(end - start) / (duration / 16));
+    const timer = setInterval(() => {
+      start += step;
+      if ((step > 0 && start >= end) || (step < 0 && start <= end)) {
+        start = end;
+        clearInterval(timer);
+      }
+      setDisplayTemp(Math.round(start));
+    }, 16);
+    return () => clearInterval(timer);
+  }, [weatherTemp]);
+
   // ─── skip silently ────────────────────────────────────────────────────────
   if (status.subtype === "complete") return null;
   if (status.message?.includes("Search skipped")) return null;
 
   // ─── thought ──────────────────────────────────────────────────────────────
   if (status.subtype === "thought") {
+    const thoughtText = status.content || status.message || "";
+    if (/^(Executing step:|Completed:)/.test(thoughtText.trim())) return null;
     return (
       <ThoughtBlock
         content={status.content}
@@ -1338,31 +1364,12 @@ export function StatusMessage({
       return desc.charAt(0).toUpperCase() + desc.slice(1);
     }
 
-    const temp = d?.temperature ?? 0;
     const feels = d?.feelsLike ?? 0;
     const hum = d?.humidity ?? 0;
     const wind = d?.windSpeed ?? 0;
     const desc = d?.description ?? "";
     const city = d?.city ?? "";
     const source = d?.source ?? "";
-
-    const [displayTemp, setDisplayTemp] = useState(0);
-    useEffect(() => {
-      let start = 0;
-      const end = Math.round(temp);
-      if (start === end) { setDisplayTemp(end); return; }
-      const duration = 600;
-      const step = Math.max(1, Math.abs(end - start) / (duration / 16));
-      const timer = setInterval(() => {
-        start += step;
-        if ((step > 0 && start >= end) || (step < 0 && start <= end)) {
-          start = end;
-          clearInterval(timer);
-        }
-        setDisplayTemp(Math.round(start));
-      }, 16);
-      return () => clearInterval(timer);
-    }, [temp]);
 
     const containerVariants = {
       hidden: { opacity: 0, y: 12 },

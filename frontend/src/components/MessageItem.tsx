@@ -778,6 +778,8 @@ function PartsRenderer({
       }
       case "thought": {
         if (part.content?.trim()) {
+          const txt = part.content.trim();
+          if (/^(Executing step:|Completed:)/.test(txt)) break;
           const thoughtIsLast = !activeGenerationStatus && (i === parts.length - 1 || parts[i + 1]?.type !== "thought");
           const thoughtIsFirst = i === 0 || parts[i - 1]?.type !== "thought";
           renderedParts.push(
