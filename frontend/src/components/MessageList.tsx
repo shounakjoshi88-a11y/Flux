@@ -233,8 +233,8 @@ export function MessageList({
         </div>
       )}
 
-      {/* ─── THREE‑DOT LOADER — shows only before any parts arrive ─── */}
-      {isLoading && !messages.some(m => m.parts && m.parts.length > 0) && (
+      {/* ─── THREE‑DOT LOADER — shows only before the latest message starts streaming parts ─── */}
+      {isLoading && (messages.length === 0 || !messages[messages.length - 1].parts?.length) && (
         <div className="mx-auto max-w-[700px] mt-4 pl-2">
           <ThreeDotsLoader />
         </div>
