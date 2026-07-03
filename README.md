@@ -511,7 +511,7 @@ flux/
 │   │   │   ├── MarkdownPreview.tsx     # Markdown file preview
 │   │   │   ├── FileDownloadButton.tsx  # Download + preview for generated files
 │   │   │   ├── SourceCard.tsx          # Source citation with reputation score
-│   │   │   ├── StatusMessage.tsx       # Tool status with search-suppressed messages & thought steps
+│   │   │   ├── StatusMessage.tsx       # Tool status, weather card with animations, thought block with step reasoning & collapsible Done, generic tool call blocks
 │   │   │   ├── SuggestedActions.tsx    # Category-based suggestion prompts
 │   │   │   ├── TodoList.tsx            # Dynamic todo list component
 │   │   │   ├── PromptHistoryCard.tsx   # Scrollable user prompt history

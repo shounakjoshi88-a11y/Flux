@@ -41,29 +41,57 @@ flux/
 |
 |-- package.json                         # Root project config (Electron build scripts)
 |-- bun.lock                             # Bun lockfile
+|-- package-lock.json                    # npm lockfile
 |-- AGENTS.md                            # Agent instructions for AI coding assistants
-|-- CLAUDE.md                            # Claude-specific instructions
 |-- DESIGN.md                            # Design guidelines
-|-- GEMINI.md                            # Gemini-specific instructions
 |-- README.md                            # Project readme
+|-- FluxMap.md                           # Project map
+|-- skills-lock.json                     # Locked skill versions
+|-- vercel.json                          # Vercel deployment config
+|-- electron-builder.yml                 # Electron packaging config
+|-- .gitignore
+|-- .vercelignore
+|-- claude-fable-5.md
+|-- fix_sections.mjs
+|-- FLUX_CODE_INTERPRETER_PROMPT.md
+|-- system.md
 |-- dashboard.txt                        # Dashboard notes
 |-- skills-lock.json                     # Locked skill versions
 |-- vercel.json                          # Vercel deployment config
 |-- electron-builder.yml                 # Electron packaging config
 |-- flux.bat                             # Windows dev launcher (batch)
 |-- flux.ps1                             # Windows dev launcher (PowerShell)
-|-- .gitignore
+|-- scripts/
+|   |-- make-ico.cjs                     # ICO generator script
+|
+|-- build/
+|   |-- icon.ico                         # Windows app icon
+|
+|-- certs/
+|   |-- cert.pem                         # TLS cert (dev)
+|   |-- key.pem                          # TLS key (dev)
+|
+|-- .github/
+|   `-- workflows/
+|       |-- flux-backend-AutoDeployTrigger-....yml  # GitHub Actions deploy workflow
+|
+|-- api/
+|   |-- index.ts                         # Vercel serverless adapter
+|   |-- tsconfig.json
 |
 |-- frontend/
 |   |-- package.json
+|   |-- package-lock.json
+|   |-- bun.lock
 |   |-- tsconfig.json
 |   |-- bunfig.toml
 |   |-- build.ts
 |   |-- components.json
 |   |-- bun-env.d.ts
-|   |-- test_extreme.js
 |   |-- .env
 |   |-- .env.local
+|   |-- .gitignore
+|   |-- README.md
 |   |-- styles/
 |   |   |-- globals.css
 |   |   |-- dashboard.css
@@ -81,93 +109,27 @@ flux/
 |   |   |-- tailwind.config.js
 |   |   |-- manifest.json                # PWA manifest
 |   |   |-- sw.js                        # Service worker
+|   |   |-- APITester.tsx                # API test component
 |   |   |-- logo.svg / react.svg         # Assets
-|   |   |-- icon-*.png / icon-*.svg      # PWA icons
+|   |   |-- apple-touch-icon.png
+|   |   |-- icon-192.png / icon-192.svg / icon-192-maskable.png
+|   |   |-- icon-512.png / icon-512.svg / icon-512-maskable.png
+|   |   |
+|   |   |-- __tests__/
+|   |   |   |-- eldritch-horror.test.ts
 |   |   |
 |   |   |-- pages/
 |   |   |   |-- Auth.tsx
 |   |   |   |-- Dashboard.tsx
-|   |   |   |-- TestShowcase.tsx
-|   |   |   |-- conversation/
-|   |   |   |   |-- index.tsx
-|   |   |   |   |-- components/
-|   |   |   |   |   |-- WorkspaceCollapse.tsx
-|   |   |   |   |-- GroupedHistory/
-|   |   |   |   |   |-- index.tsx
-|   |   |   |   |   |-- ConversationRow.tsx
-|   |   |   |   |   |-- ConversationSearchPopover.tsx
-|   |   |   |   |   |-- types.ts
-|   |   |   |   |   |-- hooks/
-|   |   |   |   |   |   |-- useConversationListSync.ts
-|   |   |   |   |   |   |-- useVisibleConversationIds.ts
-|   |   |   |   |   |-- utils/
-|   |   |   |   |   |   |-- groupingHelpers.ts
-|   |   |   |   |-- Messages/
-|   |   |   |   |   |-- hooks.ts
-|   |   |   |   |-- Preview/
-|   |   |   |   |   |-- index.ts
-|   |   |   |   |   |-- constants.ts
-|   |   |   |   |   |-- context/
-|   |   |   |   |   |   |-- PreviewContext.tsx
-|   |   |   |   |-- platforms/
-|   |   |   |   |   |-- useConversationCommandQueue.ts
-|   |   |   |   |   |-- gemini/
-|   |   |   |   |   |   |-- GoogleModelSelector.tsx
-|   |   |   |   |   |   |-- useGoogleModelSelection.ts
-|   |   |   |   |-- utils/
-|   |   |   |   |   |-- conversationCache.ts
-|   |   |   |   |   |-- warmupConversation.ts
-|   |   |   |-- cron/
-|   |   |   |   |-- ScheduledTasksPage.tsx
-|   |   |   |   |-- ScheduledTasksPage/
-|   |   |   |   |   |-- TaskDetailPage.tsx
-|   |   |   |   |-- useCronJobs.ts
-|   |   |   |-- guid/
-|   |   |   |   |-- index.tsx
-|   |   |   |   |-- hooks/
-|   |   |   |   |   |-- agentSelectionUtils.ts
-|   |   |   |-- login/
-|   |   |   |   |-- index.tsx
-|   |   |   |-- settings/
-|   |   |   |   |-- AgentSettings.tsx
-|   |   |   |   |-- AgentSettings/
-|   |   |   |   |   |-- LocalAgents.tsx
-|   |   |   |   |-- AppearanceSettings.tsx
-|   |   |   |   |-- AppearanceSettings/
-|   |   |   |   |   |-- CssThemeSettings.tsx
-|   |   |   |   |-- AssistantSettings.tsx
-|   |   |   |   |-- AssistantSettings/
-|   |   |   |   |   |-- assistantUtils.ts
-|   |   |   |   |   |-- types.ts
-|   |   |   |   |-- CapabilitiesSettings.tsx
-|   |   |   |   |-- ExtensionSettingsPage.tsx
-|   |   |   |   |-- ModeSettings.tsx
-|   |   |   |   |-- PetSettings.tsx
-|   |   |   |   |-- SystemSettings.tsx
-|   |   |   |   |-- WebuiSettings.tsx
-|   |   |   |   |-- ToolsSettings/
-|   |   |   |   |   |-- McpServerItem.tsx
-|   |   |   |   |-- components/
-|   |   |   |   |   |-- AddMcpServerModal.tsx
-|   |   |   |   |   |-- AddModelModal.tsx
-|   |   |   |   |   |-- AddPlatformModal.tsx
-|   |   |   |   |   |-- EditModeModal.tsx
-|   |   |   |   |   |-- SettingsSider.tsx
-|   |   |   |-- team/
-|   |   |   |   |-- index.tsx
-|   |   |   |   |-- components/
-|   |   |   |   |   |-- TeamCreateModal.tsx
-|   |   |   |   |-- hooks/
-|   |   |   |   |   |-- TeamPermissionContext.tsx
-|   |   |   |   |   |-- useSiderTeamBadges.ts
-|   |   |   |   |   |-- useTeamCreatedRedirect.ts
-|   |   |   |   |   |-- useTeamList.ts
+|   |   |   |-- Privacy.tsx
+|   |   |   |-- Terms.tsx
 |   |   |
 |   |   |-- components/
 |   |   |   |-- AgentStatusBar.tsx
 |   |   |   |-- ArtifactsModal.tsx
 |   |   |   |-- ChartBlock.tsx
 |   |   |   |-- ChatInput.tsx
+|   |   |   |-- CodeOutputBlock.tsx
 |   |   |   |-- CustomAgentsPanel.tsx
 |   |   |   |-- FileDownloadButton.tsx
 |   |   |   |-- InputSeparator.tsx
@@ -178,7 +140,6 @@ flux/
 |   |   |   |-- NewsModal.tsx
 |   |   |   |-- PeekPanel.tsx
 |   |   |   |-- PermissionDialog.tsx
-|   |   |   |-- PlanDisplay.tsx
 |   |   |   |-- PptxPreview.tsx
 |   |   |   |-- PromptHistoryCard.tsx
 |   |   |   |-- Settings.tsx
@@ -188,153 +149,11 @@ flux/
 |   |   |   |-- StatusMessage.tsx
 |   |   |   |-- SuggestedActions.tsx
 |   |   |   |-- TeamPanel.tsx
-|   |   |   |-- TerminalComponent.tsx
-|   |   |   |-- ThoughtDisplay.tsx
 |   |   |   |-- TodoList.tsx
 |   |   |   |-- ToolsDropdown.tsx
 |   |   |   |-- ToolSummary.tsx
+|   |   |   |-- WikiGraph.tsx
 |   |   |   |-- XlsxPreview.tsx
-|   |   |   |
-|   |   |   |-- agent/
-|   |   |   |   |-- AgentStatusBar.tsx
-|   |   |   |-- base/
-|   |   |   |   |-- FileChangesPanel.tsx
-|   |   |   |-- chat/
-|   |   |   |   |-- ChatInput.tsx
-|   |   |   |-- flux/
-|   |   |   |   |-- IconParkHOC.tsx
-|   |   |   |   |-- ShimmerText.tsx
-|   |   |   |   |-- agent/
-|   |   |   |   |   |-- AcpModelSelector.tsx
-|   |   |   |   |   |-- AgentBadge.tsx
-|   |   |   |   |   |-- AgentModeSelector.tsx
-|   |   |   |   |   |-- AgentSetupCard.tsx
-|   |   |   |   |   |-- ChannelConflictWarning.tsx
-|   |   |   |   |   |-- ContextUsageIndicator.tsx
-|   |   |   |   |   |-- MarqueePillLabel.tsx
-|   |   |   |   |-- base/
-|   |   |   |   |   |-- FeedbackButton.tsx
-|   |   |   |   |   |-- FileChangesPanel.tsx
-|   |   |   |   |   |-- FluxCollapse.tsx
-|   |   |   |   |   |-- FluxModal.tsx
-|   |   |   |   |   |-- FluxScrollArea.tsx
-|   |   |   |   |   |-- FluxSelect.tsx
-|   |   |   |   |   |-- FluxSteps.tsx
-|   |   |   |   |   |-- index.ts
-|   |   |   |   |   |-- ModalWrapper.tsx
-|   |   |   |   |-- chat/
-|   |   |   |   |   |-- AtFileMenu/
-|   |   |   |   |   |   |-- index.tsx
-|   |   |   |   |   |-- BtwOverlay/
-|   |   |   |   |   |   |-- index.tsx
-|   |   |   |   |   |   |-- BtwOverlay.module.css
-|   |   |   |   |   |   |-- useBtwCommand.ts
-|   |   |   |   |   |-- CollapsibleContent.tsx
-|   |   |   |   |   |-- CommandQueuePanel.tsx
-|   |   |   |   |   |-- EmojiPicker.tsx
-|   |   |   |   |   |-- MobileActionSheet/
-|   |   |   |   |   |   |-- index.ts
-|   |   |   |   |   |   |-- MobileActionSheet.tsx
-|   |   |   |   |   |   |-- MobileActionSheet.module.css
-|   |   |   |   |   |   |-- types.ts
-|   |   |   |   |   |   |-- useAttachEntry.tsx
-|   |   |   |   |   |-- SendBox/
-|   |   |   |   |   |   |-- index.tsx
-|   |   |   |   |   |   |-- sendbox.css
-|   |   |   |   |   |-- SlashCommandMenu.tsx
-|   |   |   |   |   |-- SpeechInputButton.tsx
-|   |   |   |   |   |-- ThoughtDisplay.tsx
-|   |   |   |   |-- layout/
-|   |   |   |   |   |-- AppLoader.tsx
-|   |   |   |   |   |-- ComputerModePill.tsx
-|   |   |   |   |   |-- ComputerWorkspace.tsx
-|   |   |   |   |   |-- FlexFullContainer.tsx
-|   |   |   |   |   |-- InstallationIntegrityDialog.tsx
-|   |   |   |   |   |-- Layout.tsx
-|   |   |   |   |   |-- PwaPullToRefresh.tsx
-|   |   |   |   |   |-- Router.tsx
-|   |   |   |   |   |-- WindowControls.tsx
-|   |   |   |   |   |-- Sider/
-|   |   |   |   |   |   |-- index.tsx
-|   |   |   |   |   |   |-- Sider.module.css
-|   |   |   |   |   |   |-- SiderFooter.tsx
-|   |   |   |   |   |   |-- SiderItem.tsx
-|   |   |   |   |   |   |-- siderOrder.ts
-|   |   |   |   |   |   |-- SortableSiderEntry.tsx
-|   |   |   |   |   |   |-- TeamSiderSection.tsx
-|   |   |   |   |   |   |-- useStoredSiderOrder.ts
-|   |   |   |   |   |   |-- CronJobSiderSection/
-|   |   |   |   |   |   |   |-- index.ts
-|   |   |   |   |   |   |   |-- CronJobSiderItem.tsx
-|   |   |   |   |   |   |   |-- CronJobSiderSection.tsx
-|   |   |   |   |   |   |-- SiderNav/
-|   |   |   |   |   |   |   |-- index.ts
-|   |   |   |   |   |   |   |-- SiderScheduledEntry.tsx
-|   |   |   |   |   |   |   |-- SiderSearchEntry.tsx
-|   |   |   |   |   |   |   |-- SiderToolbar.tsx
-|   |   |   |   |   |-- Titlebar/
-|   |   |   |   |   |   |-- index.tsx
-|   |   |   |   |   |   |-- MobileConversationBrand.tsx
-|   |   |   |   |   |   |-- titlebar.css
-|   |   |   |   |-- Markdown/
-|   |   |   |   |   |-- CodeBlock.tsx
-|   |   |   |   |   |-- index.tsx
-|   |   |   |   |   |-- markdownUtils.ts
-|   |   |   |   |   |-- MermaidBlock.tsx
-|   |   |   |   |   |-- ShadowView.tsx
-|   |   |   |   |-- media/
-|   |   |   |   |   |-- Diff2Html.tsx
-|   |   |   |   |   |-- Diff2Html.css
-|   |   |   |   |   |-- FileAttachButton.tsx
-|   |   |   |   |   |-- FilePreview.tsx
-|   |   |   |   |   |-- HorizontalFileList.tsx
-|   |   |   |   |   |-- LocalImageView.tsx
-|   |   |   |   |   |-- UploadProgressBar.tsx
-|   |   |   |   |   |-- WebviewHost.tsx
-|   |   |   |   |-- settings/
-|   |   |   |   |   |-- DirectorySelectionModal.tsx
-|   |   |   |   |   |-- FontSizeStepper.tsx
-|   |   |   |   |   |-- LanguageSwitcher.tsx
-|   |   |   |   |   |-- ScaleControl.tsx
-|   |   |   |   |   |-- UpdateModal.tsx
-|   |   |   |   |   |-- SettingsModal/
-|   |   |   |   |   |   |-- index.tsx
-|   |   |   |   |   |   |-- model-provider.css
-|   |   |   |   |   |   |-- settingsViewContext.tsx
-|   |   |   |   |   |   |-- useSettingsModal.tsx
-|   |   |   |   |   |   |-- contents/
-|   |   |   |   |   |   |   |-- AboutModalContent.tsx
-|   |   |   |   |   |   |   |-- AgentModalContent.tsx
-|   |   |   |   |   |   |   |-- AppearanceModalContent.tsx
-|   |   |   |   |   |   |   |-- ExtensionSettingsTabContent.tsx
-|   |   |   |   |   |   |   |-- feedbackModules.ts
-|   |   |   |   |   |   |   |-- FeedbackReportModal.tsx
-|   |   |   |   |   |   |   |-- ModelModalContent.tsx
-|   |   |   |   |   |   |   |-- ToolsModalContent.tsx
-|   |   |   |   |   |   |   |-- WebuiModalContent.tsx
-|   |   |   |   |   |   |   |-- channels/
-|   |   |   |   |   |   |   |   |-- ChannelHeader.tsx
-|   |   |   |   |   |   |   |   |-- ChannelItem.tsx
-|   |   |   |   |   |   |   |   |-- ChannelModalContent.tsx
-|   |   |   |   |   |   |   |   |-- DingTalkConfigForm.tsx
-|   |   |   |   |   |   |   |   |-- LarkConfigForm.tsx
-|   |   |   |   |   |   |   |   |-- TelegramConfigForm.tsx
-|   |   |   |   |   |   |   |   |-- types.ts
-|   |   |   |   |   |   |   |   |-- WecomConfigForm.tsx
-|   |   |   |   |   |   |   |   |-- WeixinConfigForm.tsx
-|   |   |   |   |   |   |   |-- SystemModalContent/
-|   |   |   |   |   |   |   |   |-- index.tsx
-|   |   |   |   |   |   |   |   |-- DevSettings.tsx
-|   |   |   |   |   |   |   |   |-- DirInputItem.tsx
-|   |   |   |   |   |   |   |   |-- PreferenceRow.tsx
-|   |   |   |   |   |   |   |   |-- VoiceInputSection/
-|   |   |   |   |   |   |   |   |   |-- index.tsx
-|   |   |   |   |   |   |   |   |   |-- speechSettingsUtils.ts
-|   |   |   |   |   |   |   |   |   |-- SpeechTestPanel.tsx
-|   |   |   |   |   |-- workspace/
-|   |   |   |   |   |   |-- index.ts
-|   |   |   |   |   |   |-- recentWorkspaces.ts
-|   |   |   |   |   |   |-- WorkspaceFolderSelect.tsx
 |   |   |   |
 |   |   |   |-- ui/
 |   |   |   |   |-- button.tsx
@@ -968,7 +787,7 @@ Ambient module declarations for:
 | **Sidebar** | Legacy sidebar component |
 | **SidebarThread** | Threaded conversation sidebar |
 | **SourceCard** | Renders a source citation card |
-| **StatusMessage** | Status/loading indicator messages |
+| **StatusMessage** | Tool status messages, weather card with animated temperature/emoji/glow, thought block with step-by-step reasoning (clock icons per paragraph, collapsible, composite Done footer matching search group pattern), generic tool call blocks with terminal/file/JSON output |
 | **SuggestedActions** | Action suggestion buttons |
 | **TeamPanel** | Team collaboration panel |
 | **TerminalComponent** | Embedded xterm.js terminal for shell execution |
