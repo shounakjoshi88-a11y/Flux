@@ -1461,7 +1461,7 @@ export function MessageItem({
             </button>
             {onDelete && (
               <button
-                onClick={() => { setShowUserActions(false); onDelete(message.id); }}
+                onClick={() => { setShowUserActions(false); try { onDelete(message.id); } catch (e) { console.error("Delete error:", e); } }}
                 className="p-1.5 rounded-lg bg-black/20 dark:bg-white/5 hover:bg-red-500/15 text-muted-foreground hover:text-red-400"
                 title="Delete message"
               >
