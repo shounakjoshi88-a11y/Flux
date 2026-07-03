@@ -904,10 +904,6 @@ export function ThoughtBlock({
   const visibleRows = rows.filter(r => r.kind === 'header' || open);
 
   const railIcon = (row: Row) => {
-    if (row.kind === 'header')
-      return isThinking
-        ? <span className="size-2 rounded-full bg-[var(--accent)] animate-pulse" />
-        : <span className="size-2 rounded-full bg-[var(--text-muted)]/40" />;
     if (row.kind === 'step-line' && row.isFirstInStep)
       return <ClockIcon className={`size-3.5 ${row.isAnimating ? "text-[var(--accent)]" : "text-[var(--text-secondary)]/60"}`} />;
     if (row.kind === 'done')
@@ -920,22 +916,17 @@ export function ThoughtBlock({
       {visibleRows.map((row, ri) => {
         const hasNext = ri < visibleRows.length - 1;
         const icon = railIcon(row);
-        return (
-          <div key={ri} className="flex gap-2.5 items-start">
-            <div className="w-4 shrink-0 flex flex-col items-center self-stretch">
-              <div className="flex flex-col items-center flex-1">
-                {icon || <div className="w-px bg-[var(--text-muted)]/15" />}
-                {hasNext && <div className={`${lineCls} flex-1 min-h-[4px]`} />}
-              </div>
-            </div>
-            <div className="min-w-0 flex-1">
-              {row.kind === 'header' && (
+
+        if (row.kind === 'header') {
+          return (
+            <div key={ri} className="flex items-start">
+              <div className="min-w-0 flex-1">
                 <button
                   onClick={() => setOpen(v => !v)}
                   aria-expanded={open}
                   className="flex items-center gap-1.5 w-full text-left select-none"
                 >
-                  <span className="text-[13px] font-medium text-[var(--text-secondary)]">
+                  <span className="text-[15px] font-semibold text-[var(--text-primary)]">
                     {isThinking ? 'Thinking' : `Thought${displayElapsed != null ? ` · ${displayElapsed}s` : ''}`}
                   </span>
                   <span className="ml-auto shrink-0 flex items-center gap-1.5">
@@ -950,7 +941,20 @@ export function ThoughtBlock({
                     <ChevronDown className={`size-3 text-[var(--text-muted)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
                   </span>
                 </button>
-              )}
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div key={ri} className="flex gap-2.5 items-start">
+            <div className="w-4 shrink-0 flex flex-col items-center self-stretch">
+              <div className="flex flex-col items-center flex-1">
+                {icon || <div className="w-px bg-[var(--text-muted)]/15" />}
+                {hasNext && <div className={`${lineCls} flex-1 min-h-[4px]`} />}
+              </div>
+            </div>
+            <div className="min-w-0 flex-1">
               {row.kind === 'step-line' && (
                 <div className={`text-[13px] leading-relaxed ${row.isAnimating ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]/80"}`}>
                   <MessageRenderer content={row.text} onCitationClick={() => { }} sources={[]} />
