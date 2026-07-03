@@ -8,6 +8,9 @@
   <p style="font-size: 1.15em; color: #6c6a64; margin-top: 4px;">
     <em>Multi-model AI chat · Agentic tools · Code sandbox · Knowledge graph · Long-term memory</em>
   </p>
+  <p style="margin-top: 8px;">
+    <a href="https://flux-weld-rho.vercel.app" style="font-size: 1em; color: #cc785c; text-decoration: underline;">https://flux-weld-rho.vercel.app</a>
+  </p>
 </div>
 
 <p align="center">
@@ -15,10 +18,6 @@
   <a href="#quick-start"><img src="https://img.shields.io/badge/Quick_Start-%23141413?style=flat-square" alt="Quick Start"></a>
   <a href="#architecture"><img src="https://img.shields.io/badge/Architecture-%23141413?style=flat-square" alt="Architecture"></a>
   <a href="#api-reference"><img src="https://img.shields.io/badge/API_Reference-%23141413?style=flat-square" alt="API Reference"></a>
-</p>
-
-<p align="center">
-  <a href="https://flux-weld-rho.vercel.app"><img src="https://img.shields.io/badge/live-https://flux--weld--rho.vercel.app-%23cc785c?style=flat-square" alt="Live"></a>
 </p>
 
 <p align="center">
