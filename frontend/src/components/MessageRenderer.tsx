@@ -146,11 +146,18 @@ let mjReady = false;
 
 export function needsMathJax(formula: string): boolean {
   if (!formula) return false;
-  return /\\multicolumn\b/.test(formula) ||
+  if (/\\multicolumn\b/.test(formula) ||
     /\\intertext\b/.test(formula) ||
     /\\genfrac\b/.test(formula) ||
     /\\xymatrix\b/.test(formula) ||
-    /\\halign\b/.test(formula);
+    /\\halign\b/.test(formula)) return true;
+
+  // Math-mode commands or Unicode math chars inside \text{...}
+  // (e.g. \text{(at 25°C)} or \text{25^{\circ}C}) break KaTeX
+  // because \text is text-only. Route to MathJax which handles it.
+  if (/\\text\{[^}]*(?:\\[a-zA-Z]|°|′|″|‴|µ|Ω|Å)/.test(formula)) return true;
+
+  return false;
 }
 
 function MathJaxRenderer({ formula, display }: { formula: string; display: boolean }) {
