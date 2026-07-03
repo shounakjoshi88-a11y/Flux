@@ -161,7 +161,7 @@ export function needsMathJax(formula: string): boolean {
 }
 
 function MathJaxRenderer({ formula, display }: { formula: string; display: boolean }) {
-  const ref = useRef<HTMLSpanElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<"loading" | "rendered" | "error">("loading");
   const [errMsg, setErrMsg] = useState("");
 
@@ -177,10 +177,9 @@ function MathJaxRenderer({ formula, display }: { formula: string; display: boole
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!ref.current || !cleanFormula) { if (!cancelled) setState("rendered"); return; }
+      if (!cleanFormula) { if (!cancelled) setState("rendered"); return; }
       try {
         if (!mjReady) {
-          setState("loading");
           if (!mjPromise) {
             (window as any).MathJax = {
               tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["$$", "$$"], ["\\[", "\\]"]], processEscapes: true, processEnvironments: true, packages: { "[+]": ["xy"] } },
@@ -197,15 +196,16 @@ function MathJaxRenderer({ formula, display }: { formula: string; display: boole
           }
           await mjPromise;
         }
-        if (cancelled || !ref.current) return;
-        const node = ref.current;
+        if (cancelled) return;
+        const node = containerRef.current;
+        if (!node) return;
         node.innerHTML = "";
         const wrapper = document.createElement(display ? "div" : "span");
         wrapper.className = "mathjax-node";
         wrapper.textContent = `${display ? "\\[" : "\\("}${cleanFormula}${display ? "\\]" : "\\)"}`;
         node.appendChild(wrapper);
         await (window as any).MathJax.typesetPromise([wrapper]);
-        if (!cancelled) { setState("rendered"); setErrMsg(""); }
+        if (!cancelled) setState("rendered");
       } catch (e: any) {
         if (!cancelled) { setErrMsg(e?.message || String(e)); setState("error"); }
       }
@@ -213,17 +213,24 @@ function MathJaxRenderer({ formula, display }: { formula: string; display: boole
     return () => { cancelled = true; };
   }, [cleanFormula, display]);
 
-  if (state === "loading") {
-    return display
-      ? <div className="my-4 text-center text-xs text-muted-foreground animate-pulse">Rendering complex formula…</div>
-      : <span className="text-xs text-muted-foreground animate-pulse">⋯</span>;
-  }
   if (state === "error") {
     return <RawLatexFallback formula={formula} display={display} />;
   }
-  return display
-    ? <span ref={ref} className="my-4 text-center overflow-x-auto max-w-full py-2 block" />
-    : <span ref={ref} className="inline-math-container inline-block align-middle max-w-full overflow-x-auto overflow-y-hidden" />;
+
+  const wrapperClass = display
+    ? "my-4 text-center overflow-x-auto max-w-full py-2 block"
+    : "inline-math-container inline-block align-middle max-w-full overflow-x-auto overflow-y-hidden";
+
+  return (
+    <span className={wrapperClass} style={{ position: "relative" }}>
+      <div ref={containerRef} />
+      {state === "loading" && (
+        <span className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground animate-pulse">
+          {display ? "Rendering complex formula…" : "⋯"}
+        </span>
+      )}
+    </span>
+  );
 }
 
 // ─── Commutative diagram (\begin{CD}) → KaTeX matrix ─────
