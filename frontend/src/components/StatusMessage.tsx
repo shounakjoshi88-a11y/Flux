@@ -868,74 +868,50 @@ export function ThoughtBlock({
   if (!rawText) return null;
   const stepsToRender = allSteps.slice(0, shownCount);
 
-  const railIcon = isThinking ? (
-    <span className="size-4 flex items-center justify-center">
-      <span className="size-2 rounded-full bg-[var(--accent)] animate-pulse" />
-    </span>
-  ) : (
-    <span className="size-4 flex items-center justify-center">
-      <DoneIcon cls="text-emerald-400/70" />
-    </span>
-  );
-
   return (
-    <div className="flex gap-2.5">
-      <TimelineNode icon={railIcon} isFirst={isFirst} isLast={isLast} showRail={true} />
-      <div className="min-w-0 flex-1 flex flex-col py-2">
-        <button
-          onClick={() => setOpen(v => !v)}
-          aria-expanded={open}
-          className="flex items-center gap-1.5 w-full text-left select-none"
-        >
-          <span className="text-[13px] font-medium text-[var(--text-secondary)]">
-            {isThinking ? 'Thinking' : `Thought${displayElapsed != null ? ` · ${displayElapsed}s` : ''}`}
-          </span>
-          <span className="ml-auto shrink-0 flex items-center gap-1.5">
-            {isThinking && (
-              <span className="inline-flex gap-0.5">
-                {[0, 1, 2].map(i => (
-                  <span key={i} className="size-1 rounded-full bg-[var(--accent)]/70"
-                    style={{ animation: `thoughtDot 1.2s ease-in-out ${i * 0.2}s infinite` }} />
-                ))}
-              </span>
-            )}
-            <ChevronDown className={`size-3 text-[var(--text-muted)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
-          </span>
-        </button>
+    <div className="mb-0.5">
+      <button
+        onClick={() => setOpen(v => !v)}
+        aria-expanded={open}
+        className="flex items-center gap-1.5 w-full text-left select-none py-2"
+      >
+        <span className="text-[13px] font-medium text-[var(--text-secondary)]">
+          {isThinking ? 'Thinking' : `Thought${displayElapsed != null ? ` · ${displayElapsed}s` : ''}`}
+        </span>
+        <span className="ml-auto shrink-0 flex items-center gap-1.5">
+          {isThinking && (
+            <span className="inline-flex gap-0.5">
+              {[0, 1, 2].map(i => (
+                <span key={i} className="size-1 rounded-full bg-[var(--accent)]/70"
+                  style={{ animation: `thoughtDot 1.2s ease-in-out ${i * 0.2}s infinite` }} />
+              ))}
+            </span>
+          )}
+          <ChevronDown className={`size-3 text-[var(--text-muted)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+        </span>
+      </button>
 
-        {open && (
-          <div className="mt-2 flex flex-col">
-            {stepsToRender.map((step, i) => {
-              const isLastShown = i === stepsToRender.length - 1;
-              const isAnimating = isThinking && isLastShown;
-              const text = isAnimating ? animatedActive : step;
-              return (
-                <div key={i} className="flex gap-2.5 items-start pl-1">
-                  <div className="flex flex-col items-center w-4 shrink-0 self-stretch">
-                    <ClockIcon className={`size-3.5 ${isAnimating ? "text-[var(--accent)]" : "text-[var(--text-secondary)]/60"}`} />
-                    <div className="w-px flex-1 bg-[var(--text-muted)]/15" />
-                  </div>
-                  <div className={`text-[13px] leading-relaxed pb-2.5 min-w-0 flex-1 pt-[2px] ${isAnimating ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]/80"}`}>
-                    <MessageRenderer content={text || ""} onCitationClick={() => { }} sources={[]} />
-                    {isAnimating && (
-                      <span className="inline-block w-px h-[13px] bg-[var(--text-secondary)] ml-0.5 align-middle" style={{ animation: "blink 1s step-end infinite" }} />
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-
-            {isLast && !isThinking && (
-              <div className="flex gap-2.5 items-start pl-1">
-                <div className="flex flex-col items-center w-4 shrink-0">
-                  <DoneIcon cls="size-3.5 text-[var(--text-secondary)]/60" />
-                </div>
-                <span className="text-[13px] text-[var(--text-secondary)]/80 leading-relaxed pt-[2px]">Done</span>
+      {open && (
+        <div className="flex flex-col gap-1">
+          {stepsToRender.map((step, i) => {
+            const isLastShown = i === stepsToRender.length - 1;
+            const isAnimating = isThinking && isLastShown;
+            const text = isAnimating ? animatedActive : step;
+            return (
+              <div key={i} className={`text-[13px] leading-relaxed pl-1 ${isAnimating ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]/80"}`}>
+                <MessageRenderer content={text || ""} onCitationClick={() => { }} sources={[]} />
+                {isAnimating && (
+                  <span className="inline-block w-px h-[13px] bg-[var(--text-secondary)] ml-0.5 align-middle" style={{ animation: "blink 1s step-end infinite" }} />
+                )}
               </div>
-            )}
-          </div>
-        )}
-      </div>
+            );
+          })}
+
+          {isLast && !isThinking && (
+            <span className="text-[13px] text-[var(--text-secondary)]/60 pl-1">Done</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
