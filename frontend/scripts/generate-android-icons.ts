@@ -4,18 +4,18 @@ import sharp from "sharp";
 
 const OUT_DIR = import.meta.dir + "/../android/app/src/main/res";
 
-// Full logo: white rounded square + coral squiggly path
+// Full logo: white rounded square + coral squiggly path (safe-zone fitted)
 function createIconSVG(size: number): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 108 108">
     <rect width="108" height="108" rx="13.5" fill="#ffffff" />
-    <path d="M9,72 C22.5,27 36,81 49.5,45 S76.5,27 99,54" fill="none" stroke="#cc785c" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M18,68.4 C28.8,32.4 39.6,75.6 50.4,46.8 S72,32.4 90,54" fill="none" stroke="#cc785c" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" />
   </svg>`;
 }
 
 function createAdaptiveForegroundSVG(size: number): string {
-  // API 26+ adaptive icon foreground — transparent background, coral squiggly path only
+  // API 26+ adaptive icon foreground — transparent bg, safe-zone path only
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 108 108">
-    <path d="M9,72 C22.5,27 36,81 49.5,45 S76.5,27 99,54" fill="none" stroke="#cc785c" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M18,68.4 C28.8,32.4 39.6,75.6 50.4,46.8 S72,32.4 90,54" fill="none" stroke="#cc785c" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" />
   </svg>`;
 }
 
