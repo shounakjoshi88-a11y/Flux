@@ -113,7 +113,7 @@ Flux remembers what matters with vector-based memory extraction and retrieval:
 </details>
 
 <details>
-<summary><strong>🔬 Content & Safety</strong></summary>
+<summary><strong>🔬 Content Tools</strong></summary>
 <br>
 
 - **Article Summarization** — AI-powered summary of any URL with Tavily extraction
