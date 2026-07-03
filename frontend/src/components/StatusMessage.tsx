@@ -874,10 +874,7 @@ export function ThoughtBlock({
     </span>
   ) : (
     <span className="size-4 flex items-center justify-center">
-      <svg viewBox="0 0 16 16" className="size-4 text-emerald-400/70" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="8" cy="8" r="6" />
-        <polyline points="5.5,8 7.5,10 10.5,6" />
-      </svg>
+      <DoneIcon cls="text-emerald-400/70" />
     </span>
   );
 
@@ -906,23 +903,17 @@ export function ThoughtBlock({
           </span>
         </button>
 
-        {open && stepsToRender.length > 0 && (
+        {open && (
           <div className="mt-2 flex flex-col">
             {stepsToRender.map((step, i) => {
               const isLastShown = i === stepsToRender.length - 1;
               const isAnimating = isThinking && isLastShown;
               const text = isAnimating ? animatedActive : step;
               return (
-                <div key={i} className="flex gap-2.5 items-start pl-1"
-                  style={{
-                    animation: !isThinking ? "thoughtStepIn 0.3s ease both" : undefined,
-                    animationDelay: !isThinking ? `${i * 0.1}s` : undefined,
-                  }}>
+                <div key={i} className="flex gap-2.5 items-start pl-1">
                   <div className="flex flex-col items-center w-4 shrink-0 self-stretch">
-                    <div className="flex items-center justify-center h-4 w-4 shrink-0 relative">
-                      <ClockIcon className={`size-3.5 ${isAnimating ? "text-[var(--accent)]" : "text-[var(--text-secondary)]/60"}`} />
-                    </div>
-                    {i < stepsToRender.length - 1 && <div className="w-px flex-1 mt-px min-h-[10px] bg-[var(--text-muted)]/15" />}
+                    <ClockIcon className={`size-3.5 ${isAnimating ? "text-[var(--accent)]" : "text-[var(--text-secondary)]/60"}`} />
+                    <div className="w-px flex-1 bg-[var(--text-muted)]/15" />
                   </div>
                   <div className={`text-[13px] leading-relaxed pb-2.5 min-w-0 flex-1 pt-[2px] ${isAnimating ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]/80"}`}>
                     <MessageRenderer content={text || ""} onCitationClick={() => { }} sources={[]} />
@@ -933,15 +924,15 @@ export function ThoughtBlock({
                 </div>
               );
             })}
-          </div>
-        )}
 
-        {isLast && !isThinking && (
-          <div className="flex items-center gap-1.5 mt-3 mb-1">
-            <svg viewBox="0 0 16 16" className="size-3.5 text-emerald-400/70" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="4,8 7,11 12,5" />
-            </svg>
-            <span className="text-[13px] text-[var(--text-secondary)] leading-snug font-medium">Done</span>
+            {isLast && !isThinking && (
+              <div className="flex gap-2.5 items-start pl-1">
+                <div className="flex flex-col items-center w-4 shrink-0">
+                  <DoneIcon cls="size-3.5 text-[var(--text-secondary)]/60" />
+                </div>
+                <span className="text-[13px] text-[var(--text-secondary)]/80 leading-relaxed pt-[2px]">Done</span>
+              </div>
+            )}
           </div>
         )}
       </div>
