@@ -4,36 +4,36 @@
     <img src="frontend/src/logo.svg" width="80" height="80" alt="Flux">
   </picture>
   <br>
-  <h1 style="margin: 0; font-size: 3em; font-weight: 400; letter-spacing: -1px;">Flux</h1>
+  <h1 style="margin: 0; font-size: 3em; font-weight: 400; letter-spacing: -1px;">Flux for Android</h1>
   <p style="font-size: 1.15em; color: #6c6a64; margin-top: 4px;">
     <em>Multi-model AI chat · Document generation · Web search · Long-term memory</em>
   </p>
 </div>
 
 <p align="center">
-  <a href="#features"><img src="https://img.shields.io/badge/Explore_Features-%23cc785c?style=flat-square" alt="Features"></a>
-  <a href="#quick-start"><img src="https://img.shields.io/badge/Quick_Start-%23141413?style=flat-square" alt="Quick Start"></a>
+  <a href="https://github.com/shounakjoshi88-a11y/Flux/releases"><img src="https://img.shields.io/badge/Download_APK-%23cc785c?style=flat-square&logo=android" alt="Download APK"></a>
+  <a href="#features"><img src="https://img.shields.io/badge/Features-%23141413?style=flat-square" alt="Features"></a>
+  <a href="#build-yourself"><img src="https://img.shields.io/badge/Build_Yourself-%23141413?style=flat-square" alt="Build Yourself"></a>
   <a href="#architecture"><img src="https://img.shields.io/badge/Architecture-%23141413?style=flat-square" alt="Architecture"></a>
-  <a href="#api-reference"><img src="https://img.shields.io/badge/API_Reference-%23141413?style=flat-square" alt="API Reference"></a>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/runtime-Bun-%23cc785c?logo=bun&style=flat-square" alt="Bun">
   <img src="https://img.shields.io/badge/LLM-NVIDIA_NIM-76b900?logo=nvidia&style=flat-square" alt="NVIDIA NIM">
+  <img src="https://img.shields.io/badge/wrapper-Capacitor_8-119eff?logo=capacitor&style=flat-square" alt="Capacitor 8">
+  <img src="https://img.shields.io/badge/platform-Android-3ddc84?logo=android&style=flat-square" alt="Android">
   <img src="https://img.shields.io/badge/database-PostgreSQL_%2B_pgvector-4169e1?logo=postgresql&style=flat-square" alt="PostgreSQL + pgvector">
   <img src="https://img.shields.io/badge/auth-Supabase-3ecf8e?logo=supabase&style=flat-square" alt="Supabase">
   <img src="https://img.shields.io/badge/frontend-React_19-61dafb?logo=react&style=flat-square" alt="React 19">
-  <img src="https://img.shields.io/badge/css-Tailwind_CSS-06b6d4?logo=tailwindcss&style=flat-square" alt="Tailwind CSS">
   <img src="https://img.shields.io/badge/search-Tavily-ff6b6b?style=flat-square" alt="Tavily">
-  <img src="https://img.shields.io/badge/deploy-Vercel-black?logo=vercel&style=flat-square" alt="Vercel">
 </p>
 
 ---
 
-<h2 id="features">✨ Features</h2>
+<h2 id="features"> Features</h2>
 
 <details open>
-<summary><strong>🤖 Multi-Model Chat</strong></summary>
+<summary><strong> Multi-Model Chat</strong></summary>
 <br>
 Switch between 20+ models from a unified chat interface:
 
@@ -47,7 +47,7 @@ Each model streams responses in real-time via SSE, with visible thought process,
 </details>
 
 <details>
-<summary><strong>📄 Document Generation</strong></summary>
+<summary><strong> Document Generation</strong></summary>
 <br>
 Generate professional documents from plain English descriptions:
 
@@ -59,228 +59,139 @@ Generate professional documents from plain English descriptions:
 | **XLSX / CSV / TSV** | Formatted spreadsheets and delimited data |
 | **Markdown / JSON / SQL / HTML** | Structured text documents |
 
-Documents are built server-side by LLM-driven generation with format-specific skill prompts, retry logic, and fallback data generation. All generated files are downloadable and previewable in-browser.
+Documents are built server-side by LLM-driven generation with format-specific skill prompts.
 </details>
 
 <details>
-<summary><strong>🔧 Agentic Tool System</strong></summary>
+<summary><strong> Agentic Tool System</strong></summary>
 <br>
 The AI autonomously orchestrates tool calls to answer your queries:
 
-- **Web Search** — Real-time search via Tavily with full-page content extraction, query relevance filtering, topic extraction, anti-hallucination guards, and automatic query truncation (395 char limit)
+- **Web Search** — Real-time search via Tavily with full-page content extraction, query relevance filtering, anti-hallucination guards
 - **Document Generation** — Create files in 10 formats from natural language
 - **Weather Lookup** — Current conditions via OpenWeatherMap + Open-Meteo
 - **Image Generation** — Produce images via local Bonsai inference service
-- **Skill Reading** — Load format-specific skill prompts for better output quality
 
-Up to 10 autonomous reasoning steps per query (step limit enforced), with search loop guard (max 1 search per query), casual chat detection (skips search for personal/greeting prompts), wiki search guard, forced answer fallback, and topic extraction that prefers concise 3-10 word queries.
+Up to 10 autonomous reasoning steps per query, with search loop guard, casual chat detection, and forced answer fallback.
 </details>
 
 <details>
-<summary><strong>🧠 Long-Term Memory</strong></summary>
+<summary><strong> Long-Term Memory</strong></summary>
 <br>
 Flux remembers what matters:
 
 - **Automatic Extraction** — LLM extracts key facts from conversations in the background
 - **Vector Storage** — 1024-dimensional embeddings via BGE-M3 (local, Xenova Transformers)
-- **Similarity Search** — pgvector `<=>` operator for fast semantic retrieval
+- **Similarity Search** — pgvector operator for fast semantic retrieval
 - **Importance Scoring** — Memories ranked by relevance; low-importance junk gets pruned
 - **Deduplication** — Near-duplicate detection using embedding distance thresholds
 - **Context Injection** — Relevant memories automatically injected into system prompts
 </details>
 
 <details>
-<summary><strong>🎤 Voice I/O</strong></summary>
+<summary><strong> Voice I/O</strong></summary>
 <br>
 
 - **Speech-to-Text** — NVIDIA ASR (Parakeet 1.1B multilingual) for transcribing voice input
 - **Text-to-Speech** — Microsoft Edge TTS with 100+ voices across languages
-- **Browser TTS** — Read-aloud button on messages via Web Speech API with voice selection (prefers Google US English, Microsoft female voices, macOS high-quality voices)
+- **Browser TTS** — Read-aloud button on messages via Web Speech API
 </details>
 
 <details>
-<summary><strong>📰 News Aggregation</strong></summary>
+<summary><strong> News Aggregation</strong></summary>
 <br>
 Multi-source news reader built right in:
 
 - **Sources** — BBC, NPR, Reuters, CNN, Ars Technica, Wired, HackerNews, and more
 - **Categories** — All, World, Tech, Business, Science, Politics
 - **Caching** — Server-side RSS caching with configurable TTL
-- **HackerNews Integration** — Top stories fetched via the official Firebase API
 </details>
 
 <details>
-<summary><strong>🔍 RAG & Content Safety</strong></summary>
+<summary><strong> Conversation Management</strong></summary>
 <br>
 
-- **RAG Search** — NVIDIA Nemo Retriever models for embedding (`llama-3.2-nemoretriever-1b-vlm-embed-v1`) and reranking (`llama-3.2-nemoretriever-500m-rerank-v2`)
-- **Content Safety** — NVIDIA Nemotron content safety classification filters unsafe inputs before they reach the model
-- **Article Summarization** — Summarize any URL with optional full-text extraction
-- **Web Proxy** — In-app iframe preview of articles with CSP stripping and paywall/cookie notice hiding
-</details>
-
-<details>
-<summary><strong>💬 Conversation Management</strong></summary>
-<br>
-
-- **Searchable History** — Full-text search across all conversations with PostgreSQL FTS + trigram fuzzy matching
-- **Auto-Titling** — Conversations automatically renamed via dedicated small LLM (Nemotron Mini 4B) with 5–10 word titles
+- **Searchable History** — Full-text search across all conversations with PostgreSQL FTS
+- **Auto-Titling** — Conversations automatically renamed via dedicated small LLM
 - **Time Grouping** — Sidebar groups conversations by Today, Yesterday, This Week, etc.
 - **Undo Delete** — Deleted conversations can be restored via toast notification
 - **Artifacts Gallery** — Browse every generated file across all conversations in one place
 </details>
 
 <details>
-<summary><strong>🎨 Design & UX</strong></summary>
+<summary><strong> Mobile-Optimized UX</strong></summary>
 <br>
 
-- **Warm Design System** — Cream canvas (`#faf9f5`), coral primary (`#cc785c`), slab-serif display typography
-- **Dark Mode** — Dark navy surfaces on warm dark canvas with automatic theme detection
-- **Responsive** — Adaptive layout for desktop and tablet with animated sidebar (framer-motion spring)
-- **Auth** — Google and GitHub OAuth via Supabase with session management
-- **Settings** — Theme toggle, model preferences, TTS voice selection, and more in a slide-out panel
-- **Citation Hover Cards** — Hover any `[domain]` citation to see the source snippet + favicon + full URL in a floating card
-- **CSV Export** — Download tables as CSV via hover button
-- **Read-Aloud** — TTS button on each message with natural voice selection
-- **Reputation Score** — Authoritative domain whitelist (80+ tech domains) scores sources as trusted/untrusted
-- **Copy / Rewrite** — Per-message action buttons for copy and regenerate
-- **Share Conversation** — Top bar share button with native Web Share API (copies page URL as fallback)
-- **Thumbs Up/Down** — Local toggle feedback with animated icon fill/scale
-- **Model Selector** — Dropdown with thin custom scrollbar, grouped by category
-- **Keyboard Navigation** — Search modal, quick actions, and keyboard shortcuts throughout
-- **Prompt History** — Scrollable card showing recent user prompts
+- **Touch-friendly** — All interactions designed for touch input
+- **Safe-area-aware** — Respects Android notch and gesture bars
+- **Splash Screen** — Branded launch screen with configurable duration
+- **Pull-to-refresh** — Native-feeling conversation refresh
+- **Adaptive Layout** — Responsive design that works on phones and tablets
+- **Share Sheet** — Android native share integration for conversations
 </details>
 
 ---
 
-<h2 id="quick-start">⚡ Quick Start</h2>
+<h2 id="build-yourself"> Build the APK Yourself</h2>
 
 ### Prerequisites
 
-- [Bun](https://bun.sh) v1.2+ (or Node.js 18+)
-- PostgreSQL 14+ (or [Supabase](https://supabase.com) project)
-- **NVIDIA NIM API Key** — Get from [NVIDIA NIM](https://build.nvidia.com/nim)
-- **Tavily API Key** — Web search (get from [Tavily](https://tavily.com))
-- **Supabase Project** — Auth + PostgreSQL (get from [Supabase](https://supabase.com))
-- Optional: OpenWeatherMap API key, Bonsai setup for image generation
+- [Bun](https://bun.sh) v1.2+
+- [Android Studio](https://developer.android.com/studio) (for the Android SDK)
+- Java 17+ (bundled with Android Studio)
+- The backend runs on Azure — you don't need to run it locally unless you're developing
 
-### Installation
+### Quick Build
 
 ```bash
-# Clone and navigate
-git clone https://github.com/shounakjoshi88-a11y/Flux.git
-cd Flux
+# 1. Install frontend dependencies
+cd frontend && bun install
 
-# Install backend dependencies
-cd backend && bun install
+# 2. Build the web app
+bun run build
 
-# Set up database
-bunx prisma migrate dev --name init  # Creates database schema
-bunx prisma generate                  # Generates Prisma client
+# 3. Sync web assets to the Android project
+npx cap sync android
 
-# Install frontend dependencies
-cd ../frontend && bun install
+# 4. Build the debug APK
+cd android && ./gradlew assembleDebug
 
-# You're ready!
-cd ../
+# APK location:
+# frontend/android/app/build/outputs/apk/debug/Flux-debug.apk
 ```
 
-### Environment Variables
-
-Create `backend/.env`:
-
-```env
-# ===== DATABASE =====
-DATABASE_URL=postgresql://postgres:password@localhost:5432/flux
-
-# ===== SUPABASE (Auth) =====
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_API_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-
-# ===== OAUTH (GitHub + Google) =====
-GITHUB_OAUTH_CLIENT_ID=your_github_oauth_client_id
-GITHUB_OAUTH_CLIENT_SECRET=your_github_oauth_client_secret
-GOOGLE_OAUTH_CLIENT_ID=your_google_oauth_client_id
-GOOGLE_OAUTH_CLIENT_SECRET=your_google_oauth_client_secret
-
-# ===== LLM & AI PROVIDERS =====
-NIM_API_KEY=your_nvidia_nim_api_key              # Required
-NIM_BASE_URL=https://integrate.api.nvidia.com/v1 # Default NIM endpoint
-
-# ===== WEB SEARCH =====
-TAVILY_API_KEY=your_tavily_api_key
-
-# ===== WEATHER (Optional) =====
-OPENWEATHER_API_KEY=your_openweathermap_api_key
-
-# ===== IMAGE GENERATION (Optional) =====
-IMAGE_SERVICE_URL=http://127.0.0.1:8001          # Local Bonsai service
-BONSAI_MODELS_DIR=./image_generation_backend/models
-
-# ===== FRONTEND CONFIG =====
-BACKEND_URL=http://localhost:3001
-UNSPLASH_ACCESS_KEY=your_unsplash_api_key        # Optional, for image previews
-```
-
-**Note:** Supabase provides both authentication and PostgreSQL database.
-
-### Run Locally
+### One-Step Build Script
 
 ```bash
-# Terminal 1 — Backend (Express on Bun)
-cd backend && bun index.ts
-# → http://localhost:3001
-
-# Terminal 2 — Frontend (Bun dev server with HMR)
-cd frontend && bun dev
-# → http://localhost:3000
+cd frontend
+bun install && bun run build && npx cap sync android && cd android && ./gradlew assembleDebug
 ```
 
-### Deploy to Vercel
+### Building a Release APK
 
+For a production-ready signed APK:
+
+1. Generate a keystore:
 ```bash
-npm i -g vercel
-vercel --prod
+keytool -genkey -v -keystore release.keystore -alias flux -keyalg RSA -keysize 2048 -validity 10000
 ```
 
-The `vercel.json` configuration handles Bun installation, frontend build with Tailwind, serverless function routing, and static file serving.
+2. Place it at `frontend/android/app/flux.keystore`
 
-### Database Setup
-
-Flux requires PostgreSQL with `pgvector` extension for embeddings:
-
-**Option A: Supabase (Recommended)**
-1. Create a project on [Supabase](https://supabase.com)
-2. Copy the connection string to `DATABASE_URL` in `backend/.env`
-3. Run `bunx prisma migrate dev --name init`
-
-**Option B: Local PostgreSQL**
+3. Build the release APK:
 ```bash
-# Install PostgreSQL 14+
-# Enable pgvector extension
-createdb flux
-psql flux -c "CREATE EXTENSION IF NOT EXISTS vector"
-
-# Set DATABASE_URL
-export DATABASE_URL="postgresql://postgres:password@localhost:5432/flux"
-
-# Run migrations
-bunx prisma migrate dev --name init
+cd frontend/android && ./gradlew assembleRelease
 ```
 
 ---
 
-<h2 id="architecture">🏗️ Architecture</h2>
+<h2 id="architecture"> Architecture</h2>
 
 ```mermaid
 flowchart LR
-    subgraph frontend[React 19 SPA]
-        Dashboard[Dashboard - Chat - Sources - Tabs]
-        Sidebar[Sidebar - Search - History - News]
-        Auth[Auth - Google / GitHub OAuth]
-        Settings[Settings - Theme - Models]
-        Artifacts[Artifacts - Generated files gallery]
+    subgraph device[Android Device]
+        WebView[Capacitor WebView<br/>React 19 SPA]
+        Native[Capacitor Plugins<br/>App + Browser]
     end
 
     subgraph backend[Express 5 - Bun]
@@ -288,20 +199,12 @@ flowchart LR
         Conv[REST - Conversations CRUD]
         Memory[REST - Memories]
         News[REST - News + Summarize]
-        Voice[POST /api/tts - GET /api/tts/voices]
-    end
-
-    subgraph agentic[Agentic Loop - max 10 steps]
-        Plan[Plan - Intent analysis] --> Execute[Execute - Tool calls]
-        Execute --> Verify[Verify - Check results]
-        Verify --> Iterate[Iterate - Retry or fallback]
-        Iterate --> Finalize[Finalize - Stream answer]
+        Task[Task System - Long-running jobs]
     end
 
     subgraph nim[NVIDIA NIM]
         LLM[20+ LLMs - Mistral - DeepSeek - Qwen - Nemotron - GLM - Kimi]
         RAG[Nemo Retriever - Embed + Rerank]
-        Safety[Nemotron - Content safety]
     end
 
     subgraph storage[PostgreSQL + pgvector]
@@ -309,436 +212,143 @@ flowchart LR
         Vector[pgvector - 1024-dim embeddings - HNSW index]
     end
 
-    subgraph services[External Services]
-        Tavily[Tavily - Web search]
-        Supabase[Supabase - Auth OAuth]
-        Bonsai[Bonsai - Image generation]
-        Weather[OpenWeatherMap - Open-Meteo]
-    end
-
-    frontend -->|chat request + JWT| backend
-    backend -->|up to 10 reasoning steps| agentic
+    device -->|HTTPS + JWT| backend
     backend -->|stream LLM calls| nim
     backend -->|persist + vector search| storage
-    backend -->|tool execution| services
 ```
 
 **Request flow:**
-
-1. User types a message → frontend sends `POST /flux_ask` with query, model ID, conversation history, and optional attachments
-2. Server constructs a system prompt with memory context, datetime, location, and relevant skill files
-3. The LLM (via NVIDIA NIM) responds with streaming text, interleaved with tool call requests
-4. The server executes tool calls (web search with query relevance guard, 1-search limit, casual chat skip, 395-char truncation; document generation; weather; image gen) and feeds results back to the model
-5. After up to 10 agentic steps, the final answer streams to the frontend with sources (domain-labeled citations with hover snippet cards), thought process, follow-up questions, and any generated files
-6. Messages and metadata are persisted to PostgreSQL; memories are extracted asynchronously
-
-### Agentic Loop Details
-
-The `/flux_ask` endpoint orchestrates up to 10 reasoning steps:
-
-1. **Plan** — Analyze user intent via regex intent patterns and select appropriate workflow (code, analysis, weather, document, image, or simple QA)
-2. **Execute** — Run web search with Tavily (guard: max 1 search, casual chat skip), full-page content extraction via extract API, document generation, weather, image gen, or read skills
-3. **Verify** — Independent verification phase that synthesizes search results into a cited answer; checks for URL-only output and retries with synthesis if needed
-4. **Iterate** — If verification fails, retry the same tool or try alternatives (up to 3 retries per phase)
-5. **Finalize** — Stream final answer with reputation-scored sources, domain-labeled citations with hover preview cards, follow-up questions, and artifacts
-
-**SSE Events Streamed:**
-- `status` — Tool execution status (`searching`, `generating_document`, etc.)
-- `thought` — Visible reasoning process
-- `message` — Text chunks (streamed character-by-character)
-- `sources` — URLs with search snippets and reputation scores
-- `file` — Generated artifacts (PDF, PPTX, XLSX, etc.)
-- `follow_ups` — Suggested follow-up questions
+1. User types a message in the Android WebView
+2. Frontend sends `POST /flux_ask` to the remote backend
+3. The LLM responds with streaming text + tool calls
+4. Server executes tools and streams results back
+5. Final answer renders with sources, follow-ups, and artifacts
 
 ---
 
-<h2 id="api-reference">📡 API Reference</h2>
-
-### Chat
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/flux_ask` | Streaming AI chat with tool use — returns SSE events (`status`, `thought`, `file`, `sources`, `follow_ups`, `message_id`, text chunks) |
-
-### Conversations
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/conversations` | List user conversations (paginated, 50 per page) |
-| `POST` | `/conversations/new` | Create a new conversation |
-| `POST` | `/conversation/:id` | Load a conversation's messages |
-| `GET` | `/conversations/search?q=` | Full-text search across conversations |
-| `DELETE` | `/conversations/:id` | Delete a conversation (cascade) |
-
-### Memory
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/memories` | List all memories for the authenticated user |
-| `DELETE` | `/memories/:id` | Delete a specific memory |
-
-### Content
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/artifacts` | List all generated files across conversations |
-| `GET` | `/news` | Aggregated news with optional `?category=` filter |
-| `POST` | `/summarize` | Summarize a URL or text block |
-| `GET` | `/proxy` | Web proxy for embedding articles in iframes |
-
-### Voice
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/tts` | Text-to-speech synthesis (returns audio stream) |
-| `GET` | `/api/tts/voices` | List available Edge TTS voices |
-
-### System
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/skills/:name` | Serve skill markdown files for the frontend |
-| `GET` | `/health` | Health check (protected with timing-safe comparison) |
-
----
-
-<h2 id="project-structure">📁 Project Structure</h2>
+<h2 id="project-structure"> Project Structure</h2>
 
 ```
-flux/
-├── api/
-│   ├── index.ts                        # Vercel serverless entry (wraps backend)
-│   └── tsconfig.json
-│
-├── backend/
-│   ├── index.ts                        # Express 5 server — all routes, tool system, SSE
-│   ├── agent-tools.ts                  # Document builders (PDF, DOCX, PPTX, XLSX, CSV, TSV, MD, JSON, SQL, HTML)
-│   ├── prompt.ts                       # System prompt templates with placeholders
-│   ├── generationPrompt.ts             # Document gen prompt schemas
-│   ├── memory.ts                       # Vector memory extraction, retrieval, pruning
-│   ├── memory-enhanced.ts              # Enhanced memory module
-│   ├── retriever.ts                    # NVIDIA Nemo RAG (embed + rerank)
-│   ├── safety.ts                       # NVIDIA Nemotron content safety classifier
-│   ├── voice-client.ts                 # NVIDIA ASR (Parakeet) + Edge TTS
-│   ├── local-embedder.ts               # BGE-M3 local embeddings (Xenova Transformers)
-│   ├── middleware.ts                   # Supabase JWT verification + user upsert
-│   ├── client.ts                       # Supabase admin client (service_role)
-│   ├── db.ts                           # Prisma client singleton
-│   ├── nim-client.ts                   # NVIDIA NIM OpenAI-compatible client
-│   ├── nim-openai-client.ts            # Raw OpenAI client for NIM (fallback)
-│   ├── query-router.ts                 # Query routing logic
-│   ├── tool-registry.ts                # Central tool registration
-│   ├── search-cache.ts                 # Search result caching
-│   ├── huggingface-client.ts           # HuggingFace API client
-│   ├── tts-local.ts                    # Local TTS fallback
-│   ├── orchestrator/
-│   │   ├── index.ts                    # Re-exports
-│   │   ├── orchestrator.ts             # Plan-execute-verify agentic loop
-│   │   ├── planner.ts                  # Intent analysis + execution plans
-│   │   ├── verifier.ts                 # Phase result verification
-│   │   └── types.ts                    # Phase, ExecutionPlan, StreamWriter types
-│   ├── agent-protocol/                 # AG-UI protocol implementation
-│   │   ├── index.ts
-│   │   ├── types.ts
-│   │   ├── session.ts
-│   │   ├── team.ts
-│   │   ├── websocket.ts
-│   │   ├── model-selector.ts
-│   │   └── errors.ts
-│   ├── skills/                         # LLM skill prompts for document generation
-│   │   ├── SKILL.md                    # Master prompt with all skills
-│   │   ├── pdf-skill.md                # PDF generation prompt
-│   │   ├── docx-skill.md               # DOCX generation prompt
-│   │   ├── pptx-skill.md               # PowerPoint generation prompt
-│   │   ├── xlsx-skill.md               # Excel spreadsheet generation prompt
-│   │   ├── csv-skill.md                # Delimited data generation
-│   │   ├── tsv-skill.md
-│   │   ├── md-skill.md, json-skill.md, sql-skill.md, html-skill.md
-│   │   └── tech-writer-skill.md, finance-skill.md, coder-skill.md, creative-skill.md, legal-skill.md
-│   ├── prisma/
-│   │   ├── schema.prisma               # Models: User, Conversation, Message, Memory, WikiNode, WikiEdge
-│   │   ├── migrations/                 # SQL migration history
-│   │   ├── add_artifacts_indexes.sql
-│   │   └── apply_indexes_now.sql
-│   ├── fonts/
-│   │   └── NotoSansSC-Regular.ttf      # CJK font for PDF generation
-│   ├── sandbox/
-│   │   └── sandboxManager.ts           # Isolated code execution sandbox
-│   ├── tools/
-│   │   └── codeExecutor.ts             # Code execution tool
-│   ├── wiki/
-│   │   └── wikiManager.ts              # Wiki knowledge graph manager
-│   ├── image_generation_backend/       # Local Bonsai diffusion service (Python/Flask)
-│   │   ├── image_service.py
-│   │   └── setup_image_models.py
-│   └── package.json, tsconfig.json, Dockerfile, prisma.config.ts, express.d.ts, .npmrc
-│
+flux-android/
 ├── frontend/
-│   ├── src/
-│   │   ├── frontend.tsx                # React entry point
-│   │   ├── App.tsx                     # Router: "/" Dashboard, "/auth" Auth
-│   │   ├── index.ts                    # Bun dev server (static serve + SPA catch-all)
-│   │   ├── index.html                  # HTML shell
-│   │   ├── index.css                   # Base CSS + Tailwind import
-│   │   ├── types.ts                    # TypeScript definitions
-│   │   ├── i18n.ts                     # Internationalization
-│   │   ├── APITester.tsx               # API test component
-│   │   ├── declarations.d.ts           # Ambient type declarations
-│   │   ├── logo.svg, react.svg         # Brand + UI icons
-│   │   ├── pages/
-│   │   │   ├── Dashboard.tsx           # Main chat — auth, CRUD, SSE, tabs, previews
-│   │   │   └── Auth.tsx                # Login (Google + GitHub OAuth)
-│   │   ├── hooks/
-│   │   │   ├── useChat.ts              # SSE stream handler
-│   │   │   ├── useTheme.ts             # Dark/light theme toggle
-│   │   │   ├── useModels.ts            # Model list fetching
-│   │   │   ├── useCustomAgents.ts      # Custom agent management
-│   │   │   ├── useAgentSession.ts      # Agent session (WebSocket) management
-│   │   │   └── useSessionRevocationListener.ts
-│   │   ├── components/
-│   │   │   ├── ChatInput.tsx           # Markdown editor, model selector, file attach, voice, web toggle
-│   │   │   ├── MessageList.tsx         # Streaming messages with Answer/Links/Images tabs
-│   │   │   ├── MessageItem.tsx         # Single message — typewriter, thoughts, sources, files, action bar
-│   │   │   ├── MessageRenderer.tsx     # Rich renderer — markdown, code, math, mermaid, charts, citations
-│   │   │   ├── Sidebar.tsx             # Animated sidebar — search, conv groups, settings, news
-│   │   │   ├── SidebarThread.tsx       # Individual conversation thread item
-│   │   │   ├── Settings.tsx            # Account, Preferences, TTS, Sessions tabs
-│   │   │   ├── ArtifactsModal.tsx      # File gallery with cache, prefetch, pagination
-│   │   │   ├── NewsModal.tsx           # Multi-source news reader
-│   │   │   ├── PeekPanel.tsx           # URL/PDF/DOCX/PPTX/XLSX/MD preview panel
-│   │   │   ├── PptxPreview.tsx         # In-browser PPTX renderer (JSZip)
-│   │   │   ├── XlsxPreview.tsx         # In-browser XLSX renderer
-│   │   │   ├── MarkdownPreview.tsx     # Markdown file preview
-│   │   │   ├── FileDownloadButton.tsx  # Download + preview for generated files
-│   │   │   ├── SourceCard.tsx          # Source citation with reputation score
-│   │   │   ├── StatusMessage.tsx       # Tool status with search-suppressed messages & thought steps
-│   │   │   ├── SuggestedActions.tsx    # Category-based suggestion prompts
-│   │   │   ├── TodoList.tsx            # Dynamic todo list component
-│   │   │   ├── PromptHistoryCard.tsx   # Scrollable user prompt history
-│   │   │   ├── ToolsDropdown.tsx       # Answer/Links/Images dropdown
-│   │   │   ├── ChartBlock.tsx          # Recharts bar, line, pie, doughnut charts
-│   │   │   ├── InputSeparator.tsx      # "Flux can make mistakes" divider
-│   │   │   ├── WikiGraph.tsx           # 3D knowledge graph visualization
-│   │   │   ├── CustomAgentsPanel.tsx   # Custom agent configuration
-│   │   │   ├── CodeOutputBlock.tsx     # Code execution output display
-│   │   │   ├── AgentStatusBar.tsx      # Multi-agent status bar
-│   │   │   ├── PermissionDialog.tsx    # Permission request dialog
-│   │   │   ├── TeamPanel.tsx           # Multi-agent team panel
-│   │   │   ├── ToolSummary.tsx         # Tool call summary display
-│   │   │   └── ui/                     # Shadcn-style primitives
-│   │   ├── lib/
-│   │   │   ├── config.ts               # BACKEND_URL
-│   │   │   ├── client.ts               # Supabase browser client
-│   │   │   ├── server.ts               # Supabase SSR client
-│   │   │   ├── chat-utils.ts           # Parse assistant content (sources, follow-ups)
-│   │   │   ├── utils.ts                # cn() helper
-│   │   │   ├── tool-normalizer.ts      # Tool call normalization
-│   │   │   ├── message-index.ts        # Message indexing
-│   │   │   └── approval-store.ts       # Tool approval state
-│   │   ├── data/
-│   │   │   └── suggestions.ts          # Categorized prompts (5 categories, 10 each)
-│   │   ├── utils/
-│   │   │   ├── ReputationScore.ts      # Domain-based URL reputation scoring
-│   │   │   └── MathRenderer.tsx        # KaTeX inline/display math components
-│   │   ├── manifest.json               # PWA manifest
-│   │   ├── sw.js                       # Service worker (network-first)
-│   │   └── icon-*.svg, icon-*.png      # PWA icons
-│   ├── styles/
-│   │   ├── globals.css                 # Tailwind v4 + CSS custom properties
-│   │   └── dashboard.css               # Dashboard-specific dark/light styles
-│   ├── scripts/
-│   │   └── generate-icons.ts           # PWA icon generation script
-│   ├── dist/                           # Built output (deployed)
-│   ├── package.json, tsconfig.json, build.ts, bunfig.toml, components.json
-│   └── tailwind.config.js
+│   ├── src/                        # React 19 SPA
+│   │   ├── App.tsx                 # Router
+│   │   ├── pages/Dashboard.tsx     # Main chat UI
+│   │   ├── pages/Auth.tsx          # OAuth login
+│   │   ├── hooks/useChat.ts        # SSE stream handler
+│   │   ├── components/             # 40+ UI components
+│   │   └── lib/                    # Utilities, config
+│   ├── android/                    # Android project (Gradle)
+│   │   ├── app/
+│   │   │   ├── src/main/           # Manifest, Java, resources
+│   │   │   └── build.gradle
+│   │   ├── gradlew
+│   │   └── build.gradle
+│   ├── capacitor.config.ts         # Capacitor configuration
+│   ├── build.ts                    # Bun build script
+│   └── package.json
 │
-├── electron/                           # Desktop app (Electron)
-│   ├── main.ts                         # Main process
-│   ├── preload.ts                      # Preload script
-│   └── tsconfig.json
+├── backend/                        # Express 5 API (runs on Azure)
+│   ├── index.ts                    # Server entry — all routes
+│   ├── model-health.ts             # Model fallback health tracking
+│   ├── task-routes.ts              # Long-running task API
+│   ├── task-detector.ts            # Task intent classification
+│   ├── task-loop.ts                # Task execution loop
+│   ├── memory.ts                   # Vector memory extraction
+│   ├── tool-registry.ts            # Central tool registry
+│   ├── prompt.ts                   # System prompts
+│   ├── nim-client.ts               # NVIDIA NIM client
+│   ├── agent-protocol/             # WebSocket agent protocol
+│   ├── orchestrator/               # Agentic loop (plan-execute-verify)
+│   └── prisma/                     # Schema + migrations
 │
-├── screenshots/                        # App screenshots for README
-├── vercel.json                         # Vercel deployment config
-├── electron-builder.yml                # Electron build config
-├── AGENTS.md                           # Agent instructions
-├── DESIGN.md                           # Design system documentation
-├── FluxMap.md                          # Project map
-├── .gitignore
+├── api/                            # Vercel serverless wrapper
+├── shared/                         # Shared types
+├── Flux-Android.apk                # Pre-built debug APK
 └── README.md
 ```
 
 ---
 
-<h2 id="design">🎨 Design & UX</h2>
-
-Flux uses a **warm, minimal design language** inspired by Anthropic's Claude:
-
-**Color Palette:**
-- **Canvas:** `#faf9f5` — Warm cream background (primary surface)
-- **Primary:** `#cc785c` — Coral brand accent used on CTAs, highlights, tab underlines, and links
-- **Ink:** `#141413` — Near-black text for maximum readability
-- **Muted:** `#6c6a64` — Secondary text and borders
-- **Surface Dark:** `#181715` — Dark mode backgrounds
-
-**Typography:**
-- **Headings:** Inter (humanist sans-serif, 400–600 weight)
-- **Body:** Inter (14–16px, 400 weight)
-- **Code:** JetBrains Mono (syntax highlighting)
-- **Chat:** Newsreader serif (conversation messages)
-
-**Design Principles:**
-- Warm cream canvas — never pure white or cool grays
-- Minimal shadows — color-blocking creates depth
-- Responsive typography scaling
-- Spring animations (framer-motion) for smooth interactions
-- Accessible contrast ratios (WCAG AA+)
-- Dark mode support with automatic theme detection
-
----
-
-<h2 id="tech-stack">🛠️ Tech Stack</h2>
+<h2 id="tech-stack"> Tech Stack</h2>
 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
-| **Runtime** | [Bun](https://bun.sh) | JS/TS runtime, package manager, bundler, dev server |
-| **Backend** | Express 5 + TypeScript | REST API, SSE streaming, middleware |
-| **Frontend** | React 19 + TypeScript | SPA with router, hooks, component system |
-| **Styling** | Tailwind CSS + Radix UI + framer-motion | Utility CSS, accessible primitives, spring animations |
+| **Mobile Wrapper** | [Capacitor 8](https://capacitorjs.com) | Native Android WebView + plugins |
+| **Frontend** | React 19 + TypeScript | SPA with hooks, component system |
+| **Styling** | Tailwind CSS + framer-motion | Utility CSS, spring animations |
+| **Runtime** | [Bun](https://bun.sh) | JS/TS bundler, dev server |
+| **Backend** | Express 5 + TypeScript | REST API, SSE streaming |
 | **Database** | PostgreSQL + Prisma + pgvector | Relational data, ORM, vector embeddings |
 | **Auth** | Supabase | OAuth (Google, GitHub), JWT sessions |
 | **AI** | NVIDIA NIM | 20+ LLMs via OpenAI-compatible API |
 | **Search** | Tavily | Real-time web search API |
-| **Voice** | NVIDIA ASR + Edge TTS + Web Speech API | Speech recognition + synthesis + browser TTS |
-| **Image Gen** | Bonsai | Local diffusion model inference |
+| **Voice** | NVIDIA ASR + Edge TTS + Web Speech API | Speech recognition + synthesis |
 | **Embeddings** | Xenova Transformers | BGE-M3: local 1024-dim embeddings |
-| **RAG** | NVIDIA Nemo Retriever | Embed + rerank for retrieval-augmented generation |
-| **Safety** | NVIDIA Nemotron | Content safety classification |
-| **Deployment** | Vercel | Serverless functions + static hosting |
 
 ---
 
-## 🔧 Troubleshooting
+## Environment Variables
 
-### Database Connection Error
-```bash
-# Test PostgreSQL connection
-psql $DATABASE_URL -c "SELECT 1"
+The Android app connects to the production backend automatically. For local development, create `frontend/.env`:
 
-# If pgvector is missing
-psql $DATABASE_URL -c "CREATE EXTENSION IF NOT EXISTS vector"
+```env
+# The backend this app connects to
+BACKEND_URL=http://localhost:3001
 ```
 
-### NVIDIA NIM Not Responding
-- Verify `NIM_API_KEY` is set and valid
-- Check `NIM_BASE_URL` is correct
-- Fallback uses `OpenAI()` client with NIM models
+The backend requires its own `.env` in `backend/` — see the [main Flux README](https://github.com/shounakjoshi88-a11y/Flux) for the full list.
 
-### Frontend Not Loading
+---
+
+## Troubleshooting
+
+### APK Won't Install
+- Enable "Install from unknown sources" in Android Settings
+- You may need to uninstall any previous version first
+- Debug APKs are self-signed — this is normal for development builds
+
+### Android Build Fails
 ```bash
-# Clear cache and reinstall
+# Check Java version (requires 17+)
+java -version
+
+# Clean and rebuild
+cd frontend/android
+./gradlew clean
+./gradlew assembleDebug
+
+# If Gradle issues, delete cache
+rm -rf .gradle
+```
+
+### Web Build Fails
+```bash
 cd frontend
-rm -rf node_modules dist
+rm -rf node_modules dist bun.lock
 bun install
-bun dev
+bun run build
 ```
 
-### Prisma Migration Issues
-```bash
-# Reset database (⚠️ deletes all data)
-cd backend
-bunx prisma migrate reset
-
-# Or push schema directly
-bunx prisma db push
-```
-
-## 📖 Development Guide
-
-### Local Development
-
-**Terminal 1 — Backend**
-```bash
-cd backend
-bun index.ts
-# Server running on http://localhost:3001
-```
-
-**Terminal 2 — Frontend**
-```bash
-cd frontend
-bun dev
-# Dev server on http://localhost:3000
-```
-
-### Adding a New Tool
-
-1. Create tool handler in `backend/index.ts` (search for `web_search` example)
-2. Add tool definition to LLM system prompt (`prompt.ts`)
-3. Handle tool execution in the agentic loop
-4. Stream results via SSE to frontend
-
-### Debugging SSE Stream
-
-```bash
-# Monitor backend logs
-tail -f backend/backend.log | grep -E "status|error"
-
-# Check frontend hook
-# See frontend/src/hooks/useChat.ts for SSE parsing
-```
-
-### Testing Document Generation
-
-```bash
-# Send test request
-curl -X POST http://localhost:3001/flux_ask \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "Generate a PDF report on Q3 sales",
-    "model_id": "llama-3.2-90b-vision-instruct",
-    "conversation_id": "test"
-  }'
-```
-
-### Environment Variables Reference
-
-| Variable | Required | Example |
-|----------|----------|---------|
-| `DATABASE_URL` | ✅ Yes | `postgresql://...` |
-| `NIM_API_KEY` | ✅ Yes | `nvapi-...` |
-| `SUPABASE_SERVICE_ROLE_KEY` | ✅ Yes | `eyJhbGc...` |
-| `TAVILY_API_KEY` | ✅ Yes | `tvly-...` |
-| `IMAGE_SERVICE_URL` | ❌ No | `http://localhost:8001` |
-| `OPENWEATHER_API_KEY` | ❌ No | For weather tool |
+### Backend Connection Issues
+- The APK connects to the hosted backend by default
+- Check your internet connection
+- Verify the backend status at the health endpoint
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
-This is a personal project, but contributions are welcome!
-
-**Contribution Guidelines:**
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to your branch (`git push origin feature/amazing-feature`)
+3. Commit your changes
+4. Push to your branch
 5. Open a Pull Request
-
-**Areas for contribution:**
-- New LLM tools (e.g., code execution, file analysis)
-- Document format generators (e.g., Markdown → PDF templates)
-- UI/UX improvements
-- Performance optimizations
-- Bug fixes and tests
-
-**Questions?** Open an issue or reach out to [@shounakjoshi88-a11y](https://github.com/shounakjoshi88-a11y)
 
 ---
 
 <p align="center">
-  <sub>🚀 Built with Bun · React 19 · PostgreSQL · NVIDIA NIM · Supabase · Tailwind CSS</sub>
+  <sub> Built with Bun · React 19 · Capacitor 8 · PostgreSQL · NVIDIA NIM · Supabase</sub>
   <br>
-  <sub>📍 Flux is a personal AI assistant app — open source contributions welcome</sub>
-  <br>
-  <sub><strong>Status:</strong> Active Development | <strong>License:</strong> MIT (coming soon)</sub>
+  <sub> Flux for Android — open source, contributions welcome</sub>
 </p>
