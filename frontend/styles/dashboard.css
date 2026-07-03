@@ -1,0 +1,743 @@
+/* ===================================================
+   dashboard.css – Consolidated theme & component styles
+   Single source of truth for both dark and light themes.
+   =================================================== */
+
+/* ---------- CSS CUSTOM PROPERTIES ---------- */
+
+/* Dark theme (default) */
+:root {
+  /* Dashboard vars */
+  --bg-primary: #181715;
+  --bg-secondary: #12110f;
+  --surface-bg: rgba(255, 255, 255, 0.03);
+  --surface-border: rgba(255, 255, 255, 0.08);
+  --text-primary: #faf9f5;
+  --text-secondary: #a09d96;
+  --text-muted: #6c6a64;
+  --accent: #cc785c;
+  --accent-glow: rgba(204, 120, 92, 0.25);
+  --accent-foreground: #ffffff;
+  --user-msg-bg: #222222;
+  --scrollbar-thumb: rgba(250, 249, 245, 0.35);
+  --code-bg: #1f1e1b;
+  --inline-code-bg: rgba(204, 120, 92, 0.12);
+  --inline-code-text: #cc785c;
+
+  /* Global vars (dark values) */
+  --radius: 0.625rem;
+  --chart-1: #cc785c;
+  --chart-2: #5db8a6;
+  --chart-3: #faf9f5;
+  --chart-4: #e8a55a;
+  --chart-5: #a09d96;
+  --background: #181715;
+  --foreground: #faf9f5;
+  --card: #252320;
+  --card-foreground: #faf9f5;
+  --popover: #1f1e1b;
+  --popover-foreground: #faf9f5;
+  --primary: #cc785c;
+  --primary-foreground: #ffffff;
+  --secondary: #252320;
+  --secondary-foreground: #faf9f5;
+  --muted: #1f1e1b;
+  --muted-foreground: #a09d96;
+  --destructive: #c64545;
+  --border: #252320;
+  --input: #252320;
+  --ring: #cc785c;
+  --sidebar: #181715;
+  --sidebar-foreground: #faf9f5;
+  --sidebar-primary: #cc785c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #252320;
+  --sidebar-accent-foreground: #faf9f5;
+  --sidebar-border: #252320;
+  --sidebar-ring: #cc785c;
+}
+
+/* Also apply dark vars when .dark class is set */
+.dark {
+  --bg-primary: #181715;
+  --bg-secondary: #12110f;
+  --surface-bg: rgba(255, 255, 255, 0.03);
+  --surface-border: rgba(255, 255, 255, 0.08);
+  --text-primary: #faf9f5;
+  --text-secondary: #a09d96;
+  --text-muted: #6c6a64;
+  --accent: #cc785c;
+  --accent-glow: rgba(204, 120, 92, 0.25);
+  --accent-foreground: #ffffff;
+  --user-msg-bg: #222222;
+  --scrollbar-thumb: rgba(250, 249, 245, 0.35);
+  --code-bg: #1f1e1b;
+  --inline-code-bg: rgba(204, 120, 92, 0.12);
+  --inline-code-text: #cc785c;
+  --radius: 0.625rem;
+  --chart-1: #cc785c;
+  --chart-2: #5db8a6;
+  --chart-3: #faf9f5;
+  --chart-4: #e8a55a;
+  --chart-5: #a09d96;
+  --background: #181715;
+  --foreground: #faf9f5;
+  --card: #252320;
+  --card-foreground: #faf9f5;
+  --popover: #1f1e1b;
+  --popover-foreground: #faf9f5;
+  --primary: #cc785c;
+  --primary-foreground: #ffffff;
+  --secondary: #252320;
+  --secondary-foreground: #faf9f5;
+  --muted: #1f1e1b;
+  --muted-foreground: #a09d96;
+  --destructive: #c64545;
+  --border: #252320;
+  --input: #252320;
+  --ring: #cc785c;
+  --sidebar: #181715;
+  --sidebar-foreground: #faf9f5;
+  --sidebar-primary: #cc785c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #252320;
+  --sidebar-accent-foreground: #faf9f5;
+  --sidebar-border: #252320;
+  --sidebar-ring: #cc785c;
+}
+
+/* Light theme */
+.light {
+  /* Dashboard vars (light) */
+  --bg-primary: #faf9f5;
+  --bg-secondary: #f5f0e8;
+  --surface-bg: rgba(20, 20, 19, 0.03);
+  --surface-border: #e6dfd8;
+  --text-primary: #141413;
+  --text-secondary: #3d3d3a;
+  --text-muted: #6c6a64;
+  --accent: #cc785c;
+  --accent-glow: rgba(204, 120, 92, 0.20);
+  --accent-foreground: #ffffff;
+  --user-msg-bg: #ffffff;
+  --scrollbar-thumb: rgba(0, 0, 0, 0.20);
+  --code-bg: #efe9de;
+  --inline-code-bg: rgba(204, 120, 92, 0.08);
+  --inline-code-text: #cc785c;
+
+  /* Global vars (light values) */
+  --radius: 0.625rem;
+  --chart-1: #cc785c;
+  --chart-2: #5db8a6;
+  --chart-3: #181715;
+  --chart-4: #e8a55a;
+  --chart-5: #6c6a64;
+  --background: #faf9f5;
+  --foreground: #141413;
+  --card: #efe9de;
+  --card-foreground: #141413;
+  --popover: #faf9f5;
+  --popover-foreground: #141413;
+  --primary: #cc785c;
+  --primary-foreground: #ffffff;
+  --secondary: #f5f0e8;
+  --secondary-foreground: #141413;
+  --muted: #f5f0e8;
+  --muted-foreground: #5a5854;
+  --destructive: #c64545;
+  --border: #e6dfd8;
+  --input: #e6dfd8;
+  --ring: #cc785c;
+  --sidebar: #f5f0e8;
+  --sidebar-foreground: #3d3d3a;
+  --sidebar-primary: #cc785c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #efe9de;
+  --sidebar-accent-foreground: #141413;
+  --sidebar-border: #e6dfd8;
+  --sidebar-ring: #cc785c;
+}
+
+/* ---------- GLOBAL ---------- */
+body {
+  transition: background-color 0.5s ease, color 0.4s ease;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+/* ---------- SCROLLBAR ---------- */
+.sidebar-scroll,
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar,
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track,
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb,
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 3px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover,
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+.light .sidebar-scroll::-webkit-scrollbar-thumb:hover,
+.light .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+.sidebar-scroll::-webkit-scrollbar-button,
+.custom-scrollbar::-webkit-scrollbar-button {
+  display: none;
+}
+
+/* ---------- MAIN BACKGROUND ---------- */
+.main-container {
+  background: radial-gradient(ellipse at top, var(--bg-primary) 0%, var(--bg-secondary) 70%);
+  transition: background 0.5s ease;
+}
+
+/* ---------- ASSISTANT ANSWERS ---------- */
+.assistant-section h1,
+.assistant-section h2,
+.assistant-section h3,
+.assistant-section h4 {
+  font-family: 'Cormorant Garamond', 'Newsreader', Georgia, 'Times New Roman', serif !important;
+  font-weight: 400 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  line-height: 1.25 !important;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary) !important;
+}
+
+.assistant-section h1 { font-size: 1.75rem !important; letter-spacing: -0.03em !important; }
+.assistant-section h2 { font-size: 1.375rem !important; letter-spacing: -0.02em !important; }
+.assistant-section h3 { font-size: 1.125rem !important; letter-spacing: -0.01em !important; }
+.assistant-section h4 { font-size: 1rem !important; }
+
+.assistant-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  font-size: 0.9375rem !important;
+  line-height: 1.65 !important;
+  letter-spacing: 0em !important;
+  font-weight: 400 !important;
+  color: var(--text-primary) !important;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+}
+
+.assistant-section strong {
+  font-weight: 700 !important;
+  color: var(--text-primary) !important;
+}
+
+.assistant-section em {
+  font-style: italic !important;
+}
+
+.assistant-section .follow-ups-heading {
+  font-family: 'Inter', sans-serif !important;
+}
+
+/* ---------- USER MESSAGES ---------- */
+.user-message {
+  border-radius: 1.125rem;
+  padding: 0.625rem 1rem;
+  font-size: 0.9375rem !important;
+  line-height: 1.55 !important;
+  font-weight: 400 !important;
+  background: var(--user-msg-bg);
+  border: 1px solid var(--user-msg-border);
+  color: var(--text-primary);
+  max-width: 85%;
+  word-break: break-word;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+/* ---------- UI ELEMENTS ---------- */
+input,
+button,
+.sidebar-text,
+.chat-input,
+.tools-button,
+.model-selector,
+.code-block-header,
+.citation-btn,
+.tab-btn,
+.source-card,
+.file-chip-separate,
+.ai-disclaimer,
+.status-message-text {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+/* ---------- CODE BLOCKS ---------- */
+.code-block-wrapper {
+  margin: 1.25rem 0;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  border: 1px solid var(--surface-border);
+  background: var(--code-bg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--surface-border);
+  letter-spacing: 0.025em;
+  font-family: 'Inter', sans-serif !important;
+}
+
+.code-block-wrapper pre,
+.code-block-wrapper code {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
+  font-size: 0.75rem !important;
+  line-height: 1.5;
+}
+
+.inline-code {
+  border-radius: 0.25rem;
+  background: var(--inline-code-bg) !important;
+  padding: 0.1rem 0.3rem;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.75rem !important;
+  letter-spacing: -0.02em;
+  color: var(--inline-code-text) !important;
+  border: 1px solid var(--inline-code-border) !important;
+}
+
+/* ---------- TABLES ---------- */
+table {
+  border-color: var(--table-border) !important;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+table thead tr {
+  background: var(--table-header-bg) !important;
+  border-bottom: 1px solid var(--table-border);
+}
+
+table tbody tr {
+  background: var(--table-row-bg) !important;
+  border-bottom: 1px solid var(--table-border);
+}
+
+table tbody tr:nth-child(even) {
+  background: var(--table-row-alt-bg) !important;
+}
+
+table th,
+table td {
+  border: 1px solid var(--table-border) !important;
+  padding: 0.75rem 1rem !important;
+  color: var(--text-primary) !important;
+}
+
+/* ---------- CITATIONS ---------- */
+.citation-btn {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 0.375rem;
+  padding: 0.125rem 0.5rem;
+  font-size: 13px;
+  font-weight: 500;
+  margin: 0 0.125rem;
+  background: var(--surface-bg);
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  transition: all 0.25s ease;
+}
+
+.citation-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.light .citation-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-primary);
+}
+
+/* ---------- SOURCES ---------- */
+.source-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border-radius: 0.875rem;
+  border: 1px solid var(--surface-border);
+  padding: 0.875rem;
+  text-align: left;
+  background: var(--surface-bg);
+  transition: all 0.3s ease;
+}
+
+.source-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+}
+
+.light .source-card:hover {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: var(--accent);
+}
+
+
+
+
+
+/* ---------- SERIF DISPLAY ---------- */
+.serif-display {
+  font-family: 'Cormorant Garamond', 'Newsreader', Georgia, 'Times New Roman', serif !important;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+/* ===================================================
+   MOBILE-NATIVE ENHANCEMENTS
+   =================================================== */
+
+/* Safe area insets for notched phones */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+}
+
+/* Mobile compact layout */
+@media (max-width: 767px) {
+  .main-container {
+    width: 100%;
+    height: 100dvh !important;
+    overflow: hidden;
+    background: var(--bg-primary);
+  }
+
+  body {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+    overscroll-behavior: none;
+  }
+
+  input, textarea, [contenteditable] {
+    -webkit-user-select: text;
+    user-select: text;
+    font-size: 16px !important;
+  }
+
+  .assistant-section h1 { font-size: 1.375rem !important; }
+  .assistant-section h2 { font-size: 1.125rem !important; }
+  .assistant-section h3 { font-size: 1rem !important; }
+  .assistant-section h4 { font-size: 0.9375rem !important; }
+
+  .assistant-section {
+    font-size: 0.875rem !important;
+    line-height: 1.55 !important;
+    gap: 0.75rem;
+  }
+
+  .user-message {
+    max-width: 92%;
+    font-size: 0.875rem !important;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .user-message .message-entry {
+    font-size: 16px;
+  }
+
+  .follow-ups-heading {
+    font-size: 0.6875rem !important;
+  }
+
+  button, .citation-btn {
+    min-height: 36px;
+    touch-action: manipulation;
+  }
+
+  .code-block-wrapper {
+    margin: 0.75rem 0;
+    border-radius: 0.625rem;
+  }
+
+  .code-block-header {
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .code-block-wrapper pre,
+  .code-block-wrapper code {
+    font-size: 0.6875rem !important;
+  }
+
+  .source-card {
+    padding: 0.625rem;
+    gap: 0.5rem;
+    border-radius: 0.75rem;
+  }
+
+  /* Override the fixed input width on mobile */
+  .fixed-input-area {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+  }
+
+  .chat-input-inner {
+    max-width: 100% !important;
+    border-radius: 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+  }
+
+  /* Follow-up buttons */
+  .follow-up-btn {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  /* Bottom safe area for fixed input */
+  .fixed-input-wrapper {
+    padding-bottom: calc(0.5rem + var(--sab, 0px));
+  }
+
+  /* Full-width sheets */
+  .sheet-mobile {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+  }
+
+  /* Better tap targets for sidebar threads */
+  .sidebar-thread {
+    padding: 0.625rem 0.75rem !important;
+    min-height: 44px;
+  }
+
+  /* Status message rail alignment */
+  .status-message-rail {
+    font-size: 0.8125rem !important;
+  }
+
+  /* Image display handling */
+  .assistant-section img,
+  .assistant-section video {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.625rem;
+  }
+
+  /* Model selector on mobile should be more compact */
+  .model-selector-mobile-compact {
+    max-width: 100px;
+  }
+
+  /* Hide scrollbar on mobile while keeping scroll */
+  ::-webkit-scrollbar {
+    width: 0 !important;
+    height: 0 !important;
+  }
+  * {
+    scrollbar-width: none !important;
+  }
+}
+
+/* Tablet adjustments (768-1024px) */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .assistant-section {
+    font-size: 0.9rem !important;
+  }
+
+  .user-message {
+    max-width: 80%;
+  }
+}
+
+/* ---------- SAFE AREA UTILITY ---------- */
+.safe-area-bottom {
+  padding-bottom: var(--sab, 0px);
+}
+
+.safe-area-top {
+  padding-top: var(--sat, 0px);
+}
+
+/* ---------- BETTER TOUCH FEEDBACK ---------- */
+@media (hover: none) and (pointer: coarse) {
+  .source-card:hover {
+    transform: none;
+    box-shadow: none;
+  }
+
+  .citation-btn:hover {
+    transform: none;
+  }
+
+  .sidebar-thread:active {
+    background: var(--surface-bg);
+  }
+}
+
+/* ===================================================
+   GLASSMORPHISM UTILITIES
+   =================================================== */
+.glass-panel {
+  background: rgba(35, 35, 35, 0.93);
+  backdrop-filter: blur(24px) saturate(1.1);
+  -webkit-backdrop-filter: blur(24px) saturate(1.1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.light .glass-panel {
+  background: rgba(250, 249, 245, 0.93);
+  backdrop-filter: blur(24px) saturate(1.1);
+  -webkit-backdrop-filter: blur(24px) saturate(1.1);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.glass-panel-strong {
+  background: rgba(30, 30, 30, 0.95);
+  backdrop-filter: blur(32px) saturate(1.2);
+  -webkit-backdrop-filter: blur(32px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.light .glass-panel-strong {
+  background: rgba(250, 249, 245, 0.95);
+  backdrop-filter: blur(32px) saturate(1.2);
+  -webkit-backdrop-filter: blur(32px) saturate(1.2);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.glass-backdrop {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.light .glass-backdrop {
+  background: rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ===================================================
+   ULTRA-SMOOTH TRANSITIONS
+   =================================================== */
+.smooth-transition {
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.smooth-fade {
+  transition: opacity 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ===================================================
+   ANIMATIONS
+   =================================================== */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Staggered animation delays */
+.anim-delay-1 { animation-delay: 0.05s; }
+.anim-delay-2 { animation-delay: 0.1s; }
+.anim-delay-3 { animation-delay: 0.15s; }
+.anim-delay-4 { animation-delay: 0.2s; }
+.anim-delay-5 { animation-delay: 0.25s; }
+
+/* ===================================================
+   ENHANCED ACCENT GLOW
+   =================================================== */
+.accent-glow {
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+/* ===================================================
+   SMOOTH ENTRY FOR MESSAGES
+   =================================================== */
+.assistant-section {
+  animation: slideUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.user-message-container {
+  animation: slideUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ===================================================
+   APP ENTRY TRANSITION
+   =================================================== */
+.app-content {
+  animation: fadeIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}

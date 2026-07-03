@@ -1,0 +1,48 @@
+{
+  "name": "flux",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "postinstall": "bunx prisma generate"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/ws": "^8.18.1",
+    "prisma": "^7.8.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^3.0.65",
+    "@ai-sdk/openai-compatible": "^2.0.41",
+    "@e2b/code-interpreter": "^2.6.1",
+    "@edge-tts/universal": "npm:@jsr/edge-tts__universal",
+    "@openai/agents": "^0.9.1",
+    "@pdf-lib/fontkit": "^1.1.1",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "@prisma/extension-accelerate": "^3.0.1",
+    "@supabase/supabase-js": "^2.104.1",
+    "@tavily/core": "^0.7.2",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@xenova/transformers": "^2.0.1",
+    "ai": "^6.0.170",
+    "axios": "^1.15.2",
+    "cors": "^2.8.6",
+    "docx": "^9.6.1",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2",
+    "helmet": "^8.1.0",
+    "mammoth": "^1.12.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.0.227",
+    "pg": "^8.20.0",
+    "pptxgenjs": "^4.0.1",
+    "ws": "^8.21.0",
+    "xlsx": "^0.18.5",
+    "zod": "^4.4.3"
+  }
+}

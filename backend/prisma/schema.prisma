@@ -1,0 +1,116 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "./generated"
+  engineType      = "client"
+  runtime         = "bun"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String
+  provider      AuthProvider
+  name          String
+  supabaseId    String         @unique
+  conversations Conversation[]
+  memories      Memory[]
+  wikiNodes     WikiNode[]
+}
+
+model Conversation {
+  id       String    @id @default(uuid())
+  title    String?
+  slug     String
+  userId   String
+  user     User      @relation(fields: [userId], references: [id])
+  messages Message[]
+
+
+  @@index([userId])
+}
+
+model Message {
+  id             Int          @id @default(autoincrement())
+  content        String
+  role           MessageRole
+  conversationId String
+  createdAt      DateTime     @default(now())
+  sources        Json?        // Array of source objects
+  fileAttachment Json?        // For user file attachments
+  followUps      Json?        // Array of follow-up questions
+  thoughtProcess Json?        // Array of status events (steps) for the thought process
+  generatedFiles Json?        // Array of generated document objects (base64, filename, mime, etc.)
+  metadata       Json?        // Legacy metadata
+  type           String?      // Legacy type
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt(sort: Desc)])
+  @@index([conversationId])
+}
+
+model WikiNode {
+  id             String     @id @default(uuid())
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label          String
+  description    String?
+  type           String     @default("concept")
+  sourceType     String?
+  sourceUrl      String?
+  metadata       Json?
+  x              Float?
+  y              Float?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  sourceEdges    WikiEdge[] @relation("EdgeSource")
+  targetEdges    WikiEdge[] @relation("EdgeTarget")
+
+  @@unique([userId, label])
+  @@index([userId])
+}
+
+model WikiEdge {
+  id           String   @id @default(uuid())
+  sourceId     String
+  targetId     String
+  relationship String
+  weight       Float    @default(1.0)
+  createdAt    DateTime @default(now())
+  source       WikiNode @relation("EdgeSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  target       WikiNode @relation("EdgeTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, targetId, relationship])
+  @@index([sourceId])
+  @@index([targetId])
+}
+
+model Memory {
+  id                   String                @id @default(uuid())
+  userId               String
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category             String                // preference, project, personal, decision, feedback
+  fact                 String
+  embedding            Unsupported("vector(1024)")
+  sourceConversationId String?
+  importance           Float                 @default(0.5)
+  accessCount          Int                   @default(0)
+  lastAccessedAt       DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  @@index([userId])
+  @@index([userId, category])
+}
+
+enum MessageRole {
+  User
+  Assistant
+}
+
+enum AuthProvider {
+  Github
+  Google
+}

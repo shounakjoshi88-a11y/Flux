@@ -1,0 +1,22 @@
+{
+  "name": "flux",
+  "version": "1.0.0",
+  "description": "Flux — Your AI research companion",
+  "author": "Shounak Joshi",
+  "private": true,
+  "type": "module",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "electron:compile": "tsc -p electron/tsconfig.json && copy electron\\splash.html dist-electron\\splash.html",
+    "electron:dev": "npm run electron:compile && electron .",
+    "electron:dist": "npm run electron:compile && electron-builder --win --config electron-builder.yml",
+    "electron:dist:mac": "npm run electron:compile && electron-builder --mac --config electron-builder.yml",
+    "postinstall": "cd backend && bunx prisma generate && cd .."
+  },
+  "devDependencies": {
+    "electron": "^35.7.5",
+    "electron-builder": "^26.0.0",
+    "png-to-ico": "^3.0.1",
+    "typescript": "^5.8.0"
+  }
+}
