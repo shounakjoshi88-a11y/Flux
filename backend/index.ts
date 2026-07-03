@@ -2867,7 +2867,7 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
                 sendStatus(res, 'weather', `Fetching weather for ${safeCity}...`, undefined, state.thoughtProcess);
                 const result = await fetchWeatherFromAPI(sanitizeLocation(safeCity));
                 if (!result) {
-                    sendStatus(res, 'weather_error', `Weather unavailable for ${safeCity}.`, undefined, state.thoughtProcess);
+                    sendStatus(res, 'weather_error', `Weather unavailable for ${safeCity}.`, { status: 'error' }, state.thoughtProcess);
                     return `Could not fetch weather for ${safeCity}.`;
                 }
                 const fahrenheit = ((result.temperature * 9 / 5) + 32).toFixed(1);
@@ -2875,7 +2875,16 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
                 sendStatus(res, 'weather_success',
                     `${result.resolvedCity}: ${result.temperature}°C (${fahrenheit}°F), ` +
                     `feels like ${result.feelsLike}°C (${feelsF}°F) — ${result.description}`,
-                    { source: result.source },
+                    {
+                        status: 'completed',
+                        source: result.source,
+                        city: result.resolvedCity,
+                        temperature: result.temperature,
+                        feelsLike: result.feelsLike,
+                        humidity: result.humidity,
+                        windSpeed: result.windSpeed,
+                        description: result.description,
+                    },
                     state.thoughtProcess);
                 return [
                     `Live weather for ${result.resolvedCity} (via ${result.source}):`,
