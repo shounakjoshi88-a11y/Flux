@@ -17,6 +17,9 @@ SIMPLE:
 - "What is the capital of France?"
 - "Help me debug this error: TypeError: undefined is not a function"
 - "Summarize this article for me"
+- (Narrative/chat: "Yeah funny part here the coding is not done by me AI did that but you know no AI can make it..." — just chatting about past work, no request)
+- (Chat: "I made a custom renderer that handles latex and codeblocks, it took many iterations")
+- (Chat: "The thing is I spent hours refining the backend, it went from 400 to 6000 lines")
 
 COMPLEX:
 - "Research quantum computing breakthroughs and write a summary with sources" (search + read + synthesize)
@@ -57,7 +60,18 @@ function heuristicCheck(query: string): TaskIntent | null {
   return null;
 }
 
+function isConversational(query: string): boolean {
+  const hasNarrative = /i (made|built|created|wrote|did|had|spent|used|worked|added|fixed|changed|implemented|designed|setup|just|was|have|had|used|realized|noticed|mean|think|believe|wanted|needed|tried|said|found|got|seen|been|done)/i.test(query);
+  const hasConversationalPhrase = /(you know|the thing is|funny part|the catch is|here.s the thing|honestly|i mean|like you said|as you can see|so yeah|and yeah|long story short|to be honest|tell you what)/i.test(query);
+  const hasImperativeRequest = /(can you|could you|will you|would you|please|help me|i want|i need|i'd like|i would like|build me|create for me|make me|write me|generate|create\s+a|build\s+a|make\s+a|implement\s+a|develop\s+a|design\s+a|set\s+up|setup\s+a|install|configure)\b/i.test(query);
+  // Narrative/conversational AND not requesting new work
+  return (hasNarrative || hasConversationalPhrase) && !hasImperativeRequest;
+}
+
 function complexityHeuristic(query: string): TaskIntent {
+  // Pure conversational/narrative — no task
+  if (isConversational(query)) return 'SIMPLE';
+
   const multiReq = (query.match(/\band\b/gi) || []).length >= 3;
   const hasTech = /\b(react|vue|angular|node|express|python|django|flask|docker|kubernetes|postgresql|mongodb|redis|graphql|rest|api)\b/i.test(query);
   const hasStructure = /\b(frontend|backend|database|auth|testing|deploy|config|setup|scaffold|boilerplate|template|structure|layout|page|component|module|service|middleware|route|plugin|extension)\b/i.test(query);

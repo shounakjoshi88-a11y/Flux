@@ -711,6 +711,10 @@ export default function Dashboard() {
       // Auto-detect transport: use WS if available, fall back to SSE
       if (wsAvailableRef.current) {
         ws.sendMessage(prompt, activeConversationId, selectedModel, filesToSend, {
+          onNewConversationId: (id) => {
+            setActiveConversationId(id);
+            activeConversationIdRef.current = id;
+          },
           onComplete: () => {
             const id = activeConversationIdRef.current;
             if (id) conversationCacheRef.current.delete(id);

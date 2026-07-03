@@ -158,7 +158,7 @@ async function handleSessionStart(ws: AuthenticatedSocket, payload: any) {
   const { model, conversationId, mode } = payload;
   const config: AgentSessionConfig = {
     userId: ws.userId,
-    conversationId: conversationId || `conv_${Date.now()}`,
+    conversationId: conversationId || "",
     model: model || "kimi-k2.6",
     mode: (mode as AgentMode) || "default",
   };
@@ -243,6 +243,13 @@ async function handleUserMessage(ws: AuthenticatedSocket, payload: any) {
       throw new Error(`Backend error (${sseRes.status}): ${errText}`);
     }
 
+    // Capture the real conversation ID from /flux_ask response
+    const isNewConversation = !session.config.conversationId;
+    const realConvId = sseRes.headers.get('X-Conversation-Id');
+    if (realConvId && isNewConversation) {
+      session.config.conversationId = realConvId;
+    }
+
     const reader = sseRes.body?.getReader();
     if (!reader) throw new Error("No response body");
 
@@ -300,6 +307,15 @@ async function handleUserMessage(ws: AuthenticatedSocket, payload: any) {
     // If no finish event was sent, send one
     if (!accumulatedText) {
       send(ws, makeMsg(session, "finish", { text: "", sources: [] }));
+    }
+
+    // Notify frontend of the real conversation ID for new threads
+    if (isNewConversation && realConvId) {
+      send(ws, makeMsg(session, "agent_status", {
+        status: "conversation_created",
+        message: "New conversation created",
+        conversationId: realConvId,
+      }));
     }
 
     await session.transition("ready");
