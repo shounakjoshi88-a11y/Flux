@@ -164,203 +164,29 @@ flux/
 |   |   |   |   |-- textarea.tsx
 |   |   |
 |   |   |-- hooks/
+|   |   |   |-- useAgentSession.ts
+|   |   |   |-- useChat.ts
 |   |   |   |-- useCustomAgents.ts
 |   |   |   |-- useModels.ts
 |   |   |   |-- useSessionRevocationListener.ts
 |   |   |   |-- useTheme.ts
-|   |   |   |-- agent/
-|   |   |   |   |-- useAgentSession.ts
-|   |   |   |-- chat/
-|   |   |   |   |-- useAutoTitle.ts
-|   |   |   |   |-- useChat.ts
-|   |   |   |   |-- useSendBoxDraft.ts
-|   |   |   |   |-- useSendBoxFiles.ts
-|   |   |   |   |-- useSlashCommandController.ts
-|   |   |   |-- context/
-|   |   |   |   |-- ConversationHistoryContext.tsx
-|   |   |   |   |-- LayoutContext.tsx
-|   |   |   |-- file/                     # (placeholder)
-|   |   |   |-- flux/
-|   |   |   |   |-- agent/
-|   |   |   |   |   |-- useAcpModelInfo.ts
-|   |   |   |   |   |-- useAgentModesForBackend.ts
-|   |   |   |   |   |-- useAgentReadinessCheck.ts
-|   |   |   |   |   |-- useAgents.ts
-|   |   |   |   |   |-- useConfigModelListWithImage.ts
-|   |   |   |   |   |-- useGoogleAuthModels.ts
-|   |   |   |   |   |-- useHubAgents.ts
-|   |   |   |   |   |-- useModelProviderList.ts
-|   |   |   |   |   |-- useModeModeList.ts
-|   |   |   |   |   |-- usePresetAssistantInfo.ts
-|   |   |   |   |-- assistant/
-|   |   |   |   |   |-- index.ts
-|   |   |   |   |   |-- useAssistantEditor.ts
-|   |   |   |   |   |-- useAssistantList.ts
-|   |   |   |   |   |-- useDetectedAgents.ts
-|   |   |   |   |-- chat/
-|   |   |   |   |   |-- useAutoScroll.ts
-|   |   |   |   |   |-- useAutoTitle.ts
-|   |   |   |   |   |-- useCompositionInput.ts
-|   |   |   |   |   |-- useInitialMessage.ts
-|   |   |   |   |   |-- useInputFocusRing.ts
-|   |   |   |   |   |-- useSendBoxDraft.ts
-|   |   |   |   |   |-- useSendBoxFiles.ts
-|   |   |   |   |   |-- useSlashCommandController.ts
-|   |   |   |   |   |-- useSlashCommands.ts
-|   |   |   |   |   |-- useTypingAnimation.ts
-|   |   |   |   |-- config/
-|   |   |   |   |   |-- useConfig.ts
-|   |   |   |   |-- context/
-|   |   |   |   |   |-- AuthContext.tsx
-|   |   |   |   |   |-- ConversationContext.tsx
-|   |   |   |   |   |-- ConversationHistoryContext.tsx
-|   |   |   |   |   |-- FeedbackContext.tsx
-|   |   |   |   |   |-- LayoutContext.tsx
-|   |   |   |   |   |-- NavigationHistoryContext.tsx
-|   |   |   |   |   |-- ThemeContext.tsx
-|   |   |   |   |-- file/
-|   |   |   |   |   |-- useAbortUploadsOnConversationChange.ts
-|   |   |   |   |   |-- useAutoPreviewOfficeFiles.ts
-|   |   |   |   |   |-- useConversationExport.tsx
-|   |   |   |   |   |-- useDiffPreviewHandlers.ts
-|   |   |   |   |   |-- useDirectorySelection.tsx
-|   |   |   |   |   |-- useDragUpload.ts
-|   |   |   |   |   |-- useOpenFileSelector.ts
-|   |   |   |   |   |-- usePasteService.ts
-|   |   |   |   |   |-- usePreviewLauncher.ts
-|   |   |   |   |   |-- useUploadState.ts
-|   |   |   |   |   |-- useWorkspaceSelector.ts
-|   |   |   |   |-- mcp/
-|   |   |   |   |   |-- catalog.ts
-|   |   |   |   |   |-- index.ts
-|   |   |   |   |   |-- messageQueue.ts
-|   |   |   |   |   |-- useMcpConnection.ts
-|   |   |   |   |   |-- useMcpModal.ts
-|   |   |   |   |   |-- useMcpOAuth.ts
-|   |   |   |   |   |-- useMcpServerCRUD.ts
-|   |   |   |   |   |-- useMcpServers.ts
-|   |   |   |   |-- system/
-|   |   |   |   |   |-- useAutoPreviewOfficeFilesEnabled.ts
-|   |   |   |   |   |-- useDeepLink.ts
-|   |   |   |   |   |-- useExtensionSettingsTabs.ts
-|   |   |   |   |   |-- useExtI18n.ts
-|   |   |   |   |   |-- useLiveTranscriptInsertion.ts
-|   |   |   |   |   |-- useNotificationClick.ts
-|   |   |   |   |   |-- useProtocolDetection.ts
-|   |   |   |   |   |-- usePwaMode.ts
-|   |   |   |   |   |-- useSpeechInput.ts
-|   |   |   |   |   |-- useTheme.ts
-|   |   |   |   |-- ui/
-|   |   |   |   |   |-- useConversationShortcuts.ts
-|   |   |   |   |   |-- useDebounce.ts
-|   |   |   |   |   |-- useFontScale.ts
-|   |   |   |   |   |-- useFontSizes.ts
-|   |   |   |   |   |-- useIndexedItemRefs.ts
-|   |   |   |   |   |-- useLatestRef.ts
-|   |   |   |   |   |-- useResizableSplit.tsx
-|   |   |   |   |   |-- useTextSelection.ts
-|   |   |   |   |   |-- useThrottle.ts
 |   |   |
 |   |   |-- lib/
 |   |   |   |-- approval-store.ts
 |   |   |   |-- chat-utils.ts
 |   |   |   |-- client.ts
 |   |   |   |-- config.ts
-|   |   |   |-- constants.ts
 |   |   |   |-- message-index.ts
 |   |   |   |-- server.ts
 |   |   |   |-- tool-normalizer.ts
 |   |   |   |-- utils.ts
 |   |   |
-|   |   |-- services/
-|   |   |   |-- FileService.ts
-|   |   |   |-- i18n.ts
-|   |   |   |-- PasteService.ts
-|   |   |   |-- SpeechToTextService.ts
-|   |   |   |-- speech/
-|   |   |   |   |-- pcmRecorder.ts
-|   |   |   |   |-- speechModels.ts
-|   |   |   |   |-- SpeechStreamClient.ts
-|   |   |   |   |-- speechStreamPolicy.ts
-|   |   |
-|   |   |-- utils/
-|   |   |   |-- common.ts
-|   |   |   |-- MathRenderer.tsx
-|   |   |   |-- TrustScore.ts
-|   |   |   |-- file/
-|   |   |   |   |-- diffUtils.ts
-|   |   |   |   |-- fileType.ts
-|   |   |   |-- flux/
-|   |   |   |   |-- appRestart.ts
-|   |   |   |   |-- common.ts
-|   |   |   |   |-- emitter.ts
-|   |   |   |   |-- platform.ts
-|   |   |   |   |-- previewError.ts
-|   |   |   |   |-- chat/
-|   |   |   |   |   |-- atFileQuery.ts
-|   |   |   |   |   |-- autoTitle.ts
-|   |   |   |   |   |-- chatMinimapEvents.ts
-|   |   |   |   |   |-- conversationExport.ts
-|   |   |   |   |   |-- getLastAssistantText.ts
-|   |   |   |   |   |-- latexDelimiters.ts
-|   |   |   |   |   |-- messageHistory.ts
-|   |   |   |   |   |-- skillSuggestParser.ts
-|   |   |   |   |   |-- thinkTagFilter.ts
-|   |   |   |   |   |-- timeline.ts
-|   |   |   |   |-- file/
-|   |   |   |   |   |-- base64.ts
-|   |   |   |   |   |-- diffUtils.ts
-|   |   |   |   |   |-- download.ts
-|   |   |   |   |   |-- fileSelection.ts
-|   |   |   |   |   |-- fileType.ts
-|   |   |   |   |   |-- fileTypes.ts
-|   |   |   |   |   |-- messageFiles.ts
-|   |   |   |   |   |-- workspaceFs.ts
-|   |   |   |   |   |-- workspaceMentions.ts
-|   |   |   |   |-- model/
-|   |   |   |   |   |-- agentLogo.ts
-|   |   |   |   |   |-- agentModes.ts
-|   |   |   |   |   |-- agentTypes.ts
-|   |   |   |   |   |-- agentTypeSupportPolicy.ts
-|   |   |   |   |   |-- errorDetection.ts
-|   |   |   |   |   |-- modelCapabilities.ts
-|   |   |   |   |   |-- modelContextLimits.ts
-|   |   |   |   |   |-- modelPlatforms.ts
-|   |   |   |   |-- theme/
-|   |   |   |   |   |-- applyFontSizes.ts
-|   |   |   |   |   |-- applyTheme.ts
-|   |   |   |   |   |-- customCssProcessor.ts
-|   |   |   |   |   |-- systemAppearance.ts
-|   |   |   |   |   |-- systemThemeWatcher.ts
-|   |   |   |   |-- ui/
-|   |   |   |   |   |-- clipboard.ts
-|   |   |   |   |   |-- createContext.tsx
-|   |   |   |   |   |-- focus.ts
-|   |   |   |   |   |-- HOC.tsx
-|   |   |   |   |   |-- ModalHOC.tsx
-|   |   |   |   |   |-- runtimePatches.ts
-|   |   |   |   |   |-- siderTooltip.ts
-|   |   |   |   |-- workspace/
-|   |   |   |   |   |-- workspace.ts
-|   |   |   |   |   |-- workspaceEvents.ts
-|   |   |   |   |   |-- workspaceHistory.ts
-|   |   |
-|   |   |-- theme/
-|   |   |   |-- builtinThemes.ts
-|   |   |
-|   |   |-- styles/
-|   |   |   |-- colors.ts
-|   |   |   |-- layout.css
-|   |   |
 |   |   |-- data/
 |   |   |   |-- suggestions.ts
 |   |   |
-|   |   |-- renderer/                   # Stubs for renderer path aliases
-|   |   |   |-- pages/conversation/utils/conversationCache.ts
-|   |   |   |-- services/FileService.ts
-|   |   |   |-- utils/chat/autoTitle.ts
-|   |   |   |-- utils/emitter.ts
-|   |   |   |-- utils/file/fileTypes.ts
+|   |   |-- utils/
+|   |   |   |-- MathRenderer.tsx
+|   |   |   |-- ReputationScore.ts
 |   |
 |   |-- dist/                            # Build output (gitignored)
 |
