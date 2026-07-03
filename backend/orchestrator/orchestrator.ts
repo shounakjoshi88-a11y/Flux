@@ -70,8 +70,6 @@ export class OrchestratorEngine {
     const phaseResults = new Map<string, PhaseResult>();
 
     for (const phase of plan.steps) {
-      stream.writeThought(`Executing step: ${phase.description}`);
-
       let lastResult: PhaseResult | null = null;
       let retries = 0;
 
@@ -90,7 +88,6 @@ export class OrchestratorEngine {
         if (verification.passed) {
           lastResult = result;
           phaseResults.set(phase.id, result);
-          stream.writeThought(`Completed: ${phase.description}`);
           break;
         }
 
