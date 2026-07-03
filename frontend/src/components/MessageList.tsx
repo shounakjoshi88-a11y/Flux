@@ -24,6 +24,7 @@ type MessageListProps = {
   showPromptHistory: boolean;
   onJumpToPrompt: (messageId: string | number) => void;
   conversationId?: string;
+  onDelete?: (messageId: string | number) => void;
   onFileDelete?: (messageId: string | number, filename: string, type: 'fileAttachment' | 'generatedFiles') => void;
   activeGenerationStatus?: { subtype: string; message: string } | null;
   onPreview?: (data: {
@@ -74,6 +75,7 @@ export function MessageList({
   onFileClick,
   showPromptHistory,
   onJumpToPrompt,
+  onDelete,
   onFileDelete,
   onEdit,
   activeGenerationStatus,
@@ -224,6 +226,7 @@ export function MessageList({
                   onFileClick={onFileClick}
                   onPreview={onPreview}
                   onFileDelete={onFileDelete}
+                  onDelete={onDelete}
                   activeGenerationStatus={activeGenerationStatus}
                   onHtmlPreview={onHtmlPreview}
                 />

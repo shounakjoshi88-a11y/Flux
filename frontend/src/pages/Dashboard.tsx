@@ -157,6 +157,7 @@ export default function Dashboard() {
     retry,
     stop,
     activeGenerationStatus,
+    deleteMessage: sseDeleteMessage,
   } = useChat(user);
   const ws = useAgentSession(user);
   const { categories: modelCategories, all: allModels, isLoading: modelsLoading } = useModels();
@@ -804,6 +805,14 @@ export default function Dashboard() {
     );
   }, [chatSubmit, activeConversationId, selectedModel, attachedFiles, loadConversations]);
 
+  const handleDeleteMessage = useCallback((messageId: string | number) => {
+    if (activeTransport === "ws") {
+      ws.deleteMessage?.(messageId);
+    } else {
+      sseDeleteMessage(messageId);
+    }
+  }, [activeTransport, ws, sseDeleteMessage]);
+
   // ── Jump to prompt ──
   const handleJumpToPrompt = useCallback((messageId: string | number) => {
     const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
@@ -1179,6 +1188,7 @@ export default function Dashboard() {
                   setPeekUrl={setPeekUrl}
                   onRetry={handleRetry}
                   onEdit={handleEdit}
+                  onDelete={handleDeleteMessage}
                   onFileClick={(file) => setPeekFile(file)}
                   onPreview={handlePreview}
                   onHtmlPreview={handleHtmlPreview}

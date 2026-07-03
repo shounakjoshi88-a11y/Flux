@@ -5555,6 +5555,29 @@ app.post('/api/chat-sdk', middleware, async (req: any, res: any) => {
     }
 });
 
+// ─── DELETE MESSAGE ──────────────────────────────────────────
+app.delete("/conversations/:conversationId/messages/:messageId", middleware, async (req, res) => {
+    try {
+        const appUserId = req.appUserId!;
+        const conversationId = req.params.conversationId as string;
+        const messageId = parseInt(req.params.messageId, 10);
+        if (!conversationId || isNaN(messageId)) return res.status(400).json({ message: "Invalid parameters" });
+        const conversation = await prisma.conversation.findFirst({
+            where: { id: conversationId, userId: appUserId },
+        });
+        if (!conversation) return res.status(404).json({ message: "Conversation not found" });
+        const message = await prisma.message.findFirst({
+            where: { id: messageId, conversationId },
+        });
+        if (!message) return res.status(404).json({ message: "Message not found" });
+        await prisma.message.delete({ where: { id: messageId } });
+        return res.status(200).json({ success: true });
+    } catch (error) {
+        console.error("Delete message error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+
 // ─── DELETE CONVERSATION ────────────────────────────────────
 app.delete("/conversations/:conversationId", middleware, async (req, res) => {
     try {

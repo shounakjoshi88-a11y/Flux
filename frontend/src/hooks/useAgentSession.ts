@@ -80,6 +80,7 @@ export function useAgentSession(user: any) {
 
   const wsRef = useRef<WebSocket | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const conversationIdRef = useRef<string | null>(null);
   const isLoadingRef = useRef(false);
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 5;
@@ -425,6 +426,7 @@ export function useAgentSession(user: any) {
         throttledSetThought(null as any);
         break;
       case "conversation_created":
+        conversationIdRef.current = payload.conversationId;
         callbacksRef.current?.onNewConversationId?.(payload.conversationId);
         break;
       case "capabilities": setCapabilities(payload.capabilities); break;
@@ -625,6 +627,23 @@ export function useAgentSession(user: any) {
     };
   }, [disconnect, stopThoughtTimer]);
 
+  const deleteMessage = useCallback(async (messageId: string | number) => {
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    if (typeof messageId === 'number' && messageId > 0) {
+      try {
+        const token = await getAccessToken();
+        const convId = conversationIdRef.current;
+        if (!convId) return;
+        await fetch(`${BACKEND_URL}/conversations/${convId}/messages/${messageId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch (e) {
+        console.error("Delete message error:", e);
+      }
+    }
+  }, []);
+
   return {
     messages,
     setMessages,
@@ -641,6 +660,7 @@ export function useAgentSession(user: any) {
     connect,
     disconnect,
     runningRef,
+    deleteMessage,
   };
 }
 

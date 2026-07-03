@@ -830,6 +830,23 @@ export function useChat(user: any) {
     );
   }, [isLoading, handleSubmit]);
 
+  const deleteMessage = useCallback(async (messageId: string | number) => {
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    if (typeof messageId === 'number' && messageId > 0) {
+      try {
+        const token = await getAccessToken();
+        const convId = lastRequestRef.current?.activeConversationId;
+        if (!convId) return;
+        await fetch(`${BACKEND_URL}/conversations/${convId}/messages/${messageId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch (e) {
+        console.error("Delete message error:", e);
+      }
+    }
+  }, []);
+
   return {
     messages,
     setMessages,
@@ -839,5 +856,6 @@ export function useChat(user: any) {
     retry,
     stop,
     activeGenerationStatus,
+    deleteMessage,
   };
 }
