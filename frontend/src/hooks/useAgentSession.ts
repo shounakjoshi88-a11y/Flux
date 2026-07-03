@@ -103,6 +103,9 @@ export function useAgentSession(user: any) {
   const streamingPartsRef = useRef<MessagePart[]>([]);
   const textAccumRef = useRef<string>("");
 
+  // ΓöÇΓöÇ Callbacks for the current sendMessage call ΓöÇΓöÇ
+  const callbacksRef = useRef<UseAgentSessionCallbacks | undefined>(undefined);
+
   // ΓöÇΓöÇ Thought throttling (50ms like AionUi) ΓöÇΓöÇ
   const thoughtThrottleRef = useRef<{
     pending: { subject?: string; description?: string; elapsed: number } | null;
@@ -421,6 +424,9 @@ export function useAgentSession(user: any) {
         stopThoughtTimer();
         throttledSetThought(null as any);
         break;
+      case "conversation_created":
+        callbacksRef.current?.onNewConversationId?.(payload.conversationId);
+        break;
       case "capabilities": setCapabilities(payload.capabilities); break;
       case "processing": setSessionState("processing"); break;
       case "cooldown": setSessionState("cooldown"); break;
@@ -477,6 +483,8 @@ export function useAgentSession(user: any) {
       callbacks?: UseAgentSessionCallbacks
     ) => {
       if (!text.trim() || isLoadingRef.current || !user) return;
+
+      callbacksRef.current = callbacks;
 
       setIsLoading(true);
       isLoadingRef.current = true;
@@ -566,6 +574,7 @@ export function useAgentSession(user: any) {
       }
 
       callbacks?.onComplete?.();
+      callbacksRef.current = undefined;
     },
     [user, connect, mode, updateMessages, flushPartsToMessage]
   );
