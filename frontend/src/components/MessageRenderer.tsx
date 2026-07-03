@@ -145,13 +145,8 @@ function RawLatexFallback({ formula, display }: { formula: string; display: bool
 let mjPromise: Promise<any> | null = null;
 let mjReady = false;
 
-export function needsMathJax(formula: string): boolean {
-  if (!formula) return false;
-  return /\\multicolumn\b/.test(formula) ||
-    /\\intertext\b/.test(formula) ||
-    /\\genfrac\b/.test(formula) ||
-    /\\xymatrix\b/.test(formula) ||
-    /\\halign\b/.test(formula);
+export function needsMathJax(_formula: string): boolean {
+  return false; // All formulas handled by KaTeX + repair rules
 }
 
 function MathJaxRenderer({ formula, display }: { formula: string; display: boolean }) {
@@ -408,10 +403,19 @@ export function repairLatex(formula: string): string {
   // ── 8. Convert \\[<dimen>] to \\ (KaTeX doesn't support optional arg) ──
   s = s.replace(/\\\\\[\d+(?:\.\d+)?\s*(?:pt|ex|em|mm|cm|in|pc|mu)\]/g, '\\\\');
 
-  // ── 9. Strip \hfill etc. in math mode ──
+  // ── 9. Commands KaTeX doesn't support — convert to KaTeX-compatible forms ──
+  // \intertext{...} → \text{...}\\  (inline text then newline)
+  s = s.replace(/\\intertext\s*\{([^}]*)\}/g, "\\text{$1}\\\\");
+  // \multicolumn{n}{align}{text} → {text}  (keep content, drop spanning)
+  s = s.replace(/\\multicolumn\s*\{[^}]*\}\s*\{[^}]*\}\s*\{([^}]*)\}/g, "{$1}");
+  // \genfrac{ldelim}{rdelim}{thick}{style}{num}{den} → \frac{num}{den}
+  s = s.replace(/\\genfrac(\s*\{[^}]*\}){4}\s*\{([^}]*)\}\s*\{([^}]*)\}/g, "\\frac{$2}{$3}");
+  // \xymatrix{...} / \halign{...} — let KaTeX fail naturally to RawLatexFallback
+
+  // ── 10. Strip \hfill etc. in math mode ──
   s = s.replace(/\\hfill\b/g, ' ');
 
-  // ── 10. Balance unbalanced braces (last resort safety net) ──
+  // ── 11. Balance unbalanced braces (last resort safety net) ──
   s = balanceBraces(s);
 
   return s.trim();
