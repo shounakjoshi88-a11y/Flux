@@ -69,7 +69,8 @@ const WarnIcon = ({ cls = "" }: IProps) => (
 
 const DoneIcon = ({ cls = "" }: IProps) => (
   <S cls={cls}>
-    <polyline points="2.5,10 7.5,15.5 17.5,4.5" />
+    <circle cx="10" cy="10" r="7.5" />
+    <polyline points="5.5,10 9,13.5 14.5,7" />
   </S>
 );
 
@@ -868,50 +869,103 @@ export function ThoughtBlock({
   if (!rawText) return null;
   const stepsToRender = allSteps.slice(0, shownCount);
 
+  // Build flat list of visual rows: header, blank, step lines, done
+  type Row = 
+    | { kind: 'header';        isAnimating: boolean }
+    | { kind: 'blank' }
+    | { kind: 'step-line';     isFirstInStep: boolean; text: string; isAnimating: boolean }
+    | { kind: 'done' };
+
+  const rows: Row[] = [];
+  rows.push({ kind: 'header', isAnimating: isThinking });
+  rows.push({ kind: 'blank' });
+
+  stepsToRender.forEach((step, i) => {
+    const isLastStep = i === stepsToRender.length - 1;
+    const stepText = isThinking && isLastStep ? animatedActive : step;
+    const lines = stepText.split('\n').filter(l => l.trim());
+    lines.forEach((line, li) => {
+      rows.push({
+        kind: 'step-line',
+        isFirstInStep: li === 0,
+        text: line,
+        isAnimating: isThinking && isLastStep && li === 0,
+      });
+    });
+    if (i < stepsToRender.length - 1) rows.push({ kind: 'blank' });
+  });
+
+  if (isLast && !isThinking) {
+    rows.push({ kind: 'blank' });
+    rows.push({ kind: 'done' });
+  }
+
+  const lineCls = "w-px bg-[var(--text-muted)]/15";
+  const visibleRows = rows.filter(r => r.kind === 'header' || open);
+
+  const railIcon = (row: Row) => {
+    if (row.kind === 'header')
+      return isThinking
+        ? <span className="size-2 rounded-full bg-[var(--accent)] animate-pulse" />
+        : <span className="size-2 rounded-full bg-[var(--text-muted)]/40" />;
+    if (row.kind === 'step-line' && row.isFirstInStep)
+      return <ClockIcon className={`size-3.5 ${row.isAnimating ? "text-[var(--accent)]" : "text-[var(--text-secondary)]/60"}`} />;
+    if (row.kind === 'done')
+      return <DoneIcon cls="size-3.5 text-[var(--text-secondary)]/60" />;
+    return null;
+  };
+
   return (
-    <div className="mb-0.5">
-      <button
-        onClick={() => setOpen(v => !v)}
-        aria-expanded={open}
-        className="flex items-center gap-1.5 w-full text-left select-none py-2"
-      >
-        <span className="text-[13px] font-medium text-[var(--text-secondary)]">
-          {isThinking ? 'Thinking' : `Thought${displayElapsed != null ? ` · ${displayElapsed}s` : ''}`}
-        </span>
-        <span className="ml-auto shrink-0 flex items-center gap-1.5">
-          {isThinking && (
-            <span className="inline-flex gap-0.5">
-              {[0, 1, 2].map(i => (
-                <span key={i} className="size-1 rounded-full bg-[var(--accent)]/70"
-                  style={{ animation: `thoughtDot 1.2s ease-in-out ${i * 0.2}s infinite` }} />
-              ))}
-            </span>
-          )}
-          <ChevronDown className={`size-3 text-[var(--text-muted)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
-        </span>
-      </button>
-
-      {open && (
-        <div className="flex flex-col gap-1">
-          {stepsToRender.map((step, i) => {
-            const isLastShown = i === stepsToRender.length - 1;
-            const isAnimating = isThinking && isLastShown;
-            const text = isAnimating ? animatedActive : step;
-            return (
-              <div key={i} className={`text-[13px] leading-relaxed pl-1 ${isAnimating ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]/80"}`}>
-                <MessageRenderer content={text || ""} onCitationClick={() => { }} sources={[]} />
-                {isAnimating && (
-                  <span className="inline-block w-px h-[13px] bg-[var(--text-secondary)] ml-0.5 align-middle" style={{ animation: "blink 1s step-end infinite" }} />
-                )}
+    <div className="flex flex-col py-2">
+      {visibleRows.map((row, ri) => {
+        const hasNext = ri < visibleRows.length - 1;
+        const icon = railIcon(row);
+        return (
+          <div key={ri} className="flex gap-2.5 items-start">
+            <div className="w-4 shrink-0 flex flex-col items-center self-stretch">
+              <div className="flex flex-col items-center flex-1">
+                {icon || <div className="w-px bg-[var(--text-muted)]/15" />}
+                {hasNext && <div className={`${lineCls} flex-1 min-h-[4px]`} />}
               </div>
-            );
-          })}
-
-          {isLast && !isThinking && (
-            <span className="text-[13px] text-[var(--text-secondary)]/60 pl-1">Done</span>
-          )}
-        </div>
-      )}
+            </div>
+            <div className="min-w-0 flex-1">
+              {row.kind === 'header' && (
+                <button
+                  onClick={() => setOpen(v => !v)}
+                  aria-expanded={open}
+                  className="flex items-center gap-1.5 w-full text-left select-none"
+                >
+                  <span className="text-[13px] font-medium text-[var(--text-secondary)]">
+                    {isThinking ? 'Thinking' : `Thought${displayElapsed != null ? ` · ${displayElapsed}s` : ''}`}
+                  </span>
+                  <span className="ml-auto shrink-0 flex items-center gap-1.5">
+                    {isThinking && (
+                      <span className="inline-flex gap-0.5">
+                        {[0, 1, 2].map(i => (
+                          <span key={i} className="size-1 rounded-full bg-[var(--accent)]/70"
+                            style={{ animation: `thoughtDot 1.2s ease-in-out ${i * 0.2}s infinite` }} />
+                        ))}
+                      </span>
+                    )}
+                    <ChevronDown className={`size-3 text-[var(--text-muted)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+                  </span>
+                </button>
+              )}
+              {row.kind === 'step-line' && (
+                <div className={`text-[13px] leading-relaxed ${row.isAnimating ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]/80"}`}>
+                  <MessageRenderer content={row.text} onCitationClick={() => { }} sources={[]} />
+                  {row.isAnimating && (
+                    <span className="inline-block w-px h-[13px] bg-[var(--text-secondary)] ml-0.5 align-middle" style={{ animation: "blink 1s step-end infinite" }} />
+                  )}
+                </div>
+              )}
+              {row.kind === 'done' && (
+                <span className="text-[13px] text-[var(--text-secondary)]/60">Done</span>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
