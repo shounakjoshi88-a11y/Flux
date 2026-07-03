@@ -1403,14 +1403,10 @@ export function StatusMessage({
               transition={{ delay: 0.1, duration: 0.3 }}
             >
               <span className="text-sm font-semibold text-[var(--text-primary)]">{city}</span>
-              <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium ${isOWM
+              <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium ${isOWM
                 ? "border-[var(--accent)]/20 bg-[var(--accent)]/8 text-[var(--accent)]/80"
                 : "border-teal-500/30 bg-teal-500/8 text-teal-400/80"
                 }`}>
-                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className="size-3 shrink-0">
-                  <circle cx="6" cy="4.5" r="2" />
-                  <path d="M1.5 8.5c0-1.1.8-2 2-2h5c1.2 0 2 .9 2 2a1.2 1.2 0 0 1-1.2 1.2H2.7A1.2 1.2 0 0 1 1.5 8.5z" />
-                </svg>
                 {source}
               </span>
             </motion.div>
