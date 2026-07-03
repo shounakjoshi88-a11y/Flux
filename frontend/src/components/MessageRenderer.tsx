@@ -147,21 +147,11 @@ let mjReady = false;
 
 export function needsMathJax(formula: string): boolean {
   if (!formula) return false;
-  if (/\\multicolumn\b/.test(formula) ||
+  return /\\multicolumn\b/.test(formula) ||
     /\\intertext\b/.test(formula) ||
     /\\genfrac\b/.test(formula) ||
     /\\xymatrix\b/.test(formula) ||
-    /\\halign\b/.test(formula)) return true;
-
-  // Math-mode commands or Unicode math chars inside \text{...}
-  // (e.g. \text{(at 25°C)} or \text{25^{\circ}C}) break KaTeX
-  // because \text is text-only. Route to MathJax which handles it.
-  if (/\\text\{[^}]*(?:\\[a-zA-Z]|°|′|″|‴|µ|Ω|Å)/.test(formula)) return true;
-
-  // Commands from packages KaTeX doesn't support natively
-  if (/\\slashed\b/.test(formula)) return true;
-
-  return false;
+    /\\halign\b/.test(formula);
 }
 
 function MathJaxRenderer({ formula, display }: { formula: string; display: boolean }) {
@@ -387,8 +377,20 @@ export function repairLatex(formula: string): string {
   s = s
     .replace(/\\text\s*\{\s*(lim|min|max|sup|inf|arg|min|arg|max|sin|cos|tan|cot|sec|csc|sinh|cosh|tanh|log|ln|exp|det|deg|gcd|Pr|dim|hom|ker)\s*\}/g, "\\$1");
 
+  // ── 3b. Protect \text{...} content from unicode mapping below
+  // (unicode math chars like ° inside \text break KaTeX)
+  const textBlocks: string[] = [];
+  s = s.replace(/(\\text\{[^}]*\})/g, (m) => {
+    const idx = textBlocks.length;
+    textBlocks.push(m);
+    return `\x00TEXT${idx}\x00`;
+  });
+
   // ── 4. Map Unicode math symbols to LaTeX ──
   s = mapUnicodeMath(s);
+
+  // ── 4b. Restore protected \text{...} blocks
+  s = s.replace(/\x00TEXT(\d+)\x00/g, (_, idx) => textBlocks[+idx] ?? '');
 
   // ── 5. Escape # (macro parameter character breaks KaTeX) ──
   s = s.replace(/(?<!\\)#/g, '\\#');
