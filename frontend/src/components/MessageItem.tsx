@@ -89,6 +89,7 @@ type MessageItemProps = {
   }) => void;
   onFileDelete?: (messageId: string | number, filename: string, type: 'fileAttachment' | 'generatedFiles') => void;
   onEdit?: (messageId: string | number, newContent: string) => void;
+  onDelete?: (messageId: string | number) => void;
   activeGenerationStatus?: { subtype: string; message: string } | null;
   onHtmlPreview?: (html: string) => void;
 };
@@ -1253,6 +1254,7 @@ export function MessageItem({
   onPreview,
   onFileDelete,
   onEdit,
+  onDelete,
   activeGenerationStatus,
   onHtmlPreview,
 }: MessageItemProps) {
@@ -1457,6 +1459,15 @@ export function MessageItem({
             >
               {userCopied ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
             </button>
+            {onDelete && (
+              <button
+                onClick={() => { setShowUserActions(false); onDelete(message.id); }}
+                className="p-1.5 rounded-lg bg-black/20 dark:bg-white/5 hover:bg-red-500/15 text-muted-foreground hover:text-red-400"
+                title="Delete message"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1687,6 +1698,11 @@ export function MessageItem({
               <button onClick={() => onRetry?.()} className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/8 transition text-muted-foreground/60 hover:text-foreground" title="Rewrite">
                 <RefreshCw className="size-3.5" />
               </button>
+              {onDelete && (
+                <button onClick={() => onDelete(message.id)} className="p-1.5 rounded-md hover:bg-red-500/10 transition text-muted-foreground/60 hover:text-red-400" title="Delete message">
+                  <Trash2 className="size-3.5" />
+                </button>
+              )}
             </>
           )}
 
