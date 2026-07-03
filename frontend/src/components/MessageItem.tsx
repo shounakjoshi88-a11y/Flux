@@ -1439,7 +1439,7 @@ export function MessageItem({
             </button>
             {onDelete && (
               <button
-                onClick={() => onDelete(message.id)}
+                onClick={() => { try { onDelete(message.id); } catch (e) { console.error("Delete error:", e); } }}
                 className="p-1.5 rounded-lg bg-black/20 dark:bg-white/5 hover:bg-red-500/15 text-muted-foreground hover:text-red-400"
                 title="Delete message"
               >
@@ -1650,7 +1650,7 @@ export function MessageItem({
                 <RefreshCw className="size-3.5" />
               </button>
               {onDelete && (
-                <button onClick={() => onDelete(message.id)} className="p-1.5 rounded-md hover:bg-red-500/10 transition text-muted-foreground/60 hover:text-red-400" title="Delete message">
+                <button onClick={() => { try { onDelete(message.id); } catch (e) { console.error("Delete error:", e); } }} className="p-1.5 rounded-md hover:bg-red-500/10 transition text-muted-foreground/60 hover:text-red-400" title="Delete message">
                   <Trash2 className="size-3.5" />
                 </button>
               )}
