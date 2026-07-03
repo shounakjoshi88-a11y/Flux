@@ -50,7 +50,8 @@ import type {
   MessagePart,
 } from "../types";
 import { parseAssistantContent, extractLiveContent } from "../lib/chat-utils";
-import { BACKEND_URL, UNSPLASH_ACCESS_KEY } from "../lib/config";
+import { BACKEND_URL, SITE_URL, UNSPLASH_ACCESS_KEY } from "../lib/config";
+import { Share as CapacitorShare } from "@capacitor/share";
 
 
 const supabase = createClient();
@@ -177,15 +178,18 @@ export default function Dashboard() {
   const [shared, setShared] = useState(false);
 
   const handleShare = useCallback(async () => {
+    const shareUrl = `${SITE_URL}${window.location.pathname}`;
     try {
-      if (navigator.share) {
-        await navigator.share({ title: 'Flux AI', url: window.location.href });
+      if (typeof CapacitorShare !== 'undefined' && CapacitorShare.share) {
+        await CapacitorShare.share({ title: 'Flux AI', url: shareUrl });
+      } else if (navigator.share) {
+        await navigator.share({ title: 'Flux AI', url: shareUrl });
       } else {
-        await navigator.clipboard.writeText(window.location.href);
+        await navigator.clipboard.writeText(shareUrl);
         setShared(true);
         setTimeout(() => setShared(false), 2000);
       }
-    } catch { /* user cancelled */ }
+    } catch { /* user cancelled or not available */ }
   }, []);
 
   // ─── Search modal state ──────────────────────────────────
