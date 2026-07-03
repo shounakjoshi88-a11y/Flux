@@ -1,27 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportHeight="108"
     android:viewportWidth="108">
-
-    <!-- Sun glow ring -->
     <path
         android:fillColor="#00000000"
-        android:pathData="M74,50 m-20,0 a20,20 0,1,1 40,0 a20,20 0,1,1 -40,0"
+        android:pathData="M9,72 C22.5,27 36,81 49.5,45 S76.5,27 99,54"
         android:strokeColor="#cc785c"
-        android:strokeWidth="1.2" />
-
-    <!-- Sun circle -->
-    <path
-        android:fillColor="#cc785c"
-        android:pathData="M74,50 m-11.2,0 a11.2,11.2 0,1,1 22.4,0 a11.2,11.2 0,1,1 -22.4,0" />
-
-    <!-- Mountain outline -->
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M14,70 C26,30 38,78 50,46 S74,30 94,54"
-        android:strokeColor="#cc785c"
-        android:strokeWidth="3"
+        android:strokeWidth="8"
         android:strokeLineCap="round"
         android:strokeLineJoin="round" />
 </vector>

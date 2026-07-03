@@ -4,24 +4,18 @@ import sharp from "sharp";
 
 const OUT_DIR = import.meta.dir + "/../android/app/src/main/res";
 
-// Full logo SVG including the mountain, sun, glow, and white background
+// Full logo: white rounded square + coral squiggly path
 function createIconSVG(size: number): string {
-  const vw = 108, vh = 108;
-  // Scale to fill the viewport
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${vw} ${vh}">
-    <rect width="${vw}" height="${vh}" fill="#ffffff" />
-    <circle cx="74" cy="50" r="20" fill="none" stroke="#cc785c" stroke-width="1.2" />
-    <circle cx="74" cy="50" r="11.2" fill="#cc785c" />
-    <path d="M14,70 C26,30 38,78 50,46 S74,30 94,54" fill="none" stroke="#cc785c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 108 108">
+    <rect width="108" height="108" rx="13.5" fill="#ffffff" />
+    <path d="M9,72 C22.5,27 36,81 49.5,45 S76.5,27 99,54" fill="none" stroke="#cc785c" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
   </svg>`;
 }
 
 function createAdaptiveForegroundSVG(size: number): string {
-  // API 26+ adaptive icon foreground — 108dp canvas, only the logo on transparent
+  // API 26+ adaptive icon foreground — transparent background, coral squiggly path only
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 108 108">
-    <circle cx="74" cy="50" r="20" fill="none" stroke="#cc785c" stroke-width="1.2" />
-    <circle cx="74" cy="50" r="11.2" fill="#cc785c" />
-    <path d="M14,70 C26,30 38,78 50,46 S74,30 94,54" fill="none" stroke="#cc785c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M9,72 C22.5,27 36,81 49.5,45 S76.5,27 99,54" fill="none" stroke="#cc785c" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
   </svg>`;
 }
 
