@@ -18,6 +18,10 @@
 </p>
 
 <p align="center">
+  <a href="https://flux-weld-rho.vercel.app"><img src="https://img.shields.io/badge/live-https://flux--weld--rho.vercel.app-%23cc785c?style=flat-square" alt="Live"></a>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/runtime-Bun-%23cc785c?logo=bun&style=flat-square" alt="Bun">
   <img src="https://img.shields.io/badge/LLM-NVIDIA_NIM-76b900?logo=nvidia&style=flat-square" alt="NVIDIA NIM">
   <img src="https://img.shields.io/badge/database-PostgreSQL_%2B_pgvector-4169e1?logo=postgresql&style=flat-square" alt="PostgreSQL + pgvector">
@@ -25,7 +29,8 @@
   <img src="https://img.shields.io/badge/frontend-React_19-61dafb?logo=react&style=flat-square" alt="React 19">
   <img src="https://img.shields.io/badge/css-Tailwind_CSS-06b6d4?logo=tailwindcss&style=flat-square" alt="Tailwind CSS">
   <img src="https://img.shields.io/badge/search-Tavily-ff6b6b?style=flat-square" alt="Tavily">
-  <img src="https://img.shields.io/badge/deploy-Vercel-black?logo=vercel&style=flat-square" alt="Vercel">
+  <img src="https://img.shields.io/badge/frontend-Vercel-black?logo=vercel&style=flat-square" alt="Vercel">
+  <img src="https://img.shields.io/badge/backend-Azure_Container_Apps-0078d4?logo=microsoftazure&style=flat-square" alt="Azure Container Apps">
 </p>
 
 ---
@@ -814,7 +819,8 @@ flux/
 | **Charts** | Recharts | Bar, line, area, pie, doughnut, scatter |
 | **Math** | KaTeX | Inline/display math with 70+ custom LaTeX macros |
 | **Graphs** | Mermaid + Three.js | Diagrams + 3D knowledge graph |
-| **Deployment** | Vercel | Serverless functions + static hosting |
+| **Frontend Hosting** | Vercel | Static hosting + SPA routing |
+| **Backend Hosting** | Azure Container Apps | Containerized Express server |
 
 ---
 
