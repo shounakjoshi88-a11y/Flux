@@ -927,7 +927,7 @@ export function ThoughtBlock({
                   aria-expanded={open}
                   className="flex items-center gap-1.5 w-full text-left select-none"
                 >
-                  <span className="text-[15px] font-semibold text-[var(--text-secondary)]">
+                  <span className="text-[13px] font-medium text-[var(--text-secondary)]/80">
                     {isThinking ? 'Thinking' : `Thought${displayElapsed != null ? ` · ${displayElapsed}s` : ''}`}
                   </span>
                   <span className="ml-auto shrink-0 flex items-center gap-1.5">
@@ -964,7 +964,7 @@ export function ThoughtBlock({
               {/* Content: lines → mt-10 → Done */}
               <div className="min-w-0 flex-1 flex flex-col">
                 {row.lines.map((line, li) => (
-                  <div key={li} className={`text-[13px] leading-relaxed ${li === row.lines.length - 1 ? "" : "pb-2.5"} text-[var(--text-secondary)]/60`}>
+                  <div key={li} className={`text-[13px] leading-relaxed ${li === row.lines.length - 1 ? "" : "pb-2.5"} text-[var(--text-secondary)]/40`}>
                     <MessageRenderer content={line.text} onCitationClick={() => { }} sources={[]} />
                   </div>
                 ))}
@@ -988,7 +988,7 @@ export function ThoughtBlock({
             </div>
             <div className="min-w-0 flex-1">
               {row.kind === 'step-line' && (
-                <div className={`text-[13px] leading-relaxed ${row.isAnimating ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]/60"}`}>
+                <div className={`text-[13px] leading-relaxed ${row.isAnimating ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]/40"}`}>
                   <MessageRenderer content={row.text} onCitationClick={() => { }} sources={[]} />
                   {row.isAnimating && (
                     <span className="inline-block w-px h-[13px] bg-[var(--text-secondary)] ml-0.5 align-middle" style={{ animation: "blink 1s step-end infinite" }} />
