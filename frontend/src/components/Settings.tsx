@@ -479,8 +479,9 @@ export function Settings({
         method: 'POST',
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
-      if (!initRes.ok) throw new Error('Failed to initiate Google connection');
-      const { url } = await initRes.json();
+      const initData = await initRes.json().catch(() => ({}));
+      if (!initRes.ok) throw new Error(initData.error || 'Failed to initiate Google connection');
+      const { url } = initData;
 
       // 2. Open popup
       const popup = window.open(url, 'google-oauth', 'width=600,height=700');

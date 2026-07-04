@@ -21,9 +21,16 @@ function getOAuth2Client(redirectUri?: string) {
 }
 
 function getRedirectUri(req: any): string {
+  // Dynamic derivation works on any deployment (Vercel, localhost, preview)
   const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-  const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000';
-  return `${proto}://${host}/api/integrations/google/callback`;
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  if (host) return `${proto}://${host}/api/integrations/google/callback`;
+
+  // Fallback: env var (for misconfigured proxies or non-HTTP contexts)
+  const fallback = process.env.GOOGLE_REDIRECT_URI;
+  if (fallback) return fallback;
+
+  return 'https://localhost:3000/api/integrations/google/callback';
 }
 
 export async function getValidToken(userId: string): Promise<{ accessToken: string; email?: string | null } | null> {
@@ -73,15 +80,21 @@ export async function initGoogleAuth(req: any, res: any) {
     const uid = req.appUserId;
     if (!uid) return res.status(401).json({ error: 'Unauthorized' });
 
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+      console.error('[GOOGLE] Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET env vars');
+      return res.status(500).json({ error: 'Google OAuth is not configured on the server' });
+    }
+
     const state = crypto.randomUUID();
     oauthStateStore.set(state, { userId: uid, expiresAt: Date.now() + OAUTH_STATE_TTL });
 
     const redirectUri = getRedirectUri(req);
+    console.log('[GOOGLE] Init redirect URI:', redirectUri);
     const oauth2Client = getOAuth2Client(redirectUri);
     const scopes = (
       process.env.GOOGLE_SCOPES ||
       'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive.readonly'
-    ).split(' ');
+    ).split(' ').filter(Boolean);
 
     const url = oauth2Client.generateAuthUrl({
       access_type: 'offline',
@@ -92,8 +105,9 @@ export async function initGoogleAuth(req: any, res: any) {
 
     res.json({ url });
   } catch (err) {
-    console.error('[GOOGLE] Init error:', err);
-    res.status(500).json({ error: 'Failed to initialize Google auth' });
+    const msg = (err as any)?.message || 'Unknown error';
+    console.error('[GOOGLE] Init error:', msg);
+    res.status(500).json({ error: `Failed to initialize Google auth: ${msg}` });
   }
 }
 
