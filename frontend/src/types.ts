@@ -85,6 +85,7 @@ export type Message = {
   errorMessage?: string;
   thoughtProcess?: any[];
   parts?: MessagePart[];
+  pending?: boolean;
 };
 
 export type ConversationDetail = {

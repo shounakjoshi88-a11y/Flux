@@ -285,7 +285,7 @@ export function Settings({
     try {
       const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !currentSession) { setSessions([]); setLoadingSessions(false); return; }
-      const { data, error } = await supabase.rpc('get_user_sessions', { p_user_id: user.id });
+      const { data, error } = await (supabase as any).rpc('get_user_sessions', { p_user_id: user.id });
       if (error) throw error;
       if (data && Array.isArray(data)) {
         setSessions(data.map((s: any) => {
@@ -310,7 +310,7 @@ export function Settings({
     setRevokingSessionId(sessionId);
     // Relocated setOpenMenuSessionId(null) to the success block
     try {
-      const { error } = await supabase.rpc('revoke_user_session', { p_session_id: sessionId });
+      const { error } = await (supabase as any).rpc('revoke_user_session', { p_session_id: sessionId });
       if (error) throw error;
       setSessions(prev => prev.filter(s => s.id !== sessionId));
       setOpenMenuSessionId(null); // Finalize UI only on success

@@ -318,7 +318,9 @@ Text: ${text.slice(0, 3000)}`;
     return { nodes, edges };
   }
 
-  async deleteNode(nodeId: string) {
+  async deleteNode(nodeId: string, userId: string) {
+    const node = await prisma.wikiNode.findFirst({ where: { id: nodeId, userId } });
+    if (!node) throw new Error('Node not found');
     await prisma.wikiEdge.deleteMany({
       where: { OR: [{ sourceId: nodeId }, { targetId: nodeId }] },
     });

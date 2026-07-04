@@ -1,6 +1,7 @@
 import tailwind from "bun-plugin-tailwind";
-import { rm, cp, readFile, writeFile } from "node:fs/promises";
+import { rm, cp, rename, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { createHash } from "node:crypto";
 
 const outdir = path.join(process.cwd(), "dist");
 const srcdir = path.join(process.cwd(), "src");
@@ -31,7 +32,28 @@ const result = await Bun.build({
   },
 });
 
+// Content-hash output filenames for long-term caching
+const hashMap: Record<string, string> = {};
+for (const output of result.outputs) {
+  if (!output.path.endsWith('.js')) continue;
+  const content = await Bun.file(output.path).arrayBuffer();
+  const hash = createHash('md5').update(Buffer.from(content)).digest('hex').slice(0, 10);
+  const dir = path.dirname(output.path);
+  const ext = path.extname(output.path);
+  const base = path.basename(output.path, ext);
+  const hashedName = `${base}.${hash}${ext}`;
+  const hashedPath = path.join(dir, hashedName);
+  await rename(output.path, hashedPath);
+  hashMap[base + ext] = hashedName;
+}
 
+// Rewrite index.html to reference hashed filenames
+const indexHtmlPath = path.join(outdir, 'index.html');
+if (hashMap['index.js']) {
+  let html = await Bun.file(indexHtmlPath).text();
+  html = html.replace(/src="\.\/frontend\.tsx"/, `src="./${hashMap['index.js']}"`);
+  await Bun.write(indexHtmlPath, html);
+}
 
 // Copy PWA assets to dist
 const PWA_FILES = [

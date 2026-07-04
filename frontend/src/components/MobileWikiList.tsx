@@ -16,7 +16,7 @@ function getNodeColor(type: string): string {
   if (colorCache[type]) return colorCache[type];
   let hash = 0;
   for (let i = 0; i < type.length; i++) hash = type.charCodeAt(i) + ((hash << 5) - hash);
-  const color = FALLBACK_COLORS[Math.abs(hash) % FALLBACK_COLORS.length];
+  const color = FALLBACK_COLORS[Math.abs(hash) % FALLBACK_COLORS.length] ?? '#888';
   colorCache[type] = color;
   return color;
 }

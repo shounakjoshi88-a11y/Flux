@@ -4,6 +4,8 @@ import { createClient } from "@/lib/client";
 import { BACKEND_URL } from "@/lib/config";
 import { extractLiveContent, deepCleanAnswer } from "@/lib/chat-utils";
 import type { Message, AttachedFile, Source, GeneratedFile, MessagePart, PermissionRequest } from "@/types";
+import { queueMessage, getQueuedMessages, removeQueuedMessage, getQueueLength } from "@/lib/offline-queue";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 
 const supabase = createClient();
 
@@ -19,6 +21,7 @@ type UseChatCallbacks = {
   onMessageId?: (id: string) => void;
   onPermissionRequest?: (request: PermissionRequest) => void;
   onWikiUpdate?: (update: any) => void;
+  onOfflineQueueFlushed?: () => void;
   fileContent?: string;
   attachedFiles?: { name: string; content?: string }[];
   replaceLastAssistant?: boolean;
@@ -37,6 +40,7 @@ export function useChat(user: any) {
     subtype: string;
     message: string;
   } | null>(null);
+  const [pendingCount, setPendingCount] = useState(0);
   const isLoadingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const lastRequestRef = useRef<{
@@ -48,7 +52,12 @@ export function useChat(user: any) {
   } | null>(null);
   const realMessageIdRef = useRef<string | null>(null);
   const lastCallbacksRef = useRef<UseChatCallbacks | undefined>(undefined);
+  const onQueueFlushedRef = useRef<(() => void) | null>(null);
   const streamErrorRef = useRef<string | null>(null);
+
+  const isOnline = useOnlineStatus();
+  const prevOnlineRef = useRef(isOnline);
+  const queueFlushInProgressRef = useRef(false);
 
   const latestFollowUpsRef = useRef<string[]>([]);
   const latestGeneratedFilesRef = useRef<GeneratedFile[]>([]);
@@ -67,6 +76,75 @@ export function useChat(user: any) {
     };
   }, []);
 
+  useEffect(() => {
+    getQueueLength().then(setPendingCount).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!isOnline && prevOnlineRef.current) {
+      prevOnlineRef.current = false;
+    } else if (isOnline && !prevOnlineRef.current) {
+      prevOnlineRef.current = true;
+      flushQueue().catch(() => {});
+    } else if (isOnline) {
+      prevOnlineRef.current = true;
+    }
+  }, [isOnline]);
+
+  const flushQueue = useCallback(async () => {
+    if (queueFlushInProgressRef.current) return;
+    queueFlushInProgressRef.current = true;
+    try {
+      const queued = await getQueuedMessages();
+      for (const entry of queued) {
+        if (cancelledRef.current) break;
+        try {
+          const body: any = {
+            query: entry.content,
+            model: entry.model,
+            conversationId: entry.conversationId ?? undefined,
+            fileContent: entry.fileContent ?? undefined,
+            attachedFiles: entry.files.length > 0 ? entry.files : undefined,
+          };
+
+          const token = await getAccessToken();
+          const response = await fetch(`${BACKEND_URL}/flux_ask`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(body),
+          });
+
+          if (response.ok) {
+            const incomingConvId = response.headers.get("X-Conversation-Id");
+            if (incomingConvId && !entry.conversationId) {
+              setMessages((prev) => prev.map((m) =>
+                m.id === `pending-${entry.id}` ? { ...m, content: "✅ Message sent!", pending: false } : m
+              ));
+            }
+            if (!entry.conversationId && incomingConvId) {
+              const lastReq = lastRequestRef.current;
+              lastRequestRef.current = lastReq
+                ? { ...lastReq, activeConversationId: incomingConvId }
+                : { prompt: entry.content, activeConversationId: incomingConvId, selectedModel: entry.model, attachedFiles: entry.files.length > 0 ? entry.files.map(f => ({ name: f.name, content: f.content, type: f.type })) : null, fileContent: '' };
+            }
+            await removeQueuedMessage(entry.id);
+            setPendingCount((p) => Math.max(0, p - 1));
+          }
+        } catch {
+          setMessages((prev) => prev.map((m) =>
+            m.id === `pending-${entry.id}` ? { ...m, content: "❌ Send failed — will retry.", pending: false } : m
+          ));
+        }
+      }
+    } finally {
+      queueFlushInProgressRef.current = false;
+      onQueueFlushedRef.current?.();
+    }
+  }, []);
+
   const resetMessages = useCallback(() => {
     setMessages([]);
     setIsLoading(false);
@@ -76,6 +154,7 @@ export function useChat(user: any) {
     lastRequestRef.current = null;
     realMessageIdRef.current = null;
     lastCallbacksRef.current = undefined;
+    onQueueFlushedRef.current = null;
     latestFollowUpsRef.current = [];
     latestGeneratedFilesRef.current = [];
     setActiveGenerationStatus(null);
@@ -778,6 +857,25 @@ export function useChat(user: any) {
           setMessages((prev) =>
             prev.map((m) => (String(m.id) === String(assistantMsgId) || String(m.id) === "-1" ? { ...m, id: nextId++ } : m))
           );
+        } else if (error instanceof TypeError || error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
+          const last = lastRequestRef.current;
+          if (last) {
+            const queueId = `${nextId++}-${Date.now()}`;
+            setMessages((prev) => prev.map((m) =>
+              String(m.id) === String(assistantMsgId)
+                ? { ...m, content: "⏳ Queued — will send when connection is restored.", pending: true, error: false, errorMessage: undefined }
+                : m
+            ));
+            queueMessage({
+              id: queueId,
+              conversationId: last.activeConversationId,
+              content: last.prompt,
+              model: last.selectedModel,
+              files: last.attachedFiles?.map((f: AttachedFile) => ({ name: f.name, content: f.content, type: f.type })) ?? [],
+              fileContent: last.fileContent ?? "",
+              timestamp: Date.now(),
+            }).then(() => setPendingCount((p) => p + 1)).catch(() => {});
+          }
         } else {
           console.error("Send failed:", error);
           const errMsg = error?.message && !error.message.includes("fetch")
@@ -847,6 +945,10 @@ export function useChat(user: any) {
     }
   }, []);
 
+  const setQueueFlushCallback = useCallback((cb: (() => void) | null) => {
+    onQueueFlushedRef.current = cb;
+  }, []);
+
   return {
     messages,
     setMessages,
@@ -857,5 +959,7 @@ export function useChat(user: any) {
     stop,
     activeGenerationStatus,
     deleteMessage,
+    pendingCount,
+    setQueueFlushCallback,
   };
 }

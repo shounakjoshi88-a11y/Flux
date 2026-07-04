@@ -41,6 +41,7 @@ import TeamPanel from "../components/TeamPanel";
 import CustomAgentsPanel from "../components/CustomAgentsPanel";
 import { useTheme } from "../hooks/useTheme";
 import { useSessionRevocationListener } from "../hooks/useSessionRevocationListener";
+import { useSync } from "../hooks/useSync";
 import type {
   ConversationListItem,
   Message,
@@ -52,6 +53,8 @@ import type {
 import { parseAssistantContent, extractLiveContent } from "../lib/chat-utils";
 import { BACKEND_URL, SITE_URL, UNSPLASH_ACCESS_KEY } from "../lib/config";
 import { Share as CapacitorShare } from "@capacitor/share";
+import { conversationCache } from "../lib/conversation-cache";
+import { useAdaptiveQuality } from "../hooks/useAdaptiveQuality";
 
 
 const supabase = createClient();
@@ -221,10 +224,13 @@ export default function Dashboard() {
     stop,
     activeGenerationStatus,
     deleteMessage: sseDeleteMessage,
+    pendingCount,
+    setQueueFlushCallback,
   } = useChat(user);
   const ws = useAgentSession(user);
   const { categories: modelCategories, all: allModels, isLoading: modelsLoading } = useModels();
   const { agents: customAgents, createAgent: createCustomAgent, deleteAgent: deleteCustomAgent } = useCustomAgents();
+  const adaptive = useAdaptiveQuality();
 
   const [isTeamPanelOpen, setIsTeamPanelOpen] = useState(false);
   const [isCustomAgentsOpen, setIsCustomAgentsOpen] = useState(false);
@@ -394,8 +400,18 @@ export default function Dashboard() {
   }, [getAccessToken]);
 
   // ── Load conversations ──
-  const loadConversations = useCallback(async () => {
+  const loadConversations = useCallback(async (forceRefresh?: boolean) => {
     if (!user) return;
+
+    if (!forceRefresh && adaptive.cachePreference === 'cache-first') {
+      const cached = await conversationCache.getConversations();
+      if (cached && cached.length > 0) {
+        setConversations(cached);
+        try { localStorage.setItem("flux-conversations", JSON.stringify(cached)); } catch {}
+        return;
+      }
+    }
+
     const token = await getAccessToken();
     if (!token) return;
     const res = await fetch(`${BACKEND_URL}/conversations`, {
@@ -405,9 +421,36 @@ export default function Dashboard() {
     const data = (await res.json()) as { conversations: ConversationListItem[] };
     const list = data.conversations ?? [];
     setConversations(list);
-    // Persist so the sidebar renders instantly on next page load
     try { localStorage.setItem("flux-conversations", JSON.stringify(list)); } catch {}
-  }, [user, getAccessToken]);
+    conversationCache.putConversations(list).catch(() => {});
+  }, [user, getAccessToken, adaptive.cachePreference]);
+
+  // ── Wire offline queue flush to refresh conversation list ────────────────
+  useEffect(() => {
+    setQueueFlushCallback(loadConversations);
+    return () => setQueueFlushCallback(null);
+  }, [loadConversations, setQueueFlushCallback]);
+
+  // ── Cross-device sync ────────────────────────────────────────────────────
+  useSync({
+    onConversationCreated: () => loadConversations(true),
+    onConversationDeleted: (id) => {
+      if (activeConversationId === id) createNewThread();
+      loadConversations(true);
+    },
+    onMessageCreated: (conversationId, messageId) => {
+      if (activeConversationId === conversationId) {
+        conversationCacheRef.current.delete(conversationId);
+        openConversation(conversationId);
+      }
+      loadConversations(true);
+    },
+    onMessageDeleted: (conversationId, messageId) => {
+      if (activeConversationId === conversationId) {
+        setMessages(prev => prev.filter(m => m.id !== messageId));
+      }
+    },
+  });
 
   // ── Shared enrichment helper ──────────────────────────────────────────────
   const enrichConversationMessages = useCallback(
@@ -570,7 +613,15 @@ export default function Dashboard() {
       const conv = conversations.find(c => c.id === id);
       navigate(`/c/${conv?.slug || id}`, { replace: true });
 
-      // ── 1. Serve instantly from cache if still fresh ───────────────────────
+      // ── 1. Serve instantly from conversationCache if available ────────────
+      const cachedFromDb = await conversationCache.getMessages(id);
+      if (cachedFromDb) {
+        setMessages(cachedFromDb);
+        const last = [...cachedFromDb].reverse().find((m) => m.role === "Assistant");
+        setActiveSources(last?.sources ?? []);
+      }
+
+      // ── 2. Serve instantly from in-memory cache if still fresh ────────────
       const cached = conversationCacheRef.current.get(id);
       if (cached && Date.now() - cached.ts < CONV_CACHE_TTL) {
         setMessages(cached.enriched);
@@ -579,7 +630,7 @@ export default function Dashboard() {
         return;
       }
 
-      // ── 2. Cache miss – show empty state immediately, fetch in background ──
+      // ── 3. Cache miss – show empty state immediately, fetch in background ──
       setMessages([]);
       const token = await getAccessToken();
       if (!token) return;
@@ -599,8 +650,9 @@ export default function Dashboard() {
       const data = (await res.json()) as { conversation: ConversationDetail };
       const entry = enrichConversationMessages(data.conversation.messages);
 
-      // ── 3. Store in cache ─────────────────────────────────────────────────
+      // ── 4. Store in both caches ───────────────────────────────────────────
       conversationCacheRef.current.set(id, entry);
+      conversationCache.putMessages(id, entry.enriched).catch(() => {});
 
       // Only apply if the user hasn't navigated away while we were fetching
       if (activeConversationIdRef.current === id) {
@@ -808,7 +860,7 @@ export default function Dashboard() {
           onComplete: () => {
             const id = activeConversationIdRef.current;
             if (id) conversationCacheRef.current.delete(id);
-            loadConversations();
+            loadConversations(true);
           },
         });
       } else {
@@ -828,8 +880,13 @@ export default function Dashboard() {
             },
             onComplete: () => {
               const id = activeConversationIdRef.current;
-              if (id) conversationCacheRef.current.delete(id);
-              loadConversations();
+              if (id) {
+                conversationCacheRef.current.delete(id);
+                if (sseMessages.length > 0) {
+                  conversationCache.putMessages(id, sseMessages).catch(() => {});
+                }
+              }
+              loadConversations(true);
             },
             fileContent: filesToSend.filter((f) => !f.type?.startsWith('image/') && !f.type?.startsWith('video/')).map((f) => f.content).join("\n\n---\n\n"),
             attachedFiles: filesToSend,
@@ -912,6 +969,7 @@ export default function Dashboard() {
         setConversations((prev) => prev.filter((c) => c.id !== id));
         if (activeConversationId === id) createNewThread();
         setToast({ conversationId: id, title });
+        conversationCache.removeConversation(id).catch(() => {});
         loadConversations();
       } catch (err) {
         console.error("Deletion error:", err);

@@ -131,13 +131,17 @@ export const Sidebar = memo(function Sidebar({
     let startY = 0;
 
     const onTouchStart = (e: TouchEvent) => {
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
+      const touch = e.touches[0];
+      if (!touch) return;
+      startX = touch.clientX;
+      startY = touch.clientY;
     };
 
     const onTouchEnd = (e: TouchEvent) => {
-      const dx = e.changedTouches[0].clientX - startX;
-      const dy = e.changedTouches[0].clientY - startY;
+      const touch = e.changedTouches[0];
+      if (!touch) return;
+      const dx = touch.clientX - startX;
+      const dy = touch.clientY - startY;
       if (Math.abs(dy) > Math.abs(dx)) return;
       if (dx > SWIPE_THRESHOLD && startX < 30 && !isOpen) {
         onToggle();
@@ -914,31 +918,7 @@ export const Sidebar = memo(function Sidebar({
             </button>
           </div>
         </div>
-        <SidebarInnerContent
-          isOpen={isOpen}
-          onToggle={onToggle}
-          user={user}
-          conversations={conversations}
-          activeConversationId={activeConversationId}
-          onCreateThread={onCreateThread}
-          onSelectThread={onSelectThread}
-          onDeleteThread={onDeleteThread}
-          onPrefetchThread={onPrefetchThread}
-          isDarkMode={isDarkMode}
-          toggleTheme={toggleTheme}
-          onLogout={onLogout}
-          searchConversations={searchConversations}
-          isSearchModalOpen={isSearchModalOpen}
-          onSearchModalOpen={onSearchModalOpen}
-          onSearchModalClose={onSearchModalClose}
-          onSettingsOpen={onSettingsOpen}
-          onArtifactsOpen={onArtifactsOpen}
-          onArtifactsPrefetch={onArtifactsPrefetch}
-          onWikiOpen={onWikiOpen}
-          onNewsOpen={onNewsOpen}
-          onCustomAgentsOpen={onCustomAgentsOpen}
-          onTeamOpen={onTeamOpen}
-        />
+
       </aside>
     )}
 

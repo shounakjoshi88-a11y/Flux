@@ -1,11 +1,23 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter, Route, Routes, useNavigate } from "react-router-dom";
-import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
-import Privacy from "./pages/Privacy";
-import Terms from "./pages/Terms";
+import { lazy, Suspense } from "react";
 import { createClient } from "./lib/client";
 import { SplashScreen } from "./components/SplashScreen";
+
+const Auth = lazy(() => import("./pages/Auth"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Terms = lazy(() => import("./pages/Terms"));
+
+function LoadingFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[var(--bg-primary)]">
+      <svg className="size-8 animate-spin text-[var(--muted-foreground)]" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4 31.4" strokeLinecap="round" />
+      </svg>
+    </div>
+  );
+}
 
 function DeepLinkHandler() {
   const navigate = useNavigate();
@@ -22,7 +34,7 @@ function DeepLinkHandler() {
             const supabase = createClient();
             try {
               const codeMatch = event.url.match(/[?&]code=([^&]+)/);
-              const authCode = codeMatch ? decodeURIComponent(codeMatch[1]) : null;
+              const authCode = codeMatch?.[1] ? decodeURIComponent(codeMatch[1]) : null;
               if (!authCode) throw new Error("No auth code in URL");
 
               const { data, error } = await supabase.auth.exchangeCodeForSession(authCode);
@@ -57,14 +69,16 @@ export function App() {
   return (
     <BrowserRouter>
       <DeepLinkHandler />
-      <Routes>
-        <Route path="/auth" element={<Auth />} />
-        <Route path="/privacy" element={<Privacy />} />
-        <Route path="/terms" element={<Terms />} />
-        <Route path="/c/:slug" element={<Dashboard />} />
-        <Route path="/new" element={<Dashboard />} />
-        <Route path="/" element={<Dashboard />} />
-      </Routes>
+      <Suspense fallback={<LoadingFallback />}>
+        <Routes>
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/c/:slug" element={<Dashboard />} />
+          <Route path="/new" element={<Dashboard />} />
+          <Route path="/" element={<Dashboard />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

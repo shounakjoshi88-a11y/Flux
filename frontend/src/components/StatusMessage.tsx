@@ -1427,14 +1427,14 @@ export function StatusMessage({
 
     const containerVariants = {
       hidden: { opacity: 0, y: 12 },
-      visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
+      visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" as const } },
     };
 
     const cardVariants = {
       hidden: { opacity: 0, y: 8, scale: 0.95 },
       visible: (i: number) => ({
         opacity: 1, y: 0, scale: 1,
-        transition: { delay: 0.25 + i * 0.08, duration: 0.35, ease: "easeOut" },
+        transition: { delay: 0.25 + i * 0.08, duration: 0.35, ease: "easeOut" as const },
       }),
     };
 

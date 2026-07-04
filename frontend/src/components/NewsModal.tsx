@@ -117,7 +117,7 @@ function generateParticles(): Particle[] {
       opacity: Math.random() * 0.35 + 0.08,
       duration: Math.random() * 18 + 14,
       delay: Math.random() * 10,
-      color: PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)],
+      color: PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)] ?? '#fff',
     });
   }
   return particles;
