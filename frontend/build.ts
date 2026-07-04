@@ -49,11 +49,11 @@ for (const output of result.outputs) {
 
 // Rewrite index.html to reference hashed filenames
 const indexHtmlPath = path.join(outdir, 'index.html');
-if (hashMap['index.js']) {
-  let html = await Bun.file(indexHtmlPath).text();
-  html = html.replace(/src="\.\/frontend\.tsx"/, `src="./${hashMap['index.js']}"`);
-  await Bun.write(indexHtmlPath, html);
+let html = await Bun.file(indexHtmlPath).text();
+for (const [original, hashed] of Object.entries(hashMap)) {
+  html = html.replace(new RegExp(`"\.\/${original}"`, 'g'), `"./${hashed}"`);
 }
+await Bun.write(indexHtmlPath, html);
 
 // Copy PWA assets to dist
 const PWA_FILES = [
@@ -69,8 +69,8 @@ for (const file of PWA_FILES) {
 
 // Strip crossorigin from HTML — it blocks module scripts on file:// in Android WebView
 const htmlPath = path.join(outdir, "index.html");
-const html = await readFile(htmlPath, "utf-8");
-const cleaned = html.replace(/\s+crossorigin(=["']?(?:anonymous|use-credentials)["']?)?/gi, "");
+const htmlContent = await readFile(htmlPath, "utf-8");
+const cleaned = htmlContent.replace(/\s+crossorigin(=["']?(?:anonymous|use-credentials)["']?)?/gi, "");
 await writeFile(htmlPath, cleaned);
 
 for (const output of result.outputs) {
