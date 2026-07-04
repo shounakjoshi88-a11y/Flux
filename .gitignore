@@ -39,7 +39,7 @@ AGENTS.md
 GEMINI.md
 CLAUDE.md
 DESIGN.md
-data/
+/data/
 the_app_i_copied_folders_from/
 
 # TLS certs (local dev only)
