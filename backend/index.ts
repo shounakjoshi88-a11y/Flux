@@ -4581,7 +4581,7 @@ To verify/analyze code: use read_file first, then use run_bash to run type-check
 
         // ── Apply per-tool timeouts so no single tool can hang the response ──
         const TOOL_TIMEOUTS: Record<string, number> = {
-            web_search: 15_000,
+            web_search: 30_000,
             read_skill: 10_000,
             generate_document: 60_000,
             get_weather: 10_000,
@@ -4747,10 +4747,10 @@ To verify/analyze code: use read_file first, then use run_bash to run type-check
                 system: dynSys,
                 messages,
                 tools,
-                stopWhen: stepCountIs(30),
+                stopWhen: stepCountIs(50),
                 toolChoice: 'auto',
                 temperature: 0.35,
-                maxOutputTokens: 4096,
+                maxOutputTokens: 8192,
                 abortSignal: abortController.signal,
                 providerOptions: getProviderOptions(pref),
                 onStepFinish: (step: any) => {
@@ -4840,6 +4840,7 @@ To verify/analyze code: use read_file first, then use run_bash to run type-check
                 if (typeof (res as any).flush === 'function') (res as any).flush();
             }
 
+            try {
             for await (const event of agentStream.fullStream) {
                 if (res.writableEnded || closedRef.v || forceSynthesis) break;
 
@@ -4910,6 +4911,9 @@ To verify/analyze code: use read_file first, then use run_bash to run type-check
                         }
                     } catch (toolErr) {
                         console.warn('[ASK] tool-result handler error:', (toolErr as any)?.message);
+                        if (!res.writableEnded && !forceSynthesis) {
+                            res.write(`event: error\ndata: ${JSON.stringify({ message: `Tool error: ${(toolErr as any)?.message || 'Unknown tool error'}` })}\n\n`);
+                        }
                     }
                 }
 
@@ -5033,6 +5037,12 @@ To verify/analyze code: use read_file first, then use run_bash to run type-check
                             }
                         }
                     }
+                }
+            }
+            } catch (streamErr: any) {
+                console.error('[ASK] Stream error:', streamErr?.message ?? streamErr);
+                if (!res.writableEnded) {
+                    res.write(`event: error\ndata: ${JSON.stringify({ message: streamErr?.message || 'Stream error' })}\n\n`);
                 }
             }
 
@@ -5609,7 +5619,7 @@ app.post('/api/chat-sdk', middleware, aiLimiter, async (req: any, res: any) => {
         const agentState: AgentState = { sources: [], generatedFiles: [], thoughtProcess: [], searchCount: 0, wikiSearchCount: 0 };
         const tools = createFluxTools(noopRes, model, agentState, nq, '');
         withToolTimeout(tools, {
-            web_search: 15_000,
+            web_search: 30_000,
             generate_document: 60_000,
             get_weather: 10_000,
             generate_image: 90_000,
