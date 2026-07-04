@@ -19,7 +19,27 @@ export async function retrieveMemories(
   limit = 8,
   minSimilarity = 0.45,
 ) {
-  const queryEmbedding = await getEmbeddingVector(query);
+  let queryEmbedding: number[];
+  try {
+    queryEmbedding = await getEmbeddingVector(query);
+  } catch (e) {
+    console.warn('[MEMORY] Embedding model unavailable, falling back to recent memories:', (e as any)?.message ?? e);
+    const fallback = await prisma.memory.findMany({
+      where: { userId },
+      orderBy: [{ importance: 'desc' }, { lastAccessedAt: 'desc' }],
+      take: limit,
+      select: { id: true, category: true, fact: true, importance: true, accessCount: true },
+    });
+    const result = fallback.map(m => ({ ...m, similarity: 0 }));
+    if (result.length > 0) {
+      const ids = result.map((m: any) => m.id);
+      await prisma.memory.updateMany({
+        where: { id: { in: ids } },
+        data: { accessCount: { increment: 1 }, lastAccessedAt: new Date() },
+      });
+    }
+    return result;
+  }
   const embeddingStr = `[${queryEmbedding.join(',')}]`;
 
   const maxDistance = 1 - minSimilarity;

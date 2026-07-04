@@ -4438,7 +4438,10 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
             ? await Promise.race([
                 retrieveMemories(uid, nq).then(buildMemoryContext),
                 new Promise<string>(resolve => setTimeout(() => resolve(''), 300)),
-              ]).catch(() => '')
+              ]).catch((e) => {
+                console.warn('[MEMORY] retrieveMemories failed:', (e as any)?.message ?? e);
+                return '';
+              })
             : '';
 
         // Auto-write attached text files to the E2B sandbox so run_bash can reference them
@@ -4732,9 +4735,12 @@ To verify/analyze code: use read_file first, then use run_bash to run type-check
             }
         }
 
+        const memPrefix = memCtx ? `\n\n[MEMORY: Known facts about this user from past conversations]
+${memCtx}
+---\n\n` : '';
         const userText = !isVisionModel && imageAttachments.length > 0
-            ? `[The user attached ${imageAttachments.length} image(s)]\n\n${videoNotice}${attachedFilesText}${contextQuery}`
-            : `${videoNotice}${attachedFilesText}${contextQuery}`;
+            ? `[The user attached ${imageAttachments.length} image(s)]\n\n${videoNotice}${attachedFilesText}${memPrefix}${contextQuery}`
+            : `${videoNotice}${attachedFilesText}${memPrefix}${contextQuery}`;
 
         const userContent: any = hasImages
             ? [
@@ -5667,14 +5673,20 @@ app.post('/api/chat-sdk', middleware, aiLimiter, async (req: any, res: any) => {
 
         const memEnabled = req.authUser?.user_metadata?.enable_memory ?? true;
         const memCtx = memEnabled
-            ? await retrieveMemories(uid, nq).then(buildMemoryContext).catch(() => '')
+            ? await retrieveMemories(uid, nq).then(buildMemoryContext).catch((e) => {
+                console.warn('[MEMORY-SDK] retrieveMemories failed:', (e as any)?.message ?? e);
+                return '';
+              })
             : '';
         const dynSys = [
             SYSTEM_PROMPT.replaceAll('{{CURRENT_DATETIME}}', nowStr).replaceAll('{{LOCATION_INFO}}', locInfo).replaceAll('{{MEMORY_CONTEXT}}', memCtx),
             AGENT_SYSTEM_EXTENSION,
         ].join('\n\n');
 
-        const messages: any[] = [{ role: 'user', content: nq }];
+        const memPrefix = memCtx ? `\n\n[MEMORY: Known facts about this user from past conversations]
+${memCtx}
+---\n\n` : '';
+        const messages: any[] = [{ role: 'user', content: `${memPrefix}${nq}` }];
 
         const result = streamText({
             model,
