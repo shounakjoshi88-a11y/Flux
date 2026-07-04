@@ -25,6 +25,8 @@ import https from "https";
 import compression from "compression";
 import { syncManager } from './sync';
 import type { SyncEvent } from './sync';
+import { initGoogleAuth, handleGoogleCallback, getGoogleStatus, disconnectGoogle } from './google-auth';
+import { createGoogleTools } from './google-tools';
 import { createAgentWebSocket } from './agent-protocol';
 import { codeExecutor } from './tools/codeExecutor';
 import { sandboxManager } from './sandbox/sandboxManager';
@@ -176,9 +178,17 @@ function broadcastSyncEvent(supabaseUserId: string, payload: SyncEvent) {
 }
 
 // ─── DIAGNOSTICS & SYSTEM ──────────────────────────────────
+// ── Google OAuth callback (no auth middleware — called by Google redirect) ──
+app.get('/api/integrations/google/callback', handleGoogleCallback);
+
 app.get("/ping", (req, res) => {
     res.json({ status: "ok", time: new Date().toISOString() });
 });
+
+// ── Google OAuth protected routes ──────────────────────────────────
+app.post('/api/integrations/google/init', middleware, initGoogleAuth);
+app.get('/api/integrations/google/status', middleware, getGoogleStatus);
+app.post('/api/integrations/google/disconnect', middleware, disconnectGoogle);
 
 app.get("/whoami", middleware, (req, res) => {
     console.log(`[WHOAMI] Request from ${req.appUserId}`);
@@ -3599,6 +3609,7 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
                 }
             },
         }),
+        ...createGoogleTools(uid, res, state),
     };
 }
 
@@ -4566,6 +4577,15 @@ To verify/analyze code: use read_file first, then use run_bash to run type-check
             read_url: 10_000,
             run_bash: 60_000,
             run_python: 60_000,
+            gmail_search: 30_000,
+            gmail_read: 30_000,
+            gmail_send: 30_000,
+            gmail_list_threads: 30_000,
+            calendar_list_events: 30_000,
+            calendar_create_event: 30_000,
+            drive_search_files: 30_000,
+            drive_read_file: 30_000,
+            drive_list_folder: 30_000,
         });
 
         // ── StreamWriter adapter for orchestrator ──────────────────────────
@@ -5555,9 +5575,21 @@ app.post('/api/chat-sdk', middleware, aiLimiter, async (req: any, res: any) => {
             read_url: 10_000,
             run_bash: 60_000,
             run_python: 60_000,
+            gmail_search: 30_000,
+            gmail_read: 30_000,
+            gmail_send: 30_000,
+            gmail_list_threads: 30_000,
+            calendar_list_events: 30_000,
+            calendar_create_event: 30_000,
+            drive_search_files: 30_000,
+            drive_read_file: 30_000,
+            drive_list_folder: 30_000,
         });
 
-        const memCtx = '';
+        const memEnabled = req.authUser?.user_metadata?.enable_memory ?? true;
+        const memCtx = memEnabled
+            ? await retrieveMemories(uid, nq).then(buildMemoryContext).catch(() => '')
+            : '';
         const dynSys = [
             SYSTEM_PROMPT.replaceAll('{{CURRENT_DATETIME}}', nowStr).replaceAll('{{LOCATION_INFO}}', locInfo).replaceAll('{{MEMORY_CONTEXT}}', memCtx),
             AGENT_SYSTEM_EXTENSION,

@@ -18,6 +18,8 @@ model User {
   conversations Conversation[]
   memories      Memory[]
   wikiNodes     WikiNode[]
+  googleTokens  UserGoogleToken[]
+  tasks         Task[]
 }
 
 model Conversation {
@@ -27,6 +29,7 @@ model Conversation {
   userId   String
   user     User      @relation(fields: [userId], references: [id])
   messages Message[]
+  tasks    Task[]
 
 
   @@index([userId])
@@ -87,6 +90,21 @@ model WikiEdge {
   @@index([targetId])
 }
 
+model UserGoogleToken {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken  String
+  refreshToken String?
+  scope        String
+  expiresAt    DateTime?
+  email        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+}
+
 model Memory {
   id                   String                @id @default(uuid())
   userId               String
@@ -103,6 +121,75 @@ model Memory {
 
   @@index([userId])
   @@index([userId, category])
+}
+
+enum TaskStatus {
+  PENDING
+  PLANNING
+  RUNNING
+  WAITING_FOR_INPUT
+  PAUSED
+  INTERRUPTED
+  COMPLETED
+  FAILED
+  CANCELLED
+  TIMED_OUT
+}
+
+enum StepStatus {
+  PENDING
+  RUNNING
+  BLOCKED
+  DONE
+  FAILED
+  SKIPPED
+}
+
+model Task {
+  id                String       @id @default(cuid())
+  conversationId    String
+  userId            String
+  sandboxId         String?
+  anchorMessageId   Int?         @unique
+  status            TaskStatus   @default(PENDING)
+  title             String
+  goal              String       @db.Text
+  planApprovalMode  Boolean      @default(false)
+  contextSummary    String?      @db.Text
+  costEstimateSecs  Int          @default(0)
+  maxDurationSecs   Int          @default(1800)
+  maxSteps          Int          @default(20)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  startedAt         DateTime?
+  completedAt       DateTime?
+  lastHeartbeatAt   DateTime?
+  user              User         @relation(fields: [userId], references: [id])
+  conversation      Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  steps             TaskStep[]
+
+  @@index([status])
+  @@index([conversationId])
+  @@index([userId, createdAt])
+}
+
+model TaskStep {
+  id           String     @id @default(cuid())
+  taskId       String
+  index        Int
+  title        String
+  status       StepStatus @default(PENDING)
+  dependsOn    Int[]      @default([])
+  toolCalls    Json?
+  result       String?    @db.Text
+  filesChanged Json?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  retryCount   Int        @default(0)
+  task         Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, index])
+  @@index([taskId, status])
 }
 
 enum MessageRole {

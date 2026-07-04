@@ -17,6 +17,7 @@ import {
   ArrowLeft,
   Volume2,
   Play,
+  Plug,
 } from "lucide-react";
 import { useIsMobile } from "../hooks/useMediaQuery";
 import { createClient } from "../lib/client";
@@ -139,6 +140,11 @@ export function Settings({
   const [loggingOutAllDevices, setLoggingOutAllDevices] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
 
+  // ─── Integrations State ────────────────────────────────────
+  const [googleConnected, setGoogleConnected] = useState(false);
+  const [googleEmail, setGoogleEmail] = useState("");
+  const [googleConnecting, setGoogleConnecting] = useState(false);
+
   // ─── Preview TTS with current settings ─────────────────────
   const previewVoice = useCallback(async () => {
     if (typeof window === 'undefined') return;
@@ -237,6 +243,7 @@ export function Settings({
       setConnectorDiscovery(metadata.connector_discovery ?? false);
 
       loadSessions();
+      checkGoogleStatus();
     }
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
   }, [user, isOpen]);
@@ -446,10 +453,86 @@ export function Settings({
     finally { setDeletingAccount(false); }
   };
 
+  // ─── Google Integration Handlers ────────────────────────────
+  const checkGoogleStatus = useCallback(async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      const res = await fetch(`${BACKEND_URL}/api/integrations/google/status`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setGoogleConnected(data.connected);
+      if (data.email) setGoogleEmail(data.email);
+    } catch { /* ignore */ }
+  }, []);
+
+  const handleGoogleConnect = async () => {
+    try {
+      setGoogleConnecting(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not authenticated');
+
+      // 1. Get OAuth URL from backend
+      const initRes = await fetch(`${BACKEND_URL}/api/integrations/google/init`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!initRes.ok) throw new Error('Failed to initiate Google connection');
+      const { url } = await initRes.json();
+
+      // 2. Open popup
+      const popup = window.open(url, 'google-oauth', 'width=600,height=700');
+
+      // 3. Listen for postMessage
+      const handler = (event: MessageEvent) => {
+        if (event.data?.type === 'google-oauth-success') {
+          if (event.data.success) {
+            setGoogleConnected(true);
+            setGoogleEmail(event.data.email || '');
+          }
+          window.removeEventListener('message', handler);
+          setGoogleConnecting(false);
+        }
+      };
+      window.addEventListener('message', handler);
+
+      // 4. Detect if popup closed without success
+      const checkClosed = setInterval(() => {
+        if (popup?.closed) {
+          clearInterval(checkClosed);
+          window.removeEventListener('message', handler);
+          setGoogleConnecting(false);
+        }
+      }, 500);
+    } catch (err: any) {
+      console.error('Google connect error:', err);
+      alert(err.message || 'Failed to connect Google');
+      setGoogleConnecting(false);
+    }
+  };
+
+  const handleGoogleDisconnect = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      await fetch(`${BACKEND_URL}/api/integrations/google/disconnect`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      setGoogleConnected(false);
+      setGoogleEmail('');
+    } catch (err: any) {
+      console.error('Google disconnect error:', err);
+    }
+  };
+
   const tabs = useMemo(() => [
     { id: "General", icon: <User className="size-4" />, label: "General" },
     { id: "Account", icon: <Shield className="size-4" />, label: "Account" },
     { id: "Capabilities", icon: <Brain className="size-4" />, label: "Capabilities" },
+    { id: "Integrations", icon: <Plug className="size-4" />, label: "Integrations" },
   ], []);
 
   // ── Voice list for current provider ────────────────────────
@@ -697,6 +780,43 @@ export function Settings({
                   ) : (
                     <div className="space-y-2">{memories.map((memory) => (<div key={memory.id} className="flex items-start justify-between gap-4 p-4 rounded-xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-100 dark:border-neutral-800 hover:border-neutral-200 dark:hover:border-neutral-700 transition-all duration-200 group"><div className="flex-1 min-w-0"><div className="flex items-center gap-2 mb-1"><span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400">{memory.category}</span><span className="text-[10px] text-neutral-400">{Math.round(memory.importance * 100)}% importance</span></div><p className="text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed">{memory.fact}</p><p className="text-[10px] text-neutral-400 mt-1.5">{new Date((memory as any).createdAt || memory.created_at || new Date()).toLocaleString()}</p></div><button onClick={() => handleDeleteMemory(memory.id)} disabled={deletingMemoryId === memory.id} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-neutral-400 hover:text-red-500 transition-all duration-200 opacity-0 group-hover:opacity-100 flex-shrink-0">{deletingMemoryId === memory.id ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}</button></div>))}</div>
                   )}
+                </div>
+              )}
+
+              {/* Integrations Tab */}
+              {activeTab === "Integrations" && (
+                <div className="space-y-8 max-w-2xl mx-auto">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mb-5">Connected Services</h3>
+
+                  {/* Google Card */}
+                  <div className="p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="size-10 rounded-xl bg-gradient-to-br from-blue-500 to-green-500 flex items-center justify-center">
+                          <span className="text-white font-bold text-sm">G</span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">Google</p>
+                          <p className="text-xs text-neutral-500">
+                            {googleConnected ? `Connected as ${googleEmail}` : "Gmail, Calendar & Drive"}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={googleConnected ? handleGoogleDisconnect : handleGoogleConnect}
+                        disabled={googleConnecting}
+                        className={`px-4 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2 ${googleConnected ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30" : "bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50"}`}
+                      >
+                        {googleConnecting ? <Loader2 className="size-4 animate-spin" /> : null}
+                        {googleConnected ? "Disconnect" : googleConnecting ? "Connecting..." : "Connect"}
+                      </button>
+                    </div>
+                    {googleConnected && (
+                      <p className="text-xs text-neutral-400 mt-4 border-t border-neutral-100 dark:border-neutral-800 pt-4">
+                        Connected scopes: Gmail (read & send), Calendar, Drive (read-only)
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
