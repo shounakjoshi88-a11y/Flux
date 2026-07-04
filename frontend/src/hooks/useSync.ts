@@ -86,6 +86,8 @@ export function useSync(options: UseSyncOptions) {
     let mounted = true;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let authUnsubscribe: (() => void) | null = null;
+    let retryCount = 0;
+    const MAX_RETRY_DELAY = 30_000;
 
     const start = async () => {
       if (!mounted) return;
@@ -98,6 +100,12 @@ export function useSync(options: UseSyncOptions) {
       }
       if (unsub) {
         cleanup = unsub;
+        retryCount = 0;
+      } else {
+        const delay = Math.min(1000 * Math.pow(2, retryCount), MAX_RETRY_DELAY);
+        retryCount++;
+        if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+        retryTimer = setTimeout(start, delay);
       }
     };
 
@@ -105,6 +113,7 @@ export function useSync(options: UseSyncOptions) {
 
     const onAuthChange = async (event: string) => {
       if (event === "SIGNED_IN") {
+        retryCount = 0;
         if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
         start();
       } else if (event === "SIGNED_OUT") {
@@ -116,6 +125,7 @@ export function useSync(options: UseSyncOptions) {
     authUnsubscribe = subscription?.unsubscribe ?? null;
 
     const handleOnline = () => {
+      retryCount = 0;
       if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
       retryTimer = setTimeout(start, 1000);
     };

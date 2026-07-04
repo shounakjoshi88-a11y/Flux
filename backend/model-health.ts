@@ -43,5 +43,5 @@ export function isModelHealthy(modelId: string): boolean {
 }
 
 export function getShortTimeout(modelId: string): number {
-    return isModelHealthy(modelId) ? 10000 : 3000;
+    return isModelHealthy(modelId) ? 30000 : 10000;
 }

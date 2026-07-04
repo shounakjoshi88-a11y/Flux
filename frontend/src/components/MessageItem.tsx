@@ -1317,35 +1317,37 @@ export function MessageItem({
   const _typewriterText = _lastTextPart ? _lastTextPart.text : parsedContentBundle.cleanDisplayAnswer;
   const typewriterContent = useTypewriter(_typewriterText, message.id);
 
+  // ── User-message state (unconditional to avoid hook count violations) ──
+  const userContent = message.content;
+  const cleanContent = userContent.replace(/\s*\[attached: [^\]]+\]\s*/g, "").trim();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(cleanContent);
+  const [showUserActions, setShowUserActions] = useState(false);
+  const editRef = useRef<HTMLTextAreaElement>(null);
+  const userActionsRef = useRef<HTMLDivElement>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (isEditing && editRef.current) {
+      editRef.current.focus();
+      editRef.current.setSelectionRange(editRef.current.value.length, editRef.current.value.length);
+    }
+  }, [isEditing]);
+
+  useEffect(() => {
+    if (!showUserActions) return;
+    const handler = (e: MouseEvent) => {
+      if (userActionsRef.current && !userActionsRef.current.contains(e.target as Node)) {
+        setShowUserActions(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showUserActions]);
+
   // ── USER MESSAGE ──
   if (message.role === "User") {
-    const content = message.content;
     const fileAttachments = message.fileAttachment;
-    const cleanContent = content.replace(/\s*\[attached: [^\]]+\]\s*/g, "").trim();
-    const [isEditing, setIsEditing] = useState(false);
-    const [editText, setEditText] = useState(cleanContent);
-    const [showUserActions, setShowUserActions] = useState(false);
-    const editRef = useRef<HTMLTextAreaElement>(null);
-    const userActionsRef = useRef<HTMLDivElement>(null);
-    const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    useEffect(() => {
-      if (isEditing && editRef.current) {
-        editRef.current.focus();
-        editRef.current.setSelectionRange(editRef.current.value.length, editRef.current.value.length);
-      }
-    }, [isEditing]);
-
-    useEffect(() => {
-      if (!showUserActions) return;
-      const handler = (e: MouseEvent) => {
-        if (userActionsRef.current && !userActionsRef.current.contains(e.target as Node)) {
-          setShowUserActions(false);
-        }
-      };
-      document.addEventListener('mousedown', handler);
-      return () => document.removeEventListener('mousedown', handler);
-    }, [showUserActions]);
 
     const handleUserCopy = async () => {
       try {
@@ -1606,11 +1608,11 @@ export function MessageItem({
 
   // Detect live streaming: optimistic assistant messages use IDs like "temp-assistant-N"
   const isStreaming = String(message.id).startsWith("temp-");
-  const cleanContent = parsedContentBundle.cleanDisplayAnswer;
+  const assistantContent = parsedContentBundle.cleanDisplayAnswer;
 
   // ── For image-only responses, we still render the image even if content is empty ──
   const hasImages = generatedFiles.some(f => f.mime?.startsWith("image/"));
-  const shouldShowMessageItem = cleanContent.trim() !== "" || hasImages || generatedFiles.length > 0;
+  const shouldShowMessageItem = assistantContent.trim() !== "" || hasImages || generatedFiles.length > 0;
 
   return (
     <div className="assistant-section">
