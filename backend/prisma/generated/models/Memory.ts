@@ -466,10 +466,6 @@ export type MemoryUncheckedUpdateManyWithoutUserNestedInput = {
   deleteMany?: Prisma.MemoryScalarWhereInput | Prisma.MemoryScalarWhereInput[]
 }
 
-export type NullableDateTimeFieldUpdateOperationsInput = {
-  set?: Date | string | null
-}
-
 export type MemoryUpdateWithWhereUniqueWithoutUserInput = {
   where: Prisma.MemoryWhereUniqueInput
   data: Prisma.XOR<Prisma.MemoryUpdateWithoutUserInput, Prisma.MemoryUncheckedUpdateWithoutUserInput>

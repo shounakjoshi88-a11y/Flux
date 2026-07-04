@@ -19,6 +19,7 @@ model User {
   memories      Memory[]
   wikiNodes     WikiNode[]
   tasks         Task[]
+  googleTokens  UserGoogleToken[]
 }
 
 model Conversation {
@@ -87,6 +88,21 @@ model WikiEdge {
   @@unique([sourceId, targetId, relationship])
   @@index([sourceId])
   @@index([targetId])
+}
+
+model UserGoogleToken {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken  String
+  refreshToken String?
+  scope        String
+  expiresAt    DateTime?
+  email        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model Memory {

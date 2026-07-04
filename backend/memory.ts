@@ -10,18 +10,18 @@ async function getEmbeddingVector(text: string): Promise<number[]> {
 
 /**
  * Retrieve the most relevant memories for a given query.
- * Uses the HNSW index efficiently via raw <=> operator.
+ * Uses cosine similarity via the <=> operator.
+ * Falls back to recent/important memories when semantic search yields nothing.
  */
 export async function retrieveMemories(
   userId: string,
   query: string,
-  limit = 5,
-  minSimilarity = 0.5,  // lowered from 0.7 for better recall
+  limit = 8,
+  minSimilarity = 0.45,
 ) {
   const queryEmbedding = await getEmbeddingVector(query);
   const embeddingStr = `[${queryEmbedding.join(',')}]`;
 
-  // Convert similarity threshold to distance threshold (0 = identical, 2 = opposite)
   const maxDistance = 1 - minSimilarity;
 
   const memories = await prisma.$queryRawUnsafe<any[]>(
@@ -38,17 +38,36 @@ export async function retrieveMemories(
     limit,
   );
 
-  // Update access stats
-  if (memories.length > 0) {
-    const ids = memories.map((m: any) => m.id);
-    await prisma.memory.updateMany({
-      where: { id: { in: ids } },
-      data: {
-        accessCount: { increment: 1 },
-        lastAccessedAt: new Date(),
-      },
+  // Fallback: if semantic search found nothing relevant, return recent/important memories
+  if (memories.length === 0) {
+    const fallback = await prisma.memory.findMany({
+      where: { userId },
+      orderBy: [{ importance: 'desc' }, { lastAccessedAt: 'desc' }],
+      take: limit,
+      select: { id: true, category: true, fact: true, importance: true, accessCount: true },
     });
+    const result = fallback.map(m => ({ ...m, similarity: 0 }));
+    if (result.length > 0) {
+      const ids = result.map((m: any) => m.id);
+      await prisma.memory.updateMany({
+        where: { id: { in: ids } },
+        data: {
+          accessCount: { increment: 1 },
+          lastAccessedAt: new Date(),
+        },
+      });
+    }
+    return result;
   }
+
+  const ids = memories.map((m: any) => m.id);
+  await prisma.memory.updateMany({
+    where: { id: { in: ids } },
+    data: {
+      accessCount: { increment: 1 },
+      lastAccessedAt: new Date(),
+    },
+  });
 
   return memories;
 }
@@ -182,10 +201,13 @@ ${messages.map(m => `${m.role}: ${m.content}`).join('\n')}`;
  */
 export function buildMemoryContext(memories: any[]): string {
   if (!memories.length) return '';
-  return `## User Memories (from previous interactions)
-${memories.map(m => `- [${m.category}] ${m.fact}`).join('\n')}
+  return `════════════════════════════════════════
+KNOWN USER MEMORIES (from previous conversations)
+════════════════════════════════════════
+${memories.map(m => `• [${m.category.toUpperCase()}] ${m.fact}`).join('\n')}
 
-Use these as personalisation hints, but always verify against the current conversation.`;
+IMPORTANT: The above facts are known about this user from prior interactions. You MUST reference these when relevant. This is NOT a first conversation — you already know things about them. Do NOT say "I don't know anything about you" or "this appears to be our first chat". Instead, acknowledge what you know and build on it.
+════════════════════════════════════════`;
 }
 /**
  * Prune a user's memory bank:

@@ -67,6 +67,11 @@ export type WikiNode = Prisma.WikiNodeModel
  */
 export type WikiEdge = Prisma.WikiEdgeModel
 /**
+ * Model UserGoogleToken
+ * 
+ */
+export type UserGoogleToken = Prisma.UserGoogleTokenModel
+/**
  * Model Memory
  * 
  */

@@ -308,3 +308,132 @@ toolRegistry.register('file_write', {
   maxRetries: 1,
   timeout: 15000,
 });
+
+// ── Google Services Tools ────────────────────────────────────────
+toolRegistry.register('gmail_search', {
+  name: 'gmail_search',
+  description: 'Search your Gmail inbox for emails matching a query.',
+  parameters: z.object({
+    query: z.string().describe('Gmail search query'),
+    maxResults: z.number().optional().describe('Maximum results (default 10, max 50)'),
+  }),
+  execute: async () => 'Implemented in index.ts',
+  category: 'external',
+  requiresApproval: false,
+  maxRetries: 2,
+  timeout: 30000,
+});
+
+toolRegistry.register('gmail_read', {
+  name: 'gmail_read',
+  description: 'Read the full content of a specific email by its Gmail message ID.',
+  parameters: z.object({
+    messageId: z.string().describe('The Gmail message ID'),
+  }),
+  execute: async () => 'Implemented in index.ts',
+  category: 'external',
+  requiresApproval: false,
+  maxRetries: 2,
+  timeout: 30000,
+});
+
+toolRegistry.register('gmail_send', {
+  name: 'gmail_send',
+  description: 'Compose and send an email via your Gmail account.',
+  parameters: z.object({
+    to: z.string().describe('Recipient email address(es)'),
+    subject: z.string().describe('Email subject'),
+    body: z.string().describe('Email body text'),
+  }),
+  execute: async () => 'Implemented in index.ts',
+  category: 'external',
+  requiresApproval: true,
+  maxRetries: 1,
+  timeout: 30000,
+});
+
+toolRegistry.register('gmail_list_threads', {
+  name: 'gmail_list_threads',
+  description: 'List recent email threads in your Gmail inbox.',
+  parameters: z.object({
+    maxResults: z.number().optional().describe('Maximum results (default 20, max 50)'),
+    query: z.string().optional().describe('Optional search filter'),
+  }),
+  execute: async () => 'Implemented in index.ts',
+  category: 'external',
+  requiresApproval: false,
+  maxRetries: 2,
+  timeout: 30000,
+});
+
+toolRegistry.register('calendar_list_events', {
+  name: 'calendar_list_events',
+  description: 'List upcoming events from your Google Calendar.',
+  parameters: z.object({
+    maxResults: z.number().optional().describe('Maximum results (default 20, max 100)'),
+    timeMin: z.string().optional().describe('Start time range (ISO 8601)'),
+    timeMax: z.string().optional().describe('End time range (ISO 8601)'),
+  }),
+  execute: async () => 'Implemented in index.ts',
+  category: 'external',
+  requiresApproval: false,
+  maxRetries: 2,
+  timeout: 30000,
+});
+
+toolRegistry.register('calendar_create_event', {
+  name: 'calendar_create_event',
+  description: 'Create a new event on your Google Calendar.',
+  parameters: z.object({
+    summary: z.string().describe('Event title'),
+    startTime: z.string().describe('Start time (ISO 8601)'),
+    endTime: z.string().describe('End time (ISO 8601)'),
+    description: z.string().optional().describe('Event description'),
+    attendees: z.array(z.string()).optional().describe('Attendee emails'),
+  }),
+  execute: async () => 'Implemented in index.ts',
+  category: 'external',
+  requiresApproval: true,
+  maxRetries: 1,
+  timeout: 30000,
+});
+
+toolRegistry.register('drive_search_files', {
+  name: 'drive_search_files',
+  description: 'Search your Google Drive for files matching a query.',
+  parameters: z.object({
+    query: z.string().describe('Search query'),
+    pageSize: z.number().optional().describe('Maximum results (default 10, max 50)'),
+  }),
+  execute: async () => 'Implemented in index.ts',
+  category: 'external',
+  requiresApproval: false,
+  maxRetries: 2,
+  timeout: 30000,
+});
+
+toolRegistry.register('drive_read_file', {
+  name: 'drive_read_file',
+  description: 'Read the content of a file from Google Drive.',
+  parameters: z.object({
+    fileId: z.string().describe('The Google Drive file ID'),
+  }),
+  execute: async () => 'Implemented in index.ts',
+  category: 'external',
+  requiresApproval: false,
+  maxRetries: 2,
+  timeout: 30000,
+});
+
+toolRegistry.register('drive_list_folder', {
+  name: 'drive_list_folder',
+  description: 'List files and folders inside a specific Google Drive folder.',
+  parameters: z.object({
+    folderId: z.string().optional().describe('Folder ID (omit for root)'),
+  }),
+  execute: async () => 'Implemented in index.ts',
+  category: 'external',
+  requiresApproval: false,
+  maxRetries: 2,
+  timeout: 30000,
+});

@@ -389,6 +389,7 @@ export const ModelName = {
   Message: 'Message',
   WikiNode: 'WikiNode',
   WikiEdge: 'WikiEdge',
+  UserGoogleToken: 'UserGoogleToken',
   Memory: 'Memory',
   Task: 'Task',
   TaskStep: 'TaskStep'
@@ -407,7 +408,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "conversation" | "message" | "wikiNode" | "wikiEdge" | "memory" | "task" | "taskStep"
+    modelProps: "user" | "conversation" | "message" | "wikiNode" | "wikiEdge" | "userGoogleToken" | "memory" | "task" | "taskStep"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -781,6 +782,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    UserGoogleToken: {
+      payload: Prisma.$UserGoogleTokenPayload<ExtArgs>
+      fields: Prisma.UserGoogleTokenFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.UserGoogleTokenFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserGoogleTokenPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.UserGoogleTokenFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserGoogleTokenPayload>
+        }
+        findFirst: {
+          args: Prisma.UserGoogleTokenFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserGoogleTokenPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.UserGoogleTokenFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserGoogleTokenPayload>
+        }
+        findMany: {
+          args: Prisma.UserGoogleTokenFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserGoogleTokenPayload>[]
+        }
+        create: {
+          args: Prisma.UserGoogleTokenCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserGoogleTokenPayload>
+        }
+        createMany: {
+          args: Prisma.UserGoogleTokenCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.UserGoogleTokenCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserGoogleTokenPayload>[]
+        }
+        delete: {
+          args: Prisma.UserGoogleTokenDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserGoogleTokenPayload>
+        }
+        update: {
+          args: Prisma.UserGoogleTokenUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserGoogleTokenPayload>
+        }
+        deleteMany: {
+          args: Prisma.UserGoogleTokenDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.UserGoogleTokenUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.UserGoogleTokenUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserGoogleTokenPayload>[]
+        }
+        upsert: {
+          args: Prisma.UserGoogleTokenUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserGoogleTokenPayload>
+        }
+        aggregate: {
+          args: Prisma.UserGoogleTokenAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateUserGoogleToken>
+        }
+        groupBy: {
+          args: Prisma.UserGoogleTokenGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.UserGoogleTokenGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.UserGoogleTokenCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.UserGoogleTokenCountAggregateOutputType> | number
+        }
+      }
+    }
     Memory: {
       payload: Prisma.$MemoryPayload<ExtArgs>
       fields: Prisma.MemoryFieldRefs
@@ -1093,6 +1168,21 @@ export const WikiEdgeScalarFieldEnum = {
 } as const
 
 export type WikiEdgeScalarFieldEnum = (typeof WikiEdgeScalarFieldEnum)[keyof typeof WikiEdgeScalarFieldEnum]
+
+
+export const UserGoogleTokenScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  accessToken: 'accessToken',
+  refreshToken: 'refreshToken',
+  scope: 'scope',
+  expiresAt: 'expiresAt',
+  email: 'email',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type UserGoogleTokenScalarFieldEnum = (typeof UserGoogleTokenScalarFieldEnum)[keyof typeof UserGoogleTokenScalarFieldEnum]
 
 
 export const MemoryScalarFieldEnum = {
@@ -1447,6 +1537,7 @@ export type GlobalOmitConfig = {
   message?: Prisma.MessageOmit
   wikiNode?: Prisma.WikiNodeOmit
   wikiEdge?: Prisma.WikiEdgeOmit
+  userGoogleToken?: Prisma.UserGoogleTokenOmit
   memory?: Prisma.MemoryOmit
   task?: Prisma.TaskOmit
   taskStep?: Prisma.TaskStepOmit

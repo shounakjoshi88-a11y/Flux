@@ -56,6 +56,7 @@ export const ModelName = {
   Message: 'Message',
   WikiNode: 'WikiNode',
   WikiEdge: 'WikiEdge',
+  UserGoogleToken: 'UserGoogleToken',
   Memory: 'Memory',
   Task: 'Task',
   TaskStep: 'TaskStep'
@@ -144,6 +145,21 @@ export const WikiEdgeScalarFieldEnum = {
 } as const
 
 export type WikiEdgeScalarFieldEnum = (typeof WikiEdgeScalarFieldEnum)[keyof typeof WikiEdgeScalarFieldEnum]
+
+
+export const UserGoogleTokenScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  accessToken: 'accessToken',
+  refreshToken: 'refreshToken',
+  scope: 'scope',
+  expiresAt: 'expiresAt',
+  email: 'email',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type UserGoogleTokenScalarFieldEnum = (typeof UserGoogleTokenScalarFieldEnum)[keyof typeof UserGoogleTokenScalarFieldEnum]
 
 
 export const MemoryScalarFieldEnum = {
