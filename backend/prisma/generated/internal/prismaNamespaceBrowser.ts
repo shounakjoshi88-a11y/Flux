@@ -93,7 +93,9 @@ export const ConversationScalarFieldEnum = {
   id: 'id',
   title: 'title',
   slug: 'slug',
-  userId: 'userId'
+  userId: 'userId',
+  compaction: 'compaction',
+  compactMsgCount: 'compactMsgCount'
 } as const
 
 export type ConversationScalarFieldEnum = (typeof ConversationScalarFieldEnum)[keyof typeof ConversationScalarFieldEnum]

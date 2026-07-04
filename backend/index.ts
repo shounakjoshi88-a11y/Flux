@@ -20,6 +20,7 @@ import { nim } from './nim-client';
 import { buildPPTX, buildDOCX, buildPDF, buildXLSX, buildCSV, buildTSV, buildMD, buildJSON, buildSQL, buildHTML } from './agent-tools';
 import type { GeneratedFileResult } from './agent-tools';
 import { retrieveMemories, extractMemories, buildMemoryContext, pruneMemories } from './memory';
+import { compactConversation } from './compaction';
 import { toolRegistry } from './tool-registry';
 import http from "http";
 import https from "https";
@@ -4402,19 +4403,33 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
             month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
         });
 
-        // ── Build conversation history ───────────────────────────────────
-        const MAX_HIST = 10;
-        let contextQuery = nq;
+        // ── Build conversation history with compaction support ──
+        const historyMessages: { role: 'user' | 'assistant'; content: string }[] = [];
         let previousQuery: string | undefined;
         if (isFollowUp && existingConv!.messages?.length) {
-            const hist = existingConv!.messages
-                .slice(-MAX_HIST)
-                .map((m: any) => {
-                    const content = typeof m.content === 'string' ? m.content : '';
-                    return `${m.role === 'User' ? 'User' : 'Assistant'}: ${content.slice(0, 2000)}`;
-                })
-                .join('\n\n');
-            contextQuery = `Previous conversation:\n${hist}\n\nFollow-up:\n${nq}`;
+            const MAX_HIST_CHARS = 10_000;
+            let used = 0;
+            const memos = existingConv!.messages;
+            const skipCount = (existingConv as any).compactMsgCount ?? 0;
+
+            const compaction = (existingConv as any).compaction as string | null;
+            if (compaction) {
+                historyMessages.push({ role: 'user', content: `[Compacted history]\n${compaction}` });
+                used += compaction.length;
+            }
+
+            const reversed: { role: 'user' | 'assistant'; content: string }[] = [];
+            for (let i = memos.length - 1; i >= skipCount; i--) {
+                const m = memos[i];
+                const content = typeof m.content === 'string' ? m.content.slice(0, 2000) : '';
+                if (!content) continue;
+                const role = m.role === 'User' ? 'user' : 'assistant';
+                if (used + content.length > MAX_HIST_CHARS && reversed.length > 0) break;
+                used += content.length;
+                reversed.push({ role, content } as any);
+            }
+            for (let i = reversed.length - 1; i >= 0; i--) historyMessages.push(reversed[i]!);
+
             const lastUserMsg = [...existingConv!.messages].reverse().find((m: any) => m.role === 'User');
             if (lastUserMsg && typeof lastUserMsg.content === 'string') {
                 previousQuery = lastUserMsg.content;
@@ -4434,7 +4449,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
         // ── Model routing — classify query and route to appropriate tier ──
         const route = routeModel(pref, nq, previousQuery);
         model = selectModel(route.modelId);
-        const memCtx = memEnabled
+        const memCtx = memEnabled && !isFollowUp
             ? await Promise.race([
                 retrieveMemories(uid, nq).then(buildMemoryContext),
                 new Promise<string>(resolve => setTimeout(() => resolve(''), 300)),
@@ -4739,8 +4754,8 @@ To verify/analyze code: use read_file first, then use run_bash to run type-check
 ${memCtx}
 ---\n\n` : '';
         const userText = !isVisionModel && imageAttachments.length > 0
-            ? `[The user attached ${imageAttachments.length} image(s)]\n\n${videoNotice}${attachedFilesText}${memPrefix}${contextQuery}`
-            : `${videoNotice}${attachedFilesText}${memPrefix}${contextQuery}`;
+            ? `[The user attached ${imageAttachments.length} image(s)]\n\n${videoNotice}${attachedFilesText}${memPrefix}${nq}`
+            : `${videoNotice}${attachedFilesText}${memPrefix}${nq}`;
 
         const userContent: any = hasImages
             ? [
@@ -4753,7 +4768,7 @@ ${memCtx}
             ]
             : userText;
 
-        const messages: any[] = [{ role: 'user', content: userContent }];
+        const messages: any[] = [...historyMessages, { role: 'user', content: userContent }];
 
         // ── Close detection ──────────────────────────────────────────────
         const closedRef = { v: false };
@@ -5607,6 +5622,10 @@ CROSS-FILE RULES (when multiple files provided):
             `[ASK] uid=${uid} chars=${charsSent} ` +
             `sources=${agentState.sources.length} files=${agentState.generatedFiles.length}`
         );
+
+        if (activeConversationId && isFollowUp) {
+            compactConversation(activeConversationId, model).catch(() => {});
+        }
 
     } catch (err: any) {
         console.error('[ASK] Fatal error:', err?.message ?? err);

@@ -23,13 +23,15 @@ model User {
 }
 
 model Conversation {
-  id       String    @id @default(uuid())
-  title    String?
-  slug     String
-  userId   String
-  user     User      @relation(fields: [userId], references: [id])
-  messages Message[]
-  tasks    Task[]
+  id              String    @id @default(uuid())
+  title           String?
+  slug            String
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  messages        Message[]
+  tasks           Task[]
+  compaction      String?   @db.Text
+  compactMsgCount Int?
 
 
   @@index([userId])
