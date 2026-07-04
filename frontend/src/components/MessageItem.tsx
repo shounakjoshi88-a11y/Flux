@@ -1208,7 +1208,7 @@ function UserFileAttachment({
           <div className="size-4 border-2 border-[var(--border-border)] border-t-[var(--text-primary)] rounded-full animate-spin" />
         </div>
       ) : isImage && content ? (
-        <img src={content.startsWith('data:') ? content : `data:image/png;base64,${content}`} alt={file.name} className="w-full h-20 object-cover rounded-lg mb-2" />
+        <img src={content.startsWith('data:') ? content : `data:image/png;base64,${content}`} alt={file.name} loading="lazy" className="w-full h-20 object-cover rounded-lg mb-2" />
       ) : isImage && !content ? (
         <div className="flex items-center justify-center h-20 mb-2 text-[var(--text-muted)] text-xs">Image unavailable</div>
       ) : (

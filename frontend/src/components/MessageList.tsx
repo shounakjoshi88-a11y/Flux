@@ -170,7 +170,7 @@ export function MessageList({
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {activeImages.map((url, idx) => (
-              <img key={idx} src={url} alt="" className="rounded-lg object-cover aspect-square" />
+              <img key={idx} src={url} alt="" loading="lazy" className="rounded-lg object-cover aspect-square" />
             ))}
           </div>
         )}
@@ -237,7 +237,7 @@ export function MessageList({
       )}
 
       {/* ─── THREE‑DOT LOADER — shows only before the latest message starts streaming parts ─── */}
-      {isLoading && (messages.length === 0 || !messages[messages.length - 1].parts?.length) && (
+      {isLoading && (messages.length === 0 || !messages[messages.length - 1]?.parts?.length) && (
         <div className="mx-auto max-w-[700px] mt-4 pl-2">
           <ThreeDotsLoader />
         </div>

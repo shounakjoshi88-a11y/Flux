@@ -1,6 +1,7 @@
 // index.ts – Full Pipeline Implementation (Complete & Optimized)
 import { tavily } from '@tavily/core';
 import express from "express";
+import compression from "compression";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
@@ -30,6 +31,9 @@ import { isModelHealthy, recordFailure, recordSuccess, getShortTimeout } from '.
 import { taskRouter, recoverInterruptedTasks } from './task-routes';
 import { classifyTaskIntent } from './task-detector';
 import { planTask, runTaskLoop } from './task-loop';
+import { createSupabaseClient } from "./client";
+import { syncManager } from './sync';
+import type { SyncEvent } from './sync';
 
 // ── Lazy pdfjs-dist initializer (disables Web Workers for Bun) ─────────
 let pdfjsInit: Promise<void> | null = null;
@@ -58,6 +62,9 @@ app.set('trust proxy', 1);
 // ── Security headers ──────────────────────────────────────
 app.use(helmet());
 
+// ── Compression (gzip/brotli) ─────────────────────────────
+app.use(compression({ level: 6, threshold: 512 }));
+
 // ── CORS – expanded for local dev stability ─────────────────────────────
 const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173,http://localhost:3001,http://127.0.0.1:3001')
     .split(',')
@@ -72,14 +79,101 @@ app.use(cors({
 }));
 
 // ── Body parser with size limit ────────────────────────────
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
+
+// ── SSE connection tracking & token re-validation ─────────
+const MAX_SSE_PER_USER = 5;
+const SSE_REVALIDATE_MS = 60_000;
+const supabaseAdmin = createSupabaseClient();
+const sseConnections = new Map<string, Set<any>>();
+
+function trackSseConnection(uid: string, req: any, res: any) {
+  if (!sseConnections.has(uid)) sseConnections.set(uid, new Set());
+  const conns = sseConnections.get(uid)!;
+  if (conns.size >= MAX_SSE_PER_USER) {
+    conns.forEach(c => { try { c.end(); } catch {} });
+    conns.clear();
+  }
+  conns.add(res);
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  const revalidateTimer = setInterval(async () => {
+    if (res.writableEnded) { clearInterval(revalidateTimer); return; }
+    if (!token) { res.end(); return; }
+    try {
+      const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+      if (!user) { res.end(); }
+    } catch { res.end(); }
+  }, SSE_REVALIDATE_MS);
+  req.on('close', () => {
+    clearInterval(revalidateTimer);
+    conns.delete(res);
+    if (conns.size === 0) sseConnections.delete(uid);
+  });
+}
+
+// ── Magic byte detection ──────────────────────────────────
+const MAGIC_BYTES: [RegExp, string][] = [
+  [/^\/9j[0-9A-Za-z]/, 'image/jpeg'],
+  [/^iVBORw0KGgo/, 'image/png'],
+  [/^R0lGOD/, 'image/gif'],
+  [/^UklGR/, 'image/webp'],
+  [/^J0lEQVQ/, 'image/avif'],
+  [/^Qk0/, 'image/bmp'],
+  [/^PHN2Zy/, 'image/svg+xml'],
+  [/^JVBERi0/, 'application/pdf'],
+  [/^UEsDBBQ/, 'application/zip'],
+  [/^UEsDBBAB/, 'application/vnd.openxmlformats-officedocument'],
+  [/^UEsDBAo/, 'application/x-tar'],
+];
+function detectMimeFromBase64(b64: string): string | null {
+  const sig = b64.slice(0, 10);
+  for (const [pattern, mime] of MAGIC_BYTES) {
+    if (pattern.test(sig)) return mime;
+  }
+  return null;
+}
+
+// ── SSRF prevention ────────────────────────────────────────
+import * as dns from "dns";
+const PRIVATE_IP_PATTERNS = [
+  /^127\./, /^10\./, /^172\.(1[6-9]|2\d|3[01])\./, /^192\.168\./, /^169\.254\./, /^0\./, /^::1$/, /^fc00:/, /^fe80:/,
+];
+function isPrivateHostname(hostname: string): boolean {
+  const lower = hostname.toLowerCase();
+  if (lower === 'localhost' || lower === 'localhost.localdomain' || lower === '0.0.0.0') return true;
+  if (PRIVATE_IP_PATTERNS.some(p => p.test(lower))) return true;
+  return false;
+}
+async function checkSsrFree(urlStr: string): Promise<boolean> {
+  try {
+    const parsed = new URL(urlStr);
+    const hostname = parsed.hostname;
+    if (isPrivateHostname(hostname)) return false;
+    const { address } = await dns.promises.lookup(hostname, { family: 4 }).catch(() => ({ address: '' }));
+    if (address && isPrivateHostname(address)) return false;
+    return true;
+  } catch { return false; }
+}
 
 // ── Rate limiters ──────────────────────────────────────────
 const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200 });
-const aiLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, message: { error: "Too many requests" } });
-const newConvLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30, message: { error: "Too many new threads" } });
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000, max: 10, message: { error: "Too many requests" },
+  keyGenerator: (req: any) => req.appUserId || req.ip,
+});
+const newConvLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, max: 30, message: { error: "Too many new threads" },
+  keyGenerator: (req: any) => req.appUserId || req.ip,
+});
 
 app.use(globalLimiter);
+
+// ── Cross-device sync (Supabase Realtime Broadcast) ─────────
+function broadcastSyncEvent(supabaseUserId: string, payload: SyncEvent) {
+  syncManager.broadcast(supabaseUserId, payload).catch((e: unknown) => {
+    console.error('[SYNC] Broadcast error:', (e as Error)?.message || e);
+  });
+}
 
 // ─── DIAGNOSTICS & SYSTEM ──────────────────────────────────
 app.get("/ping", (req, res) => {
@@ -125,10 +219,10 @@ app.get('/skills/:name', (req, res) => {
 });
 
 // ── Health check ────────────────────────────────────────────
-if (!process.env.HEALTH_SECRET && process.env.NODE_ENV === 'production') {
+if (!process.env.HEALTH_SECRET) {
     throw new Error("FATAL: Missing HEALTH_SECRET environment variable.");
 }
-const HEALTH_SECRET = process.env.HEALTH_SECRET || 'internal-secret';
+const HEALTH_SECRET = process.env.HEALTH_SECRET;
 
 app.get("/health", async (req, res) => {
     const provided = req.headers['x-health-secret'];
@@ -3459,6 +3553,8 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
                 if (!url || typeof url !== 'string') return 'No URL provided.';
                 const trimmed = url.trim();
                 if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) return 'Invalid URL. Must start with http:// or https://';
+                const safe = await checkSsrFree(trimmed);
+                if (!safe) return 'This URL cannot be accessed — it points to a private or internal network address.';
 
                 sendStatus(res, 'reading', `Fetching content from ${trimmed}...`, { url: trimmed }, state.thoughtProcess);
                 try {
@@ -3690,10 +3786,13 @@ async function generateImageFollowUps(originalQuery: string, enhancedPrompt: str
 
 app.post('/api/sandbox/upload', middleware, async (req: any, res: any) => {
     try {
+        const uid = req.appUserId!;
         const { conversationId, filename, content } = req.body;
         if (!conversationId || !filename || content === undefined) {
             return res.status(400).json({ error: 'conversationId, filename, and content required' });
         }
+        const conv = await prisma.conversation.findFirst({ where: { id: conversationId, userId: uid } });
+        if (!conv) return res.status(404).json({ error: 'Conversation not found' });
         const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
         const remotePath = await sandboxManager.uploadFile(conversationId, safeName, Buffer.from(content, 'base64'));
         res.json({ success: true, filename: safeName, remotePath });
@@ -3704,7 +3803,10 @@ app.post('/api/sandbox/upload', middleware, async (req: any, res: any) => {
 
 app.get('/api/sandbox/download/:conversationId/:filename', middleware, async (req: any, res: any) => {
     try {
+        const uid = req.appUserId!;
         const { conversationId, filename } = req.params;
+        const conv = await prisma.conversation.findFirst({ where: { id: conversationId, userId: uid } });
+        if (!conv) return res.status(404).json({ error: 'Conversation not found' });
         const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
         const remotePath = `/home/user/${safeName}`;
         const buffer = await sandboxManager.downloadFile(conversationId, remotePath);
@@ -3732,10 +3834,13 @@ app.get('/api/wiki', middleware, async (req: any, res: any) => {
 
 app.delete('/api/wiki/node/:nodeId', middleware, async (req: any, res: any) => {
     try {
-        await wikiManager.deleteNode(req.params.nodeId);
+        const uid = req.appUserId!;
+        await wikiManager.deleteNode(req.params.nodeId, uid);
         res.json({ success: true });
     } catch (e: any) {
-        res.status(500).json({ error: e.message });
+        const msg = (e as Error).message;
+        if (msg === 'Node not found') return res.status(404).json({ error: msg });
+        res.status(500).json({ error: msg });
     }
 });
 
@@ -3795,6 +3900,7 @@ app.post("/conversations/new", middleware, newConvLimiter, async (req, res) => {
         const c = await prisma.conversation.create({
             data: { title: "New Thread", slug: `new-thread-${Date.now()}`, userId: uid }
         });
+        broadcastSyncEvent(req.userId!, { type: 'conversation_created' });
         return res.status(201).json({ conversation: { id: c.id, title: c.title, slug: c.slug, lastMessageAt: null } });
     } catch (e) { console.error(e); return res.status(500).json({ message: "Internal server error" }); }
 });
@@ -4166,17 +4272,21 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
 
         if (isLongTask) {
             const uid = req.appUserId!;
+            const convIsNew = !conversationId;
             const convId = conversationId ?? (
                 await prisma.conversation.create({
                     data: { title: nq.slice(0, 120), slug: slugify(nq), userId: uid },
                 })
             ).id;
             activeConversationId = convId;
+            if (convIsNew) broadcastSyncEvent(suid, { type: 'conversation_created' });
 
             res.setHeader('Content-Type', 'text/event-stream');
             res.setHeader('Cache-Control', 'no-cache');
             res.setHeader('Connection', 'keep-alive');
             res.setHeader('X-Conversation-Id', convId);
+
+            trackSseConnection(uid, req, res);
 
             await prisma.message.create({
                 data: { content: nq, role: 'User', conversationId: convId },
@@ -4228,11 +4338,18 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
         const safeAtt = (attachedFiles ?? [])
             .filter(f => f && typeof f.name === 'string')
             .map(f => {
-                const isMedia = f.type?.startsWith('image/') || f.type?.startsWith('video/');
+                const rawContent = typeof f.content === 'string' ? f.content : '';
+                const detected = rawContent ? detectMimeFromBase64(rawContent) : null;
+                const claimedType = f.type || 'text/plain';
+                if (detected && !detected.startsWith(claimedType.split('/')[0]!)) {
+                    console.warn(`[MIME_MISMATCH] Claimed "${claimedType}", detected "${detected}" for file "${f.name}" — using detected type`);
+                }
+                const actualType = detected || claimedType;
+                const isMedia = actualType.startsWith('image/') || actualType.startsWith('video/');
                 return {
                     name: f.name.slice(0, 200),
-                    content: typeof f.content === 'string' ? f.content.slice(0, isMedia ? 2_000_000 : 200_000) : '',
-                    type: f.type || 'text/plain',
+                    content: rawContent.slice(0, isMedia ? 2_000_000 : 200_000),
+                    type: actualType,
                 };
             });
         // True if user attached any text/code file (via either channel)
@@ -4249,11 +4366,13 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                 include: { messages: { orderBy: { createdAt: 'asc' } } },
             });
         }
+        const convIsNew = !existingConv && !conversationId;
         activeConversationId = existingConv?.id ?? (
             await prisma.conversation.create({
                 data: { title: nq.slice(0, 120), slug: slugify(nq), userId: uid },
             })
         ).id;
+        if (convIsNew) broadcastSyncEvent(suid, { type: 'conversation_created' });
 
         // ── SSE setup ───────────────────────────────────────────────────
         res.setHeader('Cache-Control', 'no-cache');
@@ -4262,6 +4381,8 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
         res.setHeader('X-Accel-Buffering', 'no');
         res.setHeader('X-Conversation-Id', activeConversationId);
         res.flushHeaders();
+
+        trackSseConnection(uid, req, res);
 
         const isFollowUp = !!existingConv;
         const locInfo = safeLoc ? `User's location: ${safeLoc}` : "User's location: unknown";
@@ -5353,6 +5474,8 @@ CROSS-FILE RULES (when multiple files provided):
                         res.write(`event: message_id\ndata: ${JSON.stringify({ id: savedMid })}\n\n`);
                     }
 
+                    broadcastSyncEvent(suid, { type: 'message_created', conversationId: activeConversationId, messageId: savedMid });
+
                     if (!isFollowUp) autoRenameConversation(activeConversationId, nq).catch(() => { });
                     if (memEnabled && cleanAnswer) {
                         extractMemories([{ role: 'user', content: nq }, { role: 'assistant', content: cleanAnswer }], uid, activeConversationId, model)
@@ -5464,7 +5587,7 @@ CROSS-FILE RULES (when multiple files provided):
 // assistant-ui's Thread component expects natively.
 // Uses the same models and tools as /flux_ask but without
 // custom SSE events (sendStatus writes are no-op'd).
-app.post('/api/chat-sdk', middleware, async (req: any, res: any) => {
+app.post('/api/chat-sdk', middleware, aiLimiter, async (req: any, res: any) => {
     try {
         const uid = req.appUserId!;
         const { query, model: pref, location } = req.body as { query?: string; model?: string; location?: string; };
@@ -5560,7 +5683,7 @@ app.delete("/conversations/:conversationId/messages/:messageId", middleware, asy
     try {
         const appUserId = req.appUserId!;
         const conversationId = req.params.conversationId as string;
-        const messageId = parseInt(req.params.messageId, 10);
+        const messageId = parseInt(req.params.messageId as string, 10);
         if (!conversationId || isNaN(messageId)) return res.status(400).json({ message: "Invalid parameters" });
         const conversation = await prisma.conversation.findFirst({
             where: { id: conversationId, userId: appUserId },
@@ -5571,6 +5694,7 @@ app.delete("/conversations/:conversationId/messages/:messageId", middleware, asy
         });
         if (!message) return res.status(404).json({ message: "Message not found" });
         await prisma.message.delete({ where: { id: messageId } });
+        broadcastSyncEvent(req.userId!, { type: 'message_deleted', conversationId, messageId });
         return res.status(200).json({ success: true });
     } catch (error) {
         console.error("Delete message error:", error);
@@ -5594,6 +5718,7 @@ app.delete("/conversations/:conversationId", middleware, async (req, res) => {
             prisma.conversation.delete({ where: { id: conversationId } }),
         ]);
         sandboxManager.kill(conversationId);
+        broadcastSyncEvent(req.userId!, { type: 'conversation_deleted', id: conversationId });
         return res.status(200).json({ success: true });
     } catch (error) {
         console.error("Delete conversation error:", error);
@@ -5958,6 +6083,9 @@ app.get("/proxy", middleware, async (req: any, res: any) => {
         return res.status(400).json({ error: "invalid protocol" });
     }
 
+    const safe = await checkSsrFree(rawUrl);
+    if (!safe) return res.status(403).json({ error: "access to private/internal network is not allowed" });
+
     console.log(`[PROXY] ${parsed.hostname}${parsed.pathname.slice(0, 80)}`);
 
     try {
@@ -6041,6 +6169,8 @@ app.get("/preview", middleware, async (req: any, res: any) => {
     try { parsed = new URL(rawUrl); }
     catch { return res.status(400).json({ error: "invalid url" }); }
     if (!["http:", "https:"].includes(parsed.protocol)) return res.status(400).json({ error: "invalid protocol" });
+    const safe = await checkSsrFree(rawUrl);
+    if (!safe) return res.status(403).json({ error: "access to private/internal network is not allowed" });
     try {
         const upstream = await fetch(rawUrl, {
             headers: {

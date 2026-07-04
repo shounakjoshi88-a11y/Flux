@@ -25,6 +25,7 @@ import type { Source } from "../types";
 import { getDomain } from "../lib/chat-utils";
 import { ChartRenderer, type ChartData } from "./ChartBlock";
 import SmilesDrawer from "smiles-drawer";
+import DOMPurify from "dompurify";
 
 // ─── Common KaTeX macros ─────────────────────────────────
 export const MACROS: Record<string, string> = {
@@ -1359,7 +1360,7 @@ function renderBlocks(text: string, onCitationClick: any, sources: Source[], onH
           );
         }
         if (tag === "SMILES" || tag === "MOL") return <SmilesRenderer key={pi} smiles={contentBase} />;
-        return <div key={pi} className="my-4 overflow-x-auto" dangerouslySetInnerHTML={{ __html: val }} />;
+        return <div key={pi} className="my-4 overflow-x-auto" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(val) }} />;
       }
       if (val.startsWith("```")) {
         const match = val.match(/^```([a-z]*)\n?([\s\S]*?)\n?```$/i);

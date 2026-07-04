@@ -15,7 +15,7 @@ taskRouter.post('/api/tasks', async (req: any, res: any) => {
     if (!goal?.trim()) return res.status(400).json({ error: 'Goal is required' });
     if (!conversationId) return res.status(400).json({ error: 'conversationId is required' });
 
-    const conv = await prisma.conversation.findUnique({ where: { id: conversationId } });
+    const conv = await prisma.conversation.findFirst({ where: { id: conversationId, userId: uid } });
     if (!conv) return res.status(404).json({ error: 'Conversation not found' });
 
     const title = goal.trim().slice(0, 120);
@@ -44,8 +44,9 @@ taskRouter.post('/api/tasks', async (req: any, res: any) => {
 
 taskRouter.get('/api/tasks/:id', async (req: any, res: any) => {
   try {
-    const task = await prisma.task.findUnique({
-      where: { id: req.params.id },
+    const uid = req.appUserId!;
+    const task = await prisma.task.findFirst({
+      where: { id: req.params.id, userId: uid },
       include: { steps: { orderBy: { index: 'asc' } } },
     });
     if (!task) return res.status(404).json({ error: 'Task not found' });
@@ -56,9 +57,10 @@ taskRouter.get('/api/tasks/:id', async (req: any, res: any) => {
 });
 
 taskRouter.get('/api/tasks/:id/stream', async (req: any, res: any) => {
+  const uid = req.appUserId!;
   const taskId = req.params.id;
 
-  const task = await prisma.task.findUnique({ where: { id: taskId } });
+  const task = await prisma.task.findFirst({ where: { id: taskId, userId: uid } });
   if (!task) return res.status(404).json({ error: 'Task not found' });
 
   res.setHeader('Content-Type', 'text/event-stream');
@@ -102,6 +104,9 @@ taskRouter.get('/api/tasks/:id/stream', async (req: any, res: any) => {
 
 taskRouter.post('/api/tasks/:id/cancel', async (req: any, res: any) => {
   try {
+    const uid = req.appUserId!;
+    const task = await prisma.task.findFirst({ where: { id: req.params.id, userId: uid } });
+    if (!task) return res.status(404).json({ error: 'Task not found' });
     await prisma.task.update({ where: { id: req.params.id }, data: { status: 'CANCELLED' } });
     res.json({ success: true });
   } catch (e: any) {
@@ -111,6 +116,9 @@ taskRouter.post('/api/tasks/:id/cancel', async (req: any, res: any) => {
 
 taskRouter.post('/api/tasks/:id/pause', async (req: any, res: any) => {
   try {
+    const uid = req.appUserId!;
+    const task = await prisma.task.findFirst({ where: { id: req.params.id, userId: uid } });
+    if (!task) return res.status(404).json({ error: 'Task not found' });
     await prisma.task.update({ where: { id: req.params.id }, data: { status: 'PAUSED' } });
     res.json({ success: true });
   } catch (e: any) {
@@ -120,8 +128,8 @@ taskRouter.post('/api/tasks/:id/pause', async (req: any, res: any) => {
 
 taskRouter.post('/api/tasks/:id/resume', async (req: any, res: any) => {
   try {
-    await prisma.task.update({ where: { id: req.params.id }, data: { status: 'PENDING' } });
-    const task = await prisma.task.findUnique({ where: { id: req.params.id } });
+    const uid = req.appUserId!;
+    const task = await prisma.task.findFirst({ where: { id: req.params.id, userId: uid } });
     if (task && !task.goal) {
       await planTask(task.id);
     }
