@@ -217,6 +217,31 @@ ${messages.map(m => `${m.role}: ${m.content}`).join('\n')}`;
 }
 
 /**
+ * Lightweight memory retrieval for follow-up messages.
+ * Skips the expensive embedding step — just returns recent/important memories.
+ */
+export async function getRecentMemories(
+  userId: string,
+  limit = 8,
+) {
+  const memories = await prisma.memory.findMany({
+    where: { userId },
+    orderBy: [{ importance: 'desc' }, { lastAccessedAt: 'desc' }],
+    take: limit,
+    select: { id: true, category: true, fact: true, importance: true, accessCount: true },
+  });
+  const result = memories.map(m => ({ ...m, similarity: 0 }));
+  if (result.length > 0) {
+    const ids = result.map((m: any) => m.id);
+    await prisma.memory.updateMany({
+      where: { id: { in: ids } },
+      data: { accessCount: { increment: 1 }, lastAccessedAt: new Date() },
+    });
+  }
+  return result;
+}
+
+/**
  * Build a context string for the system prompt from retrieved memories.
  */
 export function buildMemoryContext(memories: any[]): string {

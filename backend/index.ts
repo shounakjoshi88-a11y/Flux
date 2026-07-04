@@ -19,7 +19,7 @@ import { middleware } from './middleware';
 import { nim } from './nim-client';
 import { buildPPTX, buildDOCX, buildPDF, buildXLSX, buildCSV, buildTSV, buildMD, buildJSON, buildSQL, buildHTML } from './agent-tools';
 import type { GeneratedFileResult } from './agent-tools';
-import { retrieveMemories, extractMemories, buildMemoryContext, pruneMemories } from './memory';
+import { retrieveMemories, getRecentMemories, extractMemories, buildMemoryContext, pruneMemories } from './memory';
 import { compactConversation } from './compaction';
 import { toolRegistry } from './tool-registry';
 import http from "http";
@@ -4439,7 +4439,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
         // ── Save user message ────────────────────────────────────────────
         await prisma.message.create({
             data: {
-                content: nq,
+                content: attachedFilesText ? `${attachedFilesText}\n--\n${nq}` : nq,
                 role: 'User',
                 conversationId: activeConversationId,
                 fileAttachment: safeAtt.length > 0 ? safeAtt : undefined,
@@ -4449,11 +4449,11 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
         // ── Model routing — classify query and route to appropriate tier ──
         const route = routeModel(pref, nq, previousQuery);
         model = selectModel(route.modelId);
-        const memCtx = memEnabled && !isFollowUp
-            ? await Promise.race([
-                retrieveMemories(uid, nq).then(buildMemoryContext),
-                new Promise<string>(resolve => setTimeout(() => resolve(''), 300)),
-              ]).catch((e) => {
+        const memCtx = memEnabled
+            ? await (isFollowUp
+                ? getRecentMemories(uid, 8)
+                : retrieveMemories(uid, nq)
+            ).then(buildMemoryContext).catch((e) => {
                 console.warn('[MEMORY] retrieveMemories failed:', (e as any)?.message ?? e);
                 return '';
               })
@@ -5529,7 +5529,8 @@ CROSS-FILE RULES (when multiple files provided):
 
                     if (!isFollowUp) autoRenameConversation(activeConversationId, nq).catch(() => { });
                     if (memEnabled && cleanAnswer) {
-                        extractMemories([{ role: 'user', content: nq }, { role: 'assistant', content: cleanAnswer }], uid, activeConversationId, model)
+                        const extractUserMsg = attachedFilesText ? `${attachedFilesText}\n\nUser message: ${nq}` : nq;
+                        extractMemories([{ role: 'user', content: extractUserMsg }, { role: 'assistant', content: cleanAnswer }], uid, activeConversationId, model)
                             .then(() => pruneMemories(uid))
                             .catch(e => console.warn('[MEMORY]', e));
                     }
