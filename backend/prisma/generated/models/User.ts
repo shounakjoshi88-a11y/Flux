@@ -186,6 +186,7 @@ export type UserWhereInput = {
   memories?: Prisma.MemoryListRelationFilter
   wikiNodes?: Prisma.WikiNodeListRelationFilter
   googleTokens?: Prisma.UserGoogleTokenListRelationFilter
+  tasks?: Prisma.TaskListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -198,6 +199,7 @@ export type UserOrderByWithRelationInput = {
   memories?: Prisma.MemoryOrderByRelationAggregateInput
   wikiNodes?: Prisma.WikiNodeOrderByRelationAggregateInput
   googleTokens?: Prisma.UserGoogleTokenOrderByRelationAggregateInput
+  tasks?: Prisma.TaskOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -213,6 +215,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   memories?: Prisma.MemoryListRelationFilter
   wikiNodes?: Prisma.WikiNodeListRelationFilter
   googleTokens?: Prisma.UserGoogleTokenListRelationFilter
+  tasks?: Prisma.TaskListRelationFilter
 }, "id" | "supabaseId">
 
 export type UserOrderByWithAggregationInput = {
@@ -247,6 +250,7 @@ export type UserCreateInput = {
   memories?: Prisma.MemoryCreateNestedManyWithoutUserInput
   wikiNodes?: Prisma.WikiNodeCreateNestedManyWithoutUserInput
   googleTokens?: Prisma.UserGoogleTokenCreateNestedManyWithoutUserInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -259,6 +263,7 @@ export type UserUncheckedCreateInput = {
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutUserInput
   wikiNodes?: Prisma.WikiNodeUncheckedCreateNestedManyWithoutUserInput
   googleTokens?: Prisma.UserGoogleTokenUncheckedCreateNestedManyWithoutUserInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserUpdateInput = {
@@ -271,6 +276,7 @@ export type UserUpdateInput = {
   memories?: Prisma.MemoryUpdateManyWithoutUserNestedInput
   wikiNodes?: Prisma.WikiNodeUpdateManyWithoutUserNestedInput
   googleTokens?: Prisma.UserGoogleTokenUpdateManyWithoutUserNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -283,6 +289,7 @@ export type UserUncheckedUpdateInput = {
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutUserNestedInput
   wikiNodes?: Prisma.WikiNodeUncheckedUpdateManyWithoutUserNestedInput
   googleTokens?: Prisma.UserGoogleTokenUncheckedUpdateManyWithoutUserNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -396,6 +403,20 @@ export type UserUpdateOneRequiredWithoutMemoriesNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutMemoriesInput, Prisma.UserUpdateWithoutMemoriesInput>, Prisma.UserUncheckedUpdateWithoutMemoriesInput>
 }
 
+export type UserCreateNestedOneWithoutTasksInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutTasksInput, Prisma.UserUncheckedCreateWithoutTasksInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutTasksInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutTasksNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutTasksInput, Prisma.UserUncheckedCreateWithoutTasksInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutTasksInput
+  upsert?: Prisma.UserUpsertWithoutTasksInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutTasksInput, Prisma.UserUpdateWithoutTasksInput>, Prisma.UserUncheckedUpdateWithoutTasksInput>
+}
+
 export type UserCreateWithoutConversationsInput = {
   id?: string
   email: string
@@ -405,6 +426,7 @@ export type UserCreateWithoutConversationsInput = {
   memories?: Prisma.MemoryCreateNestedManyWithoutUserInput
   wikiNodes?: Prisma.WikiNodeCreateNestedManyWithoutUserInput
   googleTokens?: Prisma.UserGoogleTokenCreateNestedManyWithoutUserInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutConversationsInput = {
@@ -416,6 +438,7 @@ export type UserUncheckedCreateWithoutConversationsInput = {
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutUserInput
   wikiNodes?: Prisma.WikiNodeUncheckedCreateNestedManyWithoutUserInput
   googleTokens?: Prisma.UserGoogleTokenUncheckedCreateNestedManyWithoutUserInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutConversationsInput = {
@@ -443,6 +466,7 @@ export type UserUpdateWithoutConversationsInput = {
   memories?: Prisma.MemoryUpdateManyWithoutUserNestedInput
   wikiNodes?: Prisma.WikiNodeUpdateManyWithoutUserNestedInput
   googleTokens?: Prisma.UserGoogleTokenUpdateManyWithoutUserNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutConversationsInput = {
@@ -454,6 +478,7 @@ export type UserUncheckedUpdateWithoutConversationsInput = {
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutUserNestedInput
   wikiNodes?: Prisma.WikiNodeUncheckedUpdateManyWithoutUserNestedInput
   googleTokens?: Prisma.UserGoogleTokenUncheckedUpdateManyWithoutUserNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutWikiNodesInput = {
@@ -465,6 +490,7 @@ export type UserCreateWithoutWikiNodesInput = {
   conversations?: Prisma.ConversationCreateNestedManyWithoutUserInput
   memories?: Prisma.MemoryCreateNestedManyWithoutUserInput
   googleTokens?: Prisma.UserGoogleTokenCreateNestedManyWithoutUserInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutWikiNodesInput = {
@@ -476,6 +502,7 @@ export type UserUncheckedCreateWithoutWikiNodesInput = {
   conversations?: Prisma.ConversationUncheckedCreateNestedManyWithoutUserInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutUserInput
   googleTokens?: Prisma.UserGoogleTokenUncheckedCreateNestedManyWithoutUserInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutWikiNodesInput = {
@@ -503,6 +530,7 @@ export type UserUpdateWithoutWikiNodesInput = {
   conversations?: Prisma.ConversationUpdateManyWithoutUserNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutUserNestedInput
   googleTokens?: Prisma.UserGoogleTokenUpdateManyWithoutUserNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutWikiNodesInput = {
@@ -514,6 +542,7 @@ export type UserUncheckedUpdateWithoutWikiNodesInput = {
   conversations?: Prisma.ConversationUncheckedUpdateManyWithoutUserNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutUserNestedInput
   googleTokens?: Prisma.UserGoogleTokenUncheckedUpdateManyWithoutUserNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutGoogleTokensInput = {
@@ -525,6 +554,7 @@ export type UserCreateWithoutGoogleTokensInput = {
   conversations?: Prisma.ConversationCreateNestedManyWithoutUserInput
   memories?: Prisma.MemoryCreateNestedManyWithoutUserInput
   wikiNodes?: Prisma.WikiNodeCreateNestedManyWithoutUserInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutGoogleTokensInput = {
@@ -536,6 +566,7 @@ export type UserUncheckedCreateWithoutGoogleTokensInput = {
   conversations?: Prisma.ConversationUncheckedCreateNestedManyWithoutUserInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutUserInput
   wikiNodes?: Prisma.WikiNodeUncheckedCreateNestedManyWithoutUserInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutGoogleTokensInput = {
@@ -563,6 +594,7 @@ export type UserUpdateWithoutGoogleTokensInput = {
   conversations?: Prisma.ConversationUpdateManyWithoutUserNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutUserNestedInput
   wikiNodes?: Prisma.WikiNodeUpdateManyWithoutUserNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutGoogleTokensInput = {
@@ -574,6 +606,7 @@ export type UserUncheckedUpdateWithoutGoogleTokensInput = {
   conversations?: Prisma.ConversationUncheckedUpdateManyWithoutUserNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutUserNestedInput
   wikiNodes?: Prisma.WikiNodeUncheckedUpdateManyWithoutUserNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutMemoriesInput = {
@@ -585,6 +618,7 @@ export type UserCreateWithoutMemoriesInput = {
   conversations?: Prisma.ConversationCreateNestedManyWithoutUserInput
   wikiNodes?: Prisma.WikiNodeCreateNestedManyWithoutUserInput
   googleTokens?: Prisma.UserGoogleTokenCreateNestedManyWithoutUserInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutMemoriesInput = {
@@ -596,6 +630,7 @@ export type UserUncheckedCreateWithoutMemoriesInput = {
   conversations?: Prisma.ConversationUncheckedCreateNestedManyWithoutUserInput
   wikiNodes?: Prisma.WikiNodeUncheckedCreateNestedManyWithoutUserInput
   googleTokens?: Prisma.UserGoogleTokenUncheckedCreateNestedManyWithoutUserInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutMemoriesInput = {
@@ -623,6 +658,7 @@ export type UserUpdateWithoutMemoriesInput = {
   conversations?: Prisma.ConversationUpdateManyWithoutUserNestedInput
   wikiNodes?: Prisma.WikiNodeUpdateManyWithoutUserNestedInput
   googleTokens?: Prisma.UserGoogleTokenUpdateManyWithoutUserNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutMemoriesInput = {
@@ -632,6 +668,71 @@ export type UserUncheckedUpdateWithoutMemoriesInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   supabaseId?: Prisma.StringFieldUpdateOperationsInput | string
   conversations?: Prisma.ConversationUncheckedUpdateManyWithoutUserNestedInput
+  wikiNodes?: Prisma.WikiNodeUncheckedUpdateManyWithoutUserNestedInput
+  googleTokens?: Prisma.UserGoogleTokenUncheckedUpdateManyWithoutUserNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutTasksInput = {
+  id?: string
+  email: string
+  provider: $Enums.AuthProvider
+  name: string
+  supabaseId: string
+  conversations?: Prisma.ConversationCreateNestedManyWithoutUserInput
+  memories?: Prisma.MemoryCreateNestedManyWithoutUserInput
+  wikiNodes?: Prisma.WikiNodeCreateNestedManyWithoutUserInput
+  googleTokens?: Prisma.UserGoogleTokenCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutTasksInput = {
+  id?: string
+  email: string
+  provider: $Enums.AuthProvider
+  name: string
+  supabaseId: string
+  conversations?: Prisma.ConversationUncheckedCreateNestedManyWithoutUserInput
+  memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutUserInput
+  wikiNodes?: Prisma.WikiNodeUncheckedCreateNestedManyWithoutUserInput
+  googleTokens?: Prisma.UserGoogleTokenUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutTasksInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutTasksInput, Prisma.UserUncheckedCreateWithoutTasksInput>
+}
+
+export type UserUpsertWithoutTasksInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutTasksInput, Prisma.UserUncheckedUpdateWithoutTasksInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutTasksInput, Prisma.UserUncheckedCreateWithoutTasksInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutTasksInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutTasksInput, Prisma.UserUncheckedUpdateWithoutTasksInput>
+}
+
+export type UserUpdateWithoutTasksInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  provider?: Prisma.EnumAuthProviderFieldUpdateOperationsInput | $Enums.AuthProvider
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  supabaseId?: Prisma.StringFieldUpdateOperationsInput | string
+  conversations?: Prisma.ConversationUpdateManyWithoutUserNestedInput
+  memories?: Prisma.MemoryUpdateManyWithoutUserNestedInput
+  wikiNodes?: Prisma.WikiNodeUpdateManyWithoutUserNestedInput
+  googleTokens?: Prisma.UserGoogleTokenUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutTasksInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  provider?: Prisma.EnumAuthProviderFieldUpdateOperationsInput | $Enums.AuthProvider
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  supabaseId?: Prisma.StringFieldUpdateOperationsInput | string
+  conversations?: Prisma.ConversationUncheckedUpdateManyWithoutUserNestedInput
+  memories?: Prisma.MemoryUncheckedUpdateManyWithoutUserNestedInput
   wikiNodes?: Prisma.WikiNodeUncheckedUpdateManyWithoutUserNestedInput
   googleTokens?: Prisma.UserGoogleTokenUncheckedUpdateManyWithoutUserNestedInput
 }
@@ -646,6 +747,7 @@ export type UserCountOutputType = {
   memories: number
   wikiNodes: number
   googleTokens: number
+  tasks: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -653,6 +755,7 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   memories?: boolean | UserCountOutputTypeCountMemoriesArgs
   wikiNodes?: boolean | UserCountOutputTypeCountWikiNodesArgs
   googleTokens?: boolean | UserCountOutputTypeCountGoogleTokensArgs
+  tasks?: boolean | UserCountOutputTypeCountTasksArgs
 }
 
 /**
@@ -693,6 +796,13 @@ export type UserCountOutputTypeCountGoogleTokensArgs<ExtArgs extends runtime.Typ
   where?: Prisma.UserGoogleTokenWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountTasksArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.TaskWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -704,6 +814,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   memories?: boolean | Prisma.User$memoriesArgs<ExtArgs>
   wikiNodes?: boolean | Prisma.User$wikiNodesArgs<ExtArgs>
   googleTokens?: boolean | Prisma.User$googleTokensArgs<ExtArgs>
+  tasks?: boolean | Prisma.User$tasksArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -737,6 +848,7 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   memories?: boolean | Prisma.User$memoriesArgs<ExtArgs>
   wikiNodes?: boolean | Prisma.User$wikiNodesArgs<ExtArgs>
   googleTokens?: boolean | Prisma.User$googleTokensArgs<ExtArgs>
+  tasks?: boolean | Prisma.User$tasksArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -749,6 +861,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     memories: Prisma.$MemoryPayload<ExtArgs>[]
     wikiNodes: Prisma.$WikiNodePayload<ExtArgs>[]
     googleTokens: Prisma.$UserGoogleTokenPayload<ExtArgs>[]
+    tasks: Prisma.$TaskPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1154,6 +1267,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   memories<T extends Prisma.User$memoriesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$memoriesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MemoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   wikiNodes<T extends Prisma.User$wikiNodesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$wikiNodesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WikiNodePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   googleTokens<T extends Prisma.User$googleTokensArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$googleTokensArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$UserGoogleTokenPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  tasks<T extends Prisma.User$tasksArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$tasksArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1674,6 +1788,30 @@ export type User$googleTokensArgs<ExtArgs extends runtime.Types.Extensions.Inter
   take?: number
   skip?: number
   distinct?: Prisma.UserGoogleTokenScalarFieldEnum | Prisma.UserGoogleTokenScalarFieldEnum[]
+}
+
+/**
+ * User.tasks
+ */
+export type User$tasksArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Task
+   */
+  select?: Prisma.TaskSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Task
+   */
+  omit?: Prisma.TaskOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.TaskInclude<ExtArgs> | null
+  where?: Prisma.TaskWhereInput
+  orderBy?: Prisma.TaskOrderByWithRelationInput | Prisma.TaskOrderByWithRelationInput[]
+  cursor?: Prisma.TaskWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.TaskScalarFieldEnum | Prisma.TaskScalarFieldEnum[]
 }
 
 /**

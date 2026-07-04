@@ -23,13 +23,15 @@ model User {
 }
 
 model Conversation {
-  id       String    @id @default(uuid())
-  title    String?
-  slug     String
-  userId   String
-  user     User      @relation(fields: [userId], references: [id])
-  messages Message[]
-  tasks    Task[]
+  id              String    @id @default(uuid())
+  title           String?
+  slug            String
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  messages        Message[]
+  tasks           Task[]
+  compaction      String?   @db.Text   // LLM-summarized history when messages exceed budget
+  compactMsgCount Int?                 // How many messages were rolled into compaction
 
 
   @@index([userId])

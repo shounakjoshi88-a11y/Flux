@@ -52,3 +52,13 @@ export type UserGoogleToken = Prisma.UserGoogleTokenModel
  * 
  */
 export type Memory = Prisma.MemoryModel
+/**
+ * Model Task
+ * 
+ */
+export type Task = Prisma.TaskModel
+/**
+ * Model TaskStep
+ * 
+ */
+export type TaskStep = Prisma.TaskStepModel

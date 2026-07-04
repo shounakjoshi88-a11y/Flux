@@ -9,6 +9,34 @@
 * 🟢 You can import this file directly.
 */
 
+export const TaskStatus = {
+  PENDING: 'PENDING',
+  PLANNING: 'PLANNING',
+  RUNNING: 'RUNNING',
+  WAITING_FOR_INPUT: 'WAITING_FOR_INPUT',
+  PAUSED: 'PAUSED',
+  INTERRUPTED: 'INTERRUPTED',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED',
+  CANCELLED: 'CANCELLED',
+  TIMED_OUT: 'TIMED_OUT'
+} as const
+
+export type TaskStatus = (typeof TaskStatus)[keyof typeof TaskStatus]
+
+
+export const StepStatus = {
+  PENDING: 'PENDING',
+  RUNNING: 'RUNNING',
+  BLOCKED: 'BLOCKED',
+  DONE: 'DONE',
+  FAILED: 'FAILED',
+  SKIPPED: 'SKIPPED'
+} as const
+
+export type StepStatus = (typeof StepStatus)[keyof typeof StepStatus]
+
+
 export const MessageRole = {
   User: 'User',
   Assistant: 'Assistant'
