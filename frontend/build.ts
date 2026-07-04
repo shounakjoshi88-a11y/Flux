@@ -49,11 +49,11 @@ for (const output of result.outputs) {
 
 // Rewrite index.html to reference hashed filenames
 const indexHtmlPath = path.join(outdir, 'index.html');
-if (hashMap['index.js']) {
-  let html = await Bun.file(indexHtmlPath).text();
-  html = html.replace(/src="\.\/frontend\.tsx"/, `src="./${hashMap['index.js']}"`);
-  await Bun.write(indexHtmlPath, html);
+let html = await Bun.file(indexHtmlPath).text();
+for (const [original, hashed] of Object.entries(hashMap)) {
+  html = html.replace(new RegExp(`"\.\/${original}"`, 'g'), `"./${hashed}"`);
 }
+await Bun.write(indexHtmlPath, html);
 
 // Copy PWA assets to dist
 const PWA_FILES = [
