@@ -1200,7 +1200,10 @@ function parseList(lines: string[], startIndex: number) {
   const items: { level: number; text: string; type: "ol" | "ul" }[] = [];
   let i = startIndex;
   while (i < lines.length) {
-    const match = lines[i]!.match(/^(\s*)([-*•]|\d+\.)\s+(.+)$/);
+    const line = lines[i]!;
+    const trimmed = line.trim();
+    if (!trimmed) { i++; continue; }
+    const match = line.match(/^(\s*)([-*•]|\d+\.)\s+(.+)$/);
     if (!match) break;
     items.push({ level: match[1]!.length, text: match[3]!, type: match[2]!.match(/\d/) ? "ol" : "ul" });
     i++;

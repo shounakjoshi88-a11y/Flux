@@ -428,14 +428,32 @@ function slugify(input: string) {
 // ── Auto‑rename ─────────────────────────────────────────────
 const TITLE_MODEL = nim.chatModel('meta/llama-4-maverick-17b-128e-instruct');
 
+function extractTitle(query: string): string {
+    let q = query.trim();
+    q = q.replace(/^(hey|hi|hello|yo)\s*/i, '');
+    q = q.replace(/^(can|could|will|would|do|does|did|are|is|i want|i need|i have|i would like)\s+(you\s+)?(please\s+)?/i, '');
+    q = q.replace(/\b(please|thanks|thank you|pls|plz)\b.*$/i, '');
+    q = q.replace(/["\n\r]/g, ' ').replace(/\s+/g, ' ').trim();
+    q = q.replace(/^(research|search|find|look up|tell me about|explain|what is|what are|how to|how do|how can|write|create|build|make|generate|edit|update|modify|change|add|remove|delete|fix|debug|refactor|review|analyze|check|test)\s+/i, '');
+    if (!q || q.length < 3) q = query.trim().slice(0, 80);
+    return q.slice(0, 80).replace(/[<>]/g, '');
+}
+
 async function autoRenameConversation(
     conversationId: string,
     firstQuery: string,
     docIntent?: string | null
 ) {
+    const fallbackTitle = sanitizeTitle(extractTitle(firstQuery));
+
     try {
         const safeQuery = firstQuery.replace(/["\n\r]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
-        if (!safeQuery) return;
+        if (!safeQuery) {
+            if (fallbackTitle) {
+                await prisma.conversation.updateMany({ where: { id: conversationId }, data: { title: fallbackTitle } });
+            }
+            return;
+        }
 
         let context = "";
         if (docIntent === "image") context = "The user created an image. ";
@@ -459,8 +477,8 @@ async function autoRenameConversation(
         } as any);
 
         let clean = sanitizeTitle((text ?? '').trim());
-
-        if (!clean || clean.length > 80) clean = safeQuery.slice(0, 80);
+        if (!clean) clean = fallbackTitle;
+        if (clean.length > 80) clean = fallbackTitle;
 
         if (docIntent === "image" && !clean.toLowerCase().includes("image")) clean = `Image: ${clean}`;
         else if (docIntent && docIntent !== "image" && !clean.toLowerCase().includes(docIntent.toLowerCase())) {
@@ -474,6 +492,11 @@ async function autoRenameConversation(
             });
         }
     } catch (err: any) {
+        if (fallbackTitle) {
+            try {
+                await prisma.conversation.updateMany({ where: { id: conversationId }, data: { title: fallbackTitle } });
+            } catch {}
+        }
         if (err?.code !== 'P2025' && err?.name !== 'TimeoutError' && err?.name !== 'AbortError') {
             console.warn("Failed to auto-rename conversation:", err?.message ?? err);
         }
