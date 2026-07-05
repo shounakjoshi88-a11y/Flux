@@ -125,6 +125,26 @@ model Memory {
   @@index([userId, category])
 }
 
+model DocumentChunk {
+  id           String   @id @default(uuid())
+  userId       String
+  documentName String
+  source       String   // "upload" | "read_url"
+  sourceUrl    String?
+  chunkIndex   Int
+  heading      String?
+  text         String   @db.Text
+  embedding    Unsupported("vector(1024)")
+  searchVector Unsupported("tsvector")?
+  tokenCount   Int
+  contentHash  String
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, documentName])
+  @@index([contentHash])
+}
+
 enum TaskStatus {
   PENDING
   PLANNING
