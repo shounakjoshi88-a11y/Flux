@@ -1216,29 +1216,40 @@ function renderList(items: any[], onCitationClick: any, sources: Source[], paren
   let i = 0;
   while (i < items.length) {
     const item = items[i];
+    const baseLevel = item.level;
     const listType = item.type;
     const ListTag = listType === "ol" ? "ol" : "ul";
 
-    // Collect all consecutive same-level items of the same type into one <ol>/<ul>
-    const listItems: any[] = [];
+    // Collect all items at this level or nested under it (stop at next same-level item of different type)
+    const group: any[] = [];
     let j = i;
-    while (j < items.length && items[j].level === item.level && items[j].type === listType) {
-      listItems.push(items[j]);
+    while (j < items.length) {
+      const cur = items[j];
+      if (cur.level === baseLevel && cur.type !== listType) break;
+      if (cur.level < baseLevel) break;
+      group.push(cur);
       j++;
     }
 
+    // Separate top-level items from nested
+    const topLevelItems = group.filter((x: any) => x.level === baseLevel && x.type === listType);
+    if (topLevelItems.length === 0) { i = j; continue; }
+
     result.push(
       <ListTag key={`${parentKey}-${i}`} className={`${listType === "ol" ? "list-decimal" : "list-disc"} pl-6 my-2 space-y-1`}>
-        {listItems.map((li, idx) => {
-          // Collect nested items (higher level) after this item
+        {topLevelItems.map((li: any) => {
+          // Find nested items that belong to this top-level item
+          const liIdx = group.indexOf(li);
           const nested: any[] = [];
-          let k = j;
-          while (k < items.length && items[k].level > li.level) { nested.push(items[k]); k++; }
-          if (nested.length > 0) j = k; // skip nested in outer sweep
+          for (let k = liIdx + 1; k < group.length; k++) {
+            const sub = group[k];
+            if (sub.level <= baseLevel) break;
+            nested.push(sub);
+          }
           return (
-            <li key={`${parentKey}-li-${i + idx}`} className="pl-1">
-              {formatInlineText(li.text, onCitationClick, sources, `${parentKey}-li-${i + idx}`)}
-              {nested.length > 0 && renderList(nested, onCitationClick, sources, `${parentKey}-nested-${i + idx}`)}
+            <li key={`${parentKey}-li-${i}-${li.text.slice(0, 20)}`} className="pl-1">
+              {formatInlineText(li.text, onCitationClick, sources, `${parentKey}-li-${i}-${li.text.slice(0, 10)}`)}
+              {nested.length > 0 && renderList(nested, onCitationClick, sources, `${parentKey}-nested-${i}-${li.text.slice(0, 10)}`)}
             </li>
           );
         })}
