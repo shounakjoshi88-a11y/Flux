@@ -90,7 +90,7 @@ type MessageItemProps = {
   onFileDelete?: (messageId: string | number, filename: string, type: 'fileAttachment' | 'generatedFiles') => void;
   onEdit?: (messageId: string | number, newContent: string) => void;
   onDelete?: (messageId: string | number) => void;
-  activeGenerationStatus?: { subtype: string; message: string } | null;
+  activeGenerationStatus?: { subtype: string; message: string; data?: any } | null;
   onHtmlPreview?: (html: string) => void;
 };
 
@@ -665,7 +665,7 @@ function PartsRenderer({
   onPreview?: (data: { type: 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'md'; base64?: string; html?: string; filename: string }) => void;
   onFileDelete?: (messageId: string | number, filename: string, type: 'fileAttachment' | 'generatedFiles') => void;
   onSourceClick?: (url: string | null) => void;
-  activeGenerationStatus?: { subtype: string; message: string } | null;
+  activeGenerationStatus?: { subtype: string; message: string; data?: any } | null;
   onHtmlPreview?: (html: string) => void;
 }) {
   // Find the last text part index for typewriter treatment
@@ -972,6 +972,7 @@ function PartsRenderer({
             type: activeGenerationStatus.subtype,
             subtype: activeGenerationStatus.subtype,
             message: activeGenerationStatus.message,
+            data: activeGenerationStatus.data || undefined,
           }}
           isFirst={isFirst}
           isLast={true}
@@ -1620,6 +1621,7 @@ export function MessageItem({
               type: activeGenerationStatus.subtype,
               subtype: activeGenerationStatus.subtype,
               message: activeGenerationStatus.message,
+              data: activeGenerationStatus.data || undefined,
             }}
             isFirst={true}
             isLast={true}

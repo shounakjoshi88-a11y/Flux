@@ -540,6 +540,9 @@ function FileCodeBlock({
   isError = false,
   diffAdded,
   diffRemoved,
+  oldStr,
+  newStr,
+  toolName,
 }: {
   filename: string;
   content?: string;
@@ -549,8 +552,13 @@ function FileCodeBlock({
   isError?: boolean;
   diffAdded?: number;
   diffRemoved?: number;
+  oldStr?: string;
+  newStr?: string;
+  toolName?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [animAdded, setAnimAdded] = useState(0);
+  const [animRemoved, setAnimRemoved] = useState(0);
   const lang = getLangStyle(language);
   const preview = content ? content.slice(0, 6000) : '';
   const truncated = content ? content.length > 6000 : false;
@@ -558,6 +566,30 @@ function FileCodeBlock({
   const ext = filename.split('.').pop()?.toLowerCase() ?? '';
   const lineCount = content ? content.split('\n').length : 0;
   const byteCount = content ? content.length : 0;
+
+  // Animate diff counters upward
+  const prevTargetRef = useRef<{ a: number; r: number }>({ a: 0, r: 0 });
+  useEffect(() => {
+    if (diffAdded === undefined || diffRemoved === undefined) return;
+    const prev = prevTargetRef.current;
+    const targetA = diffAdded;
+    const targetR = diffRemoved;
+    if (targetA === 0 && targetR === 0) { setAnimAdded(0); setAnimRemoved(0); prevTargetRef.current = { a: 0, r: 0 }; return; }
+    const frame = (targetA + targetR) > 20 ? 12 : 40;
+    let progress = 0;
+    const step = () => {
+      progress += 1 / (targetA + targetR || 1) * (frame === 12 ? 0.15 : 0.08);
+      if (progress >= 1) { setAnimAdded(targetA); setAnimRemoved(targetR); return; }
+      setAnimAdded(Math.min(Math.round(targetA * progress), targetA));
+      setAnimRemoved(Math.min(Math.round(targetR * progress), targetR));
+      requestAnimationFrame(step);
+    };
+    const timer = setTimeout(() => requestAnimationFrame(step), 60);
+    prevTargetRef.current = { a: targetA, r: targetR };
+    return () => clearTimeout(timer);
+  }, [diffAdded, diffRemoved]);
+  const displayAdded = isRunning ? animAdded : (diffAdded ?? 0);
+  const displayRemoved = isRunning ? animRemoved : (diffRemoved ?? 0);
 
   const headerBorder = isRunning
     ? 'border-[var(--accent)]/25'
@@ -600,15 +632,21 @@ function FileCodeBlock({
         <span className="font-mono text-[12.5px] text-[#d4d1cb] truncate">{filename}</span>
 
         <div className="ml-auto flex items-center gap-2 shrink-0">
-          {/* Diff stats */}
-          {diffAdded !== undefined && diffRemoved !== undefined && !isRunning && (
+          {/* Tool name badge */}
+          {toolName && (
+            <span className="text-[10px] font-mono rounded border border-white/10 px-1.5 py-[2px] text-[var(--text-muted)]/70">
+              {toolName}
+            </span>
+          )}
+          {/* Diff stats (animated) */}
+          {diffAdded !== undefined && diffRemoved !== undefined && (
             <span className="text-[10px] font-mono">
-              <span className="text-emerald-400/80">+{diffAdded}</span>
-              <span className="text-red-400/80 ml-1">-{diffRemoved}</span>
+              <span className="text-emerald-400/80">+{displayAdded}</span>
+              <span className="text-red-400/80 ml-1">-{displayRemoved}</span>
             </span>
           )}
           {/* Writing shimmer */}
-          {isRunning && (
+          {isRunning && diffAdded === undefined && (
             <span className="flex items-center gap-1 text-[10px] text-[var(--accent)]/80 font-mono">
               <svg viewBox="0 0 12 12" className="size-2.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                 <path d="M2 6 L4 8 L10 3" />
@@ -644,6 +682,34 @@ function FileCodeBlock({
       {isRunning && (
         <div className="relative h-[2px] overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--accent)]/40 to-transparent animate-[flare-sweep_1.8s_linear_infinite]" />
+        </div>
+      )}
+
+      {/* Before/after diff snippet for edit_file */}
+      {(oldStr || newStr) && (
+        <div className="border-t border-white/5">
+          {oldStr && (
+            <div>
+              <div className="flex items-center gap-1.5 px-3 py-1 text-[10px] text-red-400/70 font-mono border-b border-red-500/10 bg-red-500/5">
+                <svg viewBox="0 0 12 12" className="size-2.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                  <path d="M1 6 L4 9 L10 3" />
+                </svg>
+                replaced
+              </div>
+              <pre className="text-[11px] leading-[1.6] font-mono px-3 py-2 overflow-x-auto whitespace-pre-wrap text-red-300/70 max-h-[120px] overflow-y-auto">{oldStr}</pre>
+            </div>
+          )}
+          {newStr && (
+            <div>
+              <div className="flex items-center gap-1.5 px-3 py-1 text-[10px] text-emerald-400/70 font-mono border-b border-emerald-500/10 bg-emerald-500/5">
+                <svg viewBox="0 0 12 12" className="size-2.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                  <path d="M2 6 L4 8 L10 3" />
+                </svg>
+                new
+              </div>
+              <pre className="text-[11px] leading-[1.6] font-mono px-3 py-2 overflow-x-auto whitespace-pre-wrap text-emerald-300/70 max-h-[120px] overflow-y-auto">{newStr}</pre>
+            </div>
+          )}
         </div>
       )}
 
@@ -1753,6 +1819,9 @@ export function StatusMessage({
     const isEdit = status.data?.diffAdded !== undefined;
     const diffAdded = status.data?.diffAdded ?? 0;
     const diffRemoved = status.data?.diffRemoved ?? 0;
+    const oldStr = status.data?.old_str || "";
+    const newStr = status.data?.new_str || "";
+    const toolName = status.data?.toolName || (isEdit ? "edit_file" : fileContent ? "write_file" : "");
 
     const fileIconColor = isWriting && isActive
       ? "text-[var(--accent)]"
@@ -1801,6 +1870,9 @@ export function StatusMessage({
                 isError={isError}
                 diffAdded={isEdit ? diffAdded : undefined}
                 diffRemoved={isEdit ? diffRemoved : undefined}
+                oldStr={oldStr || undefined}
+                newStr={newStr || undefined}
+                toolName={toolName || undefined}
               />
             )}
 
