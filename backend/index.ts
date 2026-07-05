@@ -902,6 +902,7 @@ AVAILABLE FUNCTIONS — call these via function calling, do NOT describe them in
     Download file to user. AFTER editing (from /home/user/edits/) or generating a new file, call this to deliver it. Images render inline. NEVER deliver from /home/user/uploads/ — those are read-only originals.
 
 REMEMBER: Writing bash commands as text does NOT execute them. Only function calls execute.
+REMEMBER: Writing JSON like {"name":"some_tool","parameters":{...}} as text does NOT call that tool. Only actual function calls (via the tools API) execute. Never output raw tool JSON in your text response.
 </sandbox_environment>
 
 <code_workflow>

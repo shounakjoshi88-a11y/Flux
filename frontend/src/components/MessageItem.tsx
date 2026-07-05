@@ -756,7 +756,6 @@ function PartsRenderer({
                   subtype: tp.name,
                   message: tp.output || "",
                   data: {
-                    toolName: tp.name,
                     args: tp.input,
                     result: tp.output,
                     status: tp.status,
@@ -1016,26 +1015,6 @@ function PartsRenderer({
         break;
       }
     }
-  }
-
-  if (activeGenerationStatus) {
-    const isFirst = parts.length === 0;
-    renderedParts.push(
-      <div key="active-gen-status" className="mb-0.5">
-        <StatusMessage
-          status={{
-            type: activeGenerationStatus.subtype,
-            subtype: activeGenerationStatus.subtype,
-            message: activeGenerationStatus.message,
-            data: activeGenerationStatus.data || undefined,
-          }}
-          isFirst={isFirst}
-          isLast={true}
-          isActive={true}
-          showRail={true}
-        />
-      </div>
-    );
   }
 
   return <>{renderedParts}</>;
