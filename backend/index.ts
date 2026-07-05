@@ -2596,32 +2596,26 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
         web_search: (tool as any)({
             description:
                 'Search the web to retrieve LIVE, CURRENT data (recent news, events, facts). ' +
+                'MAX 2 CALLS TOTAL. After 2 searches, answer immediately. Further calls will be blocked. ' +
                 'Your training data is from 2024-2025 — this tool returns FRESH results from the present day. ' +
                 'CRITICAL: After this tool returns, IGNORE what your training data says and answer ONLY from these results. ' +
                 'Always include the current year/month in your query. ' +
                 'Do NOT use for general knowledge, logic, math, or basic greetings. ' +
                 'Call this tool SILENTLY — no preamble. Never say "The user is asking me to" or "Let me search". Just call the tool directly. ' +
-                'The query MUST be directly related to the user\'s topic. ' +
-                'CRITICAL: Search EXACTLY ONCE per user question. After results come back, answer immediately. Do NOT call web_search a second time. ' +
-                'If you call web_search a second time it will be BLOCKED and your entire response will be discarded.',
+                'The query MUST be directly related to the user\'s topic.',
             inputSchema: z.object({
                 query: z.string().describe(
-                    'A precise, targeted search query (6–10 words). ' +
-                    'Extract ONLY the KEY ENTITIES: place names, product names, brand names, specific topics, years. ' +
-                    'CRITICAL — NEVER echo the user\'s instruction preamble. If the user says "search for tours to X", the query is "tours X", NOT "search for tours to X". ' +
-                    'NEVER include: instruction words (search for, find, tell me, look up), filler (tours and travels for visiting, information about), or verification words (true, false, verify, confirm, legit). ' +
-                    'Example: user says "search for tours and travels for visiting Statue of Unity from Nagpur and prices too" → query "Statue Unity tour packages Nagpur prices 2026". ' +
-                    'Example: user says "Is it true Meta is cancelling AI projects?" → query "Meta cancelling AI projects 2026". ' +
-                    'Example: user says "Hey can you find 2nd year courses at RBU Nagpur Btech CSE" → query "RBU Nagpur Btech CSE 2nd year courses 2026". ' +
-                    'Rule: your query should look like what appears in a browser address bar for this topic, not like a sentence. ' +
-                    'For travel/price/product queries, always append the current year. ' +
-                    'REQUIRED — always provide a specific query.'
+                    'TARGETED search (6–10 words). Extract KEY ENTITIES only: specific names, topics, years. ' +
+                    'NEVER include instruction words (search for, find, tell me), filler (information about), or verification words (true, false, verify). ' +
+                    'Example: "Statue Unity tour packages Nagpur prices 2026". ' +
+                    'Example: "Meta cancelling AI projects 2026". ' +
+                    'Example: "RBU Nagpur Btech CSE 2nd year courses 2026". ' +
+                    'Should look like a browser search bar query, not a sentence. Always append current year.'
                 ),
                 queries: z.array(z.string()).describe(
-                    'Run multiple search queries in parallel (each 6–10 words, same rules as query). ' +
-                    'USE THIS for: travel routes (query origin + destination separately), product comparisons, multi-part questions. ' +
-                    'Example: "tours Nagpur to Statue of Unity prices" + "Kevadiya Statue Unity entry ticket 2026". ' +
-                    'Do NOT use for single-topic queries — use query instead.'
+                    'MAX 3 parallel queries max (each targeted, same rules as query). ' +
+                    'Only use for multi-part questions needing separate angles. ' +
+                    'Example: "tours Nagpur to Statue of Unity prices" + "Kevadiya Statue Unity entry ticket 2026".'
                 ).optional(),
             }),
                 execute: async ({ query, queries: queriesArr }: any) => {
@@ -4510,6 +4504,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
         const fileGuard = hasAnyFile
             ? `\n⚠️ FILE ATTACHED: The user's file(s) are below (truncated). The FULL file is at /home/user/uploads/<filename> in the sandbox.${sandboxFileNotice}
 CRITICAL — FIRST STEP: Call read_skill({ doc_type: "file" }) IMMEDIATELY before doing anything else. This loads the file-reading rules that tell you how to handle each file type (PDF, DOCX, XLSX, code, etc.). Do NOT skip this.
+CRITICAL — SEARCH RULES: You may call web_search at most 2 times. Each call must have targeted, specific queries (not broad). After 2 searches, STOP and answer with what you found. Do NOT search again.
 CRITICAL — FILE LOCATION: Uploaded originals are at /home/user/uploads/. To edit, FIRST copy to /home/user/edits/ (run_bash: cp /home/user/uploads/<file> /home/user/edits/<file>). All editing happens in /home/user/edits/ — NEVER edit files in uploads/. Deliver from /home/user/edits/ when done.
 CRITICAL — You MUST only work on the uploaded file(s). Do NOT create, scaffold, or generate new files or projects unless the user explicitly asks.
 CRITICAL — ALWAYS call get_generated_file({ path: "/home/user/edits/<filename>" }) after editing — files left in sandbox are invisible.
