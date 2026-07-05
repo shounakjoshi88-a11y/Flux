@@ -14,13 +14,21 @@ FROM oven/bun:1-slim
 
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --system --gid 1001 flux && \
     useradd --system --uid 1001 --gid flux flux
-
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma/generated ./prisma/generated
 COPY . .
+
+RUN pip3 install --no-cache-dir -r pdf_parsing_backend/requirements.txt
 
 RUN chown -R flux:flux /app
 

@@ -5,6 +5,9 @@
 When a user uploads a file, the path is listed in the fileGuard notice at `/home/user/uploads/<filename>`.
 **The file may be truncated in context.** You must go read it properly.
 
+CRITICAL — ALWAYS look for uploaded files in /home/user/uploads/ FIRST. Do NOT look in /home/user/ root.
+When the user says "edit my file" or "work on my file", start with list_files({ path: "/home/user/uploads/" }).
+
 The naive thing — `read_file` on everything — is wrong for most files:
 - On a PDF, XLSX, or DOCX it prints binary garbage.
 - On a large CSV it floods your context with rows you will never use.

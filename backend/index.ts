@@ -8,6 +8,7 @@ import rateLimit from "express-rate-limit";
 import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
+import * as os from "os";
 import { streamText, generateText, tool, stepCountIs } from 'ai';
 import { z } from 'zod';
 import { OrchestratorEngine } from './orchestrator';
@@ -37,18 +38,9 @@ import { syncManager } from './sync';
 import type { SyncEvent } from './sync';
 import { initGoogleAuth, handleGoogleCallback, getGoogleStatus, disconnectGoogle } from './google-auth';
 import { createGoogleTools } from './google-tools';
-
-// ── Lazy pdfjs-dist initializer (disables Web Workers for Bun) ─────────
-let pdfjsInit: Promise<void> | null = null;
-async function initPdfjs() {
-    if (!pdfjsInit) {
-        pdfjsInit = (async () => {
-            const mod = await import('pdfjs-dist/legacy/build/pdf.mjs') as any;
-            mod.GlobalWorkerOptions.workerSrc = '';
-        })();
-    }
-    return pdfjsInit;
-}
+import { chunkByHeadings } from './lib/chunking';
+import type { PageData } from './lib/chunking';
+import { retrieveDocChunks } from './lib/hybrid-retrieval';
 
 const client = tavily({ apiKey: process.env.TAVILY_API_KEY });
 const app = express();
@@ -823,17 +815,22 @@ function sanitizeThought(text: string): string {
 const AGENT_SYSTEM_EXTENSION = `
 <sandbox_environment>
 You have a cloud-isolated Linux sandbox (E2B). Persistent per conversation — files survive across messages.
-All files at /home/user/. write_file and run_bash share the SAME filesystem — no cd needed.
+
+CRITICAL — FILE LOCATIONS:
+  - User-uploaded files are ALWAYS at /home/user/uploads/<filename>. When the user says "edit my file" or "work on my file", look in /home/user/uploads/ FIRST.
+  - Your own created files go to /home/user/<filename>.
+  - write_file, read_file, edit_file, and run_bash all share the SAME filesystem under /home/user/ — no cd needed.
+  - If you're unsure what files exist, run list_files({ path: "/home/user/uploads/" }) to see uploaded files.
 
 CRITICAL — NEVER install packages (npm install, pip install, apt, etc.). Everything needed is pre-installed.
 CRITICAL — NEVER run useless commands like "which", "echo", "ls", "cd", "pwd", "type", "--version", "npx <tool> --version", "tsc --noEmit", or any "2>&1 || true" error suppression. Jump straight to the actual work. All tools (node, tsx, tsc, gcc, rustc, python3, etc.) are pre-installed and verified — no need to check.
 CRITICAL — After editing/creating a file, ALWAYS call get_generated_file to deliver it to the user. Files left in the sandbox are invisible to the user.
 
 <file_reading>
-When the user uploads a file:
-- For TEXT and CODE files (.ts, .tsx, .js, .py, .rs, .go, .txt, .md, .json, .yaml, .css, .html, .log): use read_file.
-- For CSV/TSV: use run_bash with pandas (pd.read_csv with nrows=5 to preview).
-- For OFFICE files (.pdf, .docx, .xlsx, .pptx): do NOT use read_file. Use run_bash with Python: pymupdf for PDF, python-docx for DOCX, openpyxl for XLSX, python-pptx for PPTX.
+When the user uploads a file, it is at /home/user/uploads/<filename>. Follow these rules:
+- For TEXT and CODE files (.ts, .tsx, .js, .py, .rs, .go, .txt, .md, .json, .yaml, .css, .html, .log): use read_file({ path: "/home/user/uploads/<filename>" }).
+- For CSV/TSV: use run_bash with pandas (pd.read_csv("/home/user/uploads/<filename>", nrows=5) to preview).
+- For OFFICE files (.pdf, .docx, .xlsx, .pptx): do NOT use read_file. Use run_bash with Python and the full /home/user/uploads/ path: pymupdf for PDF, python-docx for DOCX, openpyxl for XLSX, python-pptx for PPTX.
 - For images (.jpg, .png, .gif, .webp): already visible in context — no read needed.
 - For archives (.zip, .tar): use run_bash with unzip -l / tar -tf to list, never blindly extract.
 - ALWAYS check file size with stat before loading large files.
@@ -863,7 +860,7 @@ AVAILABLE FUNCTIONS — call these via function calling, do NOT describe them in
     context in old_str to make the match unique. PREFER edit_file over write_file for targeted
     changes — only use write_file for entirely new files.
 
-  list_files({ path: "/home/user/" }) — List sandbox files.
+  list_files({ path: "/home/user/uploads/" }) — List user-uploaded files (use this FIRST when user asks to edit). Use "/home/user/" to list your own created files.
 
   install_package({ package: "tensorflow" }) — pip install.
 
@@ -888,12 +885,11 @@ REMEMBER: Writing bash commands as text does NOT execute them. Only function cal
   CODE WORKFLOW — EXACT SEQUENCE (NEVER SKIP, NEVER REORDER)
 ══════════════════════════════════════════════════════════════════════════════════
 
-When the user asks you to write code (function, algorithm, program, class, script),
-you MUST follow this exact cycle. Every step triggers the next. Never stop at step 1.
+When the user asks you to write code or edit files, you MUST follow this exact cycle.
 
-FILESYSTEM: All files at /home/user/. write_file creates there. run_bash runs from
-/home/user/ (sandbox default CWD). They share the SAME filesystem — any file written
-by write_file is immediately visible to run_bash. No cd needed.
+FILESYSTEM: User-uploaded files are at /home/user/uploads/. Your own created files go to /home/user/.
+write_file creates there. run_bash runs from /home/user/ (default CWD).
+They share the SAME filesystem — no cd needed. Use ABSOLUTE paths (/home/user/uploads/...) in all commands.
 
 ┌──────────────────────────────────────────────────────────────────────────────────┐
 │  CORE CYCLE                                                                      │
@@ -3588,7 +3584,12 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
                     const isDocx = contentType.includes('wordprocessingml') || /\.docx($|\?)/i.test(trimmed);
                     if (isPdf) {
                         sendStatus(res, 'reading', `Parsing PDF (${(rawBuf.length / 1024).toFixed(0)} KB)...`, undefined, state.thoughtProcess);
-                        extracted = await extractPdfTableAware(rawBuf);
+                        const pdfResult = await extractPdf(rawBuf);
+                        extracted = pdfResult.markdown || pdfResult.text || '';
+                        if (pdfResult.token_count >= 4000 && uid) {
+                            await processLargeDocument(pdfResult, uid, trimmed, 'read_url', trimmed);
+                            extracted = `[PDF DOCUMENT: ${trimmed}]\n${pdfResult.metadata.pages} pages, ${pdfResult.metadata.ocr_pages > 0 ? `${pdfResult.metadata.ocr_pages} OCR pages, ` : ''}${pdfResult.metadata.has_images ? 'contains embedded images, ' : ''}${(pdfResult.token_count * 4 / 1024).toFixed(0)} KB total.\n\nThe document is large and has been chunked into searchable sections. Use retrieve_doc_chunks(query) to find relevant content, then answer based on the retrieved sections.\n\nFirst section preview:\n${(pdfResult.pages?.[0]?.text ?? pdfResult.markdown ?? '').slice(0, 2000)}`;
+                        }
                     } else if (isDocx) {
                         sendStatus(res, 'reading', `Parsing DOCX (${(rawBuf.length / 1024).toFixed(0)} KB)...`, undefined, state.thoughtProcess);
                         extracted = await extractDocxText(rawBuf);
@@ -3624,110 +3625,127 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
                 }
             },
         }),
+        // ── retrieve_doc_chunks ─────────────────────────────────────────────
+        retrieve_doc_chunks: (tool as any)({
+            description:
+                'Search a previously uploaded or fetched document for sections relevant to the user\'s question. ' +
+                'Use this when the user asks about a large document that was chunked into sections. ' +
+                'Provide a specific query related to what you need to find in the document. ' +
+                'Returns the most relevant text sections with their headings.',
+            inputSchema: z.object({
+                query: z.string().describe('What to search for in the document — be specific, like a search engine query'),
+                documentName: z.string().optional().describe('Optional: restrict search to a specific document name'),
+                topK: z.number().optional().describe('Number of sections to return (default 5, max 10)'),
+            }),
+            execute: async ({ query, documentName, topK }: { query: string; documentName?: string; topK?: number }) => {
+                if (!uid) return 'No user session — cannot search documents.';
+                if (!query || typeof query !== 'string') return 'No query provided.';
+                const results = await retrieveDocChunks(query, uid, documentName, Math.min(topK ?? 5, 10));
+                if (results.length === 0) return 'No matching sections found in the document. Try a different query.';
+                return results.map((r, i) =>
+                    `[Section ${i + 1}]${r.heading ? ` (${r.heading})` : ''}\n${r.text}`
+                ).join('\n\n---\n\n');
+            },
+        }),
         ...createGoogleTools(uid, res, state),
     };
 }
 
-// ── PDF parsing (table-aware) ──────────────────────────────────────────
-async function extractPdfTableAware(rawBuf: Buffer): Promise<string> {
+// ── PDF parsing (pymupdf4llm subprocess) ────────────────────────────────
+
+interface ExtractionResult {
+    metadata: { pages: number; ocr_pages: number; is_scanned: boolean; has_images: boolean };
+    markdown: string;
+    text?: string;
+    pages: PageData[];
+    token_count: number;
+}
+
+async function extractPdf(rawBuf: Buffer): Promise<ExtractionResult> {
+    const MAX_FILE_SIZE = 50 * 1024 * 1024;
+    if (rawBuf.length > MAX_FILE_SIZE) {
+        return {
+            metadata: { pages: 0, ocr_pages: 0, is_scanned: false, has_images: false },
+            markdown: '', text: '', pages: [], token_count: 0,
+        };
+    }
+
+    const tmp = path.join(os.tmpdir(), `flux-pdf-${crypto.randomUUID()}.pdf`);
     try {
-        await initPdfjs();
-        const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs') as any;
-        const data = new Uint8Array(rawBuf);
-        const doc = await getDocument({ data, useSystemFonts: true }).promise;
+        await Bun.write(tmp, rawBuf);
+        const proc = Bun.spawn(['python3', path.resolve('pdf_parser.py'), tmp], { timeout: 30_000 });
+        const [out, errOut] = await Promise.all([
+            new Response(proc.stdout).text(),
+            new Response(proc.stderr).text(),
+        ]);
+        const exitCode = await proc.exited;
 
-        const Y_TOLERANCE = 4;
-        const MAX_CHARS = 80000;
-        const allPages: string[] = [];
-
-        for (let p = 1; p <= doc.numPages; p++) {
-            const page = await doc.getPage(p);
-            const content = await page.getTextContent();
-            const items = content.items as any[];
-
-            const rows = new Map<number, any[]>();
-            for (const item of items) {
-                const y = Math.round(item.transform[5] / Y_TOLERANCE) * Y_TOLERANCE;
-                if (!rows.has(y)) rows.set(y, []);
-                rows.get(y)!.push(item);
-            }
-
-            const sortedY = [...rows.keys()].sort((a, b) => b - a);
-            const pageLines: string[] = [];
-            let prevY = -1000;
-
-            for (const y of sortedY) {
-                const rowItems = rows.get(y)!.sort((a, b) => a.transform[4] - b.transform[4]);
-
-                const gaps: number[] = [];
-                for (let i = 1; i < rowItems.length; i++) {
-                    const prevEnd = rowItems[i - 1].transform[4] + (rowItems[i - 1].width || rowItems[i - 1].str.length * 5);
-                    const gap = rowItems[i].transform[4] - prevEnd;
-                    if (gap > 0) gaps.push(gap);
-                }
-                gaps.sort((a, b) => a - b);
-                const medianGap: number = gaps.length > 0 ? (gaps[Math.floor(gaps.length / 2)] ?? 0) : 0;
-                const colThreshold = Math.max(medianGap * 3, 20);
-
-                const lineParts: string[] = [];
-                let lastX = -100;
-                for (const item of rowItems) {
-                    const x = item.transform[4];
-                    const text = item.str;
-                    if (!text.trim()) continue;
-                    const gap = x - lastX;
-                    if (gap > colThreshold && lastX > 0) {
-                        lineParts.push(' | ');
-                    } else if (lineParts.length > 0 && lastX > 0 && gap > 2) {
-                        lineParts.push(' ');
-                    }
-                    lineParts.push(text);
-                    lastX = x + (item.width || text.length * 5);
-                }
-
-                const line = lineParts.join('').trim();
-                if (line) {
-                    if (prevY - y > 15) pageLines.push('');
-                    pageLines.push(line);
-                    prevY = y;
-                }
-            }
-
-            allPages.push(pageLines.join('\n'));
-            if (allPages.join('\n\n').length > MAX_CHARS) break;
+        if (exitCode !== 0) {
+            console.error('[PDF_PARSER] Subprocess failed:', errOut.slice(0, 500));
+            return {
+                metadata: { pages: 0, ocr_pages: 0, is_scanned: false, has_images: false },
+                markdown: `[PDF parsing failed: ${errOut.replace(/\n/g, ' ').slice(0, 200)}]`,
+                text: '', pages: [], token_count: 0,
+            };
         }
 
-        let result = allPages.join('\n\n--- Page ---\n\n').slice(0, MAX_CHARS);
-
-        const wordCount = result.split(/\s+/).length;
-        if (wordCount < 10 || result.length < 200) {
-            const simple = await extractPdfSimple(rawBuf);
-            return simple || result;
-        }
-
-        return result;
-    } catch {
-        return await extractPdfSimple(rawBuf);
+        const result = JSON.parse(out);
+        return {
+            metadata: result.metadata,
+            markdown: result.markdown || '',
+            text: result.markdown || '',
+            pages: result.pages || [],
+            token_count: result.token_count || 0,
+        };
+    } catch (e: any) {
+        console.error('[PDF_PARSER] Exception:', e.message);
+        return {
+            metadata: { pages: 0, ocr_pages: 0, is_scanned: false, has_images: false },
+            markdown: `[PDF parsing error: ${e.message}]`, text: '', pages: [], token_count: 0,
+        };
+    } finally {
+        try { await fs.promises.rm(tmp, { force: true }); } catch { /* ignore */ }
     }
 }
 
-async function extractPdfSimple(rawBuf: Buffer): Promise<string> {
-    try {
-        await initPdfjs();
-        const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs') as any;
-        const data = new Uint8Array(rawBuf);
-        const doc = await getDocument({ data, useSystemFonts: true }).promise;
-        const pages: string[] = [];
-        for (let i = 1; i <= doc.numPages; i++) {
-            const page = await doc.getPage(i);
-            const items = (await page.getTextContent()).items as any[];
-            pages.push(items.map((t: any) => t.str).join(' '));
-            if (pages.join('\n').length > 60000) break;
-        }
-        return pages.join('\n').slice(0, 80000);
-    } catch {
-        return '';
-    }
+async function processLargeDocument(
+    result: ExtractionResult,
+    userId: string,
+    docName: string,
+    source: string,
+    sourceUrl?: string,
+): Promise<void> {
+    const contentHash = crypto.createHash('sha256').update(Buffer.from(result.markdown)).digest('hex');
+    const existing = await prisma.documentChunk.findFirst({ where: { contentHash, userId } });
+    if (existing) return;
+
+    const chunks = chunkByHeadings(result.pages, docName);
+    const embedded = await Promise.all(
+        chunks.map(async (chunk) => {
+            const { getEmbedding } = await import('./local-embedder');
+            const embedding = await getEmbedding(chunk.text);
+            return { chunk, embedding };
+        }),
+    );
+
+    await prisma.$transaction(
+        embedded.map(({ chunk, embedding }) =>
+            prisma.documentChunk.create({
+                data: {
+                    userId,
+                    documentName: docName,
+                    source,
+                    sourceUrl: sourceUrl ?? null,
+                    chunkIndex: chunk.index,
+                    heading: chunk.heading,
+                    text: chunk.text,
+                    embedding: embedding as any,
+                    tokenCount: chunk.tokenCount,
+                    contentHash,
+                },
+            }),
+        ),
+    );
 }
 
 // ── DOCX parsing ─────────────────────────────────────────────────────────
@@ -4468,16 +4486,25 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                 // Ensure uploads directory exists
                 await codeExecutor.runBash(cid, 'mkdir -p /home/user/uploads');
                 for (const att of safeAtt) {
-                    if (!att.content || att.type?.startsWith('image/') || att.type?.startsWith('video/')) continue;
-                    const fn = att.name || 'attached.txt';
-                    const raw = typeof att.content === 'string' ? att.content : '';
-                    if (raw) {
-                        await codeExecutor.writeFile(cid, `/home/user/uploads/${fn}`, raw);
-                        paths.push(`/home/user/uploads/${fn}`);
+                    if (!att.content) continue;
+                    const fn = att.name || 'attached.bin';
+                    const isBinary = att.type?.startsWith('image/') || att.type?.startsWith('video/') || att.type?.includes('pdf');
+                    if (isBinary) {
+                        const rawBase64 = att.content.startsWith('data:') ? (att.content.split(',')[1] || '') : att.content;
+                        if (rawBase64) {
+                            await codeExecutor.writeFile(cid, `/home/user/uploads/${fn}`, Buffer.from(rawBase64, 'base64'));
+                            paths.push(`/home/user/uploads/${fn}`);
+                        }
+                    } else {
+                        const raw = typeof att.content === 'string' ? att.content : '';
+                        if (raw) {
+                            await codeExecutor.writeFile(cid, `/home/user/uploads/${fn}`, raw);
+                            paths.push(`/home/user/uploads/${fn}`);
+                        }
                     }
                 }
                 if (paths.length) {
-                    sandboxFileNotice = `\n📁 Uploaded file(s) available in sandbox at:\n${paths.map(p => `  - ${p}`).join('\n')}\nUse read_file({ path: "/home/user/uploads/<filename>" }) to read the full content, or run_bash with the path for analysis.\n`;
+                    sandboxFileNotice = `\n📁 Uploaded file(s) available in sandbox at:\n${paths.map(p => `  - ${p}`).join('\n')}\nIMPORTANT: These files are in /home/user/uploads/. When reading, editing, or running commands, always use the full /home/user/uploads/<filename> path.\n`;
                     console.log(`[SANDBOX_WRITE] Successfully wrote ${paths.length} file(s) to sandbox:`, paths.join(', '));
                 }
             } catch (e: any) {
@@ -4487,28 +4514,29 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
 
         // When the user provides a file, prepend a hard instruction to stop the model searching
         const fileGuard = hasAnyFile
-            ? `\n⚠️ FILE ATTACHED: The user's file(s) are shown in the message below (may be truncated for context). The FULL file content is available in the sandbox — use read_file to read the complete file. You MUST NOT call web_search or read_url for the attached file.${sandboxFileNotice}CRITICAL RULES:
-- NEVER install packages (npm install, pip install, apt-get, etc.). The sandbox already has everything needed.
-- NEVER waste time with unnecessary commands like "which node", "node --version", "echo", "ls", "cd", "pwd", "type" — just run the actual analysis.
-- When editing: PREFER edit_file for small targeted changes over write_file which rewrites the entire file. Only use write_file for entirely new files.
-- ALWAYS call get_generated_file({ path: "/home/user/uploads/<filename>" }) after editing/generating a file — the user can only see files delivered through that tool, not files left in the sandbox. Do NOT just say "the file has been saved" in text without calling get_generated_file.
-- You MUST only work on the uploaded file(s) — do NOT create, scaffold, or generate any new files or projects unless the user explicitly asks.
-EDITING WORKFLOW (Claude-style):
-  1. To find where to edit: use run_bash with grep to search across files (e.g. grep -n function /home/user/uploads/*.ts)
-  2. read_file to see the full content around the target
-  3. edit_file with enough surrounding context in old_str to make the match unique
-  4. run_bash to re-compile/lint/verify the fix
-FILE READING — Correct approach per file type (no need to call read_skill):
-  • Code/text (.ts, .tsx, .js, .py, .rs, .go, .txt, .md, .json, .yaml, .css, .html, .log): read_file directly.
-  • CSV/TSV: use run_bash with Python pandas — pd.read_csv(path, nrows=5) to preview, wc -l for row count.
-  • PDF: NEVER read_file — use run_bash: python3 -c "import pymupdf; doc=pymupdf.open(path); [print(p.get_text()) for p in doc]"
-  • DOCX: NEVER read_file — use run_bash: python3 -c "from docx import Document; [print(p.text) for p in Document(path).paragraphs]"
-  • XLSX: NEVER read_file — use run_bash: python3 -c "from openpyxl import load_workbook; wb=load_workbook(path,read_only=True); [print(r) for r in wb.active.iter_rows(max_row=5,values_only=True)]"
-  • PPTX: NEVER read_file — use run_bash: python3 -c "from pptx import Presentation; [print(s.text) for s in Presentation(path).slides[0].shapes if s.has_text_frame]"
-  • Images (.jpg, .png, .gif, .webp): already visible in context — no read needed.
-  • Archives (.zip, .tar, .tar.gz): NEVER blindly extract — run_bash with "unzip -l" or "tar -tf" to list contents first.
-  • Unknown: run_bash with "file /path/to/file" to identify type, then decide.
-To verify/analyze code: use read_file first, then use run_bash to run type-checkers and linters directly. If the user asks you to improve the design/styling, the rules are already loaded — use them.\n`
+            ? `\n⚠️ FILE ATTACHED: The user's file(s) are below (truncated). The FULL file is at /home/user/uploads/<filename> in the sandbox.${sandboxFileNotice}
+CRITICAL — FILE LOCATION: Uploaded files are ALWAYS at /home/user/uploads/<filename>. When asked to edit, read, or analyze the user's file, look in /home/user/uploads/ FIRST. Do NOT look in /home/user/ root. Do NOT create new files in uploads/ unless the user tells you to replace the uploaded file.
+CRITICAL — You MUST only work on the uploaded file(s). Do NOT create, scaffold, or generate new files or projects unless the user explicitly asks.
+CRITICAL — ALWAYS call get_generated_file({ path: "/home/user/uploads/<filename>" }) after editing — files left in sandbox are invisible to the user.
+CRITICAL — NEVER install packages (pip, npm, apt). Everything is pre-installed.
+
+EDITING WORKFLOW (strict order):
+  1. list_files({ path: "/home/user/uploads/" }) — see what files exist
+  2. read_file({ path: "/home/user/uploads/<filename>" }) — read full content
+  3. edit_file({ path: "/home/user/uploads/<filename>", old_str: "...", new_str: "..." }) — make targeted changes
+  4. run_bash with compile/lint/verify command using absolute /home/user/uploads/<filename> paths
+  5. get_generated_file({ path: "/home/user/uploads/<filename>" }) — deliver to user
+
+FILE READING — ALL paths use /home/user/uploads/ prefix:
+  • Code/text (.ts, .tsx, .js, .py, .rs, .go, .txt, .md, .json, .yaml, .css, .html, .log): read_file({ path: "/home/user/uploads/<filename>" })
+  • CSV/TSV: run_bash with pandas: pd.read_csv("/home/user/uploads/<filename>", nrows=5)
+  • PDF: NEVER read_file — run_bash: python3 -c "import pymupdf; doc=pymupdf.open('/home/user/uploads/<filename>'); [print(p.get_text()) for p in doc]"
+  • DOCX: NEVER read_file — run_bash: python3 -c "from docx import Document; [print(p.text) for p in Document('/home/user/uploads/<filename>').paragraphs]"
+  • XLSX: NEVER read_file — run_bash: python3 -c "from openpyxl import load_workbook; wb=load_workbook('/home/user/uploads/<filename>',read_only=True); [print(r) for r in wb.active.iter_rows(max_row=5,values_only=True)]"
+  • PPTX: NEVER read_file — run_bash: python3 -c "from pptx import Presentation; [print(s.text) for s in Presentation('/home/user/uploads/<filename>').slides[0].shapes if s.has_text_frame]"
+  • Images (.jpg, .png, .gif, .webp): already visible — no read needed.
+  • Archives (.zip, .tar, .tar.gz): NEVER blindly extract — run_bash: "unzip -l /home/user/uploads/<filename>" or "tar -tf /home/user/uploads/<filename>" to list first.
+  • Unknown: run_bash "file /home/user/uploads/<filename>" to identify.\n`
             : '';
 
         // Detect system/architecture/code-review questions — strip execution tools
@@ -4738,7 +4766,13 @@ To verify/analyze code: use read_file first, then use run_bash to run type-check
                     if (rawBuf && rawBuf.length > 50) {
                         sendStatus(res, 'parsing', `Parsing ${att.name} (${(rawBuf.length / 1024).toFixed(0)} KB)...`, { name: att.name }, agentState.thoughtProcess);
                         if (isPdfAtt) {
-                            parsedContent = await extractPdfTableAware(rawBuf);
+                            const pdfResult = await extractPdf(rawBuf);
+                            parsedContent = pdfResult.markdown || pdfResult.text || '';
+                            if (pdfResult.token_count >= 4000 && uid) {
+                                await processLargeDocument(pdfResult, uid, att.name || 'document', 'upload');
+                                const preview = (pdfResult.pages?.[0]?.text ?? parsedContent).slice(0, 1500);
+                                parsedContent = `[PDF DOCUMENT: ${att.name}]\n${pdfResult.metadata.pages} pages, ${(rawBuf.length / 1024).toFixed(0)} KB.\n\nThe document is large and has been chunked into searchable sections. Use retrieve_doc_chunks(query) to find relevant content.\n\nFirst section preview:\n${preview}`;
+                            }
                         } else {
                             parsedContent = await extractDocxText(rawBuf);
                         }
