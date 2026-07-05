@@ -817,20 +817,21 @@ const AGENT_SYSTEM_EXTENSION = `
 You have a cloud-isolated Linux sandbox (E2B). Persistent per conversation — files survive across messages.
 
 CRITICAL — FILE LOCATIONS:
-  - User-uploaded files are ALWAYS at /home/user/uploads/<filename>. When the user says "edit my file" or "work on my file", look in /home/user/uploads/ FIRST.
+  - User-uploaded files are ALWAYS at /home/user/uploads/<filename>. NEVER edit files here — they are read-only originals.
+  - To edit an uploaded file, FIRST copy it to /home/user/edits/<filename> using run_bash (cp /home/user/uploads/<file> /home/user/edits/<file>), then edit the copy in /home/user/edits/.
   - Your own created files go to /home/user/<filename>.
   - write_file, read_file, edit_file, and run_bash all share the SAME filesystem under /home/user/ — no cd needed.
-  - If you're unsure what files exist, run list_files({ path: "/home/user/uploads/" }) to see uploaded files.
+  - If you're unsure what files exist, run list_files({ path: "/home/user/uploads/" }) to see uploaded files, or list_files({ path: "/home/user/edits/" }) to see files in progress.
 
 CRITICAL — NEVER install packages (npm install, pip install, apt, etc.). Everything needed is pre-installed.
 CRITICAL — NEVER run useless commands like "which", "echo", "ls", "cd", "pwd", "type", "--version", "npx <tool> --version", "tsc --noEmit", or any "2>&1 || true" error suppression. Jump straight to the actual work. All tools (node, tsx, tsc, gcc, rustc, python3, etc.) are pre-installed and verified — no need to check.
 CRITICAL — After editing/creating a file, ALWAYS call get_generated_file to deliver it to the user. Files left in the sandbox are invisible to the user.
 
 <file_reading>
-When the user uploads a file, it is at /home/user/uploads/<filename>. Follow these rules:
-- For TEXT and CODE files (.ts, .tsx, .js, .py, .rs, .go, .txt, .md, .json, .yaml, .css, .html, .log): use read_file({ path: "/home/user/uploads/<filename>" }).
+Originals are at /home/user/uploads/<filename> (read-only). For editing, FIRST copy to /home/user/edits/ then read/edit from there.
+- For TEXT and CODE files (.ts, .tsx, .js, .py, .rs, .go, .txt, .md, .json, .yaml, .css, .html, .log): use read_file({ path: "/home/user/uploads/<filename>" }) for originals, or from /home/user/edits/ after copying.
 - For CSV/TSV: use run_bash with pandas (pd.read_csv("/home/user/uploads/<filename>", nrows=5) to preview).
-- For OFFICE files (.pdf, .docx, .xlsx, .pptx): do NOT use read_file. Use run_bash with Python and the full /home/user/uploads/ path: pymupdf for PDF, python-docx for DOCX, openpyxl for XLSX, python-pptx for PPTX.
+- For OFFICE files (.pdf, .docx, .xlsx, .pptx): do NOT use read_file. Use run_bash with Python and the full path: pymupdf for PDF, python-docx for DOCX, openpyxl for XLSX, python-pptx for PPTX.
 - For images (.jpg, .png, .gif, .webp): already visible in context — no read needed.
 - For archives (.zip, .tar): use run_bash with unzip -l / tar -tf to list, never blindly extract.
 - ALWAYS check file size with stat before loading large files.
@@ -860,7 +861,7 @@ AVAILABLE FUNCTIONS — call these via function calling, do NOT describe them in
     context in old_str to make the match unique. PREFER edit_file over write_file for targeted
     changes — only use write_file for entirely new files.
 
-  list_files({ path: "/home/user/uploads/" }) — List user-uploaded files (use this FIRST when user asks to edit). Use "/home/user/" to list your own created files.
+  list_files({ path: "/home/user/uploads/" }) — List user-uploaded originals. list_files({ path: "/home/user/edits/" }) — List files in progress (after copying from uploads). Use "/home/user/" to list your own created files.
 
   install_package({ package: "tensorflow" }) — pip install.
 
@@ -874,8 +875,8 @@ AVAILABLE FUNCTIONS — call these via function calling, do NOT describe them in
   get_app_url({ app_id: "..." })
     Public URL of running app. Call after start_app.
 
-  get_generated_file({ path: "/home/user/chart.png" })
-    Download file to user. Images render inline. Call this AFTER editing/verifying/generating any file the user needs — code, images, PDFs, CSVs — to send it in chat.
+  get_generated_file({ path: "/home/user/edits/edited_file.ts" })
+    Download file to user. AFTER editing (from /home/user/edits/) or generating a new file, call this to deliver it. Images render inline. NEVER deliver from /home/user/uploads/ — those are read-only originals.
 
 REMEMBER: Writing bash commands as text does NOT execute them. Only function calls execute.
 </sandbox_environment>
@@ -2879,9 +2880,10 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
         // ── read_skill ────────────────────────────────────────────────────
         read_skill: (tool as any)({
             description:
-                'Load a skill file with rules for generating document types (pdf, docx, pptx, xlsx, etc.) ' +
-                'or for design/styling (design). ' +
-                'Call this before generate_document for doc types, or to load design rules when the user wants UI improvements on an uploaded file.',
+                'Load rules for handling files or generating documents. ' +
+                'Use doc_type="file" when a user uploads a file — this is the FIRST thing you should call. ' +
+                'Use doc_type="design" for UI/styling rules on uploaded HTML/CSS files. ' +
+                'Use other doc types (pdf, docx, pptx, xlsx, etc.) before generate_document to get generation rules.',
             inputSchema: z.object({
                 doc_type: z
                     .enum(['pdf', 'pptx', 'docx', 'xlsx', 'csv', 'tsv', 'md', 'json', 'sql', 'html', 'tech', 'finance', 'coder', 'creative', 'legal', 'design', 'file'])
@@ -3521,7 +3523,7 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
         get_generated_file: (tool as any)({
             description: 'Download a file from the sandbox and return its base64-encoded content with MIME type. Use this to return files (images, PDFs, CSVs, code files, edited documents) directly to the user in chat. Call this AFTER you finish editing or generating a file the user should receive.',
             inputSchema: z.object({
-                path: z.string().describe('Absolute path to the file in the sandbox, e.g. /home/user/MessageRenderer.tsx'),
+                path: z.string().describe('Absolute path to the file in the sandbox. For edited files use /home/user/edits/<filename>, for originals use /home/user/uploads/<filename>, for new files use /home/user/<filename>.'),
             }),
             execute: async ({ path }: any) => {
                 const cid = activeConversationId || 'default';
@@ -4484,7 +4486,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                 const cid = activeConversationId;
                 const paths: string[] = [];
                 // Ensure uploads directory exists
-                await codeExecutor.runBash(cid, 'mkdir -p /home/user/uploads');
+                await codeExecutor.runBash(cid, 'mkdir -p /home/user/uploads /home/user/edits');
                 for (const att of safeAtt) {
                     if (!att.content) continue;
                     const fn = att.name || 'attached.bin';
@@ -4515,28 +4517,19 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
         // When the user provides a file, prepend a hard instruction to stop the model searching
         const fileGuard = hasAnyFile
             ? `\n⚠️ FILE ATTACHED: The user's file(s) are below (truncated). The FULL file is at /home/user/uploads/<filename> in the sandbox.${sandboxFileNotice}
-CRITICAL — FILE LOCATION: Uploaded files are ALWAYS at /home/user/uploads/<filename>. When asked to edit, read, or analyze the user's file, look in /home/user/uploads/ FIRST. Do NOT look in /home/user/ root. Do NOT create new files in uploads/ unless the user tells you to replace the uploaded file.
+CRITICAL — FIRST STEP: Call read_skill({ doc_type: "file" }) IMMEDIATELY before doing anything else. This loads the file-reading rules that tell you how to handle each file type (PDF, DOCX, XLSX, code, etc.). Do NOT skip this.
+CRITICAL — FILE LOCATION: Uploaded originals are at /home/user/uploads/. To edit, FIRST copy to /home/user/edits/ (run_bash: cp /home/user/uploads/<file> /home/user/edits/<file>). All editing happens in /home/user/edits/ — NEVER edit files in uploads/. Deliver from /home/user/edits/ when done.
 CRITICAL — You MUST only work on the uploaded file(s). Do NOT create, scaffold, or generate new files or projects unless the user explicitly asks.
-CRITICAL — ALWAYS call get_generated_file({ path: "/home/user/uploads/<filename>" }) after editing — files left in sandbox are invisible to the user.
+CRITICAL — ALWAYS call get_generated_file({ path: "/home/user/edits/<filename>" }) after editing — files left in sandbox are invisible.
 CRITICAL — NEVER install packages (pip, npm, apt). Everything is pre-installed.
 
 EDITING WORKFLOW (strict order):
-  1. list_files({ path: "/home/user/uploads/" }) — see what files exist
-  2. read_file({ path: "/home/user/uploads/<filename>" }) — read full content
-  3. edit_file({ path: "/home/user/uploads/<filename>", old_str: "...", new_str: "..." }) — make targeted changes
-  4. run_bash with compile/lint/verify command using absolute /home/user/uploads/<filename> paths
-  5. get_generated_file({ path: "/home/user/uploads/<filename>" }) — deliver to user
-
-FILE READING — ALL paths use /home/user/uploads/ prefix:
-  • Code/text (.ts, .tsx, .js, .py, .rs, .go, .txt, .md, .json, .yaml, .css, .html, .log): read_file({ path: "/home/user/uploads/<filename>" })
-  • CSV/TSV: run_bash with pandas: pd.read_csv("/home/user/uploads/<filename>", nrows=5)
-  • PDF: NEVER read_file — run_bash: python3 -c "import pymupdf; doc=pymupdf.open('/home/user/uploads/<filename>'); [print(p.get_text()) for p in doc]"
-  • DOCX: NEVER read_file — run_bash: python3 -c "from docx import Document; [print(p.text) for p in Document('/home/user/uploads/<filename>').paragraphs]"
-  • XLSX: NEVER read_file — run_bash: python3 -c "from openpyxl import load_workbook; wb=load_workbook('/home/user/uploads/<filename>',read_only=True); [print(r) for r in wb.active.iter_rows(max_row=5,values_only=True)]"
-  • PPTX: NEVER read_file — run_bash: python3 -c "from pptx import Presentation; [print(s.text) for s in Presentation('/home/user/uploads/<filename>').slides[0].shapes if s.has_text_frame]"
-  • Images (.jpg, .png, .gif, .webp): already visible — no read needed.
-  • Archives (.zip, .tar, .tar.gz): NEVER blindly extract — run_bash: "unzip -l /home/user/uploads/<filename>" or "tar -tf /home/user/uploads/<filename>" to list first.
-  • Unknown: run_bash "file /home/user/uploads/<filename>" to identify.\n`
+  1. list_files({ path: "/home/user/uploads/" }) — see uploaded files
+  2. run_bash({ command: "mkdir -p /home/user/edits && cp /home/user/uploads/<file> /home/user/edits/<file>" }) — copy to edits/
+  3. read_file({ path: "/home/user/edits/<filename>" }) — read the copy
+  4. edit_file({ path: "/home/user/edits/<filename>", old_str: "...", new_str: "..." }) — edit the copy
+  5. run_bash with compile/lint/verify using /home/user/edits/<filename> paths
+  6. get_generated_file({ path: "/home/user/edits/<filename>" }) — deliver to user\n`
             : '';
 
         // Detect system/architecture/code-review questions — strip execution tools

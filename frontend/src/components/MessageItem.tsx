@@ -52,7 +52,7 @@ import {
   FileDown,
 } from "lucide-react";
 
-import { FileDownloadButton } from "./FileDownloadButton";
+import { FileCard } from "./FileCard";
 import { CodeOutputBlock } from "./CodeOutputBlock";
 import { getDomain, deepCleanAnswer } from "../lib/chat-utils";
 import type { Message, MessagePart, Source } from "../types";
@@ -861,14 +861,10 @@ function PartsRenderer({
         } else {
           renderedParts.push(
             <div key={`file-${i}`} className="mt-2">
-              <FileDownloadButton
-                file={{
-                  base64: part.base64 || "",
-                  filename: part.filename,
-                  mime: part.mime,
-                }}
-                onPreview={onPreview}
-                onDelete={onFileDelete ? () => onFileDelete(messageId, part.filename, 'generatedFiles') : undefined}
+              <FileCard
+                filename={part.filename}
+                base64={part.base64}
+                mime={part.mime}
               />
             </div>
           );
@@ -1623,11 +1619,11 @@ export function MessageItem({
                     onDelete={onFileDelete ? () => onFileDelete(message.id, file.filename, 'generatedFiles') : undefined}
                   />
                 ) : (
-                  <FileDownloadButton
+                  <FileCard
                     key={idx}
-                    file={file}
-                    onPreview={onPreview}
-                    onDelete={onFileDelete ? () => onFileDelete(message.id, file.filename, 'generatedFiles') : undefined}
+                    filename={file.filename}
+                    base64={file.base64}
+                    mime={file.mime}
                   />
                 )
               )}
@@ -1635,7 +1631,6 @@ export function MessageItem({
           )}
         </>
       )}
-
       {/* Footer: source cascade + actions — Claude-style minimal bar */}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-0.5">
