@@ -4610,9 +4610,6 @@ EDITING WORKFLOW (strict order):
         // ── Per-request agent state ──────────────────────────────────────
         const agentState: AgentState = { sources: [], generatedFiles: [], thoughtProcess: [], searchCount: 0, wikiSearchCount: 0 };
         const tools = createFluxTools(res, model, agentState, nq, activeConversationId, uid, abortController.signal);
-        if (hasAnyFile) {
-            delete (tools as any).web_search;
-        }
         if (isSystemQuery) {
             const destructiveTools = ['create_project', 'write_file', 'edit_file', 'run_bash', 'run_python', 'install_package', 'start_app', 'stop_app', 'list_apps', 'get_app_logs', 'get_app_url', 'web_search', 'get_weather', 'wiki_search'];
             for (const name of destructiveTools) {
