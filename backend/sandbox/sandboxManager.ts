@@ -12,6 +12,8 @@ export class SandboxManager {
     const existing = this.sandboxes.get(conversationId);
 
     if (existing) {
+      // Always extend the sandbox timeout on access to prevent mid-operation expiry
+      try { await (existing.sandbox as any).setTimeout?.(1_800_000); } catch {}
       // Only health-check if it's been > 3 minutes since last use
       if (Date.now() - existing.lastUsed < 3 * 60 * 1000) {
         existing.lastUsed = Date.now();
@@ -28,8 +30,11 @@ export class SandboxManager {
 
     const sandbox = await Sandbox.create({
       apiKey: process.env.E2B_API_KEY!,
-      timeoutMs: 900_000,
+      timeoutMs: 1_800_000,
     });
+
+    // Extend sandbox timeout immediately after creation
+    try { await (sandbox as any).setTimeout?.(1_800_000); } catch {}
 
     await sandbox.commands.run(
       'pip install pandas numpy matplotlib seaborn plotly scipy scikit-learn pillow requests -q',
