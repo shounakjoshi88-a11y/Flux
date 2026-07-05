@@ -5296,6 +5296,71 @@ ${memCtx}
                 }
             }
 
+            // ── Plain-text tool call fallback handler ──────────────────────────
+            // Some NIM models output tool calls as raw text like
+            //   readfile({ path: "/home/user/file.md" })
+            // instead of using the function-calling API.
+            if (!closedRef.v) {
+                const toolNameMap: Record<string, string> = {
+                    read_file: 'read_file', readfile: 'read_file',
+                    write_file: 'write_file', writefile: 'write_file',
+                    list_files: 'list_files', listfiles: 'list_files',
+                    edit_file: 'edit_file', editfile: 'edit_file',
+                    get_generated_file: 'get_generated_file', getgeneratedfile: 'get_generated_file', getgenerated: 'get_generated_file',
+                    run_bash: 'run_bash', runbash: 'run_bash',
+                    run_python: 'run_python', runpython: 'run_python',
+                    install_package: 'install_package', installpackage: 'install_package',
+                };
+                const toolCallRe = /(\w+)\s*\(\s*\{([\s\S]*?)\}\s*\)/gi;
+                const toolMatches: Array<{ index: number; fullMatch: string; name: string; paramsStr: string }> = [];
+                let tcm: RegExpExecArray | null;
+                while ((tcm = toolCallRe.exec(fullText)) !== null) {
+                    const rawName = tcm[1]!.toLowerCase().trim();
+                    const actualName = toolNameMap[rawName];
+                    if (actualName && (tools as any)[actualName]?.execute) {
+                        toolMatches.push({ index: tcm.index, fullMatch: tcm[0], name: actualName, paramsStr: tcm[2]! });
+                    }
+                }
+                if (toolMatches.length > 0) {
+                    console.log(`[TOOL-FALLBACK] Found ${toolMatches.length} plain-text tool calls, executing...`);
+                    for (let i = toolMatches.length - 1; i >= 0; i--) {
+                        const { index, fullMatch, name, paramsStr } = toolMatches[i]!;
+                        try {
+                            let params: Record<string, any> = {};
+                            try { params = JSON.parse(paramsStr); }
+                            catch {
+                                const fixed = paramsStr.replace(/'/g, '"').replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3');
+                                try { params = JSON.parse(fixed); }
+                                catch {
+                                    const kvRe = /["']?(\w+)["']?\s*:\s*["']?([^,"'}]+)["']?/g;
+                                    let kv: RegExpExecArray | null;
+                                    while ((kv = kvRe.exec(paramsStr)) !== null) {
+                                        params[kv[1]!] = kv[2]!.trim().replace(/^["']|["']$/g, '');
+                                    }
+                                }
+                            }
+                            const result = await (tools as any)[name].execute(params);
+                            const formatted = `\n\n${result}`;
+                            fullText = fullText.slice(0, index) + formatted + fullText.slice(index + fullMatch.length);
+                            writeSafeSSE(res, formatted);
+                            charsSent += formatted.length;
+                            hasToolCall = true;
+                        } catch (e: any) {
+                            console.warn(`[TOOL-FALLBACK] ${name} failed:`, e?.message);
+                            const errMsg = `\n\n[${name} failed: ${e?.message ?? 'error'}]`;
+                            fullText = fullText.slice(0, index) + errMsg + fullText.slice(index + fullMatch.length);
+                            writeSafeSSE(res, errMsg);
+                            charsSent += errMsg.length;
+                        }
+                        if (typeof (res as any).flush === 'function') (res as any).flush();
+                    }
+                    sendStatus(res, 'sandbox_success',
+                        `Tool fallback finished (${toolMatches.length} calls)`,
+                        { tool: 'tool_fallback', count: toolMatches.length },
+                        agentState.thoughtProcess);
+                }
+            }
+
             // ── Auto-document generation (fire-and-forget with 15s timeout) ──
             if (!closedRef.v) {
                 const safeQ = (query ?? '').toLowerCase();
