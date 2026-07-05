@@ -2,13 +2,20 @@
 
 ## Why this skill exists
 
-When a user uploads a file, the path is listed in the fileGuard notice at `/home/user/uploads/<filename>`.
+When a user uploads a file as an attachment, the path is listed at `/home/user/uploads/<filename>`.
 **The file may be truncated in context.** You must go read it properly.
 
-CRITICAL — Originals are in /home/user/uploads/ (read-only). To edit, FIRST copy to /home/user/edits/:
+If the user's file content is inline (not an uploaded attachment), **it does NOT exist in the sandbox**. First write it:
+  write_file({ path: "/home/user/edits/<filename>", content: "..." })
+Then read/edit from /home/user/edits/.
+
+CRITICAL — Originals (when uploaded) are in /home/user/uploads/ (read-only). To edit, FIRST copy to /home/user/edits/:
   run_bash({ command: "cp /home/user/uploads/<file> /home/user/edits/<file>" })
 Then read/edit/deliver from /home/user/edits/.
-When the user says "edit my file" or "work on my file", start with list_files({ path: "/home/user/uploads/" }).
+
+**After the first copy, keep using /home/user/edits/ for ALL subsequent operations on that file.** Do not go back to /home/user/uploads/ — the working copy is in edits/. The uploads/ directory may not persist between conversation turns (sandbox can be reset).
+
+When the user says "edit my file" or "work on my file", start with list_files({ path: "/home/user/edits/" }) or list_files({ path: "/home/user/uploads/" }).
 
 The naive thing — `read_file` on everything — is wrong for most files:
 - On a PDF, XLSX, or DOCX it prints binary garbage.
@@ -32,8 +39,8 @@ This skill tells you the right first move for each type.
 
 | Extension | First move | Notes |
 | --------- | ---------- | ----- |
-| `.txt`, `.md`, `.log`, `.json`, `.yaml`, `.yml`, `.toml`, `.ini`, `.cfg`, `.env` | `read_file({ path: "/home/user/edits/<file>" })` for edits, or `read_file({ path: "/home/user/uploads/<file>" })` for originals. | For huge (>1MB) logs: `run_bash` with `tail -200` instead. |
-| `.ts`, `.tsx`, `.js`, `.jsx`, `.py`, `.rs`, `.go`, `.java`, `.c`, `.cpp`, `.h`, `.hpp`, `.css`, `.scss`, `.less`, `.html`, `.svelte`, `.vue` | Use `/home/user/edits/` path after copying for edits; use `/home/user/uploads/` for originals. | After reading, use `run_bash` to compile/lint/typecheck. |
+| `.txt`, `.md`, `.log`, `.json`, `.yaml`, `.yml`, `.toml`, `.ini`, `.cfg`, `.env` | `read_file({ path: "/home/user/edits/<file>" })` — always use edits/ for working copies. If file was inline text (never uploaded), write it to edits/ first. | For huge (>1MB) logs: `run_bash` with `tail -200` instead. |
+| `.ts`, `.tsx`, `.js`, `.jsx`, `.py`, `.rs`, `.go`, `.java`, `.c`, `.cpp`, `.h`, `.hpp`, `.css`, `.scss`, `.less`, `.html`, `.svelte`, `.vue` | Use `/home/user/edits/` path. If file was inline text, write it to edits/ first. | After reading, use `run_bash` to compile/lint/typecheck. |
 | `.csv`, `.tsv` | Use `run_bash` with Python pandas to preview:\n```python\nimport pandas as pd\ndf = pd.read_csv("/home/user/edits/data.csv", nrows=5)\nprint(df)\nprint(df.dtypes)\n``` | For `.tsv` add `sep="\\t"`. Get row count with `wc -l` (approximate). |
 | `.json`, `.jsonl` | Use Python `json` module or `jq`:\n```python\nimport json\nwith open("/home/user/edits/data.json") as f:\n    data = json.load(f)\nif isinstance(data, list): print(f"Array of {len(data)} items")\nelif isinstance(data, dict): print(f"Object with keys: {list(data.keys())}")\n``` | JSONL: `head -3` then `wc -l`. |
 | `.pdf` | **NEVER** `read_file` a PDF. Use Python:\n```python\nimport pymupdf\ndoc = pymupdf.open("/home/user/edits/file.pdf")\nprint(f"{len(doc)} pages")\nfor page in doc:\n    print(page.get_text())\n``` | `pymupdf` (aka `fitz`) is pre-installed. For scanned PDFs without text layer, the output will be empty. |
@@ -48,6 +55,8 @@ This skill tells you the right first move for each type.
 ## Important rules
 
 - **NEVER** edit files in /home/user/uploads/ — those are read-only originals. Copy to /home/user/edits/ first.
+- **After copying a file to /home/user/edits/, ALL subsequent reads and edits use /home/user/edits/.** Never go back to /home/user/uploads/ for that file.
+- **If the file content is inline text (no file attachment), it is NOT in the sandbox.** Write it to /home/user/edits/ using write_file before reading/editing.
 - **NEVER** `cat` or `read_file` a binary file (PDF, DOCX, XLSX, PPTX, images, archives, executables) — you get garbage.
 - **ALWAYS** check file size first for large files (>1MB). Use `stat -c '%s bytes' /path/to/file`.
 - **For code/text files**, `read_file` is the right tool — it returns the complete content.

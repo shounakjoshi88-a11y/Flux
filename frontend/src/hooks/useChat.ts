@@ -39,6 +39,7 @@ export function useChat(user: any) {
   const [activeGenerationStatus, setActiveGenerationStatus] = useState<{
     subtype: string;
     message: string;
+    data?: any;
   } | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const isLoadingRef = useRef(false);
@@ -436,14 +437,22 @@ export function useChat(user: any) {
                 if (isTerminal) {
                   setActiveGenerationStatus(null);
                   const baseSub = sub.replace(/_(?:success|error|complete|done)$/, '');
-                  let idx = streamingPartsRef.current.findIndex(
-                    p => p.type === 'tool_call' && p.name === baseSub
-                  );
-                  // Handle _start naming pattern (sandbox_start → sandbox_success)
+                  let idx = -1;
+                  for (let i = streamingPartsRef.current.length - 1; i >= 0; i--) {
+                    const p = streamingPartsRef.current[i];
+                    if (p.type === 'tool_call' && p.name === baseSub) {
+                      idx = i;
+                      break;
+                    }
+                  }
                   if (idx < 0) {
-                    idx = streamingPartsRef.current.findIndex(
-                      p => p.type === 'tool_call' && p.name === `${baseSub}_start`
-                    );
+                    for (let i = streamingPartsRef.current.length - 1; i >= 0; i--) {
+                      const p = streamingPartsRef.current[i];
+                      if (p.type === 'tool_call' && p.name === `${baseSub}_start`) {
+                        idx = i;
+                        break;
+                      }
+                    }
                   }
                   if (idx >= 0) {
                     const updated = [...streamingPartsRef.current];
@@ -485,7 +494,7 @@ export function useChat(user: any) {
                   sub === 'sandbox_start' ||
                   sub === 'parsing'
                 ) {
-                  setActiveGenerationStatus({ subtype: sub, message: parsed.message });
+                  setActiveGenerationStatus({ subtype: sub, message: parsed.message, data: parsed.data });
                 }
               } catch { }
             }

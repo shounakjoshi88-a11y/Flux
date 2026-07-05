@@ -3361,11 +3361,11 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
                 const filename = path.split('/').pop() || 'file';
                 const addedLines = (new_str?.match(/\n/g) || []).length;
                 const removedLines = (old_str?.match(/\n/g) || []).length;
-                sendStatus(res, 'generating_file', `Editing ${filename}...`, { path, old_str: old_str.slice(0, 80), diffAdded: addedLines, diffRemoved: removedLines }, state.thoughtProcess);
+                sendStatus(res, 'generating_file', `Editing ${filename}...`, { path, old_str: old_str.slice(0, 120), new_str: new_str.slice(0, 120), diffAdded: addedLines, diffRemoved: removedLines }, state.thoughtProcess);
                 try {
                     const result = await codeExecutor.editFile(cid, path, old_str || '', new_str || '');
                     if (result.success) {
-                        sendStatus(res, 'generating_file_success', `Edited ${filename}`, { path, diffAdded: addedLines, diffRemoved: removedLines }, state.thoughtProcess);
+                        sendStatus(res, 'generating_file_success', `Edited ${filename}`, { path, old_str: old_str.slice(0, 120), new_str: new_str.slice(0, 120), diffAdded: addedLines, diffRemoved: removedLines }, state.thoughtProcess);
                         return `File ${path} edited successfully. After editing code, call run_bash to re-compile and re-run to verify the fix.`;
                     }
                     sendStatus(res, 'generating_file_error', `Edit failed on ${filename}: ${result.error}`, { path }, state.thoughtProcess);
@@ -4542,12 +4542,14 @@ CRITICAL — ALWAYS call get_generated_file({ path: "/home/user/edits/<filename>
 CRITICAL — NEVER install packages (pip, npm, apt). Everything is pre-installed.
 
 EDITING WORKFLOW (strict order):
-  1. list_files({ path: "/home/user/uploads/" }) — see uploaded files
-  2. run_bash({ command: "mkdir -p /home/user/edits && cp /home/user/uploads/<file> /home/user/edits/<file>" }) — copy to edits/
-  3. read_file({ path: "/home/user/edits/<filename>" }) — read the copy
-  4. edit_file({ path: "/home/user/edits/<filename>", old_str: "...", new_str: "..." }) — edit the copy
-  5. run_bash with compile/lint/verify using /home/user/edits/<filename> paths
-  6. get_generated_file({ path: "/home/user/edits/<filename>" }) — deliver to user\n`
+  1. list_files({ path: "/home/user/edits/" }) — see working copies (or list_files({ path: "/home/user/uploads/" }) for originals)
+  2. If file is inline text (no upload), write to /home/user/edits/ first via write_file
+  3. If file was uploaded as attachment, run_bash({ command: "mkdir -p /home/user/edits && cp /home/user/uploads/<file> /home/user/edits/<file>" }) — copy to edits/
+  4. read_file({ path: "/home/user/edits/<filename>" }) — read the copy
+  5. edit_file({ path: "/home/user/edits/<filename>", old_str: "...", new_str: "..." }) — edit the copy
+  6. run_bash with compile/lint/verify using /home/user/edits/<filename> paths
+  7. get_generated_file({ path: "/home/user/edits/<filename>" }) — deliver to user
+IMPORTANT: After step 3, ALL subsequent operations use /home/user/edits/. Never go back to /home/user/uploads/. The uploads/ original may not persist.\n`
             : '';
 
         // Detect system/architecture/code-review questions — strip execution tools
