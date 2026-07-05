@@ -54,7 +54,7 @@ import {
 
 import { FileCard } from "./FileCard";
 import { CodeOutputBlock } from "./CodeOutputBlock";
-import { getDomain, deepCleanAnswer } from "../lib/chat-utils";
+import { getDomain, deepCleanAnswer, rewriteSandboxUrls } from "../lib/chat-utils";
 import type { Message, MessagePart, Source } from "../types";
 
 type MessageItemProps = {
@@ -92,6 +92,7 @@ type MessageItemProps = {
   onDelete?: (messageId: string | number) => void;
   activeGenerationStatus?: { subtype: string; message: string; data?: any } | null;
   onHtmlPreview?: (html: string) => void;
+  conversationId?: string | null;
 };
 
 import { StatusMessage, TimelineNode, ThoughtBlock } from "./StatusMessage";
@@ -653,6 +654,7 @@ function PartsRenderer({
   onSourceClick,
   activeGenerationStatus,
   onHtmlPreview,
+  conversationId,
 }: {
   parts: MessagePart[];
   isStreaming: boolean;
@@ -666,6 +668,7 @@ function PartsRenderer({
   onSourceClick?: (url: string | null) => void;
   activeGenerationStatus?: { subtype: string; message: string; data?: any } | null;
   onHtmlPreview?: (html: string) => void;
+  conversationId?: string | null;
 }) {
   // Find the last text part index for typewriter treatment
   const lastTextPartIndex = (() => {
@@ -687,11 +690,11 @@ function PartsRenderer({
 
     switch (part.type) {
       case "text": {
-        const text = i === lastTextPartIndex ? typewriterContent : part.text;
-        if (text.trim()) {
+        const rawText = i === lastTextPartIndex ? typewriterContent : part.text;
+        if (rawText.trim()) {
           renderedParts.push(
             <div key={`text-${i}`} className="max-w-none text-foreground/90">
-              <MessageRenderer content={text} onCitationClick={onCitationClick} sources={sources} onHtmlPreview={onHtmlPreview} />
+              <ContentWithFileCards text={rawText} conversationId={conversationId} onCitationClick={onCitationClick} sources={sources} onHtmlPreview={onHtmlPreview} />
             </div>
           );
         }
@@ -818,33 +821,22 @@ function PartsRenderer({
           })();
           const lang = extToLang(part.filename);
           renderedParts.push(
-            <div key={`file-${i}`} className="mt-2">
+            <div key={`file-${i}`} className="mt-2 space-y-2">
+              <FileCard
+                filename={part.filename}
+                base64={part.base64}
+                mime={part.mime}
+              />
               <div className="rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] overflow-hidden">
-                <div className="flex items-center justify-between px-3 py-2 border-b border-white/5">
-                  <span className="text-sm font-medium text-foreground truncate">{part.filename}</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={async () => {
-                        try { await navigator.clipboard.writeText(decoded); } catch {}
-                      }}
-                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      <Copy className="size-3" /> Copy
-                    </button>
-                    <button
-                      onClick={() => {
-                        const blob = new Blob([decoded], { type: 'text/plain' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url; a.download = part.filename;
-                        a.click();
-                        URL.revokeObjectURL(url);
-                      }}
-                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      <FileDown className="size-3" /> Download
-                    </button>
-                  </div>
+                <div className="flex items-center justify-end px-3 py-1.5 border-b border-white/5">
+                  <button
+                    onClick={async () => {
+                      try { await navigator.clipboard.writeText(decoded); } catch {}
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Copy className="size-3" /> Copy code
+                  </button>
                 </div>
                 <SyntaxHighlighter
                   language={lang}
@@ -1249,6 +1241,61 @@ function RenderFollowUpText({ text }: { text: string }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Sandbox URL → FileCard                                            */
+/* ------------------------------------------------------------------ */
+function ContentWithFileCards({
+  text,
+  conversationId,
+  onCitationClick,
+  sources,
+  onHtmlPreview,
+}: {
+  text: string;
+  conversationId?: string | null;
+  onCitationClick: (index: number) => void;
+  sources: Source[];
+  onHtmlPreview?: (html: string) => void;
+}) {
+  const rewritten = useMemo(() => rewriteSandboxUrls(text, conversationId), [text, conversationId]);
+  const parts = useMemo(() => {
+    const sandboxRe = /(\/api\/sandbox\/download\/[^\s)\]]+)/g;
+    const split: Array<{ type: 'text' | 'file'; value: string; filename?: string }> = [];
+    let last = 0;
+    let m: RegExpExecArray | null;
+    while ((m = sandboxRe.exec(rewritten)) !== null) {
+      if (m.index > last) split.push({ type: 'text', value: rewritten.slice(last, m.index) });
+      const filename = m[0].split('/').pop() || 'file';
+      split.push({ type: 'file', value: m[0], filename });
+      last = m.index + m[0].length;
+    }
+    if (last < rewritten.length) split.push({ type: 'text', value: rewritten.slice(last) });
+    return split;
+  }, [rewritten]);
+
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.type === 'file') {
+          return (
+            <div key={`file-${i}`} className="my-2">
+              <FileCard filename={part.filename!} downloadUrl={part.value} />
+            </div>
+          );
+        }
+        if (part.value.trim()) {
+          return (
+            <div key={`text-${i}`} className="inline">
+              <MessageRenderer content={part.value} onCitationClick={onCitationClick} sources={sources} onHtmlPreview={onHtmlPreview} />
+            </div>
+          );
+        }
+        return null;
+      })}
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  MessageItem                                                       */
 /* ------------------------------------------------------------------ */
 export function MessageItem({
@@ -1266,6 +1313,7 @@ export function MessageItem({
   onDelete,
   activeGenerationStatus,
   onHtmlPreview,
+  conversationId,
 }: MessageItemProps) {
   const parsedContentBundle = useMemo(() => {
     const rawText = message.content || "";
@@ -1395,7 +1443,7 @@ export function MessageItem({
             </div>
           ) : (
             <div className="user-message text-left w-fit max-w-[85%]">
-              <MessageRenderer content={cleanContent} onCitationClick={() => { }} sources={[]} />
+              <ContentWithFileCards text={cleanContent} conversationId={conversationId} onCitationClick={() => {}} sources={[]} />
             </div>
           )}
           <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1576,6 +1624,7 @@ export function MessageItem({
             onSourceClick={(url) => url && onSourceClick(url)}
             activeGenerationStatus={activeGenerationStatus}
             onHtmlPreview={onHtmlPreview}
+            conversationId={conversationId}
           />
         </>
       ) : (
@@ -1583,7 +1632,7 @@ export function MessageItem({
           {/* ─── RENDER ANSWER TEXT (backward compat) ─── */}
           {typewriterContent.trim() !== "" && (
             <div className="max-w-none text-foreground/90">
-              <MessageRenderer content={typewriterContent} onCitationClick={onCitationClick} sources={sources} onHtmlPreview={onHtmlPreview} />
+              <ContentWithFileCards text={typewriterContent} conversationId={conversationId} onCitationClick={onCitationClick} sources={sources} onHtmlPreview={onHtmlPreview} />
             </div>
           )}
 

@@ -130,6 +130,35 @@ export function deepCleanAnswer(raw: string): string {
   return clean.replace(/\n+$/, "").trim();
 }
 
+export function rewriteSandboxUrls(text: string, conversationId?: string | null): string {
+  if (!conversationId || !text) return text;
+  // Strip markdown link wrappers around sandbox URLs: [text](sandbox:/path/file) → text
+  let result = text.replace(
+    /\[([^\]]*)\]\(sandbox:\/home\/user\/(?:uploads\/|edits\/)?([^\s)\]]+)\)/gi,
+    (_match, linkText) => linkText
+  );
+  // Replace bare sandbox: URLs with download URLs
+  result = result.replace(
+    /sandbox:\/home\/user\/(?:uploads\/|edits\/)?([^\s)\]]+)/gi,
+    (_match, filename) => `/api/sandbox/download/${conversationId}/${filename}`
+  );
+  return result;
+}
+
+export function extractSandboxDownloadUrls(text: string): Array<{ url: string; filename: string }> {
+  const results: Array<{ url: string; filename: string }> = [];
+  const regex = /\/api\/sandbox\/download\/([^/]+)\/([^\s)\]]+)/g;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    results.push({ url: match[0], filename: match[2] || 'file' });
+  }
+  return results;
+}
+
+export function replaceSandboxDownloadUrls(text: string, replaceWith: (url: string) => string): string {
+  return text.replace(/\/api\/sandbox\/download\/[^\s)\]]+/g, (match) => replaceWith(match));
+}
+
 export function getDomain(url: string) {
   try {
     return new URL(url).hostname.replace("www.", "");
