@@ -849,6 +849,7 @@ CRITICAL — FILE LOCATIONS:
 CRITICAL — NEVER install packages (npm install, pip install, apt, etc.). Everything needed is pre-installed.
 CRITICAL — NEVER run useless commands like "which", "echo", "ls", "cd", "pwd", "type", "--version", "npx <tool> --version", "tsc --noEmit", or any "2>&1 || true" error suppression. Jump straight to the actual work. All tools (node, tsx, tsc, gcc, rustc, python3, etc.) are pre-installed and verified — no need to check.
 CRITICAL — After editing/creating a file, ALWAYS call get_generated_file to deliver it to the user. Files left in the sandbox are invisible to the user.
+CRITICAL — NEVER reference /home/user/ paths in your text output to the user. These are internal sandbox paths the user cannot access. Use the download URL from get_generated_file result (format: /api/sandbox/download/&lt;id&gt;/&lt;filename&gt;) if you need to link a file.
 
 <file_reading>
 Originals are at /home/user/uploads/<filename> (read-only). For editing, FIRST copy to /home/user/edits/ then read/edit from there.
@@ -3554,7 +3555,7 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
                         res.write(`event: file\ndata: ${JSON.stringify({ filename, path, mime: mimeType, base64, downloadUrl: `/api/sandbox/download/${cid}/${filename}` })}\n\n`);
                     }
                     sendStatus(res, 'generating_file_success', `Delivered ${filename}`, { path, filename, mime: mimeType }, state.thoughtProcess);
-                    return `File "${filename}" (${mimeType}, ${Math.round(base64.length * 0.75 / 1024)}KB) has been sent to the user.`;
+                    return `File "${filename}" (${mimeType}, ${Math.round(base64.length * 0.75 / 1024)}KB) has been sent to the user. Download URL: /api/sandbox/download/${cid}/${filename}`;
                 } catch (e: any) {
                     sendStatus(res, 'generating_file_error', `Failed to deliver ${path.split('/').pop() || 'file'}: ${e.message}`, { path, error: e.message }, state.thoughtProcess);
                     return `Failed to get file: ${e.message}`;
@@ -5593,8 +5594,13 @@ CROSS-FILE RULES (when multiple files provided):
             res.write('data: [DONE]\n\n');
         }
 
-        // ── Clean text for DB (remove <FOLLOW_UPS> block) ───────────────
-        const cleanAnswer = fullText
+        // ── Clean text for DB ─────────────────────────────────────────
+        // Rewrite sandbox:/home/user/... links to proper download URLs
+        let cleanText = fullText.replace(
+            /sandbox:\/home\/user\/(?:uploads\/|edits\/)?([^\s)\]]+)/gi,
+            (_match, filename) => `/api/sandbox/download/${activeConversationId}/${filename}`
+        );
+        const cleanAnswer = cleanText
             .replace(/<FOLLOW_UPS>[\s\S]*?<\/FOLLOW_UPS>/gi, '')
             .replace(/<FOLLOW_UPS>[\s\S]*/gi, '')
             .trim();
