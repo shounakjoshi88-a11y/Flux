@@ -28,7 +28,7 @@ export class SandboxManager {
 
     const sandbox = await Sandbox.create({
       apiKey: process.env.E2B_API_KEY!,
-      timeoutMs: 300_000,
+      timeoutMs: 900_000,
     });
 
     await sandbox.commands.run(
@@ -62,7 +62,7 @@ export class SandboxManager {
 
   private async cleanup(): Promise<void> {
     const now = Date.now();
-    const idleTimeout = 4 * 60 * 1000;
+    const idleTimeout = 12 * 60 * 1000;
     for (const [convId, { sandbox, lastUsed }] of this.sandboxes.entries()) {
       if (now - lastUsed > idleTimeout) {
         try { await sandbox.kill(); } catch {}
