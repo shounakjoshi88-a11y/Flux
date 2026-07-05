@@ -124,7 +124,7 @@ const AnimatedAudioLines = ({ isActive }: { isActive: boolean }) => {
   );
 };
 
-  // ΓöÇΓöÇΓöÇ Cursor preservation helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ─── Cursor preservation helpers ───
 function saveCursor(el: HTMLElement): number {
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return 0;
@@ -196,7 +196,7 @@ export function ChatInput({
   const pickCamera = () => { cameraRef.current?.click(); setAttachMenuOpen(false); };
   const pickFiles = () => { filesRef.current?.click(); setAttachMenuOpen(false); };
 
-  // ΓöÇΓöÇΓöÇ Render markdown to HTML ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ─── Render markdown to HTML ───
   const renderMarkdown = useCallback(async (text: string): Promise<string> => {
     if (!text.trim()) return "";
     try {
@@ -207,7 +207,7 @@ export function ChatInput({
     }
   }, []);
 
-  // ΓöÇΓöÇΓöÇ Sync contenteditable from external query changes ΓöÇΓöÇΓöÇΓöÇ
+  // ─── Sync contenteditable from external query changes ───
   useEffect(() => {
     const el = editorRef.current;
     if (!el) return;
@@ -218,7 +218,7 @@ export function ChatInput({
     });
   }, [query, renderMarkdown]);
 
-  // ΓöÇΓöÇΓöÇ Handle user input ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ─── Handle user input ───
   const handleInput = useCallback(async () => {
     const el = editorRef.current;
     if (!el) return;
@@ -243,7 +243,7 @@ export function ChatInput({
   const handleCompositionStart = useCallback(() => { isComposing.current = true; }, []);
   const handleCompositionEnd = useCallback(() => { isComposing.current = false; }, []);
 
-  // ΓöÇΓöÇΓöÇ Paste: handle images/files from clipboard ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ─── Paste: handle images/files from clipboard ───
   const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
     const items = Array.from(e.clipboardData.items);
     const fileItems = items.filter(item => item.kind === 'file');
@@ -320,7 +320,7 @@ export function ChatInput({
         ${compact ? "rounded-none border-x-0" : "max-w-[740px]"}
       `}
     >
-      {/* ΓöÇΓöÇΓöÇ FILE CARDS ΓöÇΓöÇΓöÇ */}
+      {/* ─── FILE CARDS ─── */}
       <AnimatePresence>
         {attachedFiles.length > 0 && (
           <motion.div
@@ -366,7 +366,7 @@ export function ChatInput({
         )}
       </AnimatePresence>
 
-      {/* ΓöÇΓöÇΓöÇ CONTENTEDITABLE EDITOR (markdown renders inline) ΓöÇΓöÇΓöÇ */}
+      {/* ─── CONTENTEDITABLE EDITOR (markdown renders inline) ─── */}
       <div className="px-4 pt-[10px] pb-0">
         <div
           ref={editorRef}
@@ -380,11 +380,11 @@ export function ChatInput({
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
           data-placeholder={placeholderText}
-          className="w-full min-h-[28px] max-h-[200px] overflow-y-auto text-[14px] text-[var(--text-primary)] leading-relaxed font-sans outline-none [&:empty:before]:content-[attr(data-placeholder)] [&:empty:before]:text-[var(--text-secondary)]/70 [&:empty:before]:text-[13px] [&:empty:before]:pointer-events-none [&_p]:my-0 [&_pre]:my-1 [&_pre]:bg-[var(--code-bg)] [&_pre]:rounded-lg [&_pre]:p-2 [&_code]:text-[var(--inline-code-text)] [&_code]:bg-[var(--inline-code-bg)]"
+          className="w-full min-h-[28px] max-h-[200px] overflow-y-auto custom-scrollbar text-[14px] text-[var(--text-primary)] leading-relaxed font-sans outline-none [&:empty:before]:content-[attr(data-placeholder)] [&:empty:before]:text-[var(--text-secondary)]/70 [&:empty:before]:text-[13px] [&:empty:before]:pointer-events-none [&_p]:my-0 [&_pre]:my-1 [&_pre]:bg-[var(--code-bg)] [&_pre]:rounded-lg [&_pre]:p-2 [&_code]:text-[var(--inline-code-text)] [&_code]:bg-[var(--inline-code-bg)]"
         />
       </div>
 
-      {/* ΓöÇΓöÇΓöÇ BOTTOM CONTROLS ΓöÇΓöÇΓöÇ */}
+      {/* ─── BOTTOM CONTROLS ─── */}
       <div className="flex items-center justify-between px-3 pb-1.5">
         <div className="flex items-center gap-1">
           <button
@@ -513,7 +513,7 @@ export function ChatInput({
                               }`}
                           >
                             <span>{model.label}</span>
-                            {selectedModel === model.id && <span className="text-[var(--accent)]">ΓùÅ</span>}
+                            {selectedModel === model.id && <span className="text-[var(--accent)]">●</span>}
                           </button>
                         ))}
                       </div>
