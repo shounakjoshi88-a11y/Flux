@@ -821,32 +821,13 @@ function PartsRenderer({
           })();
           const lang = extToLang(part.filename);
           renderedParts.push(
-            <div key={`file-${i}`} className="mt-2 space-y-2">
+            <div key={`file-${i}`} className="mt-2">
               <FileCard
                 filename={part.filename}
                 base64={part.base64}
                 mime={part.mime}
+                onClick={() => onFileClick?.({ name: part.filename, content: decoded })}
               />
-              <div className="rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] overflow-hidden">
-                <div className="flex items-center justify-end px-3 py-1.5 border-b border-white/5">
-                  <button
-                    onClick={async () => {
-                      try { await navigator.clipboard.writeText(decoded); } catch {}
-                    }}
-                    className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <Copy className="size-3" /> Copy code
-                  </button>
-                </div>
-                <SyntaxHighlighter
-                  language={lang}
-                  style={document.documentElement.classList.contains('light') ? oneLight : vscDarkPlus}
-                  customStyle={{ margin: 0, borderRadius: 0, background: 'transparent', padding: '0.75rem', fontSize: '12.5px', maxHeight: '600px' }}
-                  showLineNumbers
-                >
-                  {decoded}
-                </SyntaxHighlighter>
-              </div>
             </div>
           );
         } else {

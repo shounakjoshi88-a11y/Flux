@@ -5,6 +5,7 @@ type FileCardProps = {
   base64?: string;
   mime?: string;
   downloadUrl?: string;
+  onClick?: () => void;
 };
 
 const FILE_CATEGORIES: Record<string, string> = {
@@ -85,7 +86,7 @@ function getExtension(filename: string): string {
   return filename.split(".").pop()?.toLowerCase() || "";
 }
 
-export function FileCard({ filename, base64, mime, downloadUrl }: FileCardProps) {
+export function FileCard({ filename, base64, mime, downloadUrl, onClick }: FileCardProps) {
   const [downloading, setDownloading] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -132,7 +133,10 @@ export function FileCard({ filename, base64, mime, downloadUrl }: FileCardProps)
   };
 
   return (
-    <div className="flex items-center justify-between gap-5 rounded-2xl border border-white/10 bg-[#1c1c1c] px-5 py-4 w-full max-w-2xl">
+    <div
+      onClick={onClick}
+      className={`flex items-center justify-between gap-5 rounded-2xl border border-white/10 bg-[#1c1c1c] px-5 py-4 w-full max-w-2xl ${onClick ? 'cursor-pointer hover:bg-[#252525] transition-colors' : ''}`}
+    >
       <div className="flex items-center gap-[18px] min-w-0">
         <div
           className="flex flex-shrink-0 items-center justify-center rounded-[10px] border-[1.5px] border-white/25 bg-[#242424]"
@@ -157,7 +161,7 @@ export function FileCard({ filename, base64, mime, downloadUrl }: FileCardProps)
       </div>
 
       <button
-        onClick={handleDownload}
+        onClick={(e) => { e.stopPropagation(); handleDownload(); }}
         disabled={(!base64 && !downloadUrl) || downloading}
         className="flex-shrink-0 rounded-[10px] border border-white/15 bg-transparent px-[18px] py-[9px] text-sm font-medium text-white transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-30 disabled:cursor-not-allowed"
       >
