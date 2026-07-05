@@ -628,7 +628,19 @@ export function useAgentSession(user: any) {
   }, [disconnect, stopThoughtTimer]);
 
   const deleteMessage = useCallback(async (messageId: string | number) => {
-    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    let pairedId: string | number | null = null;
+    setMessages((prev) => {
+      const idx = prev.findIndex(m => m.id === messageId);
+      if (idx < 0) return prev.filter((m) => m.id !== messageId);
+      const msg = prev[idx]!;
+      if (msg.role === 'User' && idx + 1 < prev.length && prev[idx + 1]?.role === 'Assistant') {
+        pairedId = prev[idx + 1]!.id;
+      } else if (msg.role === 'Assistant' && idx > 0 && prev[idx - 1]?.role === 'User') {
+        pairedId = prev[idx - 1]!.id;
+      }
+      const idsToDelete = pairedId ? [messageId, pairedId] : [messageId];
+      return prev.filter((m) => !idsToDelete.includes(m.id));
+    });
     if (typeof messageId === 'number' && messageId > 0) {
       try {
         const token = await getAccessToken();
@@ -638,6 +650,12 @@ export function useAgentSession(user: any) {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (pairedId !== null && typeof pairedId === 'number' && pairedId > 0) {
+          await fetch(`${BACKEND_URL}/conversations/${convId}/messages/${pairedId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        }
       } catch (e) {
         console.error("Delete message error:", e);
       }

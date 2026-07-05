@@ -935,7 +935,21 @@ export default function Dashboard() {
     } else {
       sseDeleteMessage(messageId);
     }
-  }, [activeTransport, ws, sseDeleteMessage]);
+    const idx = messages.findIndex(m => m.id === messageId);
+    if (idx >= 0) {
+      const msg = messages[idx]!;
+      let pairedId: string | number | null = null;
+      if (msg.role === 'User' && idx + 1 < messages.length && messages[idx + 1]?.role === 'Assistant') {
+        pairedId = messages[idx + 1]!.id;
+      } else if (msg.role === 'Assistant' && idx > 0 && messages[idx - 1]?.role === 'User') {
+        pairedId = messages[idx - 1]!.id;
+      }
+      const remaining = messages.filter(m => m.id !== messageId && m.id !== pairedId);
+      if (remaining.length === 0) {
+        createNewThread();
+      }
+    }
+  }, [activeTransport, ws, sseDeleteMessage, messages, createNewThread]);
 
   // ── Jump to prompt ──
   const handleJumpToPrompt = useCallback((messageId: string | number) => {
