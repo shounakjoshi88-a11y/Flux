@@ -130,6 +130,19 @@ export function deepCleanAnswer(raw: string): string {
   return clean.replace(/\n+$/, "").trim();
 }
 
+export function rewriteSandboxUrls(text: string, conversationId?: string | null): string {
+  if (!conversationId || !text) return text;
+  let result = text.replace(
+    /\[([^\]]*)\]\(sandbox:\/home\/user\/(?:uploads\/|edits\/)?([^\s)\]]+)\)/gi,
+    (_match, linkText) => linkText
+  );
+  result = result.replace(
+    /sandbox:\/home\/user\/(?:uploads\/|edits\/)?([^\s)\]]+)/gi,
+    (_match, filename) => `/api/sandbox/download/${conversationId}/${filename}`
+  );
+  return result;
+}
+
 export function getDomain(url: string) {
   try {
     return new URL(url).hostname.replace("www.", "");

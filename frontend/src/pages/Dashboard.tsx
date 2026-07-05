@@ -1322,6 +1322,7 @@ export default function Dashboard() {
                   onJumpToPrompt={handleJumpToPrompt}
                   onFileDelete={handleDeleteFile}
                   activeGenerationStatus={activeGenerationStatus}
+                  conversationId={activeConversationId ?? undefined}
                 />
               </div>
             </div>

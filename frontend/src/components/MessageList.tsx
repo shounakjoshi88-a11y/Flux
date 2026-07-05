@@ -81,6 +81,7 @@ export function MessageList({
   activeGenerationStatus,
   onPreview,
   onHtmlPreview,
+  conversationId,
 }: MessageListProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const lastScrollTopRef = useRef(0);
@@ -235,6 +236,7 @@ export function MessageList({
                   onDelete={onDelete}
                   activeGenerationStatus={activeGenerationStatus}
                   onHtmlPreview={onHtmlPreview}
+                  conversationId={conversationId}
                 />
               </div>
             </motion.div>

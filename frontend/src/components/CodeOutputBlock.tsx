@@ -8,6 +8,7 @@
 import { useState, useEffect, useRef } from "react";
 import { ChevronDown } from "lucide-react";
 import type { CodeOutputLine } from "../types";
+import { FileCard } from "./FileCard";
 
 interface CodeOutputBlockProps {
   language?: string;
@@ -272,26 +273,11 @@ export function CodeOutputBlock({
         </>
       )}
 
-      {/* ── Generated files chips */}
+      {/* ── Generated files */}
       {generatedFiles.length > 0 && (
-        <div
-          className="px-3 py-2 border-t border-white/[0.05] flex flex-wrap gap-1.5"
-          style={{ background: 'rgba(0,0,0,0.15)' }}
-        >
+        <div className="space-y-2 px-3 py-3 border-t border-white/[0.05]">
           {generatedFiles.map((file, i) => (
-            <a
-              key={i}
-              href={file.downloadUrl}
-              download={file.filename}
-              className="flex items-center gap-1.5 rounded-md border border-[var(--surface-border)] bg-[var(--surface-bg)] px-2 py-1 text-[11px] text-[var(--accent)]/80 hover:text-[var(--accent)] hover:border-[var(--accent)]/25 transition-all duration-150"
-              style={{ animation: `outputLineIn 0.25s ease-out ${i * 0.05}s both` }}
-            >
-              <svg viewBox="0 0 14 14" className="size-3 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 2h5l2.5 2.5V12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" />
-                <polyline points="9,2 9,4.5 11.5,4.5" />
-              </svg>
-              <span className="font-mono truncate max-w-[160px]">{file.filename}</span>
-            </a>
+            <FileCard key={i} filename={file.filename} downloadUrl={file.downloadUrl} />
           ))}
         </div>
       )}
