@@ -374,7 +374,8 @@ export default function Dashboard() {
     if (avatarUrl && !avatarError) {
       return <img src={avatarUrl} alt="" className={`${size} rounded-full object-cover`} onError={() => setAvatarError(true)} />;
     }
-    return <div className={`${size} rounded-full bg-black/10 dark:bg-white/20 flex items-center justify-center text-xs font-semibold uppercase text-foreground`}>{user?.email?.charAt(0) ?? "?"}</div>;
+    // Fully opaque premium solid background for fallback avatar
+    return <div className={`${size} rounded-full bg-[#363532] flex items-center justify-center text-xs font-bold uppercase text-white border border-white/5`}>{user?.email?.charAt(0) ?? "?"}</div>;
   };
 
   const createNewThread = useCallback(() => {
@@ -1214,62 +1215,83 @@ export default function Dashboard() {
         className={`relative flex-1 flex flex-col min-w-0 transition-[margin] duration-300 ease-in-out ${
           !isMobile && isSidebarOpen ? "md:ml-[260px]" : "md:ml-0"
         } ${!isMobile && !isSidebarOpen ? 'px-[48px]' : ''}`}
-        style={{ minHeight: 0, height: '100%', paddingTop: isMobile ? 'var(--sat, 0px)' : undefined }}
+        style={{ minHeight: 0, height: '100%' }}
       >
-        <div className="fixed top-0 left-0 right-0 h-16 z-[1] pointer-events-none bg-gradient-to-b from-[var(--bg-primary)] to-transparent" />
+
+
+        {hasStarted && <div className="premium-top-fade" />}
 
         {hasStarted && (
-          <header className="flex items-center justify-center px-2 md:px-4 py-2 md:py-2.5 relative z-10">
-            {/* Floating glass bar — completely outside the chat card */}
-            <div className="flex items-center justify-center w-full max-w-lg mx-auto bg-[var(--bg-primary)]/70 backdrop-blur-xl shadow-lg px-3 py-1.5 md:py-2 gap-2">
-              {/* Account avatar inside header on mobile */}
-              {isMobile && (
-                <button type="button" onClick={() => setIsSidebarOpen(p => !p)} className="w-8 h-8 shrink-0" style={{ WebkitTapHighlightColor: "transparent" }} aria-label="Toggle sidebar">
-                  {renderAvatar("size-8")}
-                </button>
-              )}
+          <header
+            className="absolute top-0 left-0 right-0 flex items-center justify-between px-3 md:px-4 z-10 bg-transparent"
+            style={{
+              paddingTop: isMobile ? "calc(env(safe-area-inset-top, 0px) + 8px)" : "10px",
+              paddingBottom: "8px",
+            }}
+          >
+            {/* Left: avatar circle → opens sidebar (mobile) */}
+            {isMobile ? (
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(p => !p)}
+                className="shrink-0"
+                style={{ WebkitTapHighlightColor: "transparent" }}
+                aria-label="Toggle sidebar"
+              >
+                {renderAvatar("size-9")}
+              </button>
+            ) : (
+              <div className="w-9" />
+            )}
 
-              {/* Pill with layoutId animation */}
-              <div className="flex items-center gap-2 bg-[var(--surface-bg)]/60 border border-[var(--surface-border)] rounded-full p-0.5 w-auto mx-auto">
-                {(["answer", "links", "images"] as const).map((tab) => (
-                  <button key={tab} type="button" onClick={() => setActiveTab(tab)}
-                    className="relative flex items-center justify-center gap-1.5 px-2 py-1.5 h-8 rounded-full text-[11px] md:text-xs font-medium z-10 transition-colors duration-200"
-                  >
-                    {activeTab === tab && (
-                      <motion.div layoutId="tab-bg"
-                        className="absolute inset-0 rounded-full bg-[var(--accent)]/70 backdrop-blur-sm ring-1 ring-[var(--accent)]/60"
-                        transition={isPerfLow ? { duration: 0 } : { type: "spring", stiffness: 300, damping: 30, mass: 0.5 }}
-                      />
+            {/* Centre: tab pill — floats with its own frosted glassmorphism surface */}
+            <div
+              className="flex items-center gap-1 border border-white/[0.08] dark:border-white/[0.08] rounded-full p-0.5 shadow-lg shadow-black/15"
+              style={{
+                background: "rgba(255, 255, 255, 0.05)",
+                backdropFilter: "blur(20px)",
+                WebkitBackdropFilter: "blur(20px)",
+              }}
+            >
+              {(["answer", "links", "images"] as const).map((tab) => (
+                <button key={tab} type="button" onClick={() => setActiveTab(tab)}
+                  className="relative flex items-center justify-center gap-1.5 px-2.5 py-1.5 h-8 rounded-full text-[11px] md:text-xs font-medium z-10 transition-colors duration-200"
+                >
+                  {activeTab === tab && (
+                    <motion.div layoutId="tab-bg"
+                      className="absolute inset-0 rounded-full bg-[var(--accent)]/70 backdrop-blur-sm ring-1 ring-[var(--accent)]/60"
+                      transition={isPerfLow ? { duration: 0 } : { type: "spring", stiffness: 300, damping: 30, mass: 0.5 }}
+                    />
+                  )}
+                  <span className="relative z-10 flex items-center gap-1.5">
+                    {tab === "answer" ? (
+                      <svg className="size-[17px] md:size-[20px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M2 16C5 6 8 18 11 10S17 6 22 12" />
+                      </svg>
+                    ) : tab === "links" ? (
+                      <Globe className="size-[17px] md:size-[20px]" />
+                    ) : (
+                      <Image className="size-[17px] md:size-[20px]" />
                     )}
-                    <span className="relative z-10 flex items-center gap-1.5">
-                      {tab === "answer" ? (
-                        <svg className="size-[17px] md:size-[20px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M2 16C5 6 8 18 11 10S17 6 22 12" />
-                        </svg>
-                      ) : tab === "links" ? (
-                        <Globe className="size-[17px] md:size-[20px]" />
-                      ) : (
-                        <Image className="size-[17px] md:size-[20px]" />
-                      )}
-                      <span className={`hidden sm:inline ${activeTab === tab ? "text-[var(--accent)]" : "text-[var(--text-secondary)]/80"}`}>
-                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                      </span>
+                    <span className={`hidden sm:inline ${activeTab === tab ? "text-[var(--accent)]" : "text-[var(--text-secondary)]/80"}`}>
+                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
                     </span>
-                  </button>
-                ))}
-              </div>
-
-              {/* 3-dot menu */}
-              <ThreadMenu
-                isShared={shared}
-                onShare={handleShare}
-                onDelete={() => {
-                  if (activeConversationId) deleteConversation(activeConversationId);
-                }}
-              />
+                  </span>
+                </button>
+              ))}
             </div>
+
+            {/* Right: 3-dot menu — its own circle */}
+            <ThreadMenu
+              isShared={shared}
+              onShare={handleShare}
+              onDelete={() => {
+                if (activeConversationId) deleteConversation(activeConversationId);
+              }}
+            />
           </header>
         )}
+
 
         {!isMobile && hasStarted && (
           <PromptHistoryCard
@@ -1283,59 +1305,35 @@ export default function Dashboard() {
 
           {!hasStarted ? (
             <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar relative" style={{ minHeight: 0 }}>
-              {/* ── New-chat top bar (Perplexity-style) ── */}
-              <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,0px)+12px)] pb-2 shrink-0 z-10">
-                {/* Left: avatar → opens sidebar */}
+              {/* ── Top bar: avatar (left) + news icon (right) ── */}
+              <div
+                className="flex items-center justify-between px-4 pb-1 shrink-0 z-10"
+                style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)" }}
+              >
+                {/* Avatar → opens sidebar */}
                 <button
                   type="button"
                   onClick={() => setIsSidebarOpen(p => !p)}
                   className="shrink-0"
                   style={{ WebkitTapHighlightColor: "transparent" }}
-                  aria-label="Toggle sidebar"
+                  aria-label="Open sidebar"
                 >
                   {renderAvatar("size-10")}
                 </button>
 
-                {/* Right: feature icon buttons */}
-                <div className="flex items-center gap-1.5">
-                  {/* Live News */}
-                  <button
-                    type="button"
-                    onClick={() => setIsNewsOpen(true)}
-                    className="flex items-center justify-center size-10 rounded-full transition-colors hover:bg-white/8 active:bg-white/12 text-[var(--text-secondary)]"
-                    style={{ WebkitTapHighlightColor: "transparent" }}
-                    title="Live News"
-                    aria-label="Live News"
-                  >
-                    <Newspaper className="size-[22px]" strokeWidth={1.5} />
-                  </button>
-
-                  {/* Knowledge Graph */}
-                  <button
-                    type="button"
-                    onClick={() => setIsWikiOpen(true)}
-                    className="flex items-center justify-center size-10 rounded-full transition-colors hover:bg-white/8 active:bg-white/12 text-[var(--text-secondary)]"
-                    style={{ WebkitTapHighlightColor: "transparent" }}
-                    title="Knowledge Graph"
-                    aria-label="Knowledge Graph"
-                  >
-                    <Network className="size-[22px]" strokeWidth={1.5} />
-                  </button>
-
-                  {/* Artifacts */}
-                  <button
-                    type="button"
-                    onClick={() => setIsArtifactsOpen(true)}
-                    onMouseEnter={() => prefetchArtifacts(BACKEND_URL)}
-                    className="flex items-center justify-center size-10 rounded-full transition-colors hover:bg-white/8 active:bg-white/12 text-[var(--text-secondary)]"
-                    style={{ WebkitTapHighlightColor: "transparent" }}
-                    title="Artifacts"
-                    aria-label="Artifacts"
-                  >
-                    <Layers className="size-[22px]" strokeWidth={1.5} />
-                  </button>
-                </div>
+                {/* Live News icon */}
+                <button
+                  type="button"
+                  onClick={() => setIsNewsOpen(true)}
+                  className="flex items-center justify-center size-10 rounded-full transition-colors hover:bg-white/8 active:bg-white/12 text-[var(--text-secondary)]"
+                  style={{ WebkitTapHighlightColor: "transparent" }}
+                  title="Live News"
+                  aria-label="Live News"
+                >
+                  <Newspaper className="size-[22px]" strokeWidth={1.5} />
+                </button>
               </div>
+
 
               {/* Center greeting */}
               <div className="flex-1 flex items-center justify-center px-6">
@@ -1372,7 +1370,7 @@ export default function Dashboard() {
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col -mt-[60px] md:-mt-[72px] pt-[60px] md:pt-[72px]" style={{ minHeight: 0 }}>
+            <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
               <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
 
                 {activeTransport === "ws" && (

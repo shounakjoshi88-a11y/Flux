@@ -5,7 +5,7 @@ import {
   Search,
   PlusCircle,
   MessageSquare,
-  Network,
+  BrainCircuit,
   Layers,
   Newspaper,
   Trash2,
@@ -127,12 +127,12 @@ const SidebarContent = memo(function SidebarContent({
       className="flex flex-col h-full select-none"
       style={{
         background: "#111111",
-        paddingTop: "env(safe-area-inset-top)",
-        paddingBottom: "env(safe-area-inset-bottom)",
+        paddingTop: "env(safe-area-inset-top, 0px)",
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}
     >
       {/* ── App title ──────────────────────────────────────────────── */}
-      <div className="px-5 pt-10 pb-6 shrink-0">
+      <div className="px-5 pt-5 pb-5 shrink-0">
         <h1
           className="text-[2rem] font-bold text-white tracking-tight leading-none"
           style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
@@ -165,18 +165,6 @@ const SidebarContent = memo(function SidebarContent({
           </span>
         </button>
 
-        {/* Chats */}
-        <button
-          type="button"
-          onClick={() => {}}
-          className="flex items-center gap-3.5 w-full px-2.5 py-3 rounded-xl transition-colors hover:bg-white/5 active:bg-white/10 text-left"
-        >
-          <MessageSquare
-            className="size-5.5 shrink-0 text-white/85"
-            strokeWidth={1.5}
-          />
-          <span className="text-[15px] font-medium text-white/85">Chats</span>
-        </button>
 
         {/* Artifacts */}
         <button
@@ -189,7 +177,7 @@ const SidebarContent = memo(function SidebarContent({
             className="size-5.5 shrink-0 text-white/85"
             strokeWidth={1.5}
           />
-          <span className="text-[15px] font-medium text-white/85">Artifacts</span>
+          <span className="text-[15px] font-normal text-white/80">Artifacts</span>
         </button>
 
         {/* Knowledge Graph */}
@@ -198,11 +186,11 @@ const SidebarContent = memo(function SidebarContent({
           onClick={onWikiOpen}
           className="flex items-center gap-3.5 w-full px-2.5 py-3 rounded-xl transition-colors hover:bg-white/5 active:bg-white/10 text-left"
         >
-          <Network
+          <BrainCircuit
             className="size-5.5 shrink-0 text-white/85"
             strokeWidth={1.5}
           />
-          <span className="text-[15px] font-medium text-white/85">Knowledge Graph</span>
+          <span className="text-[15px] font-normal text-white/80">Knowledge Graph</span>
         </button>
 
         {/* Live News */}
@@ -215,7 +203,7 @@ const SidebarContent = memo(function SidebarContent({
             className="size-5.5 shrink-0 text-white/85"
             strokeWidth={1.5}
           />
-          <span className="text-[15px] font-medium text-white/85">Live News</span>
+          <span className="text-[15px] font-normal text-white/80">Live News</span>
         </button>
       </nav>
 
@@ -538,43 +526,24 @@ export const Sidebar = memo(function Sidebar({
       {isMobile ? (
         isPerfLow ? (
           isOpen && (
-            <>
-              <div
-                className="fixed inset-0 z-40"
-                style={{ background: "rgba(0,0,0,0.55)" }}
-                onClick={onToggle}
-              />
-              <aside
-                className="fixed inset-y-0 left-0 z-50 w-[82vw] max-w-[300px] overflow-hidden"
-              >
-                <SidebarContent {...innerProps} />
-              </aside>
-            </>
+            <aside
+              className="fixed inset-0 z-50 overflow-hidden"
+            >
+              <SidebarContent {...innerProps} />
+            </aside>
           )
         ) : (
           <AnimatePresence>
             {isOpen && (
-              <>
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.18 }}
-                  className="fixed inset-0 z-40"
-                  style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)" }}
-                  onClick={onToggle}
-                />
-                <motion.aside
-                  initial={{ x: "-100%" }}
-                  animate={{ x: 0 }}
-                  exit={{ x: "-100%" }}
-                  transition={{ duration: 0.26, ease: [0.2, 0, 0, 1] }}
-                  className="fixed inset-y-0 left-0 z-50 w-[82vw] max-w-[300px] overflow-hidden"
-                  style={{ borderRight: "1px solid rgba(255,255,255,0.06)", boxShadow: "8px 0 40px rgba(0,0,0,0.6)" }}
-                >
-                  <SidebarContent {...innerProps} />
-                </motion.aside>
-              </>
+              <motion.aside
+                initial={{ x: "-100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "-100%" }}
+                transition={{ duration: 0.26, ease: [0.2, 0, 0, 1] }}
+                className="fixed inset-0 z-50 overflow-hidden"
+              >
+                <SidebarContent {...innerProps} />
+              </motion.aside>
             )}
           </AnimatePresence>
         )

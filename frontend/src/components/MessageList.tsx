@@ -268,11 +268,20 @@ export function MessageList({
         followOutput={false}
         atBottomStateChange={handleAtBottomChange}
         components={{
-          Header: () => messages.length === 0 && isLoading ? (
-            <div className="mx-auto max-w-[700px] mt-4 pl-2 px-5">
-              <ThreeDotsLoader />
-            </div>
-          ) : null,
+          Header: () => (
+            <>
+              {/* Floating transparent header spacer */}
+              <div
+                className="w-full shrink-0"
+                style={{ height: "calc(env(safe-area-inset-top, 0px) + 52px)" }}
+              />
+              {messages.length === 0 && isLoading && (
+                <div className="mx-auto max-w-[700px] mt-4 pl-2 px-5">
+                  <ThreeDotsLoader />
+                </div>
+              )}
+            </>
+          ),
           EmptyPlaceholder: () => null,
         }}
         increaseViewportBy={{ top: 200, bottom: 200 }}

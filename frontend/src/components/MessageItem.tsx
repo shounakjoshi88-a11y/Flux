@@ -325,16 +325,16 @@ function InlineImageDisplay({
 }
 
 // ─── Image generation skeleton (ChatGPT-style) ───────────────
-const IMAGE_SKELETON_CSS = `
-  @keyframes imgSkeletonIn {
-    from { opacity: 0; transform: translateY(5px); }
-    to   { opacity: 1; transform: translateY(0);   }
-  }
-  @keyframes labelFade {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-  }
-`;
+const IMAGE_SKELETON_CSS = [
+  "@keyframes imgSkeletonIn {",
+  "  from { opacity: 0; transform: translateY(5px); }",
+  "  to   { opacity: 1; transform: translateY(0);   }",
+  "}",
+  "@keyframes labelFade {",
+  "  from { opacity: 0; }",
+  "  to   { opacity: 1; }",
+  "}",
+].join("\n");
 
 const CARD_BG_VAL = 54; // #363636 - the flat grey
 
