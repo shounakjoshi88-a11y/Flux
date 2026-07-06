@@ -441,7 +441,7 @@ export function useChat(user: any) {
                   let idx = -1;
                   for (let i = streamingPartsRef.current.length - 1; i >= 0; i--) {
                     const p = streamingPartsRef.current[i];
-                    if (p.type === 'tool_call' && p.name === baseSub) {
+                    if (p && p.type === 'tool_call' && p.name === baseSub) {
                       idx = i;
                       break;
                     }
@@ -449,7 +449,7 @@ export function useChat(user: any) {
                   if (idx < 0) {
                     for (let i = streamingPartsRef.current.length - 1; i >= 0; i--) {
                       const p = streamingPartsRef.current[i];
-                      if (p.type === 'tool_call' && p.name === `${baseSub}_start`) {
+                      if (p && p.type === 'tool_call' && p.name === `${baseSub}_start`) {
                         idx = i;
                         break;
                       }

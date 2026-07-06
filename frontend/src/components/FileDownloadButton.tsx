@@ -57,7 +57,13 @@ export function FileDownloadButton({ file, onDownload, onPreview, className = ""
     if (isDownloading) return;
 
     setIsDownloading(true);
-    onDownload?.();
+
+    // If an external onDownload handler is provided, let it handle everything
+    if (onDownload) {
+      onDownload();
+      setIsDownloading(false);
+      return;
+    }
 
     try {
       // Convert base64 to blob

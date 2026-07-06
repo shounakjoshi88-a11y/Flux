@@ -1,5 +1,5 @@
 // src/components/SidebarThread.tsx
-import { memo, useRef, useCallback } from "react";
+import React, { useRef, useCallback } from "react";
 import { Trash2 } from "lucide-react";
 
 type SidebarThreadProps = {
@@ -11,7 +11,7 @@ type SidebarThreadProps = {
   onHover?: () => void; // fires once on first hover to prefetch conversation
 };
 
-export const SidebarThread = memo(function SidebarThread({
+export const SidebarThread = React.memo(function SidebarThread({
   title,
   isActive,
   onClick,

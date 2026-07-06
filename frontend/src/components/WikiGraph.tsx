@@ -546,22 +546,20 @@ export function WikiGraph({ isOpen, onClose }: WikiGraphProps) {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
-  const bgPanel = isLight ? "#f5f3ef" : "#141413";
-  const bgSidebar = isLight ? "#eeede9" : "#111110";
-  const bgDark = isLight ? "#e8e6e0" : "#0f0f0e";
-  const borderColor = isLight ? "#d4d2cc" : "#1f1e1b";
-  const txtSec = isLight ? "#888480" : "#6c6a64";
-  const txtMuted = isLight ? "#706c66" : "#8e8b82";
-  const txtBody = isLight ? "#3a3834" : "#c4c2bc";
-  const txtBright = isLight ? "#1a1814" : "#faf9f5";
-  const headerBg = isLight
-    ? "linear-gradient(180deg, #f0eeea 0%, #eeede9 100%)"
-    : "linear-gradient(180deg, #181714 0%, #141413 100%)";
-  const headerBorder = isLight ? "#d4d2cc" : "#1f1e1b";
-  const inputBg = isLight ? "#e0ded8" : "#0f0f0e";
-  const inputBorder = isLight ? "#c8c4bc" : "#1f1e1b";
-  const inputText = isLight ? "#1a1814" : "#faf9f5";
-  const searchIcon = isLight ? "#888480" : "#8e8b82";
+  const bgPanel = "var(--bg-primary)";
+  const bgSidebar = "var(--bg-secondary)";
+  const bgDark = "var(--bg-secondary)";
+  const borderColor = "var(--surface-border)";
+  const txtSec = "var(--text-primary)";
+  const txtMuted = "var(--text-primary)";
+  const txtBody = "var(--text-primary)";
+  const txtBright = "var(--text-primary)";
+  const headerBg = "var(--bg-primary)";
+  const headerBorder = "var(--surface-border)";
+  const inputBg = "var(--bg-secondary)";
+  const inputBorder = "var(--surface-border)";
+  const inputText = "var(--text-primary)";
+  const searchIcon = "var(--text-primary)";
 
   const allTypes = Array.from(new Set(nodes.map(n => n.type)));
 
@@ -680,7 +678,13 @@ export function WikiGraph({ isOpen, onClose }: WikiGraphProps) {
 
   if (isMobile) {
     return (
-      <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", flexDirection: "column", background: isLight ? "#f5f3ef" : "#0d0d0d" }}>
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 100,
+        display: 'flex', flexDirection: 'column',
+        background: isLight ? 'rgba(245,243,239,0.98)' : 'rgba(13,12,10,0.98)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+      }}>
         <MobileWikiList
           nodes={nodes}
           edges={edges}
@@ -698,7 +702,7 @@ export function WikiGraph({ isOpen, onClose }: WikiGraphProps) {
   }
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", flexDirection: "column", background: bgPanel }}>
+    <div className="pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]" style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", flexDirection: "column", background: bgPanel }}>
       <style>{`
         .wg-sidebar::-webkit-scrollbar { width: 6px; }
         .wg-sidebar::-webkit-scrollbar-track { background: transparent; }
@@ -710,46 +714,59 @@ export function WikiGraph({ isOpen, onClose }: WikiGraphProps) {
       `}</style>
       {/* Header */}
       <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "12px 20px", borderBottom: `1px solid ${headerBorder}`,
-        background: headerBg, flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '12px 20px',
+        borderBottom: `1px solid ${headerBorder}`,
+        background: isLight ? 'rgba(245,243,239,0.95)' : 'rgba(18,17,15,0.95)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        flexShrink: 0,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <Network size={18} color="#cc785c" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 32, height: 32, borderRadius: 10,
+            background: 'rgba(204,120,92,0.15)',
+            border: '1px solid rgba(204,120,92,0.25)',
+          }}>
+            <Network size={16} color="#cc785c" />
+          </div>
           <div>
-            <h2 style={{ fontSize: "15px", fontWeight: 600, color: txtBright, margin: 0, fontFamily: "Inter, sans-serif" }}>
+            <h2 style={{ fontSize: '14px', fontWeight: 600, color: txtBright, margin: 0, fontFamily: 'Inter, sans-serif', letterSpacing: '-0.01em' }}>
               Knowledge Graph
             </h2>
-            <p style={{ fontSize: "11px", color: txtSec, margin: "1px 0 0 0", fontFamily: "Inter, sans-serif" }}>
+            <p style={{ fontSize: '11px', color: txtSec, margin: '1px 0 0 0', fontFamily: 'Inter, sans-serif' }}>
               {nodes.length > 0
-                ? `${nodes.length} concepts · ${edges.length} relationships${stats ? ` · rebuilt ${stats.concepts} nodes` : ""}`
-                : "Automatically extracted from your conversations"}
+                ? `${nodes.length} concepts · ${edges.length} relationships${stats ? ` · rebuilt ${stats.concepts} nodes` : ''}`
+                : 'Automatically extracted from your conversations'}
             </p>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {rebuilding && (
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", color: txtSec, fontFamily: "Inter, sans-serif" }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: txtSec, fontFamily: 'Inter, sans-serif' }}>
               <LoaderCircle size={13} className="animate-spin" />
-              <span>{rebuildProgress || "Updating…"}</span>
+              <span>{rebuildProgress || 'Updating…'}</span>
             </div>
           )}
           <button onClick={() => setIsLight(p => !p)} title="Toggle theme" style={{
-            display: "flex", alignItems: "center", justifyContent: "center",
-            width: 30, height: 30, borderRadius: "6px",
-            background: "transparent", color: txtMuted, border: `1px solid ${borderColor}`,
-            cursor: "pointer", fontSize: "15px",
-          }}>{isLight ? "🌙" : "☀️"}</button>
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 30, height: 30, borderRadius: '8px',
+            background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
+            color: txtMuted, border: `1px solid ${borderColor}`,
+            cursor: 'pointer', fontSize: '14px',
+          }}>{isLight ? '🌙' : '☀️'}</button>
           <button onClick={handleRebuild} disabled={rebuilding} style={{
-            display: "flex", alignItems: "center", gap: "6px",
-            padding: "6px 14px", borderRadius: "6px",
-            background: "transparent", color: txtMuted, border: `1px solid ${borderColor}`,
-            cursor: rebuilding ? "not-allowed" : "pointer", fontSize: "12px",
-            fontFamily: "Inter, sans-serif", opacity: rebuilding ? 0.5 : 1,
+            display: 'flex', alignItems: 'center', gap: '6px',
+            padding: '6px 12px', borderRadius: '8px',
+            background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)',
+            color: txtMuted, border: `1px solid ${borderColor}`,
+            cursor: rebuilding ? 'not-allowed' : 'pointer', fontSize: '12px',
+            fontFamily: 'Inter, sans-serif', opacity: rebuilding ? 0.5 : 1,
           }}><RefreshCw size={13} /> Rebuild</button>
           <button onClick={onClose} style={{
-            background: "none", border: "none", cursor: "pointer",
-            color: txtMuted, padding: "4px", borderRadius: "4px", display: "flex",
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 30, height: 30, borderRadius: '8px',
           }}><X size={17} /></button>
         </div>
       </div>

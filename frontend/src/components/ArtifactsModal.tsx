@@ -14,6 +14,7 @@ import {
   ArrowUpRight,
   File,
   Table,
+  Component,
 } from "lucide-react";
 import { BACKEND_URL } from "../lib/config";
 import { createClient } from "../lib/client";
@@ -115,6 +116,33 @@ function getFileConfig(art: Artifact) {
   return       { Icon: FileType, label: ext?.toUpperCase() || "FILE", color: "text-purple-400", bg: "bg-purple-400/10", border: "border-purple-400/20", isPdf: false, isPptx: false, isDocx: false, isXlsx: false, isMd: false, isImage: false };
 }
 
+// ─── File type color map ─────────────────────────────────────
+const FILE_CONFIGS: Record<string, { gradient: string; glowColor: string; labelColor: string }> = {
+  pptx: { gradient: 'linear-gradient(135deg, rgba(249,115,22,0.18) 0%, rgba(249,115,22,0.05) 100%)', glowColor: 'rgba(249,115,22,0.35)', labelColor: '#f97316' },
+  docx: { gradient: 'linear-gradient(135deg, rgba(59,130,246,0.18) 0%, rgba(59,130,246,0.05) 100%)', glowColor: 'rgba(59,130,246,0.35)', labelColor: '#3b82f6' },
+  xlsx: { gradient: 'linear-gradient(135deg, rgba(34,197,94,0.18) 0%, rgba(34,197,94,0.05) 100%)', glowColor: 'rgba(34,197,94,0.35)', labelColor: '#22c55e' },
+  csv:  { gradient: 'linear-gradient(135deg, rgba(34,197,94,0.18) 0%, rgba(34,197,94,0.05) 100%)', glowColor: 'rgba(34,197,94,0.35)', labelColor: '#22c55e' },
+  md:   { gradient: 'linear-gradient(135deg, rgba(99,102,241,0.18) 0%, rgba(99,102,241,0.05) 100%)', glowColor: 'rgba(99,102,241,0.35)', labelColor: '#6366f1' },
+  pdf:  { gradient: 'linear-gradient(135deg, rgba(239,68,68,0.18) 0%, rgba(239,68,68,0.05) 100%)', glowColor: 'rgba(239,68,68,0.35)', labelColor: '#ef4444' },
+  txt:  { gradient: 'linear-gradient(135deg, rgba(113,113,122,0.18) 0%, rgba(113,113,122,0.05) 100%)', glowColor: 'rgba(113,113,122,0.25)', labelColor: '#71717a' },
+  img:  { gradient: 'linear-gradient(135deg, rgba(245,158,11,0.18) 0%, rgba(245,158,11,0.05) 100%)', glowColor: 'rgba(245,158,11,0.35)', labelColor: '#f59e0b' },
+  default: { gradient: 'linear-gradient(135deg, rgba(139,92,246,0.18) 0%, rgba(139,92,246,0.05) 100%)', glowColor: 'rgba(139,92,246,0.35)', labelColor: '#8b5cf6' },
+};
+
+function getFileColors(art: Artifact) {
+  const filename = art.filename || art.name || '';
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  const mime = art.mime || '';
+  if (mime.includes('presentation') || ext === 'pptx') return FILE_CONFIGS.pptx!;
+  if (mime.includes('word') || ext === 'docx') return FILE_CONFIGS.docx!;
+  if (mime.includes('spreadsheet') || ext === 'xlsx' || ext === 'csv' || ext === 'tsv') return FILE_CONFIGS.xlsx!;
+  if (mime.includes('markdown') || ext === 'md') return FILE_CONFIGS.md!;
+  if (mime === 'application/pdf' || ext === 'pdf') return FILE_CONFIGS.pdf!;
+  if (mime.startsWith('image/')) return FILE_CONFIGS.img!;
+  if (mime.includes('text') || ext === 'txt') return FILE_CONFIGS.txt!;
+  return FILE_CONFIGS.default!;
+}
+
 function ArtifactCard({
   art, index, onDownload, onPreview, onSelectConversation, onClose,
 }: {
@@ -124,10 +152,12 @@ function ArtifactCard({
   onSelectConversation: (id: string) => void;
   onClose: () => void;
 }) {
-  const filename = art.filename || art.name || "Untitled";
-  const { Icon, color, bg, border, isPdf, isPptx, isDocx, isXlsx, isMd, isImage } = getFileConfig(art);
-  const date = new Date(art.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const filename = art.filename || art.name || 'Untitled';
+  const { Icon, label, isPdf, isPptx, isDocx, isXlsx, isMd, isImage } = getFileConfig(art);
+  const { gradient, glowColor, labelColor } = getFileColors(art);
+  const date = new Date(art.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const [opLoading, setOpLoading] = useState(false);
+  const [pressed, setPressed] = useState(false);
 
   const handleAction = async (fn: (a: Artifact) => Promise<void>) => {
     setOpLoading(true);
@@ -135,82 +165,114 @@ function ArtifactCard({
     finally { setOpLoading(false); }
   };
 
+  const canPreview = isPdf || isDocx || isPptx || isXlsx || isMd;
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.18, delay: index * 0.025, ease: [0.23, 1, 0.32, 1] }}
-      whileHover={{ y: -1, transition: { duration: 0.12 } }}
-      className="group flex flex-col bg-[var(--surface-bg)] hover:bg-[var(--surface-bg)]/80 border border-[var(--surface-border)] hover:border-[var(--accent)]/30 rounded-xl p-3.5 transition-colors duration-150 relative overflow-hidden"
+      initial={{ opacity: 0, y: 12, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.22, delay: Math.min(index * 0.03, 0.24), ease: [0.2, 0, 0, 1] }}
+      whileTap={{ scale: 0.97 }}
+      className="group flex flex-col relative overflow-hidden rounded-2xl cursor-default"
+      style={{
+        background: gradient,
+        border: `1px solid ${glowColor}`,
+        boxShadow: `0 2px 16px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.06)`,
+        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+      }}
     >
-      {/* Visual Preview for Images */}
+      {/* Image preview background */}
       {isImage && (art.thumbnail || art.base64) && (
-        <div className="absolute inset-0 opacity-[0.06] group-hover:opacity-[0.1] transition-opacity pointer-events-none">
-          <img 
-            src={art.base64 ? `data:${art.mime};base64,${art.base64}` : `data:image/jpeg;base64,${art.thumbnail}`} 
-            alt="" 
+        <div className="absolute inset-0 opacity-[0.08] group-hover:opacity-[0.14] transition-opacity pointer-events-none rounded-2xl overflow-hidden">
+          <img
+            src={art.base64 ? `data:${art.mime};base64,${art.base64}` : `data:image/jpeg;base64,${art.thumbnail}`}
+            alt=""
             className="w-full h-full object-cover"
           />
         </div>
       )}
 
-      {/* Icon + badge row */}
-      <div className="flex items-center justify-between mb-2.5 relative z-10">
-        <div className={`p-1.5 rounded-lg ${bg} border ${border}`}>
-          <Icon className={`size-3.5 ${color}`} />
+      {/* Glow orb */}
+      <div
+        className="absolute -top-3 -right-3 size-12 rounded-full blur-xl pointer-events-none opacity-50"
+        style={{ background: glowColor }}
+      />
+
+      <div className="p-3.5 flex flex-col gap-2 relative z-10">
+        {/* Icon + type badge */}
+        <div className="flex items-center justify-between">
+          <div
+            className="flex items-center justify-center size-8 rounded-xl"
+            style={{ background: `${glowColor}`, backdropFilter: 'blur(8px)' }}
+          >
+            <Icon className="size-4" style={{ color: labelColor }} />
+          </div>
+          <span
+            className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+            style={{ background: `${glowColor}22`, color: labelColor, border: `1px solid ${glowColor}` }}
+          >
+            {label}
+          </span>
         </div>
-        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${bg} ${color} uppercase tracking-wide`}>
-          {art.type === "uploaded" ? "Upload" : "AI"}
-        </span>
-      </div>
 
-      {/* Filename */}
-      <p className="text-xs font-semibold text-[var(--text-primary)] truncate mb-0.5 relative z-10" title={filename}>
-        {filename}
-      </p>
-
-      {/* Conversation link */}
-      <button
-        onClick={() => { onSelectConversation(art.conversationId); onClose(); }}
-        className="flex items-center gap-0.5 text-[10px] text-[var(--text-muted)]/60 hover:text-[var(--text-secondary)] transition-colors mb-2.5 truncate group/link w-full text-left relative z-10"
-      >
-        <span className="truncate">{art.conversationTitle}</span>
-        <ArrowUpRight className="size-2.5 shrink-0 opacity-0 group-hover/link:opacity-100 transition-opacity" />
-      </button>
-
-      {/* Date + actions */}
-      <div className="flex items-center gap-1.5 mt-auto relative z-10">
-        <span className="text-[10px] text-[var(--text-muted)]/40 mr-auto">{date}</span>
-
-        {isPdf || isDocx || isPptx || isXlsx || isMd ? (
-          <button
-            onClick={() => handleAction(onPreview)}
-            disabled={opLoading}
-            className="text-[10px] font-medium px-2 py-1 rounded-lg bg-[var(--surface-bg)] hover:bg-[var(--surface-bg)]/80 border border-[var(--surface-border)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all flex items-center gap-1.5"
-          >
-            {opLoading && <Loader2 className="size-2.5 animate-spin" />}
-            Preview
-          </button>
-        ) : (
-          <button
-            onClick={() => handleAction(onDownload)}
-            disabled={opLoading}
-            className="text-[10px] font-medium px-2 py-1 rounded-lg bg-[var(--surface-bg)] hover:bg-[var(--surface-bg)]/80 border border-[var(--surface-border)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all flex items-center gap-1.5"
-          >
-            {opLoading && <Loader2 className="size-2.5 animate-spin" />}
-            Download
-          </button>
-        )}
-
-        <motion.button
-          whileTap={{ scale: 0.88 }}
-          onClick={() => handleAction(onDownload)}
-          disabled={opLoading}
-          title="Download"
-          className="p-1 rounded-lg bg-[var(--surface-bg)] hover:bg-[var(--surface-bg)]/80 border border-[var(--surface-border)] text-[var(--text-muted)]/50 hover:text-[var(--text-primary)]/70 transition-all"
+        {/* Filename */}
+        <p
+          className="text-xs font-semibold truncate leading-snug"
+          style={{ color: 'rgba(250,249,245,0.9)' }}
+          title={filename}
         >
-          <Download className="size-3" />
-        </motion.button>
+          {filename}
+        </p>
+
+        {/* Conversation link */}
+        <button
+          onClick={() => { onSelectConversation(art.conversationId); onClose(); }}
+          className="flex items-center gap-0.5 text-left w-full group/link"
+        >
+          <span
+            className="text-[10px] truncate transition-colors group-hover/link:opacity-80"
+            style={{ color: 'rgba(250,249,245,0.45)' }}
+          >
+            {art.conversationTitle}
+          </span>
+          <ArrowUpRight
+            className="size-2.5 shrink-0 opacity-0 group-hover/link:opacity-60 transition-opacity"
+            style={{ color: labelColor }}
+          />
+        </button>
+
+        {/* Date + actions */}
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <span className="text-[10px] mr-auto" style={{ color: 'rgba(250,249,245,0.3)' }}>{date}</span>
+
+          <motion.button
+            whileTap={{ scale: 0.88 }}
+            onClick={() => handleAction(canPreview ? onPreview : onDownload)}
+            disabled={opLoading}
+            className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg transition-all"
+            style={{
+              background: `${glowColor}`,
+              color: labelColor,
+              border: `1px solid ${glowColor}`,
+            }}
+          >
+            {opLoading ? <Loader2 className="size-2.5 animate-spin" /> : null}
+            {canPreview ? 'Preview' : 'Save'}
+          </motion.button>
+
+          {canPreview && (
+            <motion.button
+              whileTap={{ scale: 0.88 }}
+              onClick={() => handleAction(onDownload)}
+              disabled={opLoading}
+              className="flex items-center justify-center size-6 rounded-lg transition-all"
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
+              title="Download"
+            >
+              <Download className="size-3" style={{ color: 'rgba(250,249,245,0.5)' }} />
+            </motion.button>
+          )}
+        </div>
       </div>
     </motion.div>
   );
@@ -389,28 +451,59 @@ export function ArtifactsModal({ isOpen, onClose, onSelectConversation, onPrevie
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={onClose}
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            className="absolute inset-0"
+            style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
           />
 
           <motion.div
             initial={isMobile ? { y: "100%" } : { scale: 0.96, opacity: 0, y: 12 }}
             animate={isMobile ? { y: 0 } : { scale: 1, opacity: 1, y: 0 }}
             exit={isMobile ? { y: "100%" } : { scale: 0.96, opacity: 0, y: 12 }}
-            transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
-            className={`flex flex-col bg-[var(--bg-primary)] overflow-hidden ${
+            transition={{ duration: 0.28, ease: [0.2, 0, 0, 1] }}
+            className={`flex flex-col overflow-hidden ${
               isMobile
-                ? "relative mt-auto w-full h-[75vh] rounded-t-2xl shadow-2xl border-t border-[var(--surface-border)]"
-                : "relative w-full max-w-5xl max-h-[82vh] border border-[var(--surface-border)] rounded-2xl shadow-2xl"
+                ? 'relative mt-auto w-full h-[90vh] rounded-t-3xl shadow-2xl'
+                : 'relative w-full max-w-5xl max-h-[82vh] border border-[var(--surface-border)] rounded-2xl shadow-2xl'
             }`}
+            style={{
+              background: isMobile ? 'rgba(18,17,15,0.97)' : 'var(--bg-primary)',
+              backdropFilter: isMobile ? 'blur(32px) saturate(1.6)' : 'none',
+              WebkitBackdropFilter: isMobile ? 'blur(32px) saturate(1.6)' : 'none',
+              border: isMobile ? '1px solid rgba(255,255,255,0.08)' : undefined,
+              borderBottom: 'none',
+            }}
           >
-            {/* Header */}
-            <div className={`flex items-center gap-2 px-3 py-2.5 sm:px-5 sm:py-3.5 border-b border-[var(--surface-border)] shrink-0 ${isMobile ? 'flex-wrap' : ''}`}>
-              <div className="flex items-center gap-2 flex-1 bg-[var(--bg-secondary)] border border-[var(--surface-border)] rounded-lg px-3 py-1.5 sm:px-3 sm:py-2 focus-within:border-[var(--accent)]/40 transition-colors min-w-0">
-                <Search className="size-3.5 text-[var(--text-muted)] shrink-0" />
+            {isMobile && (
+              <div className="flex justify-center pt-3 pb-1 shrink-0">
+                <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
+              </div>
+            )}
+
+            <div
+              className={`flex items-center gap-2.5 shrink-0 ${isMobile ? 'px-4 py-3' : 'px-4 py-3 sm:px-5 sm:py-3.5'}`}
+              style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+            >
+              {!isMobile && (
+                <div className="flex items-center gap-2 mr-1">
+                  <div
+                    className="flex items-center justify-center size-7 rounded-lg"
+                    style={{ background: 'rgba(204,120,92,0.15)', border: '1px solid rgba(204,120,92,0.2)' }}
+                  >
+                    <Component className="size-3.5" style={{ color: '#cc785c' }} />
+                  </div>
+                  <span className="text-sm font-semibold text-[var(--text-primary)]">Files</span>
+                </div>
+              )}
+
+              <div
+                className="flex items-center gap-2 flex-1 rounded-xl px-3 py-2 focus-within:border-[var(--accent)]/30 transition-colors min-w-0"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+              >
+                <Search className="size-3.5 shrink-0" style={{ color: 'rgba(250,249,245,0.3)' }} />
                 <input
                   ref={searchRef}
                   type="text"
-                  placeholder="Search files and conversations..."
+                  placeholder="Search files..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="flex-1 bg-transparent outline-none text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/40 min-w-0"
@@ -422,7 +515,7 @@ export function ArtifactsModal({ isOpen, onClose, onSelectConversation, onPrevie
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.7 }}
                       transition={{ duration: 0.1 }}
-                      onClick={() => setSearch("")}
+                      onClick={() => setSearch('')}
                       className="p-0.5 rounded hover:bg-[var(--surface-bg)] transition-colors"
                     >
                       <X className="size-3 text-[var(--text-muted)]/60" />
@@ -431,26 +524,26 @@ export function ArtifactsModal({ isOpen, onClose, onSelectConversation, onPrevie
                 </AnimatePresence>
               </div>
 
-              {/* Filter pills — Claude-style segmented control */}
-              <div className="flex items-center gap-0.5 bg-[var(--bg-secondary)] border border-[var(--surface-border)] rounded-lg p-0.5 shrink-0">
+              <div className="flex items-center gap-0.5 rounded-xl p-0.5 shrink-0" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
                 {FILTERS.map(({ key, label, count }) => (
                   <button
                     key={key}
                     onClick={() => setFilter(key)}
-                    className={`relative px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ${
-                      filter === key ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                    className={`relative px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-150 whitespace-nowrap ${
+                      filter === key ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
                     }`}
                   >
                     {filter === key && (
                       <motion.div
-                        layoutId="filter-pill"
-                        className="absolute inset-0 bg-[var(--surface-card)] rounded-md shadow-sm"
-                        transition={{ type: "spring", stiffness: 450, damping: 38 }}
+                        layoutId="filter-pill-artifacts"
+                        className="absolute inset-0 rounded-lg"
+                        style={{ background: 'rgba(255,255,255,0.08)' }}
+                        transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
                       />
                     )}
                     <span className="relative flex items-center gap-1">
                       {label}
-                      <span className={`text-[10px] tabular-nums ${filter === key ? "text-[var(--text-muted)]" : "text-[var(--text-muted)]/40"}`}>
+                      <span className={`text-[10px] tabular-nums ${filter === key ? 'text-[var(--text-muted)]' : 'text-[var(--text-muted)]/40'}`}>
                         {count}
                       </span>
                     </span>
@@ -461,13 +554,13 @@ export function ArtifactsModal({ isOpen, onClose, onSelectConversation, onPrevie
               <motion.button
                 whileTap={{ scale: 0.9 }}
                 onClick={onClose}
-                className="p-1.5 rounded-lg hover:bg-[var(--surface-bg)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all shrink-0"
+                className="p-2 rounded-xl hover:bg-[var(--surface-bg)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all shrink-0"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
               >
                 <X className="size-4" />
               </motion.button>
             </div>
 
-            {/* Content */}
             <div className="flex-1 overflow-y-auto p-4" style={{ scrollbarWidth: "none" }}>
               <AnimatePresence mode="wait">
                 {loading && filteredArtifacts.length === 0 ? (

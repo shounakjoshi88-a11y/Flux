@@ -23,23 +23,23 @@ type NewsModalProps = {
 
 // —— Palette: Refined Vermillion × Ink × Paper ———————————————————
 const P = {
-  bg: "#0C0A09",
-  bgPanel: "#141210",
-  bgCard: "#1A1714",
-  bgCardHover: "#221F1A",
-  verm: "#C4502A",
-  vermDim: "#8A3D1E",
-  vermGlow: "rgba(196,80,42,0.12)",
-  vermBorder: "rgba(196,80,42,0.25)",
-  gold: "#D49447",
-  paper: "#EFD9BC",
-  paperFaint: "rgba(239,217,188,0.15)",
-  ink: "rgba(239,217,188,0.92)",
-  inkMid: "rgba(239,217,188,0.6)",
-  inkFaint: "rgba(239,217,188,0.35)",
-  inkGhost: "rgba(239,217,188,0.06)",
-  border: "rgba(110,72,36,0.22)",
-  borderFaint: "rgba(110,72,36,0.12)",
+  bg: "#181715",
+  bgPanel: "#1f1e1b",
+  bgCard: "#252320",
+  bgCardHover: "#2a2825",
+  verm: "#cc785c",
+  vermDim: "#a9583e",
+  vermGlow: "rgba(204,120,92,0.12)",
+  vermBorder: "rgba(204,120,92,0.25)",
+  gold: "#e8a55a",
+  paper: "#faf9f5",
+  paperFaint: "rgba(250,249,245,0.15)",
+  ink: "rgba(250,249,245,0.92)",
+  inkMid: "rgba(250,249,245,0.6)",
+  inkFaint: "rgba(250,249,245,0.35)",
+  inkGhost: "rgba(250,249,245,0.06)",
+  border: "rgba(255,255,255,0.08)",
+  borderFaint: "rgba(255,255,255,0.04)",
 };
 
 const CATEGORIES = [
@@ -464,84 +464,119 @@ export function NewsModal({ isOpen, onClose }: NewsModalProps) {
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="fixed inset-0 z-[200] flex flex-col overflow-hidden" style={{ background: P.bg }}>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="fixed inset-0 z-[200] flex flex-col overflow-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]" style={{ background: P.bg }}>
           {/* Particle background */}
           <ParticleField />
 
           {/* —— Header —————————————————————————————— */}
-          <motion.header initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.05, type: "spring", stiffness: 400, damping: 30, mass: 0.6 }} className="relative z-10 shrink-0 flex flex-wrap items-center gap-3 px-4 py-2.5 sm:px-5 sm:py-3" style={{ background: `${P.bgPanel}fa`, borderBottom: `1px solid ${P.border}`, backdropFilter: "blur(16px)" }}>
-            {/* Brand + Controls row (mobile: always visible) */}
-            <div className="flex items-center justify-between w-full sm:w-auto sm:gap-3">
-              <div className="flex items-center gap-2 shrink-0">
-                <div className="flex items-center justify-center" style={{ width: 32, height: 32, background: P.vermGlow, border: `1px solid ${P.vermBorder}`, borderRadius: 8 }}>
+          <motion.header
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.05, duration: 0.28, ease: [0.2, 0, 0, 1] }}
+            className="relative z-10 shrink-0"
+            style={{ background: 'rgba(18,17,15,0.96)', borderBottom: `1px solid ${P.border}`, backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' }}
+          >
+            {/* Top row */}
+            <div className="flex items-center gap-3 px-4 py-3">
+              {/* Brand */}
+              <div className="flex items-center gap-2.5 shrink-0">
+                <div
+                  className="flex items-center justify-center size-8 rounded-xl"
+                  style={{ background: P.vermGlow, border: `1px solid ${P.vermBorder}` }}
+                >
                   <ToriiMark size={16} color={P.verm} />
                 </div>
                 <div>
-                  <h1 className="font-bold tracking-tight" style={{ fontSize: 13, color: P.paper, fontFamily: "'Shippori Mincho', 'Noto Serif JP', serif" }}> News </h1>
+                  <h1 className="font-bold tracking-tight text-sm" style={{ color: P.paper }}>Live News</h1>
+                  {lastRefreshed && (
+                    <p className="text-[10px] leading-none" style={{ color: P.inkFaint }}>
+                      {timeAgo(lastRefreshed.toISOString())}
+                    </p>
+                  )}
                 </div>
               </div>
-              <div className="flex items-center gap-2 sm:hidden">
-                {lastRefreshed && (
-                  <span className="flex items-center gap-1" style={{ fontSize: 10, color: P.inkFaint }}>
-                    <Clock size={10} />
-                    {timeAgo(lastRefreshed.toISOString())}
-                  </span>
-                )}
-                <button onClick={() => { handleSearchChange(""); }} disabled={loading || searching} className="flex items-center gap-1 rounded-lg transition-all disabled:opacity-40" style={{ background: P.inkGhost, border: `1px solid ${P.borderFaint}`, padding: "5px 8px", color: P.inkMid }}>
-                  <RefreshCw size={12} style={{ animation: loading || searching ? "spin 1s linear infinite" : "none" }} />
-                </button>
-                <button onClick={onClose} className="flex items-center gap-1 rounded-lg transition-all" style={{ background: `${P.verm}15`, border: `1px solid ${P.vermBorder}`, padding: "5px 8px", color: P.verm }}>
-                  <X size={14} />
-                </button>
-              </div>
-            </div>
-            {/* Search (mobile: full width second row) */}
-            <div className="w-full sm:flex-1 sm:max-w-md order-last sm:order-none sm:w-auto">
-              <div className="flex items-center gap-2 px-3 py-1.5 sm:py-2 rounded-lg transition-all" style={{ background: P.inkGhost, border: `1px solid ${P.borderFaint}` }}>
+
+              {/* Search */}
+              <div
+                className="flex items-center gap-2 flex-1 rounded-xl px-3 py-2 transition-all min-w-0"
+                style={{ background: P.inkGhost, border: `1px solid ${P.borderFaint}` }}
+              >
                 <SearchIcon size={13} color={searching ? P.verm : P.inkFaint} />
-                <input ref={searchRef} type="text" placeholder="Search headlines…" value={search} onChange={e => handleSearchChange(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleSearchSubmit(); }} className="flex-1 bg-transparent outline-none min-w-0" style={{ fontSize: 13, color: P.ink, caretColor: P.verm, fontFamily: "'Inter', 'Noto Sans JP', sans-serif" }} />
+                <input
+                  ref={searchRef}
+                  type="text"
+                  placeholder="Search headlines…"
+                  value={search}
+                  onChange={e => handleSearchChange(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleSearchSubmit(); }}
+                  className="flex-1 bg-transparent outline-none min-w-0"
+                  style={{ fontSize: 13, color: P.ink, caretColor: P.verm }}
+                />
                 {searching && (
-                  <motion.div animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} style={{ width: 12, height: 12, borderRadius: "50%", border: `1.5px solid ${P.border}`, borderTopColor: P.verm }} />
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                    style={{ width: 12, height: 12, borderRadius: '50%', border: `1.5px solid ${P.border}`, borderTopColor: P.verm, flexShrink: 0 }}
+                  />
                 )}
                 {search && !searching && (
-                  <button onClick={() => handleSearchChange("")} className="rounded p-0.5 transition-colors" style={{ color: P.inkMid }}>
+                  <button onClick={() => handleSearchChange('')} style={{ color: P.inkMid }}>
                     <X size={12} />
                   </button>
                 )}
               </div>
+
+              {/* Controls */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => { handleSearchChange(''); }}
+                  disabled={loading || searching}
+                  className="flex items-center justify-center size-8 rounded-xl transition-all disabled:opacity-40"
+                  style={{ background: P.inkGhost, border: `1px solid ${P.borderFaint}` }}
+                >
+                  <RefreshCw size={13} style={{ color: P.inkMid, animation: loading || searching ? 'spin 1s linear infinite' : 'none' }} />
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  onClick={onClose}
+                  className="flex items-center justify-center size-8 rounded-xl transition-all"
+                  style={{ background: `${P.verm}18`, border: `1px solid ${P.vermBorder}` }}
+                >
+                  <X size={14} style={{ color: P.verm }} />
+                </motion.button>
+              </div>
             </div>
-            {/* Controls (desktop) */}
-            <div className="hidden sm:flex items-center gap-2 shrink-0">
-              {lastRefreshed && (
-                <span className="flex items-center gap-1.5" style={{ fontSize: 11, color: P.inkFaint }}>
-                  <Clock size={12} />
-                  {timeAgo(lastRefreshed.toISOString())}
-                </span>
-              )}
-              <button onClick={() => { handleSearchChange(""); }} disabled={loading || searching} className="flex items-center gap-1.5 rounded-lg transition-all disabled:opacity-40" style={{ background: P.inkGhost, border: `1px solid ${P.borderFaint}`, padding: "6px 10px", color: P.inkMid }}>
-                <RefreshCw size={13} style={{ animation: loading || searching ? "spin 1s linear infinite" : "none" }} />
-                <span className="hidden sm:inline" style={{ fontSize: 11, fontWeight: 500 }}>Refresh</span>
-              </button>
-              <button onClick={onClose} className="flex items-center gap-1.5 rounded-lg transition-all" style={{ background: `${P.verm}15`, border: `1px solid ${P.vermBorder}`, padding: "6px 10px", color: P.verm }}>
-                <X size={14} />
-                <span className="hidden sm:inline" style={{ fontSize: 11, fontWeight: 600 }}>Close</span>
-              </button>
+
+            {/* Category pills */}
+            <div
+              className="flex items-center gap-1.5 px-4 pb-3 overflow-x-auto"
+              style={{ scrollbarWidth: 'none' }}
+            >
+              {CATEGORIES.map(cat => {
+                const isActive = activeCategory === cat.en;
+                return (
+                  <button
+                    key={cat.en}
+                    onClick={() => setActiveCategory(cat.en)}
+                    className="relative shrink-0 rounded-xl font-medium transition-colors duration-150"
+                    style={{
+                      padding: '5px 14px',
+                      fontSize: 12,
+                      color: isActive ? P.paper : P.inkFaint,
+                      background: isActive ? P.verm : P.inkGhost,
+                      border: `1px solid ${isActive ? P.vermBorder : P.borderFaint}`,
+                      fontWeight: isActive ? 600 : 500,
+                    }}
+                  >
+                    {cat.label}
+                  </button>
+                );
+              })}
             </div>
           </motion.header>
 
-          {/* —— Category Tabs ——————————————————————— */}
-          <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} className="relative z-10 shrink-0 flex items-center gap-1 px-5 py-2 overflow-x-auto" style={{ background: `${P.bg}ee`, borderBottom: `1px solid ${P.borderFaint}` }}>
-            {CATEGORIES.map(cat => {
-              const isActive = activeCategory === cat.en;
-              return (
-                <button key={cat.en} onClick={() => setActiveCategory(cat.en)} className="shrink-0 rounded-md font-medium transition-all duration-200" style={{ padding: "6px 14px", fontSize: 12, background: isActive ? P.verm : P.inkGhost, border: `1px solid ${isActive ? P.vermBorder : P.borderFaint}`, color: isActive ? "#fff" : P.inkMid, fontWeight: isActive ? 600 : 500 }}>
-                  {cat.label}
-                </button>
-              );
-            })}
-          </motion.div>
-
-          {/* —— Main Content ——————————————————————— */}
+          {/* ── Main Content ──────────────────────────────────────── */}
           <div className="relative z-10 flex-1 overflow-hidden">
             <AnimatePresence mode="wait">
               {/* Loading */}
@@ -583,43 +618,121 @@ export function NewsModal({ isOpen, onClose }: NewsModalProps) {
                   <div className="max-w-5xl mx-auto px-5 py-5">
                     {/* Featured */}
                     {featured && (
-                      <motion.article initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} onClick={() => openArticleSummary(featured)} className="mb-6 p-5 rounded-xl cursor-pointer group" style={{ background: P.bgCard, border: `1px solid ${P.borderFaint}`, transition: "all 0.25s ease" }} onMouseEnter={e => { const el = e.currentTarget; el.style.background = P.bgCardHover; el.style.borderColor = P.vermBorder; el.style.transform = "translateY(-2px)"; el.style.boxShadow = `0 8px 30px rgba(196,80,42,0.1)`; }} onMouseLeave={e => { const el = e.currentTarget; el.style.background = P.bgCard; el.style.borderColor = P.borderFaint; el.style.transform = "translateY(0)"; el.style.boxShadow = "none"; }}>
-                        <div className="flex items-center gap-3 mb-3">
-                          <span className="font-bold px-2 py-0.5 rounded" style={{ fontSize: 10, letterSpacing: "0.06em", background: P.vermGlow, border: `1px solid ${P.vermBorder}`, color: P.gold }}> {featured.source} </span>
-                          <span style={{ fontSize: 11, color: P.inkFaint }}> {timeAgo(featured.publishedDate)} · {readingTime(featured.content)} </span>
-                        </div>
-                        <h2 className="font-bold leading-snug mb-3 transition-colors duration-200" style={{ fontSize: 20, color: P.paper, lineHeight: 1.45, fontFamily: "'Shippori Mincho', 'Noto Serif JP', serif" }}> {featured.title} </h2>
-                        <p className="leading-relaxed mb-4" style={{ fontSize: 13, color: P.inkMid, lineHeight: 1.75 }}> {featured.content.slice(0, 320)}{featured.content.length > 320 ? "…" : ""} </p>
-                        <div className="flex items-center gap-2 font-semibold" style={{ fontSize: 12, color: P.verm }}>
-                          <BookOpen size={14} /> Read article
+                      <motion.article
+                        initial={{ opacity: 0, y: 14 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.08, duration: 0.28, ease: [0.2, 0, 0, 1] }}
+                        onClick={() => openArticleSummary(featured)}
+                        className="mb-5 rounded-2xl cursor-pointer overflow-hidden group"
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(204,120,92,0.12) 0%, rgba(232,165,90,0.06) 100%)',
+                          border: `1px solid ${P.vermBorder}`,
+                          boxShadow: `0 4px 32px rgba(196,80,42,0.12), inset 0 1px 0 rgba(255,255,255,0.06)`,
+                        }}
+                        whileHover={{ scale: 1.005, transition: { duration: 0.15 } }}
+                        whileTap={{ scale: 0.99 }}
+                      >
+                        <div className="p-5">
+                          <div className="flex items-center gap-2.5 mb-3">
+                            <span
+                              className="font-bold px-2.5 py-1 rounded-xl"
+                              style={{ fontSize: 10, letterSpacing: '0.08em', background: P.vermGlow, border: `1px solid ${P.vermBorder}`, color: P.gold }}
+                            >
+                              {featured.source}
+                            </span>
+                            <span style={{ fontSize: 11, color: P.inkFaint }}>
+                              {timeAgo(featured.publishedDate)} · {readingTime(featured.content)}
+                            </span>
+                            <span
+                              className="ml-auto text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-lg"
+                              style={{ background: 'rgba(204,120,92,0.15)', color: P.verm }}
+                            >
+                              Featured
+                            </span>
+                          </div>
+                          <h2
+                            className="font-bold leading-snug mb-3"
+                            style={{ fontSize: 18, color: P.paper, lineHeight: 1.4 }}
+                          >
+                            {featured.title}
+                          </h2>
+                          <p
+                            className="leading-relaxed mb-4 line-clamp-3"
+                            style={{ fontSize: 13, color: P.inkMid, lineHeight: 1.75 }}
+                          >
+                            {featured.content.slice(0, 280)}{featured.content.length > 280 ? '\u2026' : ''}
+                          </p>
+                          <div
+                            className="flex items-center gap-2 font-semibold"
+                            style={{ fontSize: 12, color: P.verm }}
+                          >
+                            <BookOpen size={14} /> Read full article
+                          </div>
                         </div>
                       </motion.article>
                     )}
                     {/* Grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                      {(featured ? gridItems : filteredNews).map((item, i) => {
-                        const isHov = hoveredIndex === i;
-                        return (
-                          <motion.article key={item.url} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 + 0.1 }} onMouseEnter={() => setHoveredIndex(i)} onMouseLeave={() => setHoveredIndex(null)} onClick={() => openArticleSummary(item)} className="flex flex-col rounded-lg cursor-pointer" style={{ background: isHov ? P.bgCardHover : P.bgCard, border: `1px solid ${isHov ? P.vermBorder : P.borderFaint}`, transform: isHov ? "translateY(-2px)" : "translateY(0)", transition: "all 0.2s ease", boxShadow: isHov ? `0 6px 20px rgba(196,80,42,0.08)` : "none" }}>
-                            <div className="p-4 flex flex-col flex-1">
-                              <div className="flex items-center justify-between mb-2">
-                                <span className="font-bold px-1.5 py-0.5 rounded" style={{ fontSize: 9, letterSpacing: "0.05em", background: P.vermGlow, border: `1px solid ${P.vermBorder}`, color: P.gold }}> {item.source} </span>
-                                <span style={{ fontSize: 10, color: P.inkFaint }}> {timeAgo(item.publishedDate)} </span>
-                              </div>
-                              <h3 className="font-semibold leading-snug mb-2 transition-colors duration-200" style={{ fontSize: 13, color: isHov ? P.verm : P.ink, lineHeight: 1.5 }}> {item.title} </h3>
-                              <p className="leading-relaxed flex-1" style={{ fontSize: 11, color: P.inkFaint, lineHeight: 1.7 }}> {item.content} </p>
-                              <div className="flex items-center justify-between mt-3 pt-3" style={{ borderTop: `1px solid ${P.borderFaint}` }}>
-                                <span className="font-medium" style={{ fontSize: 10, color: isHov ? P.verm : P.inkFaint }}> {readingTime(item.content)} </span>
-                                <div className="flex items-center justify-center rounded-md transition-all" style={{ width: 22, height: 22, background: isHov ? P.verm : P.inkGhost }}>
-                                  <ExternalLink size={10} color={isHov ? P.bg : P.inkFaint} />
-                                </div>
+                      {(featured ? gridItems : filteredNews).map((item, i) => (
+                        <motion.article
+                          key={item.url}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: Math.min(i * 0.035, 0.3) + 0.05, duration: 0.22, ease: [0.2, 0, 0, 1] }}
+                          onClick={() => openArticleSummary(item)}
+                          className="flex flex-col rounded-2xl cursor-pointer overflow-hidden"
+                          style={{
+                            background: P.bgCard,
+                            border: `1px solid ${P.borderFaint}`,
+                            boxShadow: '0 2px 16px rgba(0,0,0,0.18)',
+                          }}
+                          whileHover={{ y: -3, transition: { duration: 0.15 } }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          <div className="p-4 flex flex-col flex-1">
+                            <div className="flex items-center justify-between mb-2.5">
+                              <span
+                                className="font-bold px-2 py-0.5 rounded-lg"
+                                style={{ fontSize: 9, letterSpacing: '0.05em', background: P.vermGlow, border: `1px solid ${P.vermBorder}`, color: P.gold }}
+                              >
+                                {item.source}
+                              </span>
+                              <span style={{ fontSize: 10, color: P.inkFaint }}>
+                                {timeAgo(item.publishedDate)}
+                              </span>
+                            </div>
+                            <h3
+                              className="font-semibold leading-snug mb-2"
+                              style={{ fontSize: 13, color: P.ink, lineHeight: 1.5 }}
+                            >
+                              {item.title}
+                            </h3>
+                            <p
+                              className="leading-relaxed flex-1 line-clamp-3"
+                              style={{ fontSize: 11, color: P.inkFaint, lineHeight: 1.7 }}
+                            >
+                              {item.content}
+                            </p>
+                            <div
+                              className="flex items-center justify-between mt-3 pt-2.5"
+                              style={{ borderTop: `1px solid ${P.borderFaint}` }}
+                            >
+                              <span className="font-medium" style={{ fontSize: 10, color: P.inkFaint }}>
+                                {readingTime(item.content)}
+                              </span>
+                              <div
+                                className="flex items-center justify-center rounded-lg"
+                                style={{ width: 24, height: 24, background: P.inkGhost, border: `1px solid ${P.borderFaint}` }}
+                              >
+                                <ExternalLink size={10} color={P.inkFaint} />
                               </div>
                             </div>
-                          </motion.article>
-                        );
-                      })}
+                          </div>
+                        </motion.article>
+                      ))}
                     </div>
                     <div style={{ height: 24 }} />
+
                   </div>
                 </motion.div>
               )}

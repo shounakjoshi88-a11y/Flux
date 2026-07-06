@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import { createClient } from "./lib/client";
 import { SplashScreen } from "./components/SplashScreen";
+import { PerformanceProvider } from "./lib/performance-context";
 
 const Auth = lazy(() => import("./pages/Auth"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -67,19 +68,21 @@ export function App() {
   }
 
   return (
-    <BrowserRouter>
-      <DeepLinkHandler />
-      <Suspense fallback={<LoadingFallback />}>
-        <Routes>
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/privacy" element={<Privacy />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/c/:slug" element={<Dashboard />} />
-          <Route path="/new" element={<Dashboard />} />
-          <Route path="/" element={<Dashboard />} />
-        </Routes>
-      </Suspense>
-    </BrowserRouter>
+    <PerformanceProvider>
+      <BrowserRouter>
+        <DeepLinkHandler />
+        <Suspense fallback={<LoadingFallback />}>
+          <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/c/:slug" element={<Dashboard />} />
+            <Route path="/new" element={<Dashboard />} />
+            <Route path="/" element={<Dashboard />} />
+          </Routes>
+        </Suspense>
+      </BrowserRouter>
+    </PerformanceProvider>
   );
 }
 

@@ -1,13 +1,11 @@
-// src/components/MessageList.tsx
-import { useRef, useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { useRef, useEffect, useState, useCallback, memo } from "react";
+import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { MessageItem } from "./MessageItem";
 import { SourceCard } from "./SourceCard";
 import { getDomain } from "../lib/chat-utils";
 import { calculateReputationScore } from "../utils/ReputationScore";
 import type { Message, Source } from "../types";
 
-// ─── Props ──────────────────────────────────────────────────
 type MessageListProps = {
   messages: Message[];
   activeTab: "answer" | "links" | "images";
@@ -36,31 +34,86 @@ type MessageListProps = {
   onHtmlPreview?: (html: string) => void;
 };
 
-// ─── Three dots loader ──────────────────────────────────────
 function ThreeDotsLoader() {
   return (
     <div className="flex items-center gap-1.5">
       {[0, 1, 2].map((i) => (
-        <motion.span
+        <span
           key={i}
-          className="size-2 rounded-full bg-zinc-500"
-          animate={{
-            y: [0, -6, 0],
-            opacity: [0.4, 1, 0.4],
-          }}
-          transition={{
-            duration: 1.2,
-            repeat: Infinity,
-            delay: i * 0.2,
-            ease: "easeInOut",
-          }}
+          className="size-2 rounded-full bg-zinc-500 animate-bounce"
+          style={{ animationDelay: `${i * 0.2}s` }}
         />
       ))}
     </div>
   );
 }
 
-// ─── Main component ────────────────────────────────────────
+const MessageEntry = memo(function MessageEntry({
+  message,
+  index,
+  messagesLen,
+  onCitationClick,
+  onFollowUpClick,
+  onRetry,
+  onEdit,
+  onSourceClick,
+  onFileClick,
+  onPreview,
+  onFileDelete,
+  onDelete,
+  activeGenerationStatus,
+  onHtmlPreview,
+  conversationId,
+}: {
+  message: Message;
+  index: number;
+  messagesLen: number;
+  onCitationClick: (index: number) => void;
+  onFollowUpClick: (query: string) => void;
+  onRetry?: (prompt?: string) => void;
+  onEdit?: (messageId: string | number, newContent: string) => void;
+  onSourceClick?: (url: string | null) => void;
+  onFileClick?: (file: { name: string; content: string }) => void;
+  onPreview?: (data: any) => void;
+  onFileDelete?: (messageId: string | number, filename: string, type: 'fileAttachment' | 'generatedFiles') => void;
+  onDelete?: (messageId: string | number) => void;
+  activeGenerationStatus?: any;
+  onHtmlPreview?: (html: string) => void;
+  conversationId?: string | null;
+}) {
+  let retryPrompt: string | undefined;
+  if (message.role === "Assistant") {
+    for (let j = index - 1; j >= 0; j--) {
+      const prev = (window as any).__flux_messages?.[j];
+      if (prev && prev.role === "User") {
+        retryPrompt = prev.content;
+        break;
+      }
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-[700px] px-5">
+      <MessageItem
+        message={message}
+        sources={[]}
+        onCitationClick={onCitationClick}
+        onFollowUpClick={onFollowUpClick}
+        onRetry={() => onRetry?.(retryPrompt)}
+        onEdit={onEdit}
+        onSourceClick={onSourceClick}
+        onFileClick={onFileClick}
+        onPreview={onPreview}
+        onFileDelete={onFileDelete}
+        onDelete={onDelete}
+        activeGenerationStatus={activeGenerationStatus}
+        onHtmlPreview={onHtmlPreview}
+        conversationId={conversationId}
+      />
+    </div>
+  );
+});
+
 export function MessageList({
   messages,
   activeTab,
@@ -83,28 +136,54 @@ export function MessageList({
   onHtmlPreview,
   conversationId,
 }: MessageListProps) {
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const lastScrollTopRef = useRef(0);
-  const autoScrollEnabledRef = useRef(true);
-  const prevMessagesLenRef = useRef(messages.length);
-  const [forceScrollKey, setForceScrollKey] = useState(0);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const atBottomRef = useRef(true);
+  const prevLenRef = useRef(messages.length);
 
-  // Force auto-scroll when a new message is added (user sent a prompt / conversation loaded)
+  // Expose messages for retryPrompt lookup in MessageEntry
   useEffect(() => {
-    if (messages.length > prevMessagesLenRef.current) {
-      autoScrollEnabledRef.current = true;
-      setForceScrollKey(k => k + 1);
+    (window as any).__flux_messages = messages;
+    return () => { (window as any).__flux_messages = null; };
+  }, [messages]);
+
+  // Auto-scroll when new messages arrive
+  useEffect(() => {
+    if (messages.length > prevLenRef.current && atBottomRef.current) {
+      setTimeout(() => {
+        virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, align: "end", behavior: "auto" });
+      }, 50);
     }
-    prevMessagesLenRef.current = messages.length;
+    prevLenRef.current = messages.length;
   }, [messages.length]);
 
-  useEffect(() => {
-    if (!autoScrollEnabledRef.current) return;
-    const container = scrollContainerRef.current;
-    if (container) container.scrollTop = container.scrollHeight;
-  }, [messages, isLoading, forceScrollKey]);
+  const handleAtBottomChange = useCallback((atBottom: boolean) => {
+    atBottomRef.current = atBottom;
+  }, []);
 
-  // ─── Links tab ────────────────────────────────────────────
+  const itemContent = useCallback((index: number) => {
+    const message = messages[index];
+    if (!message) return null;
+    return (
+      <MessageEntry
+        message={message}
+        index={index}
+        messagesLen={messages.length}
+        onCitationClick={(i) => setActiveCitationIndex(i)}
+        onFollowUpClick={onFollowUpClick}
+        onRetry={onRetry}
+        onEdit={onEdit}
+        onSourceClick={setPeekUrl}
+        onFileClick={onFileClick}
+        onPreview={onPreview}
+        onFileDelete={onFileDelete}
+        onDelete={onDelete}
+        activeGenerationStatus={activeGenerationStatus}
+        onHtmlPreview={onHtmlPreview}
+        conversationId={conversationId}
+      />
+    );
+  }, [messages, onFollowUpClick, onRetry, onEdit, setPeekUrl, onFileClick, onPreview, onFileDelete, onDelete, activeGenerationStatus, onHtmlPreview, conversationId]);
+
   if (activeTab === "links") {
     const sourceGroups: { prompt: string; sources: Source[] }[] = [];
     let currentPrompt = "Assistant response";
@@ -161,7 +240,6 @@ export function MessageList({
     );
   }
 
-  // ─── Images tab ───────────────────────────────────────────
   if (activeTab === "images") {
     return (
       <div className="flex-1 overflow-y-auto px-4 md:px-6 pt-4 md:pt-6 custom-scrollbar" style={{ minHeight: 0 }}>
@@ -171,7 +249,7 @@ export function MessageList({
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 md:gap-3">
             {activeImages.map((url, idx) => (
-              <img key={idx} src={url} alt="" className="rounded-lg object-cover aspect-square" />
+              <img key={idx} src={url} alt="" className="rounded-lg object-cover aspect-square" loading="lazy" />
             ))}
           </div>
         )}
@@ -179,77 +257,26 @@ export function MessageList({
     );
   }
 
-  // ─── Answer tab ───────────────────────────────────────────
   return (
-    <div
-      ref={scrollContainerRef}
-      onScroll={(e) => {
-        const target = e.currentTarget;
-        const currentTop = target.scrollTop;
-        const isScrollingUp = currentTop < lastScrollTopRef.current;
-        const nearBottom = target.scrollHeight - (target.scrollTop + target.clientHeight) < 80;
-        if (isScrollingUp && !nearBottom) autoScrollEnabledRef.current = false;
-        if (nearBottom) autoScrollEnabledRef.current = true;
-        lastScrollTopRef.current = currentTop;
-      }}
-      className="flex-1 overflow-y-auto px-6 pt-6 pb-72 relative custom-scrollbar"
-      style={{ minHeight: 0 }}
-    >
-      {messages.length > 0 && (
-        <div className="space-y-0.2">
-          {messages.map((message, index) => {
-            // Find previous user message for retry/rewrite
-            let retryPrompt: string | undefined;
-            if (message.role === "Assistant") {
-              for (let j = index - 1; j >= 0; j--) {
-                const prev = messages[j];
-                if (prev && prev.role === "User") {
-                  retryPrompt = prev.content;
-                  break;
-                }
-              }
-            }
-            return (
-            <motion.div
-              key={index}
-              data-message-id={message.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: Math.min(index * 0.03, 0.2) }}
-            >
-              <div className="mx-auto max-w-[700px]">
-                <MessageItem
-                  message={message}
-                  sources={
-                    message.sources && message.sources.length > 0
-                      ? message.sources
-                      : String(message.id).startsWith("temp-") ? activeSources : []
-                  }
-                  onCitationClick={(index) => setActiveCitationIndex(index)}
-                  onFollowUpClick={onFollowUpClick}
-                  onRetry={() => onRetry?.(retryPrompt)}
-                  onEdit={onEdit}
-                  onSourceClick={setPeekUrl}
-                  onFileClick={onFileClick}
-                  onPreview={onPreview}
-                  onFileDelete={onFileDelete}
-                  onDelete={onDelete}
-                  activeGenerationStatus={activeGenerationStatus}
-                  onHtmlPreview={onHtmlPreview}
-                  conversationId={conversationId}
-                />
-              </div>
-            </motion.div>
-          );})}
-        </div>
-      )}
-
-      {/* ─── THREE‑DOT LOADER — shows only before any parts arrive ─── */}
-      {isLoading && !messages.some(m => m.parts && m.parts.length > 0) && (
-        <div className="mx-auto max-w-[700px] mt-4 pl-2">
-          <ThreeDotsLoader />
-        </div>
-      )}
+    <div className="flex-1 flex flex-col relative" style={{ minHeight: 0 }}>
+      <Virtuoso
+        ref={virtuosoRef}
+        className="flex-1 overflow-y-auto custom-scrollbar"
+        style={{ minHeight: 0 }}
+        data={messages}
+        itemContent={itemContent}
+        followOutput={false}
+        atBottomStateChange={handleAtBottomChange}
+        components={{
+          Header: () => messages.length === 0 && isLoading ? (
+            <div className="mx-auto max-w-[700px] mt-4 pl-2 px-5">
+              <ThreeDotsLoader />
+            </div>
+          ) : null,
+          EmptyPlaceholder: () => null,
+        }}
+        increaseViewportBy={{ top: 200, bottom: 200 }}
+      />
     </div>
   );
 }

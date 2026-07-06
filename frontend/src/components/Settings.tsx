@@ -2,26 +2,24 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
-  User,
-  Shield,
   X,
   Upload,
   Loader2,
   Check,
   Sun,
   Moon,
-  Brain,
-  LogOut,
-  MoreVertical,
   Trash2,
-  ArrowLeft,
   Volume2,
   Play,
   Plug,
+  ExternalLink,
+  ChevronDown,
+  Lock,
 } from "lucide-react";
 import { useIsMobile } from "../hooks/useMediaQuery";
 import { createClient } from "../lib/client";
 import { BACKEND_URL } from "../lib/config";
+import { usePerformance } from "../lib/performance-context";
 
 interface SettingsProps {
   isOpen: boolean;
@@ -78,6 +76,24 @@ function parseUserAgent(userAgent: string): string {
   return `${browser} (${os})`;
 }
 
+function timeAgo(dateString: string | null): string {
+  if (!dateString) return "";
+  const now = new Date();
+  const date = new Date(dateString);
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHr = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHr / 24);
+
+  if (diffSec < 60) return "Just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffHr < 24) return `${diffHr}h ago`;
+  if (diffDay === 1) return "yesterday";
+  if (diffDay < 7) return `${diffDay}d ago`;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 type MemoryItem = {
   id: string;
   category: string;
@@ -86,6 +102,75 @@ type MemoryItem = {
   source_conversation_id?: string;
   created_at: string;
 };
+
+// ─── Custom UI Switch component matching native screenshots ──
+function Switch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className="relative w-10 h-5.5 rounded-full p-0.5 transition-colors focus:outline-none shrink-0"
+      style={{
+        background: checked ? "#cc785c" : "rgba(255,255,255,0.12)",
+      }}
+    >
+      <motion.div
+        layout
+        className="size-4.5 rounded-full bg-white shadow-sm"
+        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+        style={{
+          marginLeft: checked ? "16px" : "0px",
+        }}
+      />
+    </button>
+  );
+}
+
+// ─── Custom Layout Row Component for Clean Vertical Settings ──
+function SettingRow({
+  label,
+  subtitle,
+  value,
+  onClick,
+  rightSlot,
+  isRed,
+}: {
+  label: string;
+  subtitle?: string;
+  value?: string;
+  onClick?: () => void;
+  rightSlot?: React.ReactNode;
+  isRed?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!onClick}
+      className={`w-full flex items-center justify-between py-3.5 px-4 transition-colors text-left select-none
+        ${onClick ? "hover:bg-[rgba(255,255,255,0.035)] active:scale-[0.99] cursor-pointer" : ""}`}
+    >
+      <div className="flex-1 pr-4 min-w-0">
+        <p className={`text-[13.5px] leading-snug font-sans ${isRed ? "text-red-400 font-medium" : "text-[rgba(250,249,245,0.85)]"}`}>
+          {label}
+        </p>
+        {subtitle && (
+          <p className="text-[11px] text-[rgba(250,249,245,0.4)] mt-1.5 leading-relaxed font-sans max-w-[90%]">
+            {subtitle}
+          </p>
+        )}
+      </div>
+      <div className="shrink-0 flex items-center gap-3.5">
+        {value && (
+          <span className="text-[12.5px] text-[rgba(250,249,245,0.4)] font-sans">
+            {value}
+          </span>
+        )}
+        {rightSlot}
+      </div>
+    </button>
+  );
+}
 
 export function Settings({
   isOpen,
@@ -96,7 +181,7 @@ export function Settings({
   toggleTheme,
 }: SettingsProps) {
   const isMobile = useIsMobile();
-  const [activeTab, setActiveTab] = useState("General");
+  const { tier, setTier } = usePerformance();
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -271,14 +356,14 @@ export function Settings({
   }, [ttsProvider]);
 
   useEffect(() => {
-    if (isOpen && activeTab === "Account") {
+    if (isOpen) {
       loadSessions();
       const interval = setInterval(loadSessions, 12000); // 12s interval
       return () => clearInterval(interval);
     }
-  }, [isOpen, activeTab]);
+  }, [isOpen]);
 
-  useEffect(() => { if (activeTab === "Capabilities" && user) loadMemories(); }, [activeTab, user]);
+  useEffect(() => { if (isOpen && user) loadMemories(); }, [isOpen, user]);
 
   useEffect(() => {
     return () => {
@@ -288,7 +373,8 @@ export function Settings({
 
   // ─── Load ALL sessions via RPC ─────────────────────────────
   const loadSessions = async () => {
-    if (!user) return; setLoadingSessions(true);
+    if (!user) return;
+    setLoadingSessions(true);
     try {
       const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !currentSession) { setSessions([]); setLoadingSessions(false); return; }
@@ -315,40 +401,23 @@ export function Settings({
 
   const handleRevokeSession = async (sessionId: string) => {
     setRevokingSessionId(sessionId);
-    // Relocated setOpenMenuSessionId(null) to the success block
     try {
       const { error } = await (supabase as any).rpc('revoke_user_session', { p_session_id: sessionId });
       if (error) throw error;
       setSessions(prev => prev.filter(s => s.id !== sessionId));
-      setOpenMenuSessionId(null); // Finalize UI only on success
-    } catch (error) { 
-      console.error('Error revoking session:', error); 
-      alert('Failed to revoke session.'); 
+      setOpenMenuSessionId(null);
+    } catch (error) {
+      console.error('Error revoking session:', error);
+      alert('Failed to revoke session.');
     }
     finally { setRevokingSessionId(null); }
   };
 
-  const [debugInfo, setDebugInfo] = useState<any>(null);
-  const [debugError, setDebugError] = useState<string | null>(null);
-
   const loadMemories = async () => {
-    if (!user) return; setMemoriesLoading(true);
-    setDebugError(null);
+    if (!user) return;
+    setMemoriesLoading(true);
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token || '';
-      
-      // Also fetch whoami for debugging
-      fetch(`${BACKEND_URL}/whoami`, { headers: { Authorization: `Bearer ${token}` } })
-        .then(async r => {
-          if (!r.ok) throw new Error(`Status ${r.status}`);
-          return r.json();
-        })
-        .then(setDebugInfo)
-        .catch(err => {
-          console.error('Debug fetch failed:', err);
-          setDebugError(err.message);
-        });
-
       const res = await fetch(`${BACKEND_URL}/memories`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -360,11 +429,11 @@ export function Settings({
         console.error('Failed to fetch memories:', res.status, errData);
         setMemories([]);
       }
-    } catch (error) { 
-      console.error('Error loading memories:', error); 
-      setMemories([]); 
-    } finally { 
-      setMemoriesLoading(false); 
+    } catch (error) {
+      console.error('Error loading memories:', error);
+      setMemories([]);
+    } finally {
+      setMemoriesLoading(false);
     }
   };
 
@@ -381,11 +450,11 @@ export function Settings({
       } else {
         throw new Error('Failed to delete');
       }
-    } catch (error) { 
-      console.error('Error deleting memory:', error); 
-      alert('Failed to delete memory.'); 
-    } finally { 
-      setDeletingMemoryId(null); 
+    } catch (error) {
+      console.error('Error deleting memory:', error);
+      alert('Failed to delete memory.');
+    } finally {
+      setDeletingMemoryId(null);
     }
   };
 
@@ -474,7 +543,6 @@ export function Settings({
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Not authenticated');
 
-      // 1. Get OAuth URL from backend
       const initRes = await fetch(`${BACKEND_URL}/api/integrations/google/init`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${session.access_token}` },
@@ -483,10 +551,7 @@ export function Settings({
       if (!initRes.ok) throw new Error(initData.error || 'Failed to initiate Google connection');
       const { url } = initData;
 
-      // 2. Open popup
       const popup = window.open(url, 'google-oauth', 'width=600,height=700');
-
-      // 3. Listen for postMessage
       const handler = (event: MessageEvent) => {
         if (event.data?.type === 'google-oauth-success') {
           if (event.data.success) {
@@ -499,7 +564,6 @@ export function Settings({
       };
       window.addEventListener('message', handler);
 
-      // 4. Detect if popup closed without success
       const checkClosed = setInterval(() => {
         if (popup?.closed) {
           clearInterval(checkClosed);
@@ -529,314 +593,419 @@ export function Settings({
     }
   };
 
-  const tabs = useMemo(() => [
-    { id: "General", icon: <User className="size-4" />, label: "General" },
-    { id: "Account", icon: <Shield className="size-4" />, label: "Account" },
-    { id: "Capabilities", icon: <Brain className="size-4" />, label: "Capabilities" },
-    { id: "Integrations", icon: <Plug className="size-4" />, label: "Integrations" },
-  ], []);
-
-  // ── Voice list for current provider ────────────────────────
-  // For browser: populated by useEffect listening to voiceschanged
-  // For local/pollinations: static lists
-  const voiceList: { value: string; label: string }[] = useMemo(() => {
-    if (ttsProvider === "browser") {
-      return browserVoices;
-    }
-    if (ttsProvider === "local") {
-      return [{ value: "", label: "Default (lessac-medium)" }];
-    }
+  const voiceList = useMemo(() => {
+    if (ttsProvider === "browser") return browserVoices;
+    if (ttsProvider === "local") return [{ value: "", label: "Default (lessac-medium)" }];
     if (ttsProvider === "pollinations") {
       return [
         { value: "alloy", label: "Alloy (Neutral)" }, { value: "echo", label: "Echo (Warm)" },
         { value: "fable", label: "Fable (British)" }, { value: "onyx", label: "Onyx (Deep)" },
-        { value: "nova", label: "Nova (Friendly F)" }, { value: "shimmer", label: "Shimmer (F)" },
+        { value: "nova", label: "Nova (Friendly)" }, { value: "shimmer", label: "Shimmer (Soft)" },
       ];
     }
     return [];
   }, [ttsProvider, browserVoices]);
 
-  // ── Common select style that matches the theme ──────────────
-  const selectClass = `
-    bg-neutral-200 dark:bg-neutral-700
-    text-neutral-800 dark:text-neutral-200
-    rounded-xl px-4 py-2 text-sm font-medium
-    border-none outline-none
-    cursor-pointer
-    focus:ring-2 focus:ring-blue-500/40
-    transition
-  `;
+  // Dropdown style helper
+  const selectClass = "bg-[#252525] border border-[rgba(255,255,255,0.08)] text-[rgba(250,249,245,0.85)] rounded-xl px-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-[#cc785c] cursor-pointer min-w-[140px]";
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm sm:p-4" onClick={onClose}
-        >
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-6">
           <motion.div
-            initial={{ scale: isMobile ? 1 : 0.95, opacity: 0, y: isMobile ? 0 : 20 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: isMobile ? 1 : 0.95, opacity: 0, y: isMobile ? 0 : 20 }}
-            transition={{ type: "spring", damping: 30, stiffness: 350, mass: 0.7 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={onClose}
+            className="absolute inset-0 bg-black/60 backdrop-blur-md"
+          />
+
+          <motion.div
+            initial={isMobile ? { y: "100%" } : { scale: 0.96, opacity: 0, y: 12 }}
+            animate={isMobile ? { y: 0 } : { scale: 1, opacity: 1, y: 0 }}
+            exit={isMobile ? { y: "100%" } : { scale: 0.96, opacity: 0, y: 12 }}
+            transition={{ duration: 0.28, ease: [0.2, 0, 0, 1] }}
             onClick={(e) => e.stopPropagation()}
-            className={`flex flex-col sm:flex-row bg-white/95 dark:bg-neutral-900/95 backdrop-blur-xl border border-white/20 dark:border-neutral-800 shadow-2xl overflow-hidden ${
+            className={`flex flex-col bg-[#121212] overflow-hidden ${
               isMobile
-                ? "fixed inset-0 w-full h-full rounded-none border-0"
-                : "h-[80vh] max-h-[800px] w-full max-w-4xl rounded-2xl"
+                ? "fixed inset-0 w-full h-full pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
+                : "w-full max-w-[620px] h-[82vh] max-h-[740px] border border-[rgba(255,255,255,0.08)] rounded-3xl shadow-2xl"
             }`}
           >
-            {/* Left Sidebar — collapsible nav strip on mobile */}
-            <div className={`flex-shrink-0 border-white/10 dark:border-white/5 bg-white/60 dark:bg-neutral-900/60 backdrop-blur-xl flex ${
-              isMobile
-                ? "w-full border-b overflow-x-auto px-2 py-2 gap-1"
-                : "w-56 border-r p-2 flex-col h-full"
-            }`}>
-              <div className={`flex items-center ${isMobile ? "shrink-0" : "justify-between px-3 py-4"}`}>
-                {!isMobile && <h2 className="text-lg font-semibold text-neutral-800 dark:text-neutral-100">Settings</h2>}
-                <button onClick={onClose} className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-xl transition-all duration-200 text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-white"><X className="size-5" /></button>
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 shrink-0 border-b border-[rgba(255,255,255,0.06)] bg-[#121212]/50 backdrop-blur-xl">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={onClose}
+                  className="flex items-center justify-center size-8 rounded-xl transition hover:bg-[rgba(255,255,255,0.05)] text-[rgba(250,249,245,0.6)] hover:text-white"
+                  aria-label="Back"
+                >
+                  <X className="size-5" />
+                </button>
+                <h1 className="text-base font-bold text-white tracking-wide font-sans">Settings</h1>
               </div>
-              <div className={`${isMobile ? "flex gap-1" : "space-y-1 flex-1 overflow-y-auto custom-scrollbar"}`}>
-                {tabs.map(tab => (
-                  <button key={tab.id} onClick={() => { setActiveTab(tab.id); setShowMemoryManager(false); }}
-                    className={`${isMobile ? "whitespace-nowrap px-3 py-1.5 text-xs" : "w-full text-left px-3 py-2.5"} flex items-center gap-2 rounded-xl text-sm transition-all duration-200 ${activeTab === tab.id ? "bg-blue-500/10 dark:bg-blue-400/10 text-blue-600 dark:text-blue-400 font-medium shadow-sm" : "text-neutral-600 dark:text-neutral-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-white"}`}>
-                    {tab.icon}{tab.label}
-                  </button>
-                ))}
+              {savedMessage && (
+                <span className="text-xs text-[#cc785c] font-sans font-medium px-2 py-0.5 rounded-lg bg-[#cc785c]/10">
+                  {savedMessage}
+                </span>
+              )}
+            </div>
+
+            {/* Scrollable Settings Panel list */}
+            <div className="flex-1 overflow-y-auto pb-12 divide-y divide-[rgba(255,255,255,0.06)]" style={{ scrollbarWidth: 'none' }}>
+              
+              {/* Profile details */}
+              <div className="py-4">
+                <div className="px-5 mb-4 text-[11px] font-bold uppercase tracking-widest text-[#cc785c]/80 font-sans">
+                  Profile
+                </div>
+                
+                {/* Avatar change */}
+                <div className="flex items-center gap-4.5 px-5 py-3">
+                  <div className="relative size-14 rounded-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] flex items-center justify-center overflow-hidden">
+                    {avatarUrl ? (
+                      <img src={avatarUrl} alt="Avatar" className="size-full object-cover" />
+                    ) : (
+                      <span className="text-sm font-bold text-[rgba(250,249,245,0.6)]">
+                        {fullName.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || "?"}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-xs font-semibold text-[#cc785c] hover:opacity-85 text-left"
+                    >
+                      Change photo
+                    </button>
+                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+                    <p className="text-[10px] text-[rgba(250,249,245,0.35)]">PNG, JPG or GIF up to 2MB</p>
+                  </div>
+                </div>
+
+                <div className="px-5 py-2.5 flex flex-col gap-1">
+                  <label className="text-[11px] font-medium text-[rgba(250,249,245,0.45)]">Full Name</label>
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => handleTextChange(setFullName, e.target.value)}
+                    placeholder="Your name"
+                    className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] rounded-xl px-3.5 py-2.5 text-xs text-[rgba(250,249,245,0.85)] outline-none focus:border-[#cc785c]/40 font-sans"
+                  />
+                </div>
+
+                <div className="px-5 py-2.5 flex flex-col gap-1">
+                  <label className="text-[11px] font-medium text-[rgba(250,249,245,0.45)]">Display Name</label>
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => handleTextChange(setDisplayName, e.target.value)}
+                    placeholder="What should Flux call you?"
+                    className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] rounded-xl px-3.5 py-2.5 text-xs text-[rgba(250,249,245,0.85)] outline-none focus:border-[#cc785c]/40 font-sans"
+                  />
+                </div>
+
+                <div className="px-5 py-2.5 flex flex-col gap-1.5">
+                  <label className="text-[11px] font-medium text-[rgba(250,249,245,0.45)]">Instructions for Flux</label>
+                  <p className="text-[10px] text-[rgba(250,249,245,0.35)] leading-snug">
+                    Instructions keep Flux tailored to your specific preferences across chats.
+                  </p>
+                  <textarea
+                    value={instructions}
+                    onChange={(e) => handleTextChange(setInstructions, e.target.value)}
+                    placeholder="e.g., respond code blocks in TypeScript, explain with examples..."
+                    className="w-full h-24 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] rounded-xl px-3.5 py-2.5 text-xs text-[rgba(250,249,245,0.85)] outline-none focus:border-[#cc785c]/40 resize-none font-sans"
+                  />
+                </div>
               </div>
-              {!isMobile && (
-                <div className="pt-4 border-t border-white/10 dark:border-white/5">
+
+              {/* Appearance */}
+              <div className="py-4">
+                <div className="px-5 mb-1.5 text-[11px] font-bold uppercase tracking-widest text-[#cc785c]/80 font-sans">
+                  Appearance
+                </div>
+                
+                <SettingRow
+                  label="Dark Mode"
+                  subtitle="Toggle dark theme interface styling"
+                  rightSlot={<Switch checked={isDarkMode} onChange={() => { toggleTheme(); saveSettings(); }} />}
+                />
+
+                <SettingRow
+                  label="Display Refresh Rate"
+                  subtitle={tier === 'high' ? "Smooth transition framing (120 FPS)" : "Reduced battery performance framing (60 FPS)"}
+                  rightSlot={
+                    <Switch checked={tier === 'high'} onChange={() => setTier(tier === 'high' ? 'low' : 'high')} />
+                  }
+                />
+
+                <SettingRow
+                  label="Chat Font Style"
+                  rightSlot={
+                    <select
+                      value={chatFont}
+                      onChange={(e) => handleSelectChange("chat_font", setChatFont, e.target.value)}
+                      className={selectClass}
+                    >
+                      {FONT_OPTIONS.map(f => (
+                        <option key={f.value} value={f.value}>{f.label}</option>
+                      ))}
+                    </select>
+                  }
+                />
+              </div>
+
+              {/* Speech Output */}
+              <div className="py-4">
+                <div className="px-5 mb-1.5 text-[11px] font-bold uppercase tracking-widest text-[#cc785c]/80 font-sans">
+                  Audio & Speech
+                </div>
+                
+                <SettingRow
+                  label="TTS Engine Provider"
+                  subtitle="Select speech synthesis provider"
+                  rightSlot={
+                    <select
+                      value={ttsProvider}
+                      onChange={(e) => {
+                        setTtsProvider(e.target.value);
+                        setTtsVoice('');
+                        handleSelectChange("tts_provider", setTtsProvider, e.target.value);
+                      }}
+                      className={selectClass}
+                    >
+                      {TTS_PROVIDERS.map(p => (
+                        <option key={p.value} value={p.value}>{p.label}</option>
+                      ))}
+                    </select>
+                  }
+                />
+
+                <SettingRow
+                  label="Voice Accent Style"
+                  rightSlot={
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={ttsVoice}
+                        onChange={(e) => handleSelectChange("tts_voice", setTtsVoice, e.target.value)}
+                        className={selectClass}
+                      >
+                        <option value="">Default Voice</option>
+                        {voiceList.map(v => (
+                          <option key={v.value} value={v.value}>{v.label}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={previewVoice}
+                        disabled={isSpeaking}
+                        className="p-2 rounded-xl bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.1)] text-white transition active:scale-95 disabled:opacity-40"
+                        title="Test voice"
+                      >
+                        <Volume2 className="size-3.5" />
+                      </button>
+                    </div>
+                  }
+                />
+              </div>
+
+              {/* Capabilities & Brain Memory */}
+              <div className="py-4">
+                <div className="px-5 mb-1.5 text-[11px] font-bold uppercase tracking-widest text-[#cc785c]/80 font-sans">
+                  Capabilities & Memory
+                </div>
+
+                <SettingRow
+                  label="Enable AI Memory Bank"
+                  subtitle="Allow Flux to store key facts about your context across separate sessions"
+                  rightSlot={<Switch checked={enableMemory} onChange={(v) => handleToggle("enable_memory", setEnableMemory, !v)} />}
+                />
+
+                <SettingRow
+                  label="Connector Auto-Discovery"
+                  subtitle="Permit automated mapping of local resource directories"
+                  rightSlot={<Switch checked={connectorDiscovery} onChange={(v) => handleToggle("connector_discovery", setConnectorDiscovery, !v)} />}
+                />
+
+                <SettingRow
+                  label="Tool Integration Execution"
+                  rightSlot={
+                    <select
+                      value={toolAccessMode}
+                      onChange={(e) => handleSelectChange("tool_access_mode", setToolAccessMode, e.target.value)}
+                      className={selectClass}
+                    >
+                      <option value="load_tools_when_needed">On-demand Loading</option>
+                      <option value="load_tools_upfront">Pre-load Instantly</option>
+                    </select>
+                  }
+                />
+
+                {/* Manage Memory bank inline accordion */}
+                <div className="px-1.5">
+                  <SettingRow
+                    label="Manage Personal Memory Bank"
+                    subtitle={`${memories.length} facts saved in memory bank`}
+                    onClick={() => setShowMemoryManager(m => !m)}
+                    rightSlot={<ChevronDown className={`size-4 transition-transform duration-200 ${showMemoryManager ? "rotate-180" : ""}`} />}
+                  />
+                  
                   <AnimatePresence>
-                    {savedMessage && (
-                      <motion.div initial={{ opacity: 0, y: 6, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 6, scale: 0.95 }}
-                        className={`flex items-center justify-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full ${savedMessage.startsWith("Error") ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400" : "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"}`}>
-                        <Check className="size-3" />{savedMessage}
+                    {showMemoryManager && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="px-3.5 pb-3 pt-1 space-y-2 overflow-hidden"
+                      >
+                        {memoriesLoading ? (
+                          <p className="text-xs text-[rgba(250,249,245,0.4)] animate-pulse">Loading facts...</p>
+                        ) : memories.length === 0 ? (
+                          <p className="text-xs text-[rgba(250,249,245,0.45)]">Memory bank is empty. Start chatting to save facts.</p>
+                        ) : (
+                          <div className="max-h-[220px] overflow-y-auto space-y-1.5 rounded-2xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.05)] p-2">
+                            {memories.map((m) => (
+                              <div
+                                key={m.id}
+                                className="flex items-center justify-between gap-3 p-2 rounded-xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.04)]"
+                              >
+                                <div className="min-w-0">
+                                  <p className="text-xs text-[rgba(250,249,245,0.8)] leading-relaxed truncate-2-lines">
+                                    {m.fact}
+                                  </p>
+                                  <span className="text-[9.5px] uppercase tracking-wider text-[#cc785c]/80 font-semibold font-sans mt-0.5 block">
+                                    {m.category}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteMemory(m.id)}
+                                  disabled={deletingMemoryId === m.id}
+                                  className="p-1.5 rounded-lg text-[rgba(250,249,245,0.4)] hover:text-red-400 hover:bg-red-500/10 transition"
+                                  title="Forget fact"
+                                >
+                                  {deletingMemoryId === m.id ? (
+                                    <Loader2 className="size-3 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="size-3.5" />
+                                  )}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </motion.div>
                     )}
                   </AnimatePresence>
                 </div>
-              )}
-            </div>
+              </div>
 
-            {/* Right Content */}
-            <div className={`flex-1 overflow-y-auto custom-scrollbar ${isMobile ? "p-4" : "p-8"}`}>
-              {activeTab === "General" && (
-                <div className="space-y-10 max-w-2xl mx-auto">
-                  {/* Profile */}
-                  <div>
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mb-5">Profile</h3>
-                    <div className="space-y-5">
-                      <div className="flex items-center gap-5">
-                        <div className="relative size-16 rounded-2xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 dark:from-blue-400/10 dark:to-purple-400/10 ring-2 ring-white/50 dark:ring-white/10 flex items-center justify-center text-2xl font-bold overflow-hidden shadow-sm">
-                          {avatarUrl ? (<img src={avatarUrl} alt="Avatar" className="size-full object-cover" />) : (<span className="text-neutral-600 dark:text-neutral-300">{fullName.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || "?"}</span>)}
-                        </div>
-                        <div>
-                          <button onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-1.5 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition font-medium"><Upload className="size-4" />Change avatar</button>
-                          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
-                          <p className="text-xs text-neutral-400 dark:text-neutral-500 mt-1">JPG, PNG, GIF • Max 2MB</p>
-                        </div>
-                      </div>
-                      <div><label className="text-sm font-medium text-neutral-500 dark:text-neutral-400 block mb-1.5">Full name</label><input type="text" value={fullName} onChange={(e) => handleTextChange(setFullName, e.target.value)} className="w-full px-4 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-blue-500/40 focus:bg-white dark:focus:bg-neutral-800 outline-none text-sm transition-all duration-200 placeholder:text-neutral-400" placeholder="Your full name" /></div>
-                      <div><label className="text-sm font-medium text-neutral-500 dark:text-neutral-400 block mb-1.5">What should Flux call you?</label><input type="text" value={displayName} onChange={(e) => handleTextChange(setDisplayName, e.target.value)} className="w-full px-4 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-blue-500/40 focus:bg-white dark:focus:bg-neutral-800 outline-none text-sm transition-all duration-200 placeholder:text-neutral-400" placeholder="Your display name" /></div>
-                      <div><label className="text-sm font-medium text-neutral-500 dark:text-neutral-400 block mb-2">Instructions for Flux</label><p className="text-xs text-neutral-400 dark:text-neutral-500 mb-2">Flux will keep these in mind across all conversations.</p><textarea value={instructions} onChange={(e) => handleTextChange(setInstructions, e.target.value)} placeholder="e.g. ask clarifying questions..." className="w-full h-32 px-4 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-blue-500/40 focus:bg-white dark:focus:bg-neutral-800 outline-none text-sm resize-none transition-all duration-200 placeholder:text-neutral-400" /></div>
-                    </div>
-                  </div>
-
-                  {/* Preferences */}
-                  <div>
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mb-5">Preferences</h3>
-                    <div className="space-y-5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Appearance</span>
-                        <button onClick={() => { toggleTheme(); saveSettings(); }} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-all duration-200 text-sm font-medium">
-                          {isDarkMode ? (<><Sun className="size-4" /><span>Light</span></>) : (<><Moon className="size-4" /><span>Dark</span></>)}
-                        </button>
-                      </div>
-
-                      {/* Fonts */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Chat font</span>
-                        <select value={chatFont} onChange={(e) => handleSelectChange("chat_font", setChatFont, e.target.value)} className={selectClass}>
-                          {FONT_OPTIONS.map(f => (<option key={f.value} value={f.value}>{f.label}</option>))}
-                        </select>
-                      </div>
-
-                      {/* TTS */}
-                      <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Text‑to‑Speech</span>
-                          <select value={ttsProvider} onChange={(e) => { setTtsProvider(e.target.value); setTtsVoice(''); handleSelectChange("tts_provider", setTtsProvider, e.target.value); }} className={selectClass}>
-                            {TTS_PROVIDERS.map(p => (<option key={p.value} value={p.value}>{p.label}</option>))}
-                          </select>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {voicesLoading ? (
-                            <div className="flex items-center gap-2 text-xs text-neutral-500"><Loader2 className="size-3 animate-spin" />Loading voices...</div>
-                          ) : (
-                            <select value={ttsVoice} onChange={(e) => handleSelectChange("tts_voice", setTtsVoice, e.target.value)} className={`${selectClass} flex-1`}>
-                              <option value="">{ttsProvider === 'pollinations' ? 'Select voice...' : 'Default voice'}</option>
-                              {voiceList.map(v => (<option key={v.value} value={v.value}>{v.label}</option>))}
-                            </select>
-                          )}
-                          <button onClick={previewVoice} disabled={isSpeaking}
-                            className="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 disabled:opacity-50 shrink-0"
-                            title="Preview voice">
-                            {isSpeaking ? <Volume2 className="size-4 animate-pulse text-blue-500" /> : <Play className="size-4" />}
-                          </button>
-                        </div>
-                        <p className="text-[10px] text-neutral-400 mt-1.5">{TTS_PROVIDERS.find(p => p.value === ttsProvider)?.description}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Notifications */}
-                  <div>
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mb-5">Notifications</h3>
-                    <div className="space-y-5">
-                      <ToggleRow label="Response completions" description="Get notified when Flux has finished a response." enabled={responseCompletions} onToggle={() => handleToggle("response_completions", setResponseCompletions, responseCompletions)} />
-                      <ToggleRow label="Dispatch messages" description="Get a push notification on your phone when Flux messages you in Dispatch." enabled={dispatchMessages} onToggle={() => handleToggle("dispatch_messages", setDispatchMessages, dispatchMessages)} />
-                    </div>
-                  </div>
+              {/* Integrations */}
+              <div className="py-4">
+                <div className="px-5 mb-1.5 text-[11px] font-bold uppercase tracking-widest text-[#cc785c]/80 font-sans">
+                  Integrations
                 </div>
-              )}
-
-              {/* Account Tab */}
-              {activeTab === "Account" && (
-                <div className="space-y-8 max-w-2xl mx-auto">
-                  <h3 className="text-lg font-semibold text-neutral-800 dark:text-neutral-100 mb-4">Account</h3>
-                  <div className="space-y-5">
-                    <div className="flex items-center justify-between py-1"><span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Log out of all devices</span><button onClick={handleLogoutAllDevices} disabled={loggingOutAllDevices} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 text-sm font-medium transition-all duration-200 disabled:opacity-50">{loggingOutAllDevices ? <Loader2 className="size-4 animate-spin" /> : <LogOut className="size-4" />}Log out</button></div>
-                    <div className="flex items-center justify-between py-1"><span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Delete your account</span><button onClick={handleDeleteAccount} disabled={deletingAccount} className="px-4 py-2 rounded-xl bg-white dark:bg-black hover:bg-gray-100 dark:hover:bg-neutral-800 text-black dark:text-white text-sm font-medium transition-all duration-200 disabled:opacity-50 border border-neutral-200 dark:border-neutral-800">{deletingAccount ? <Loader2 className="size-4 animate-spin" /> : "Delete account"}</button></div>
-                    <div className="flex items-center justify-between py-1"><span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Organization ID</span><div className="px-4 py-2 rounded-xl bg-black/5 dark:bg-white/5 text-xs font-mono text-neutral-500">{user?.id || "Not available"}</div></div>
-                  </div>
-                  <div className="pt-6">
-                    <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-4">Active sessions</h4>
-                    {loadingSessions ? (<div className="flex justify-center py-10"><Loader2 className="size-6 animate-spin text-neutral-400" /></div>) : sessions.length === 0 ? (<p className="text-sm text-neutral-500">No active sessions found.</p>) : (
-                      <div className="overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-sm">
-                        <table className="w-full text-sm"><thead><tr className="text-left text-neutral-500 dark:text-neutral-400 bg-neutral-50 dark:bg-neutral-900/50"><th className="px-5 py-3 font-medium">Device</th><th className="px-5 py-3 font-medium">Created</th><th className="px-5 py-3 font-medium">Updated</th><th className="px-5 py-3 w-10"></th></tr></thead>
-                          <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                            {sessions.map((session) => (
-                              <tr key={session.id} className="hover:bg-neutral-50 dark:hover:bg-neutral-900/50 transition-colors duration-150">
-                                <td className="px-5 py-3"><div className="flex items-center gap-2"><span className="font-medium text-neutral-800 dark:text-neutral-200">{session.device}</span>{session.isCurrent && (<span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 font-medium">Current</span>)}</div></td>
-                                <td className="px-5 py-3 text-neutral-500">{new Date(session.created_at).toLocaleString()}</td>
-                                <td className="px-5 py-3 text-neutral-500">{new Date(session.updated_at).toLocaleString()}</td>
-                                <td className="px-5 py-3 text-right relative">
-                                  {!session.isCurrent && (
-                                    <div className="relative inline-block">
-                                      <button onClick={() => setOpenMenuSessionId(openMenuSessionId === session.id ? null : session.id)} className="p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-xl transition-all duration-200 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"><MoreVertical className="size-4" /></button>
-                                      <AnimatePresence>
-                                        {openMenuSessionId === session.id && (
-                                          <motion.div initial={{ opacity: 0, scale: 0.95, y: 4 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 4 }} className="absolute right-0 bottom-full mb-1 w-36 rounded-2xl bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 shadow-xl z-10 overflow-hidden">
-                                            <button onClick={() => handleRevokeSession(session.id)} disabled={revokingSessionId === session.id} className="w-full text-left px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition flex items-center gap-2">{revokingSessionId === session.id ? <Loader2 className="size-4 animate-spin" /> : <LogOut className="size-4" />}Sign out</button>
-                                          </motion.div>
-                                        )}
-                                      </AnimatePresence>
-                                    </div>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Capabilities Tab */}
-              {activeTab === "Capabilities" && !showMemoryManager && (
-                <div className="space-y-10 max-w-2xl mx-auto">
-                  <div><h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mb-5">Memory</h3><div className="space-y-5"><ToggleRow label="Generate memory from chat history" description="Allow Flux to remember relevant context from your chats." enabled={enableMemory} onToggle={() => handleToggle("enable_memory", setEnableMemory, enableMemory)} /><button className="w-full text-left px-5 py-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all duration-200 flex items-center justify-between text-sm" onClick={() => { setShowMemoryManager(true); loadMemories(); }}><span className="font-medium text-neutral-700 dark:text-neutral-300">View and manage memory</span><span className="text-xs text-neutral-400">{memories.length > 0 ? `${memories.length} items` : 'Empty'}</span></button></div></div>
-                  <div><h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mb-5">General</h3><div className="space-y-5"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Tool access mode</p><p className="text-xs text-neutral-500 mt-0.5">Controls how connector tools are loaded in new conversations.</p></div><select value={toolAccessMode} onChange={(e) => handleSelectChange("tool_access_mode", setToolAccessMode, e.target.value)} className={selectClass}><option value="load_tools_when_needed">Load when needed</option><option value="always_allow">Always allow</option><option value="manual">Manual approval</option></select></div><ToggleRow label="Connector discovery" description="Let Flux surface connectors from the directory that may be relevant to your conversation." enabled={connectorDiscovery} onToggle={() => handleToggle("connector_discovery", setConnectorDiscovery, connectorDiscovery)} /></div></div>
-                </div>
-              )}
-
-              {activeTab === "Capabilities" && showMemoryManager && (
-                <div className="max-w-2xl mx-auto">
-                  <div className="flex items-center gap-3 mb-6">
-                    <button onClick={() => setShowMemoryManager(false)} className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-xl transition">
-                      <ArrowLeft className="size-4" />
+                
+                <SettingRow
+                  label="Google Drive & Docs"
+                  subtitle={googleConnected ? `Connected as ${googleEmail}` : "Connect your Google account to let Flux read files"}
+                  rightSlot={
+                    <button
+                      type="button"
+                      onClick={googleConnected ? handleGoogleDisconnect : handleGoogleConnect}
+                      disabled={googleConnecting}
+                      className={`text-xs font-semibold px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5
+                        ${googleConnected
+                          ? "bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20"
+                          : "bg-[#cc785c]/10 border border-[#cc785c]/20 text-[#cc785c] hover:bg-[#cc785c]/20"
+                        }`}
+                    >
+                      {googleConnecting && <Loader2 className="size-3 animate-spin" />}
+                      {googleConnected ? "Disconnect" : "Connect"}
+                      {!googleConnected && <Plug className="size-3" />}
                     </button>
-                    <h3 className="text-lg font-semibold text-neutral-800 dark:text-neutral-100">Memory Manager</h3>
-                  </div>
-                  
-                  {debugInfo && (
-                    <div className="mb-4 p-3 rounded-xl bg-neutral-100 dark:bg-neutral-800 text-[10px] font-mono text-neutral-500 overflow-hidden">
-                      <p>appUserId: {debugInfo.appUserId}</p>
-                      <p>supabaseId: {debugInfo.supabaseUserId}</p>
-                      <p>email: {debugInfo.email}</p>
-                    </div>
-                  )}
+                  }
+                />
+              </div>
 
-                  {memoriesLoading ? (<div className="flex justify-center py-12"><Loader2 className="size-6 animate-spin text-neutral-400" /></div>) : memories.length === 0 ? (
-                    <div className="text-center py-12 text-neutral-500">
-                      <Brain className="size-10 mx-auto mb-3 opacity-30" />
-                      <p className="text-sm">No memories stored yet.</p>
-                      <p className="text-xs mt-1 mb-4">Memories are automatically created when you chat with Flux.</p>
-                      <button onClick={loadMemories} className="px-4 py-2 rounded-xl bg-blue-500/10 text-blue-600 text-xs font-medium hover:bg-blue-500/20 transition">
-                        Retry Fetch
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">{memories.map((memory) => (<div key={memory.id} className="flex items-start justify-between gap-4 p-4 rounded-xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-100 dark:border-neutral-800 hover:border-neutral-200 dark:hover:border-neutral-700 transition-all duration-200 group"><div className="flex-1 min-w-0"><div className="flex items-center gap-2 mb-1"><span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400">{memory.category}</span><span className="text-[10px] text-neutral-400">{Math.round(memory.importance * 100)}% importance</span></div><p className="text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed">{memory.fact}</p><p className="text-[10px] text-neutral-400 mt-1.5">{new Date((memory as any).createdAt || memory.created_at || new Date()).toLocaleString()}</p></div><button onClick={() => handleDeleteMemory(memory.id)} disabled={deletingMemoryId === memory.id} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-neutral-400 hover:text-red-500 transition-all duration-200 opacity-0 group-hover:opacity-100 flex-shrink-0">{deletingMemoryId === memory.id ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}</button></div>))}</div>
-                  )}
+              {/* Active Sessions & Security */}
+              <div className="py-4">
+                <div className="px-5 mb-1.5 text-[11px] font-bold uppercase tracking-widest text-[#cc785c]/80 font-sans">
+                  Account & Devices
                 </div>
-              )}
+                
+                <SettingRow
+                  label="Email ID"
+                  value={user?.email || "Unknown"}
+                />
 
-              {/* Integrations Tab */}
-              {activeTab === "Integrations" && (
-                <div className="space-y-8 max-w-2xl mx-auto">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mb-5">Connected Services</h3>
+                <SettingRow
+                  label="Two-factor authentication"
+                  value="Disabled"
+                  rightSlot={<Lock className="size-3.5 text-[rgba(250,249,245,0.3)]" />}
+                />
 
-                  {/* Google Card */}
-                  <div className="p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="size-10 rounded-xl bg-gradient-to-br from-blue-500 to-green-500 flex items-center justify-center">
-                          <span className="text-white font-bold text-sm">G</span>
+                {/* Login session history */}
+                <div className="px-5 py-3">
+                  <span className="text-[11.5px] font-semibold text-[rgba(250,249,245,0.6)]">Active Devices</span>
+                  <div className="mt-2.5 space-y-2 max-h-[160px] overflow-y-auto rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.05)] p-2">
+                    {loadingSessions && sessions.length === 0 ? (
+                      <p className="text-xs text-[rgba(250,249,245,0.4)] animate-pulse">Loading login sessions...</p>
+                    ) : (
+                      sessions.map((s) => (
+                        <div key={s.id} className="flex items-center justify-between gap-3 p-2 rounded-xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.04)]">
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-white leading-tight truncate">
+                              {s.device}
+                              {s.isCurrent && (
+                                <span className="ml-1.5 text-[9px] font-bold bg-[#cc785c]/10 text-[#cc785c] px-1.5 py-0.5 rounded-md">
+                                  Current
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-[10px] text-[rgba(250,249,245,0.4)] leading-tight mt-0.5 truncate">
+                              Activity: {timeAgo(s.updated_at)}
+                            </p>
+                          </div>
+                          {!s.isCurrent && (
+                            <button
+                              type="button"
+                              onClick={() => handleRevokeSession(s.id)}
+                              disabled={revokingSessionId === s.id}
+                              className="text-[10.5px] font-semibold text-red-400 hover:text-red-300 disabled:opacity-40 transition"
+                            >
+                              Revoke
+                            </button>
+                          )}
                         </div>
-                        <div>
-                          <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">Google</p>
-                          <p className="text-xs text-neutral-500">
-                            {googleConnected ? `Connected as ${googleEmail}` : "Gmail, Calendar & Drive"}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={googleConnected ? handleGoogleDisconnect : handleGoogleConnect}
-                        disabled={googleConnecting}
-                        className={`px-4 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2 ${googleConnected ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30" : "bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50"}`}
-                      >
-                        {googleConnecting ? <Loader2 className="size-4 animate-spin" /> : null}
-                        {googleConnected ? "Disconnect" : googleConnecting ? "Connecting..." : "Connect"}
-                      </button>
-                    </div>
-                    {googleConnected && (
-                      <p className="text-xs text-neutral-400 mt-4 border-t border-neutral-100 dark:border-neutral-800 pt-4">
-                        Connected scopes: Gmail (read & send), Calendar, Drive (read-only)
-                      </p>
+                      ))
                     )}
                   </div>
                 </div>
-              )}
+
+                {/* Account deletion and global logout actions */}
+                <div className="mt-2">
+                  <SettingRow
+                    label="Sign out of all devices"
+                    subtitle="Log out of this browser and revoke all secondary auth tokens globally"
+                    onClick={handleLogoutAllDevices}
+                    isRed={true}
+                  />
+
+                  <SettingRow
+                    label="Delete Account permanently"
+                    subtitle="Erase all conversations, files, custom configurations, and settings"
+                    onClick={handleDeleteAccount}
+                    isRed={true}
+                  />
+                </div>
+              </div>
+
             </div>
           </motion.div>
-        </motion.div>
+        </div>
       )}
     </AnimatePresence>
-  );
-}
-
-// ─── Reusable accessible toggle row ─────────────────────────
-function ToggleRow({ label, description, enabled, onToggle }: { label: string; description?: string; enabled: boolean; onToggle: () => void }) {
-  return (
-    <div className="flex items-center justify-between gap-4">
-      <div><p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{label}</p>{description && (<p className="text-xs text-neutral-500 mt-0.5">{description}</p>)}</div>
-      <button type="button" role="switch" aria-checked={enabled} aria-label={label} onClick={onToggle}
-        className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${enabled ? "bg-blue-600" : "bg-neutral-300 dark:bg-neutral-600"}`}>
-        <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform duration-200 ease-in-out ${enabled ? "translate-x-6" : "translate-x-1"}`} />
-      </button>
-    </div>
   );
 }

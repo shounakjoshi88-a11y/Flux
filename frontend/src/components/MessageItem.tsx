@@ -1,5 +1,5 @@
 // src/components/MessageItem.tsx
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from "react";
 import TodoList from "./TodoList";
 import ToolSummary from "./ToolSummary";
 
@@ -52,7 +52,7 @@ import {
   FileDown,
 } from "lucide-react";
 
-import { FileCard } from "./FileCard";
+import { FileDownloadButton } from "./FileDownloadButton";
 import { CodeOutputBlock } from "./CodeOutputBlock";
 import { getDomain, rewriteSandboxUrls } from "../lib/chat-utils";
 import type { Message, MessagePart, Source } from "../types";
@@ -79,7 +79,7 @@ type MessageItemProps = {
   onFollowUpClick: (question: string) => void;
   onRetry?: (prompt?: string) => void;
   onRegenerate?: () => void;
-  onSourceClick: (url: string) => void;
+  onSourceClick?: (url: string | null) => void;
   onFileClick?: (file: { name: string; content: string }) => void;
   onPreview?: (data: {
     type: 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'md';
@@ -814,32 +814,15 @@ function PartsRenderer({
         break;
       }
       case "file": {
-        if (part.base64 && isCodeFile(part.filename)) {
-          const decoded = (() => {
-            try { return atob(part.base64); } catch { return ''; }
-          })();
-          const lang = extToLang(part.filename);
-          renderedParts.push(
-            <div key={`file-${i}`} className="mt-2">
-              <FileCard
-                filename={part.filename}
-                base64={part.base64}
-                mime={part.mime}
-                onClick={() => onFileClick?.({ name: part.filename, content: decoded })}
-              />
-            </div>
-          );
-        } else {
-          renderedParts.push(
-            <div key={`file-${i}`} className="mt-2">
-              <FileCard
-                filename={part.filename}
-                base64={part.base64}
-                mime={part.mime}
-              />
-            </div>
-          );
-        }
+        renderedParts.push(
+          <div key={`file-${i}`} className="mt-2">
+            <FileDownloadButton
+              file={{ base64: part.base64 || '', filename: part.filename, mime: part.mime || '' }}
+              onPreview={onPreview}
+              onDelete={onFileDelete ? () => onFileDelete(messageId, part.filename, 'fileAttachment') : undefined}
+            />
+          </div>
+        );
         break;
       }
       case "todos": {
@@ -946,7 +929,7 @@ function ScrollableSourceCascade({
   onSourceClick,
 }: {
   sources: Source[];
-  onSourceClick: (url: string) => void;
+  onSourceClick?: (url: string | null) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const speedRef = useRef(0);
@@ -1024,7 +1007,7 @@ function ScrollableSourceCascade({
       {sources.map((source, idx) => (
         <button
           key={source.url + idx}
-          onClick={(e) => { e.stopPropagation(); onSourceClick(source.url); }}
+          onClick={(e) => { e.stopPropagation(); onSourceClick?.(source.url); }}
           className="transition-all duration-150 hover:scale-125 hover:-translate-y-0.5 hover:shadow-lg focus:outline-none shrink-0 rounded-full"
           title={getDomain(source.url)}
           style={{ zIndex: sources.length - idx }}
@@ -1189,7 +1172,7 @@ function deepCleanAnswer(raw: string): string {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Sandbox URL → FileCard                                            */
+/*  Sandbox URL → FileDownloadButton                                  */
 /* ------------------------------------------------------------------ */
 function ContentWithFileCards({
   text,
@@ -1226,7 +1209,17 @@ function ContentWithFileCards({
         if (part.type === 'file') {
           return (
             <div key={`file-${i}`} className="my-2">
-              <FileCard filename={part.filename!} downloadUrl={part.value} />
+              <FileDownloadButton
+                file={{ base64: '', filename: part.filename || 'file', mime: '' }}
+                onDownload={() => {
+                  const link = document.createElement('a');
+                  link.href = part.value;
+                  link.download = part.filename || 'file';
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+              />
             </div>
           );
         }
@@ -1246,7 +1239,7 @@ function ContentWithFileCards({
 /* ------------------------------------------------------------------ */
 /*  MessageItem                                                       */
 /* ------------------------------------------------------------------ */
-export function MessageItem({
+export const MessageItem = memo(function MessageItem({
   message,
   sources: externalSources,
   onCitationClick,
@@ -1651,7 +1644,7 @@ export function MessageItem({
             onFileClick={onFileClick}
             onPreview={onPreview}
             onFileDelete={onFileDelete}
-            onSourceClick={(url) => url && onSourceClick(url)}
+            onSourceClick={(url) => url && onSourceClick?.(url)}
             activeGenerationStatus={activeGenerationStatus}
             onHtmlPreview={onHtmlPreview}
             conversationId={conversationId}
@@ -1679,11 +1672,11 @@ export function MessageItem({
                     onDelete={onFileDelete ? () => onFileDelete(message.id, file.filename, 'generatedFiles') : undefined}
                   />
                 ) : (
-                  <FileCard
+                  <FileDownloadButton
                     key={idx}
-                    filename={file.filename}
-                    base64={file.base64}
-                    mime={file.mime}
+                    file={{ base64: file.base64 || '', filename: file.filename, mime: file.mime || '' }}
+                    onPreview={onPreview}
+                    onDelete={onFileDelete ? () => onFileDelete(message.id, file.filename, 'generatedFiles') : undefined}
                   />
                 )
               )}
@@ -1783,4 +1776,4 @@ export function MessageItem({
       )}
     </div>
   );
-}
+});

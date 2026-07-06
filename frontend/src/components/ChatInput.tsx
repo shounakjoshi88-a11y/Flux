@@ -95,8 +95,10 @@ declare global {
   }
 }
 
+const ANIMATED_AUDIO_DURATIONS = [0.45, 0.5, 0.55, 0.5, 0.45];
+const ANIMATED_AUDIO_DELAYS = [0, 0.1, 0.2, 0.1, 0];
+
 const AnimatedAudioLines = ({ isActive }: { isActive: boolean }) => {
-  const delays = [0, 0.1, 0.2, 0.1, 0];
   return (
     <div className="flex items-center gap-[2px] h-4">
       {[4, 10, 14, 10, 4].map((height, i) => (
@@ -108,10 +110,10 @@ const AnimatedAudioLines = ({ isActive }: { isActive: boolean }) => {
           transition={
             isActive
               ? {
-                duration: 0.4 + Math.random() * 0.2,
+                duration: ANIMATED_AUDIO_DURATIONS[i],
                 repeat: Infinity,
                 repeatType: "reverse",
-                delay: (delays[i % delays.length] ?? 0) + Math.random() * 0.1,
+                delay: ANIMATED_AUDIO_DELAYS[i],
               }
               : {
                 duration: 0.2,
