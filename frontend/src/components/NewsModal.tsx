@@ -23,23 +23,23 @@ type NewsModalProps = {
 
 // —— Palette: Refined Vermillion × Ink × Paper ———————————————————
 const P = {
-  bg: "#0C0A09",
-  bgPanel: "#141210",
-  bgCard: "#1A1714",
-  bgCardHover: "#221F1A",
-  verm: "#C4502A",
-  vermDim: "#8A3D1E",
-  vermGlow: "rgba(196,80,42,0.12)",
-  vermBorder: "rgba(196,80,42,0.25)",
-  gold: "#D49447",
-  paper: "#EFD9BC",
-  paperFaint: "rgba(239,217,188,0.15)",
-  ink: "rgba(239,217,188,0.92)",
-  inkMid: "rgba(239,217,188,0.6)",
-  inkFaint: "rgba(239,217,188,0.35)",
-  inkGhost: "rgba(239,217,188,0.06)",
-  border: "rgba(110,72,36,0.22)",
-  borderFaint: "rgba(110,72,36,0.12)",
+  bg: "#181715",
+  bgPanel: "#1f1e1b",
+  bgCard: "#252320",
+  bgCardHover: "#2a2825",
+  verm: "#cc785c",
+  vermDim: "#a9583e",
+  vermGlow: "rgba(204,120,92,0.12)",
+  vermBorder: "rgba(204,120,92,0.25)",
+  gold: "#e8a55a",
+  paper: "#faf9f5",
+  paperFaint: "rgba(250,249,245,0.15)",
+  ink: "rgba(250,249,245,0.92)",
+  inkMid: "rgba(250,249,245,0.6)",
+  inkFaint: "rgba(250,249,245,0.35)",
+  inkGhost: "rgba(250,249,245,0.06)",
+  border: "rgba(255,255,255,0.08)",
+  borderFaint: "rgba(255,255,255,0.04)",
 };
 
 const CATEGORIES = [
@@ -464,7 +464,7 @@ export function NewsModal({ isOpen, onClose }: NewsModalProps) {
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="fixed inset-0 z-[200] flex flex-col overflow-hidden" style={{ background: P.bg }}>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="fixed inset-0 z-[200] flex flex-col overflow-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]" style={{ background: P.bg }}>
           {/* Particle background */}
           <ParticleField />
 

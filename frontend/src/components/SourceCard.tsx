@@ -1,5 +1,5 @@
 // src/components/SourceCard.tsx
-import { useState, memo } from "react";
+import React, { useState, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 type SourceCardProps = {
@@ -33,7 +33,7 @@ function getReputationInfo(score: number): { label: string; description: string 
   };
 }
 
-export const SourceCard = memo(function SourceCard({
+function SourceCard({
   url,
   domain,
   trustScore,
@@ -147,4 +147,6 @@ export const SourceCard = memo(function SourceCard({
       </span>
     </motion.button>
   );
-});
+}
+
+export default React.memo(SourceCard);

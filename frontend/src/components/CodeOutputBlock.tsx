@@ -8,7 +8,7 @@
 import { useState, useEffect, useRef } from "react";
 import { ChevronDown } from "lucide-react";
 import type { CodeOutputLine } from "../types";
-import { FileCard } from "./FileCard";
+import { FileDownloadButton } from "./FileDownloadButton";
 
 interface CodeOutputBlockProps {
   language?: string;
@@ -277,7 +277,18 @@ export function CodeOutputBlock({
       {generatedFiles.length > 0 && (
         <div className="space-y-2 px-3 py-3 border-t border-white/[0.05]">
           {generatedFiles.map((file, i) => (
-            <FileCard key={i} filename={file.filename} downloadUrl={file.downloadUrl} />
+            <FileDownloadButton
+              key={i}
+              file={{ base64: '', filename: file.filename, mime: '' }}
+              onDownload={() => {
+                const link = document.createElement('a');
+                link.href = file.downloadUrl;
+                link.download = file.filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
+            />
           ))}
         </div>
       )}

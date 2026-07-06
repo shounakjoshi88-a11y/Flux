@@ -1,5 +1,6 @@
 // src/components/Sidebar.tsx
 import { AnimatePresence, motion } from "framer-motion";
+import { usePerformance } from "../lib/performance-context";
 import {
   ChevronDown,
   LogOut,
@@ -109,6 +110,7 @@ export const Sidebar = memo(function Sidebar({
   onCustomAgentsOpen,
   onTeamOpen,
 }: SidebarProps) {
+  const { isLow: isPerfLow } = usePerformance();
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<ConversationListItem[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -493,78 +495,70 @@ export const Sidebar = memo(function Sidebar({
         <div className="flex flex-col h-full py-3 w-full">
           {/* Top Row: Logo left, Search and Toggle right */}
           <div className="relative flex items-center mb-4 h-8 shrink-0 px-4 justify-between">
-            <AnimatePresence mode="wait">
-              {isOpen && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                  className="flex items-center gap-2.5 select-none"
+            {isOpen && (
+              <div className="flex items-center gap-2.5 select-none">
+                {/* Flux logo: mountain with rising sun/moon */}
+                <button
+                  onClick={() => {
+                    if (!logoRisen) {
+                      setLogoRisen(true);
+                      setTimeout(() => setLogoRisen(false), 1200);
+                    }
+                  }}
+                  className="p-0 border-none bg-transparent cursor-pointer outline-none"
+                  title="Toggle dawn"
                 >
-                  {/* Flux logo: mountain with rising sun/moon */}
-                  <button
-                    onClick={() => {
-                      if (!logoRisen) {
-                        setLogoRisen(true);
-                        setTimeout(() => setLogoRisen(false), 1200);
-                      }
-                    }}
-                    className="p-0 border-none bg-transparent cursor-pointer outline-none"
-                    title="Toggle dawn"
-                  >
-                    <svg className="size-5" viewBox="0 0 24 24" style={{ overflow: 'visible' }}>
-                      {/* Landmass (hides the sun when below) */}
-                      <path
-                        d="M2 16C5 6 8 18 11 10S17 6 22 12 L22 24 L2 24 Z"
-                        fill="var(--sidebar)"
-                      />
-                      {/* Sun / Moon */}
+                  <svg className="size-5" viewBox="0 0 24 24" style={{ overflow: 'visible' }}>
+                    {/* Landmass (hides the sun when below) */}
+                    <path
+                      d="M2 16C5 6 8 18 11 10S17 6 22 12 L22 24 L2 24 Z"
+                      fill="var(--sidebar)"
+                    />
+                    {/* Sun / Moon */}
+                    <motion.circle
+                      cx="17"
+                      r="2.8"
+                      fill={isDay ? "#cc785c" : "#faf9f5"}
+                      initial={false}
+                      animate={{
+                        cy: logoRisen ? 1.5 : 11,
+                        opacity: logoRisen ? 1 : 0,
+                        scale: logoRisen ? 1 : 0.5,
+                      }}
+                      transition={{ type: "spring", stiffness: 180, damping: 16, mass: 0.8 }}
+                    />
+                    {/* Sun glow */}
+                    {isDay && (
                       <motion.circle
                         cx="17"
-                        r="2.8"
-                        fill={isDay ? "#cc785c" : "#faf9f5"}
+                        r="5"
+                        fill="none"
+                        stroke="#cc785c"
+                        strokeWidth="0.8"
                         initial={false}
                         animate={{
                           cy: logoRisen ? 1.5 : 11,
-                          opacity: logoRisen ? 1 : 0,
-                          scale: logoRisen ? 1 : 0.5,
+                          opacity: logoRisen ? 0.25 : 0,
                         }}
                         transition={{ type: "spring", stiffness: 180, damping: 16, mass: 0.8 }}
                       />
-                      {/* Sun glow */}
-                      {isDay && (
-                        <motion.circle
-                          cx="17"
-                          r="5"
-                          fill="none"
-                          stroke="#cc785c"
-                          strokeWidth="0.8"
-                          initial={false}
-                          animate={{
-                            cy: logoRisen ? 1.5 : 11,
-                            opacity: logoRisen ? 0.25 : 0,
-                          }}
-                          transition={{ type: "spring", stiffness: 180, damping: 16, mass: 0.8 }}
-                        />
-                      )}
-                      {/* Mountain outline */}
-                      <path
-                        d="M2 16C5 6 8 18 11 10S17 6 22 12"
-                        fill="none"
-                        stroke="#cc785c"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </button>
-                  <span className="text-sm font-semibold tracking-tight text-sidebar-foreground">
-                    Flux
-                  </span>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                    )}
+                    {/* Mountain outline */}
+                    <path
+                      d="M2 16C5 6 8 18 11 10S17 6 22 12"
+                      fill="none"
+                      stroke="#cc785c"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+                <span className="text-sm font-semibold tracking-tight text-sidebar-foreground">
+                  Flux
+                </span>
+              </div>
+            )}
 
             <div className={`flex items-center gap-1 ${!isOpen ? 'absolute right-0 w-[48px] justify-center' : ''}`}>
               {isOpen && (
@@ -705,14 +699,9 @@ export const Sidebar = memo(function Sidebar({
           </div>
 
           {/* Conversations List */}
-          <AnimatePresence>
-            {isOpen && (
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex-1 relative mt-4 flex flex-col" style={{ minHeight: 0 }}
-              >
+          {isPerfLow ? (
+            isOpen && (
+              <div className="flex-1 relative mt-4 flex flex-col" style={{ minHeight: 0 }}>
                 <div className="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-sidebar to-transparent pointer-events-none z-10" />
                 <div
                   ref={scrollContainerRef}
@@ -753,34 +742,75 @@ export const Sidebar = memo(function Sidebar({
                   )}
                 </div>
                 <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-sidebar to-transparent pointer-events-none z-10" />
-              </motion.div>
-            )}
-          </AnimatePresence>
+              </div>
+            )
+          ) : (
+            <AnimatePresence>
+              {isOpen && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex-1 relative mt-4 flex flex-col" style={{ minHeight: 0 }}
+                >
+                  <div className="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-sidebar to-transparent pointer-events-none z-10" />
+                  <div
+                    ref={scrollContainerRef}
+                    onMouseMove={handleThreadsMouseMove}
+                    onMouseLeave={handleThreadsMouseLeave}
+                    className="flex-1 overflow-y-auto space-y-0.5 sidebar-scroll pb-10"
+                    style={{ minHeight: 0, scrollbarWidth: "none", msOverflowStyle: "none" }}
+                  >
+                    {groupedItems.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 opacity-35">
+                         <MessageSquare className="size-7 mb-2" />
+                         <p className="text-[10px] font-bold uppercase tracking-wider">No chats yet</p>
+                      </div>
+                    ) : (
+                      groupedItems.map((item, index) =>
+                        item.type === "header" ? (
+                          <div
+                            key={`header-${item.label}-${index}`}
+                            className="text-[10px] font-bold text-sidebar-foreground/35 uppercase tracking-widest pl-4 pt-5 pb-1 select-none font-sans"
+                          >
+                            {item.label}
+                          </div>
+                        ) : (
+                          <div
+                            key={item.conversation.id}
+                          >
+                            <SidebarThread
+                              id={item.conversation.id}
+                              title={item.conversation.title ?? "Untitled conversation"}
+                              isActive={activeConversationId === item.conversation.id}
+                              onClick={() => handleSelectThread(item.conversation.id)}
+                              onDelete={() => handleDeleteThread(item.conversation.id)}
+                              onHover={onPrefetchThread ? () => onPrefetchThread(item.conversation.id) : undefined}
+                            />
+                          </div>
+                        )
+                      )
+                    )}
+                  </div>
+                  <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-sidebar to-transparent pointer-events-none z-10" />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          )}
 
           {/* Footer: User Account — Claude-style minimal */}
           <div className="relative mt-auto border-t border-sidebar-border pt-3" ref={userMenuRef}>
-            <AnimatePresence>
-              {userMenuOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 8 }}
-                  transition={{ duration: 0.12 }}
-                  className={`absolute bottom-14 bg-sidebar border border-sidebar-border rounded-xl shadow-xl z-50 p-1 ${
-                    isOpen ? "left-2 right-2" : "left-12 w-44"
-                  }`}
-                >
+            {isPerfLow ? (
+              userMenuOpen && (
+                <div className={`absolute bottom-14 bg-sidebar border border-sidebar-border rounded-xl shadow-xl z-50 p-1 ${
+                  isOpen ? "left-2 right-2" : "left-12 w-44"
+                }`}>
                   <button
                     type="button"
                     onClick={handleSettingsClick}
                     className="flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm font-medium hover:bg-sidebar-accent transition-all text-sidebar-foreground/70 hover:text-sidebar-foreground cursor-pointer"
                   >
-                    <motion.div
-                      animate={{ rotate: gearSpinning ? 360 : 0 }}
-                      transition={{ duration: 0.6, ease: "easeOut" }}
-                    >
-                      <SettingsIcon className="size-4" />
-                    </motion.div>
+                    <SettingsIcon className="size-4" />
                     Settings
                   </button>
                   <button
@@ -793,9 +823,47 @@ export const Sidebar = memo(function Sidebar({
                   >
                     <LogOut className="size-4" /> Logout
                   </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                </div>
+              )
+            ) : (
+              <AnimatePresence>
+                {userMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 8 }}
+                    transition={{ duration: 0.12 }}
+                    className={`absolute bottom-14 bg-sidebar border border-sidebar-border rounded-xl shadow-xl z-50 p-1 ${
+                      isOpen ? "left-2 right-2" : "left-12 w-44"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={handleSettingsClick}
+                      className="flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm font-medium hover:bg-sidebar-accent transition-all text-sidebar-foreground/70 hover:text-sidebar-foreground cursor-pointer"
+                    >
+                      <motion.div
+                        animate={{ rotate: gearSpinning ? 360 : 0 }}
+                        transition={{ duration: 0.6, ease: "easeOut" }}
+                      >
+                        <SettingsIcon className="size-4" />
+                      </motion.div>
+                      Settings
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onLogout();
+                        setUserMenuOpen(false);
+                      }}
+                      className="flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm font-medium hover:bg-red-500/10 transition-all text-red-400/80 hover:text-red-400 mt-0.5 cursor-pointer"
+                    >
+                      <LogOut className="size-4" /> Logout
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            )}
 
             <button
               type="button"
@@ -808,15 +876,9 @@ export const Sidebar = memo(function Sidebar({
               <span className="flex justify-center shrink-0">
                 {userAvatar}
               </span>
-              <AnimatePresence mode="wait">
-                {isOpen && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.12 }}
-                    className="truncate text-left flex-1 flex items-center justify-between pr-1"
-                  >
+              {isPerfLow ? (
+                isOpen && (
+                  <div className="truncate text-left flex-1 flex items-center justify-between pr-1">
                     <div className="truncate">
                       <p className="text-sm font-medium truncate text-sidebar-foreground leading-tight">
                         {user?.email?.split("@")[0]}
@@ -827,37 +889,43 @@ export const Sidebar = memo(function Sidebar({
                         userMenuOpen ? "rotate-180" : ""
                       }`}
                     />
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                  </div>
+                )
+              ) : (
+                <AnimatePresence mode="wait">
+                  {isOpen && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.12 }}
+                      className="truncate text-left flex-1 flex items-center justify-between pr-1"
+                    >
+                      <div className="truncate">
+                        <p className="text-sm font-medium truncate text-sidebar-foreground leading-tight">
+                          {user?.email?.split("@")[0]}
+                        </p>
+                      </div>
+                      <ChevronsUpDown
+                        className={`size-3 text-sidebar-foreground/40 transition-transform duration-200 ${
+                          userMenuOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              )}
             </button>
           </div>
         </div>
       </motion.aside>
 
       {/* ─── SEARCH MODAL ─── */}
-      <AnimatePresence>
-        {isSearchModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] px-4"
-            onClick={closeSearchModal}
-          >
-            {/* Backdrop */}
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-
-            <motion.div
-              initial={{ scale: 0.97, opacity: 0, y: -8 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.97, opacity: 0, y: -8 }}
-              transition={{ duration: 0.15 }}
-              className="relative w-full max-w-[720px] bg-[var(--bg-primary)]/95 backdrop-blur-2xl border border-[var(--surface-border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Search input row */}
+      {isPerfLow ? (
+        isSearchModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] px-4" onClick={closeSearchModal}>
+            <div className="absolute inset-0 bg-black/50" />
+            <div className="relative w-full max-w-[720px] bg-[var(--bg-primary)]/95 border border-[var(--surface-border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center gap-3 px-4 py-4 border-b border-[var(--surface-border)]">
                 <Search className="size-4 text-[var(--text-muted)] shrink-0" />
                 <input
@@ -884,8 +952,6 @@ export const Sidebar = memo(function Sidebar({
                   }}
                   className="flex-1 bg-transparent outline-none text-base text-[var(--text-primary)]/90 placeholder:text-[var(--text-muted)]/40 min-w-0"
                 />
-                
-                {/* Right side of search bar: loader or clear + persistent close */}
                 <div className="flex items-center gap-1 shrink-0">
                   {searchLoading && (
                     <Loader2 className="size-4 animate-spin text-[var(--text-muted)]" />
@@ -910,8 +976,6 @@ export const Sidebar = memo(function Sidebar({
                   </button>
                 </div>
               </div>
-
-              {/* Results list */}
               <div
                 ref={modalScrollContainerRef}
                 onMouseMove={handleModalMouseMove}
@@ -964,10 +1028,136 @@ export const Sidebar = memo(function Sidebar({
                   ))
                 )}
               </div>
+            </div>
+          </div>
+        )
+      ) : (
+        <AnimatePresence>
+          {isSearchModalOpen && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] px-4"
+              onClick={closeSearchModal}
+            >
+              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+              <motion.div
+                initial={{ scale: 0.97, opacity: 0, y: -8 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.97, opacity: 0, y: -8 }}
+                transition={{ duration: 0.15 }}
+                className="relative w-full max-w-[720px] bg-[var(--bg-primary)]/95 backdrop-blur-2xl border border-[var(--surface-border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-3 px-4 py-4 border-b border-[var(--surface-border)]">
+                  <Search className="size-4 text-[var(--text-muted)] shrink-0" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Search chats and projects"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') { closeSearchModal(); return; }
+                      if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        setSelectedIndex(i => Math.min(i + 1, modalResults.length - 1));
+                      }
+                      if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        setSelectedIndex(i => Math.max(i - 1, -1));
+                      }
+                      if (e.key === 'Enter' && selectedIndex >= 0 && modalResults[selectedIndex]) {
+                        const conv = modalResults[selectedIndex];
+                        onSelectThread(conv.id);
+                        closeSearchModal();
+                      }
+                    }}
+                    className="flex-1 bg-transparent outline-none text-base text-[var(--text-primary)]/90 placeholder:text-[var(--text-muted)]/40 min-w-0"
+                  />
+                  <div className="flex items-center gap-1 shrink-0">
+                    {searchLoading && (
+                      <Loader2 className="size-4 animate-spin text-[var(--text-muted)]" />
+                    )}
+                    {search && !searchLoading && (
+                      <button
+                        type="button"
+                        onClick={() => setSearch("")}
+                        className="p-1 rounded-md hover:bg-[var(--surface-bg)] transition-colors"
+                      >
+                        <CircleX className="size-4 text-[var(--text-muted)]/60" />
+                      </button>
+                    )}
+                    <div className="w-px h-4 bg-[var(--surface-border)] mx-1" />
+                    <button
+                      type="button"
+                      onClick={closeSearchModal}
+                      className="p-1.5 rounded-lg hover:bg-[var(--surface-bg)] transition-colors"
+                      aria-label="Close search"
+                    >
+                      <X className="size-4 text-[var(--text-muted)]/60" />
+                    </button>
+                  </div>
+                </div>
+                <div
+                  ref={modalScrollContainerRef}
+                  onMouseMove={handleModalMouseMove}
+                  onMouseLeave={handleModalMouseLeave}
+                  className="overflow-y-auto max-h-[520px] py-1.5 scrollbar-none"
+                  style={{ scrollbarWidth: "none" }}
+                >
+                  {modalResults.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-48 gap-2">
+                      <History className="size-8 text-[var(--text-muted)]/20" />
+                      <p className="text-xs text-[var(--text-muted)]/40">
+                        {search.trim() ? "No results found" : "No conversations yet"}
+                      </p>
+                    </div>
+                  ) : (
+                    modalResults.map((conv, index) => (
+                      <button
+                        key={conv.id}
+                        onClick={() => {
+                          onSelectThread(conv.id);
+                          if (conv.messageId) {
+                            setTimeout(() => {
+                              const el = document.getElementById(`message-${conv.messageId}`);
+                              el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }, 400);
+                          }
+                          closeSearchModal();
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-3.5 transition-colors text-left group
+                          ${index === selectedIndex
+                            ? 'bg-[var(--surface-bg)]'
+                            : 'hover:bg-[var(--surface-bg)]/60'
+                          }`}
+                      >
+                        <MessageSquare className="size-4 text-[var(--text-muted)]/40 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-[var(--text-secondary)]/80 group-hover:text-[var(--text-primary)] truncate transition-colors">
+                            {conv.title ?? "Untitled"}
+                          </p>
+                          {conv.snippet && (
+                            <p className="text-xs text-[var(--text-muted)]/50 truncate mt-0.5 group-hover:text-[var(--text-secondary)]/70 transition-colors">
+                              {conv.snippet}
+                            </p>
+                          )}
+                        </div>
+                        <span className="text-[11px] text-[var(--text-muted)]/40 shrink-0 group-hover:text-[var(--text-secondary)]/60 transition-colors">
+                          {formatSearchDate(conv.lastMessageAt)}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
+      )}
     </>
   );
 });

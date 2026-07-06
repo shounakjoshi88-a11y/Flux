@@ -3,7 +3,7 @@
 // Inline status renderer — redesigned terminal / thought / file / tool_call UIs.
 // Drop-in replacement: same props & exports as the previous version.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import { MessageRenderer } from "./MessageRenderer";
@@ -1355,7 +1355,7 @@ interface StatusMessageProps {
   expanded?: boolean;
 }
 
-export function StatusMessage({
+function StatusMessage({
   status, isFirst = false, isLast = false, isActive, onSourceClick, elapsedSeconds, rightSlot, searchQuery, expanded = true,
 }: StatusMessageProps) {
   const getDomain = (url: string) => {
@@ -2191,3 +2191,5 @@ export function StatusMessage({
     </StepRow>
   );
 }
+
+export default React.memo(StatusMessage);

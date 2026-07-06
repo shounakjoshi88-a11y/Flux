@@ -543,22 +543,20 @@ export function WikiGraph({ isOpen, onClose }: WikiGraphProps) {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
-  const bgPanel = isLight ? "#f5f3ef" : "#141413";
-  const bgSidebar = isLight ? "#eeede9" : "#111110";
-  const bgDark = isLight ? "#e8e6e0" : "#0f0f0e";
-  const borderColor = isLight ? "#d4d2cc" : "#1f1e1b";
-  const txtSec = isLight ? "#888480" : "#6c6a64";
-  const txtMuted = isLight ? "#706c66" : "#8e8b82";
-  const txtBody = isLight ? "#3a3834" : "#c4c2bc";
-  const txtBright = isLight ? "#1a1814" : "#faf9f5";
-  const headerBg = isLight
-    ? "linear-gradient(180deg, #f0eeea 0%, #eeede9 100%)"
-    : "linear-gradient(180deg, #181714 0%, #141413 100%)";
-  const headerBorder = isLight ? "#d4d2cc" : "#1f1e1b";
-  const inputBg = isLight ? "#e0ded8" : "#0f0f0e";
-  const inputBorder = isLight ? "#c8c4bc" : "#1f1e1b";
-  const inputText = isLight ? "#1a1814" : "#faf9f5";
-  const searchIcon = isLight ? "#888480" : "#8e8b82";
+  const bgPanel = "var(--bg-primary)";
+  const bgSidebar = "var(--bg-secondary)";
+  const bgDark = "var(--bg-secondary)";
+  const borderColor = "var(--surface-border)";
+  const txtSec = "var(--text-primary)";
+  const txtMuted = "var(--text-primary)";
+  const txtBody = "var(--text-primary)";
+  const txtBright = "var(--text-primary)";
+  const headerBg = "var(--bg-primary)";
+  const headerBorder = "var(--surface-border)";
+  const inputBg = "var(--bg-secondary)";
+  const inputBorder = "var(--surface-border)";
+  const inputText = "var(--text-primary)";
+  const searchIcon = "var(--text-primary)";
 
   const allTypes = Array.from(new Set(nodes.map(n => n.type)));
 
@@ -676,7 +674,7 @@ export function WikiGraph({ isOpen, onClose }: WikiGraphProps) {
   if (!isOpen) return null;
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", flexDirection: "column", background: bgPanel }}>
+    <div className="pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]" style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", flexDirection: "column", background: bgPanel }}>
       <style>{`
         .wg-sidebar::-webkit-scrollbar { width: 6px; }
         .wg-sidebar::-webkit-scrollbar-track { background: transparent; }

@@ -11,6 +11,10 @@ import {
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import type { AttachedFile } from "@/types";
 import { marked } from "marked";
+import { usePerformance } from "../lib/performance-context";
+
+const ANIMATED_AUDIO_DURATIONS = [0.45, 0.5, 0.55, 0.5, 0.45];
+const ANIMATED_AUDIO_DELAYS = [0, 0.1, 0.2, 0.1, 0];
 
 interface ModelOption {
   id: string;
@@ -94,7 +98,6 @@ declare global {
 }
 
 const AnimatedAudioLines = ({ isActive }: { isActive: boolean }) => {
-  const delays = [0, 0.1, 0.2, 0.1, 0];
   return (
     <div className="flex items-center gap-[2px] h-4">
       {[4, 10, 14, 10, 4].map((height, i) => (
@@ -106,10 +109,10 @@ const AnimatedAudioLines = ({ isActive }: { isActive: boolean }) => {
           transition={
             isActive
               ? {
-                duration: 0.4 + Math.random() * 0.2,
+                duration: ANIMATED_AUDIO_DURATIONS[i],
                 repeat: Infinity,
                 repeatType: "reverse",
-                delay: (delays[i % delays.length] ?? 0) + Math.random() * 0.1,
+                delay: ANIMATED_AUDIO_DELAYS[i],
               }
               : {
                 duration: 0.2,
@@ -186,6 +189,7 @@ export function ChatInput({
   const [isRecording, setIsRecording] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const isComposing = useRef(false);
+  const { isLow: isPerfLow } = usePerformance();
 
   // ─── Render markdown to HTML ───
   const renderMarkdown = useCallback(async (text: string): Promise<string> => {
@@ -315,14 +319,9 @@ export function ChatInput({
       `}
     >
       {/* ─── FILE CARDS ─── */}
-      <AnimatePresence>
-        {attachedFiles.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            className="flex flex-wrap gap-4 px-4 pt-3 pb-1 border-b border-[var(--surface-border)]"
-          >
+      {isPerfLow ? (
+        attachedFiles.length > 0 && (
+          <div className="flex flex-wrap gap-4 px-4 pt-3 pb-1 border-b border-[var(--surface-border)]">
             {attachedFiles.map((file, idx) => {
               const ext = file.name.split('.').pop()?.toUpperCase() || 'FILE';
               const isImage = file.type?.startsWith('image/');
@@ -356,9 +355,54 @@ export function ChatInput({
                 </div>
               );
             })}
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        )
+      ) : (
+        <AnimatePresence>
+          {attachedFiles.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              className="flex flex-wrap gap-4 px-4 pt-3 pb-1 border-b border-[var(--surface-border)]"
+            >
+              {attachedFiles.map((file, idx) => {
+                const ext = file.name.split('.').pop()?.toUpperCase() || 'FILE';
+                const isImage = file.type?.startsWith('image/');
+                const isVideo = file.type?.startsWith('video/');
+                return (
+                  <div
+                    key={file.name + idx}
+                    className="flex flex-col bg-[var(--bg-primary)] border border-[var(--surface-border)] rounded-lg p-3 min-w-[160px] max-w-[200px] w-auto hover:border-[var(--accent)]/35 transition-colors group"
+                  >
+                    {isImage ? (
+                      <img src={file.content} alt={file.name} className="w-full h-20 object-cover rounded-md mb-2" />
+                    ) : isVideo ? (
+                      <video src={file.content} className="w-full h-20 object-cover rounded-md mb-2" />
+                    ) : (
+                      <>
+                        <div className="font-semibold text-sm text-[var(--text-primary)] truncate">{file.name}</div>
+                        <div className="text-xs text-[var(--text-muted)] mt-0.5">
+                          {file.content ? `${file.content.split('\n').length} lines` : 'Media file'}
+                        </div>
+                      </>
+                    )}
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-[10px] px-2 py-0.5 border border-[var(--surface-border)] rounded bg-[var(--surface-bg)] text-[var(--text-secondary)]">{ext}</span>
+                      <button
+                        onClick={() => setAttachedFiles(attachedFiles.filter((_, i) => i !== idx))}
+                        className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-0.5 rounded hover:bg-[var(--surface-bg)]"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
 
       {/* ─── CONTENTEDITABLE EDITOR (markdown renders inline) ─── */}
       <div className="px-4 pt-[14px] pb-1">
@@ -392,14 +436,9 @@ export function ChatInput({
             </button>
 
           </div>
-          <AnimatePresence>
-            {attachMenuOpen && (
-              <motion.div
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 4 }}
-                className="absolute bottom-full left-0 mb-2 w-48 rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-xl z-50 overflow-hidden"
-              >
+          {isPerfLow ? (
+            attachMenuOpen && (
+              <div className="absolute bottom-full left-0 mb-2 w-48 rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-xl z-50 overflow-hidden">
                 <button
                   onClick={() => {
                     fileInputRef.current?.click();
@@ -410,9 +449,31 @@ export function ChatInput({
                   <HardDrive className="size-4" />
                   Upload from computer
                 </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              </div>
+            )
+          ) : (
+            <AnimatePresence>
+              {attachMenuOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 4 }}
+                  className="absolute bottom-full left-0 mb-2 w-48 rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-xl z-50 overflow-hidden"
+                >
+                  <button
+                    onClick={() => {
+                      fileInputRef.current?.click();
+                      setAttachMenuOpen(false);
+                    }}
+                    className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--surface-bg)] transition"
+                  >
+                    <HardDrive className="size-4" />
+                    Upload from computer
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          )}
           <input
             type="file"
             ref={fileInputRef}
@@ -433,14 +494,9 @@ export function ChatInput({
                 <span className="max-w-[120px] truncate">{currentModelLabel}</span>
                 <ChevronDown className="size-3 opacity-40" />
               </button>
-              <AnimatePresence>
-                {modelDropdownOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                    className="absolute bottom-full right-0 mb-2 w-64 max-h-80 overflow-y-auto rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-xl z-[70] p-1.5 custom-scrollbar"
-                  >
+              {isPerfLow ? (
+                modelDropdownOpen && (
+                  <div className="absolute bottom-full right-0 mb-2 w-64 max-h-80 overflow-y-auto rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-xl z-[70] p-1.5 custom-scrollbar">
                     {models.map((group) => (group.models.length > 0 && (
                       <div key={group.category} className="mb-1 last:mb-0">
                         <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] select-none">
@@ -464,9 +520,44 @@ export function ChatInput({
                         ))}
                       </div>
                     )))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                  </div>
+                )
+              ) : (
+                <AnimatePresence>
+                  {modelDropdownOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                      className="absolute bottom-full right-0 mb-2 w-64 max-h-80 overflow-y-auto rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-xl z-[70] p-1.5 custom-scrollbar"
+                    >
+                      {models.map((group) => (group.models.length > 0 && (
+                        <div key={group.category} className="mb-1 last:mb-0">
+                          <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] select-none">
+                            {group.category}
+                          </div>
+                          {group.models.map((model) => (
+                            <button
+                              key={model.id}
+                              onClick={() => {
+                                setSelectedModel(model.id);
+                                setModelDropdownOpen(false);
+                              }}
+                              className={`w-full text-left px-3 py-2 text-xs rounded-lg transition flex items-center justify-between ${selectedModel === model.id
+                                ? "text-[var(--accent)] bg-[var(--accent)]/8"
+                                : "text-[var(--text-primary)]/70 hover:bg-[var(--surface-bg)]"
+                                }`}
+                            >
+                              <span>{model.label}</span>
+                              {selectedModel === model.id && <span className="text-[var(--accent)]">●</span>}
+                            </button>
+                          ))}
+                        </div>
+                      )))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              )}
             </div>
           )}
 

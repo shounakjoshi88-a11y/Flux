@@ -224,6 +224,7 @@ export function ArtifactsModal({ isOpen, onClose, onSelectConversation, onPrevie
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "uploaded" | "generated">("all");
   const searchRef = useRef<HTMLInputElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   const fetchArtifacts = useCallback(async (pageNum: number, isInitial = false, silent = false) => {
     if (!silent) {
@@ -295,6 +296,13 @@ export function ArtifactsModal({ isOpen, onClose, onSelectConversation, onPrevie
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   const filteredArtifacts = useMemo(() => {
     return artifacts.filter((art) => {
@@ -380,7 +388,7 @@ export function ArtifactsModal({ isOpen, onClose, onSelectConversation, onPrevie
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8">
+        <div className={`fixed inset-0 z-[100] flex ${isMobile ? 'flex-col pt-[env(safe-area-inset-top)]' : 'items-center justify-center p-4 sm:p-8'}`}>
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -395,7 +403,7 @@ export function ArtifactsModal({ isOpen, onClose, onSelectConversation, onPrevie
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.96, opacity: 0, y: 12 }}
             transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
-            className="relative w-full max-w-5xl max-h-[82vh] flex flex-col bg-[var(--bg-primary)] backdrop-blur-2xl border border-[var(--surface-border)] rounded-2xl shadow-2xl overflow-hidden"
+            className={`${isMobile ? "relative mt-auto w-full h-[78vh] rounded-t-2xl shadow-2xl border-t border-[var(--surface-border)] pb-[env(safe-area-inset-bottom)]" : "relative w-full max-w-5xl max-h-[82vh] flex flex-col bg-[var(--bg-primary)] backdrop-blur-2xl border border-[var(--surface-border)] rounded-2xl shadow-2xl overflow-hidden"}`}
           >
             {/* Header */}
             <div className="flex items-center gap-3 px-5 py-3.5 border-b border-[var(--surface-border)] shrink-0">
@@ -426,12 +434,13 @@ export function ArtifactsModal({ isOpen, onClose, onSelectConversation, onPrevie
               </div>
 
               {/* Filter pills — Claude-style segmented control */}
-              <div className="flex items-center gap-0.5 bg-[var(--bg-secondary)] border border-[var(--surface-border)] rounded-lg p-0.5 shrink-0">
+              <div className={`flex items-center gap-1 ${isMobile ? 'overflow-x-auto no-scrollbar' : ''}`}>
+                <div className="flex items-center gap-0.5 bg-[var(--bg-secondary)] border border-[var(--surface-border)] rounded-lg p-0.5 shrink-0">
                 {FILTERS.map(({ key, label, count }) => (
                   <button
                     key={key}
                     onClick={() => setFilter(key)}
-                    className={`relative px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ${
+                    className={`relative px-2.5 py-1.5 rounded-md whitespace-nowrap text-xs font-medium transition-all duration-150 ${
                       filter === key ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                     }`}
                   >
@@ -450,6 +459,7 @@ export function ArtifactsModal({ isOpen, onClose, onSelectConversation, onPrevie
                     </span>
                   </button>
                 ))}
+              </div>
               </div>
 
               <motion.button

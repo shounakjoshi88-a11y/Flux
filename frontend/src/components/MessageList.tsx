@@ -1,7 +1,8 @@
 // src/components/MessageList.tsx
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect } from "react";
+import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import { motion } from "framer-motion";
-import { MessageItem } from "./MessageItem";
+import MessageItem from "./MessageItem";
 import { SourceCard } from "./SourceCard";
 import { getDomain } from "../lib/chat-utils";
 import { calculateReputationScore } from "../utils/ReputationScore";
@@ -83,26 +84,13 @@ export function MessageList({
   onHtmlPreview,
   conversationId,
 }: MessageListProps) {
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const lastScrollTopRef = useRef(0);
-  const autoScrollEnabledRef = useRef(true);
-  const prevMessagesLenRef = useRef(messages.length);
-  const [forceScrollKey, setForceScrollKey] = useState(0);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
 
-  // Force auto-scroll when a new message is added (user sent a prompt / conversation loaded)
   useEffect(() => {
-    if (messages.length > prevMessagesLenRef.current) {
-      autoScrollEnabledRef.current = true;
-      setForceScrollKey(k => k + 1);
+    if (isLoading || messages.length > 0) {
+      virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, behavior: "smooth" });
     }
-    prevMessagesLenRef.current = messages.length;
-  }, [messages.length]);
-
-  useEffect(() => {
-    if (!autoScrollEnabledRef.current) return;
-    const container = scrollContainerRef.current;
-    if (container) container.scrollTop = container.scrollHeight;
-  }, [messages, isLoading, forceScrollKey]);
+  }, [isLoading, messages.length]);
 
   // ─── Links tab ────────────────────────────────────────────
   if (activeTab === "links") {
@@ -181,36 +169,26 @@ export function MessageList({
 
   // ─── Answer tab ───────────────────────────────────────────
   return (
-    <div
-      ref={scrollContainerRef}
-      onScroll={(e) => {
-        const target = e.currentTarget;
-        const currentTop = target.scrollTop;
-        const isScrollingUp = currentTop < lastScrollTopRef.current;
-        const nearBottom = target.scrollHeight - (target.scrollTop + target.clientHeight) < 80;
-        if (isScrollingUp && !nearBottom) autoScrollEnabledRef.current = false;
-        if (nearBottom) autoScrollEnabledRef.current = true;
-        lastScrollTopRef.current = currentTop;
-      }}
-      className="flex-1 overflow-y-auto px-6 pt-6 pb-72 relative custom-scrollbar"
-      style={{ minHeight: 0 }}
-    >
-      {messages.length > 0 && (
-        <div className="space-y-0.2">
-          {messages.map((message, index) => {
-            // Find previous user message for retry/rewrite
-            let retryPrompt: string | undefined;
-            if (message.role === "Assistant") {
-              for (let j = index - 1; j >= 0; j--) {
-                const prev = messages[j];
-                if (prev && prev.role === "User") {
-                  retryPrompt = prev.content;
-                  break;
-                }
+    <div className="flex-1 relative custom-scrollbar" style={{ minHeight: 0 }}>
+      <Virtuoso
+        ref={virtuosoRef}
+        followOutput={true}
+        className="px-6 pt-6 pb-72"
+        totalCount={messages.length}
+        itemContent={(index) => {
+          const message = messages[index];
+          let retryPrompt: string | undefined;
+          if (message.role === "Assistant") {
+            for (let j = index - 1; j >= 0; j--) {
+              const prev = messages[j];
+              if (prev && prev.role === "User") {
+                retryPrompt = prev.content;
+                break;
               }
             }
-            return (
-            <div key={index} data-message-id={message.id}>
+          }
+          return (
+            <div data-message-id={message.id}>
               <div className="mx-auto max-w-[700px] animate-in fade-in duration-500">
                 <MessageItem
                   message={message}
@@ -234,16 +212,16 @@ export function MessageList({
                 />
               </div>
             </div>
-          );})}
-        </div>
-      )}
-
-      {/* ─── THREE‑DOT LOADER — shows only before the latest message starts streaming parts ─── */}
-      {isLoading && (messages.length === 0 || !messages[messages.length - 1]?.parts?.length) && (
-        <div className="mx-auto max-w-[700px] mt-4 pl-2">
-          <ThreeDotsLoader />
-        </div>
-      )}
+          );
+        }}
+        components={{
+          Footer: () => isLoading && (messages.length === 0 || !messages[messages.length - 1]?.parts?.length) ? (
+            <div className="mx-auto max-w-[700px] mt-4 pl-2">
+              <ThreeDotsLoader />
+            </div>
+          ) : null,
+        }}
+      />
     </div>
   );
 }

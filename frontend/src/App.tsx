@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { lazy, Suspense } from "react";
+import { PerformanceProvider } from "./lib/performance-context";
 
 const Auth = lazy(() => import("./pages/Auth"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -18,6 +19,7 @@ function LoadingFallback() {
 
 export function App() {
     return <BrowserRouter>
+    <PerformanceProvider>
     <Suspense fallback={<LoadingFallback />}>
     <Routes>
     <Route path="/auth" element={<Auth />} />
@@ -28,6 +30,7 @@ export function App() {
     <Route path="/" element={<Dashboard />} />
     </Routes>
     </Suspense>
+    </PerformanceProvider>
 </BrowserRouter>
 }
 

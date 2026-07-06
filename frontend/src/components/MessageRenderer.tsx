@@ -146,8 +146,9 @@ function RawLatexFallback({ formula, display }: { formula: string; display: bool
 let mjPromise: Promise<any> | null = null;
 let mjReady = false;
 
-export function needsMathJax(_formula: string): boolean {
-  return false; // All formulas handled by KaTeX + repair rules
+export function needsMathJax(formula: string): boolean {
+  if (/\\xymatrix\b/.test(formula)) return true;
+  return false;
 }
 
 function MathJaxRenderer({ formula, display }: { formula: string; display: boolean }) {
@@ -1313,6 +1314,17 @@ function renderPlainBlocks(text: string, onCitationClick: any, sources: Source[]
   return elements;
 }
 
+// ── XyMatrix standalone detection ─────────────────────────
+// \xymatrix{...} doesn't use \begin/\end, so it won't be caught by BLOCK_DELIM_REGEX.
+// We wrap it in \[...\] so it routes to DisplayMath / MathJax.
+function extractXymatrixBlocks(text: string): string {
+  return text.replace(/\\(?:xymatrix\*?(?:@[^{]*)?)\{((?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*)\}/g,
+    (_match) => {
+      return `\\[${_match}\\]`;
+    }
+  );
+}
+
 // ── Inline code protection ────────────────────────────────
 // Mask backtick-delimited inline code before the block regex runs, so that
 // prose mentions of \begin{CD} inside `code` aren't captured as env starts.
@@ -1338,7 +1350,8 @@ function renderBlocks(text: string, onCitationClick: any, sources: Source[], onH
   if (typeof text !== "string") return [];
   const codeStore: string[] = [];
   const masked = maskCode(text, codeStore);
-  return splitWithDelimiters(masked, BLOCK_DELIM_REGEX).flatMap((part, pi) => {
+  const withXy = extractXymatrixBlocks(masked);
+  return splitWithDelimiters(withXy, BLOCK_DELIM_REGEX).flatMap((part, pi) => {
     // Restore inline code spans — text parts need it, and code-block delimiter
     // parts may have placeholders if the code contained inline backtick spans.
     part.value = restoreCode(part.value, codeStore);
@@ -1387,6 +1400,10 @@ function renderBlocks(text: string, onCitationClick: any, sources: Source[], onH
           const content = val.replace(/^\\begin\{tikzpicture\}[\s\S]*?\n?/, "").replace(/\n?\\end\{tikzpicture\}$/, "").trim();
           return <TikzRenderer key={pi} code={content} />;
         }
+        if (env === "tikzcd") {
+          const content = val.replace(/^\\begin\{tikzcd\}[\s\S]*?\n?/, "").replace(/\n?\\end\{tikzcd\}$/, "").trim();
+          return <TikzRenderer key={pi} code={`\\begin{tikzcd}\n${content}\n\\end{tikzcd}`} />;
+        }
         return <DisplayMath key={pi} formula={val} />;
       }
       if (val.trim().startsWith("$$") || (val.trim().startsWith("\\[") && val.length > 10)) {
@@ -1394,6 +1411,10 @@ function renderBlocks(text: string, onCitationClick: any, sources: Source[], onH
         if (inner.startsWith("\\begin{tikzpicture}")) {
           const content = inner.replace(/^\\begin\{tikzpicture\}[\s\S]*?\n?/, "").replace(/\n?\\end\{tikzpicture\}$/, "").trim();
           return <TikzRenderer key={pi} code={content} />;
+        }
+        if (/^\\begin\{tikzcd\}/i.test(inner)) {
+          const content = inner.replace(/^\\begin\{tikzcd\}[\s\S]*?\n?/, "").replace(/\n?\\end\{tikzcd\}$/, "").trim();
+          return <TikzRenderer key={pi} code={`\\begin{tikzcd}\n${content}\n\\end{tikzcd}`} />;
         }
         return <DisplayMath key={pi} formula={val.trim()} />;
       }

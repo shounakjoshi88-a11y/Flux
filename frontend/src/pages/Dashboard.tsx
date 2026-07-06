@@ -50,6 +50,7 @@ import { parseAssistantContent, extractLiveContent } from "../lib/chat-utils";
 import { BACKEND_URL, UNSPLASH_ACCESS_KEY } from "../lib/config";
 import { conversationCache } from "../lib/conversation-cache";
 import { useAdaptiveQuality } from "../hooks/useAdaptiveQuality";
+import { usePerformance } from "../lib/performance-context";
 
 
 const supabase = createClient();
@@ -168,6 +169,7 @@ export default function Dashboard() {
   const { categories: modelCategories, all: allModels, isLoading: modelsLoading } = useModels();
   const { agents: customAgents, createAgent: createCustomAgent, deleteAgent: deleteCustomAgent } = useCustomAgents();
   const adaptive = useAdaptiveQuality();
+  const { isLow: isPerfLow } = usePerformance();
 
   const [isTeamPanelOpen, setIsTeamPanelOpen] = useState(false);
   const [isCustomAgentsOpen, setIsCustomAgentsOpen] = useState(false);
@@ -1079,7 +1081,7 @@ export default function Dashboard() {
   return (
   
     <div className="flex h-screen w-full main-container text-foreground overflow-hidden font-sans">
-      <AnimatePresence>
+      {isPerfLow ? (
         <Sidebar
           isOpen={isSidebarOpen}
           onToggle={() => setIsSidebarOpen((p) => !p)}
@@ -1109,7 +1111,39 @@ export default function Dashboard() {
           onCustomAgentsOpen={() => setIsCustomAgentsOpen((p) => !p)}
           onTeamOpen={() => setIsTeamPanelOpen((p) => !p)}
         />
-      </AnimatePresence>
+      ) : (
+        <AnimatePresence>
+          <Sidebar
+            isOpen={isSidebarOpen}
+            onToggle={() => setIsSidebarOpen((p) => !p)}
+            user={user}
+            conversations={conversations}
+            activeConversationId={activeConversationId}
+            onCreateThread={createNewThread}
+            onSelectThread={openConversation}
+            onDeleteThread={deleteConversation}
+            onPrefetchThread={prefetchConversation}
+            onArtifactsPrefetch={() => prefetchArtifacts(BACKEND_URL)}
+            isDarkMode={isDark}
+            toggleTheme={toggleTheme}
+            onLogout={async () => {
+              await supabase.auth.signOut();
+              setUser(null);
+              navigate("/auth");
+            }}
+            searchConversations={searchConversations}
+            isSearchModalOpen={isSearchModalOpen}
+            onSearchModalOpen={handleSearchModalOpen}
+            onSearchModalClose={handleSearchModalClose}
+            onSettingsOpen={handleSettingsOpen}
+            onArtifactsOpen={() => setIsArtifactsOpen(true)}
+            onWikiOpen={() => setIsWikiOpen(true)}
+            onNewsOpen={() => setIsNewsOpen(true)}
+            onCustomAgentsOpen={() => setIsCustomAgentsOpen((p) => !p)}
+            onTeamOpen={() => setIsTeamPanelOpen((p) => !p)}
+          />
+        </AnimatePresence>
+      )}
 
       <ArtifactsModal 
         isOpen={isArtifactsOpen}
@@ -1367,15 +1401,9 @@ export default function Dashboard() {
           onDeleteAgent={deleteCustomAgent}
         />
 
-        <AnimatePresence>
-          {peekFile && (
-            <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed top-0 right-0 h-full w-full sm:w-[480px] bg-white dark:bg-[#0a0a0a] border-l border-black/5 dark:border-white/10 z-50 shadow-2xl flex flex-col"
-            >
+        {isPerfLow ? (
+          peekFile && (
+            <div className="fixed top-0 right-0 h-full w-full sm:w-[480px] bg-white dark:bg-[#0a0a0a] border-l border-black/5 dark:border-white/10 z-50 shadow-2xl flex flex-col">
               <div className="flex items-center justify-between px-4 py-3 border-b border-black/5 dark:border-white/10">
                 <div className="flex items-center gap-2">
                   <FileText className="size-4 text-blue-500" />
@@ -1390,19 +1418,40 @@ export default function Dashboard() {
                   {peekFile.content || "No content available."}
                 </pre>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </div>
+          )
+        ) : (
+          <AnimatePresence>
+            {peekFile && (
+              <motion.div
+                initial={{ x: "100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "100%" }}
+                transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                className="fixed top-0 right-0 h-full w-full sm:w-[480px] bg-white dark:bg-[#0a0a0a] border-l border-black/5 dark:border-white/10 z-50 shadow-2xl flex flex-col"
+              >
+                <div className="flex items-center justify-between px-4 py-3 border-b border-black/5 dark:border-white/10">
+                  <div className="flex items-center gap-2">
+                    <FileText className="size-4 text-blue-500" />
+                    <span className="text-sm font-medium truncate">{peekFile.name}</span>
+                  </div>
+                  <button onClick={() => setPeekFile(null)} className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition">
+                    <X className="size-4" />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4">
+                  <pre className="text-xs whitespace-pre-wrap font-mono text-foreground/80 leading-relaxed">
+                    {peekFile.content || "No content available."}
+                  </pre>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
 
-        <AnimatePresence>
-          {htmlPreviewContent && (
-            <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed top-0 right-0 h-full w-full sm:w-[600px] bg-white dark:bg-[#0a0a0a] border-l border-black/5 dark:border-white/10 z-50 shadow-2xl flex flex-col"
-            >
+        {isPerfLow ? (
+          htmlPreviewContent && (
+            <div className="fixed top-0 right-0 h-full w-full sm:w-[600px] bg-white dark:bg-[#0a0a0a] border-l border-black/5 dark:border-white/10 z-50 shadow-2xl flex flex-col">
               <div className="flex items-center justify-between px-4 py-3 border-b border-black/5 dark:border-white/10 shrink-0">
                 <div className="flex items-center gap-2">
                   <Globe className="size-4 text-orange-500" />
@@ -1432,25 +1481,77 @@ export default function Dashboard() {
                   title="HTML Preview"
                 />
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </div>
+          )
+        ) : (
+          <AnimatePresence>
+            {htmlPreviewContent && (
+              <motion.div
+                initial={{ x: "100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "100%" }}
+                transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                className="fixed top-0 right-0 h-full w-full sm:w-[600px] bg-white dark:bg-[#0a0a0a] border-l border-black/5 dark:border-white/10 z-50 shadow-2xl flex flex-col"
+              >
+                <div className="flex items-center justify-between px-4 py-3 border-b border-black/5 dark:border-white/10 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <Globe className="size-4 text-orange-500" />
+                    <span className="text-sm font-medium">HTML Preview</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        const win = window.open("", "_blank");
+                        if (win) { win.document.write(htmlPreviewContent); win.document.close(); }
+                      }}
+                      className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition text-muted-foreground hover:text-foreground"
+                      title="Open in new tab"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    </button>
+                    <button onClick={() => setHtmlPreviewContent(null)} className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition text-muted-foreground hover:text-foreground">
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex-1 bg-white">
+                  <iframe
+                    srcDoc={htmlPreviewContent}
+                    className="w-full h-full border-none"
+                    sandbox="allow-scripts allow-same-origin allow-forms"
+                    title="HTML Preview"
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
 
-        <AnimatePresence>
-          {toast && (
-            <motion.div
-              initial={{ x: 100, opacity: 0, scale: 0.9 }}
-              animate={{ x: 0, opacity: 1, scale: 1 }}
-              exit={{ x: 100, opacity: 0, scale: 0.9 }}
-              transition={{ type: "spring", stiffness: 400, damping: 28 }}
-              className="fixed top-4 right-4 z-50 flex items-center gap-3 bg-[#181715] border border-white/8 text-white rounded-lg px-4 py-2.5 shadow-xl"
-            >
+        {isPerfLow ? (
+          toast && (
+            <div className="fixed top-4 right-4 z-50 flex items-center gap-3 bg-[#181715] border border-white/8 text-white rounded-lg px-4 py-2.5 shadow-xl">
               <span className="text-sm text-stone-300">Thread deleted.</span>
               <button onClick={undoDelete} className="text-sm font-medium text-[var(--accent)] hover:text-[var(--accent)]/80 transition-colors">Undo</button>
               <button onClick={() => setToast(null)} className="text-stone-500 hover:text-stone-300 transition-colors"><X className="size-3.5" /></button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </div>
+          )
+        ) : (
+          <AnimatePresence>
+            {toast && (
+              <motion.div
+                initial={{ x: 100, opacity: 0, scale: 0.9 }}
+                animate={{ x: 0, opacity: 1, scale: 1 }}
+                exit={{ x: 100, opacity: 0, scale: 0.9 }}
+                transition={{ type: "spring", stiffness: 400, damping: 28 }}
+                className="fixed top-4 right-4 z-50 flex items-center gap-3 bg-[#181715] border border-white/8 text-white rounded-lg px-4 py-2.5 shadow-xl"
+              >
+                <span className="text-sm text-stone-300">Thread deleted.</span>
+                <button onClick={undoDelete} className="text-sm font-medium text-[var(--accent)] hover:text-[var(--accent)]/80 transition-colors">Undo</button>
+                <button onClick={() => setToast(null)} className="text-stone-500 hover:text-stone-300 transition-colors"><X className="size-3.5" /></button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
       </main>
 
       <Settings
