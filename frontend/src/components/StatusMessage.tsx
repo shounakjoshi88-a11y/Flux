@@ -2192,4 +2192,6 @@ function StatusMessage({
   );
 }
 
-export default React.memo(StatusMessage);
+const StatusMessageMemo = React.memo(StatusMessage);
+export default StatusMessageMemo;
+export { StatusMessageMemo as StatusMessage };

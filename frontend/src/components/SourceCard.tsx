@@ -149,4 +149,6 @@ function SourceCard({
   );
 }
 
-export default React.memo(SourceCard);
+const SourceCardMemo = React.memo(SourceCard);
+export default SourceCardMemo;
+export { SourceCardMemo as SourceCard };

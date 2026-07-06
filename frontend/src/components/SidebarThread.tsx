@@ -73,4 +73,6 @@ function SidebarThread({
   );
 }
 
-export default React.memo(SidebarThread);
+const SidebarThreadMemo = React.memo(SidebarThread);
+export default SidebarThreadMemo;
+export { SidebarThreadMemo as SidebarThread };

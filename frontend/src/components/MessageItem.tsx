@@ -318,7 +318,7 @@ function InlineImageDisplay({
             </button>
           )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
