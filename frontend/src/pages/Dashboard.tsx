@@ -52,9 +52,6 @@ import { conversationCache } from "../lib/conversation-cache";
 import { useAdaptiveQuality } from "../hooks/useAdaptiveQuality";
 import { usePerformance } from "../lib/performance-context";
 
-
-const supabase = createClient();
-
 type GeneratedFile = {
   filename: string;
   mime: string;
@@ -69,6 +66,7 @@ export default function Dashboard() {
   const { isDark, toggle: toggleTheme } = useTheme();
 
   // ─── ALL HOOKS ──────────────────────────────────────────────
+  const supabase = useMemo(() => createClient(), []);
   const [user, setUser] = useState<User | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   // ─── Seed conversations from localStorage for instant sidebar render ────────

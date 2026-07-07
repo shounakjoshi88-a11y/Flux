@@ -1,13 +1,11 @@
 import { createClient } from "../lib/client";
 import { Button } from "../components/ui/button";
 import { Loader2, Search, Network, Brain, Layers, ChevronDown, ArrowRight, CheckCircle2, Globe, BookOpen, ExternalLink, Copy, Check, Volume2, RefreshCw, ThumbsUp, ThumbsDown } from "lucide-react";
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
 import { MessageRenderer } from "../components/MessageRenderer";
 import "../../styles/dashboard.css";
-
-const supabase = createClient();
 
 // Elite smooth easing curves
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -658,6 +656,7 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const reducedMotion = useReducedMotion();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => { document.title = "Sign In"; }, []);
 

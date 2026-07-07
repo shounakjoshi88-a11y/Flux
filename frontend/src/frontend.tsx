@@ -19,6 +19,10 @@ const app = (
 );
 
 // https://bun.com/docs/bundler/hot-reloading#import-meta-hot-data
-import.meta.hot
-  ? (import.meta.hot.data.root ??= createRoot(elem)).render(app)
-  : createRoot(elem).render(app);
+try {
+  import.meta.hot
+    ? (import.meta.hot.data.root ??= createRoot(elem)).render(app)
+    : createRoot(elem).render(app);
+} catch (e) {
+  console.error("[entry]", e);
+}

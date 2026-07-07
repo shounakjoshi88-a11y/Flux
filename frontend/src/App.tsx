@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import { PerformanceProvider } from "./lib/performance-context";
+import { ErrorBoundary } from "./lib/error-boundary";
 
 const Auth = lazy(() => import("./pages/Auth"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -18,7 +19,8 @@ function LoadingFallback() {
 }
 
 export function App() {
-    return <BrowserRouter>
+    return <ErrorBoundary>
+    <BrowserRouter>
     <PerformanceProvider>
     <Suspense fallback={<LoadingFallback />}>
     <Routes>
@@ -32,6 +34,7 @@ export function App() {
     </Suspense>
     </PerformanceProvider>
 </BrowserRouter>
+</ErrorBoundary>
 }
 
 export default App;
