@@ -5,10 +5,14 @@ import { BACKEND_URL } from "../lib/config";
 import { createClient } from "../lib/client";
 import type { PermissionRequest } from "../types";
 
-const supabase = createClient();
+let _supabase: ReturnType<typeof createClient> | null = null;
+function getSupabase() {
+  if (!_supabase) _supabase = createClient();
+  return _supabase;
+}
 
 async function getAccessToken() {
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await getSupabase().auth.getSession();
   return session?.access_token ?? "";
 }
 

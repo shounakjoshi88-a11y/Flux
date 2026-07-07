@@ -1,7 +1,11 @@
 import { useEffect, useRef, useCallback } from "react";
 import { createClient } from "../lib/client";
 
-const supabase = createClient();
+let _supabase: ReturnType<typeof createClient> | null = null;
+function getSupabase() {
+  if (!_supabase) _supabase = createClient();
+  return _supabase;
+}
 
 export interface SyncEventData {
   type: "conversation_created" | "conversation_deleted" | "message_created" | "message_deleted" | "settings_updated";
@@ -24,10 +28,10 @@ export function useSync(options: UseSyncOptions) {
   optionsRef.current = options;
 
   const setupChannel = useCallback(async (): Promise<(() => void) | null> => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await getSupabase().auth.getUser();
     if (!user?.id) return null;
 
-    const channel = supabase.channel(`sync:${user.id}`);
+    const channel = getSupabase().channel(`sync:${user.id}`);
 
     return new Promise((resolve) => {
       channel.on(
@@ -71,7 +75,7 @@ export function useSync(options: UseSyncOptions) {
           subscribed = true;
           clearTimeout(timeout);
           resolve(() => {
-            supabase.removeChannel(channel);
+            getSupabase().removeChannel(channel);
           });
         } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
           clearTimeout(timeout);
@@ -121,7 +125,7 @@ export function useSync(options: UseSyncOptions) {
       }
     };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(onAuthChange);
+    const { data: { subscription } } = getSupabase().auth.onAuthStateChange(onAuthChange);
     authUnsubscribe = subscription?.unsubscribe ?? null;
 
     const handleOnline = () => {

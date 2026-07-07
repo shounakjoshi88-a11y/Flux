@@ -19,7 +19,11 @@ import { BACKEND_URL } from "../lib/config";
 import { createClient } from "../lib/client";
 import mammoth from "mammoth";
 
-const supabase = createClient();
+let _supabase: ReturnType<typeof createClient> | null = null;
+function getSupabase() {
+  if (!_supabase) _supabase = createClient();
+  return _supabase;
+}
 
 // ─── Module-level cache ───────────────────────────────────────
 // Persists across modal opens/closes and even component remounts.
@@ -37,7 +41,7 @@ let _tokenCache: { token: string; exp: number } | null = null;
 async function getCachedToken(): Promise<string | null> {
   const now = Date.now();
   if (_tokenCache && _tokenCache.exp > now + 5_000) return _tokenCache.token;
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await getSupabase().auth.getSession();
   if (!session?.access_token) return null;
   // Supabase JWTs expire in 1 h; refresh 2 min before expiry
   const exp = session.expires_at ? session.expires_at * 1000 : now + 3600_000;

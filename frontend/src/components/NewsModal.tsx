@@ -5,7 +5,11 @@ import { X, Search, ExternalLink, RefreshCw, Clock, BookOpen } from "lucide-reac
 import { BACKEND_URL } from "../lib/config";
 import { createClient } from "../lib/client";
 import { MessageRenderer } from "./MessageRenderer";
-const supabase = createClient();
+let _supabase: ReturnType<typeof createClient> | null = null;
+function getSupabase() {
+if (!_supabase) _supabase = createClient();
+return _supabase;
+}
 
 type NewsItem = {
   title: string;
@@ -177,7 +181,7 @@ function NewsPeekPanel({ url, onClose }: { url: string; onClose: () => void }) {
     }
     const load = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await getSupabase().auth.getSession();
         const token = session?.access_token;
         const res = await fetch(
           `${BACKEND_URL}/proxy?url=${encodeURIComponent(url)}`,
@@ -282,7 +286,7 @@ export function NewsModal({ isOpen, onClose }: NewsModalProps) {
     setLoading(true);
     setFetchError(null);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await getSupabase().auth.getSession();
       const token = session?.access_token;
       if (!token) {
         setFetchError("Not authenticated. Please sign in.");
@@ -314,7 +318,7 @@ export function NewsModal({ isOpen, onClose }: NewsModalProps) {
     setSearching(true);
     setSearchError(null);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await getSupabase().auth.getSession();
       const token = session?.access_token;
       if (!token) {
         setSearchError("Not authenticated. Please sign in.");
@@ -375,7 +379,7 @@ export function NewsModal({ isOpen, onClose }: NewsModalProps) {
     setSummaryLoading(true);
     setSummaryStreaming(false);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await getSupabase().auth.getSession();
       const token = session?.access_token;
       if (!token) throw new Error("Not authenticated");
       const res = await fetch(`${BACKEND_URL}/summarize`, {

@@ -9,7 +9,11 @@ import { createMessageIndex, composeMessageWithIndex } from "@/lib/message-index
 import { normalizeToolCall } from "@/lib/tool-normalizer";
 import { ApprovalStore, approvalKeyForTool, globalApprovalStore } from "@/lib/approval-store";
 
-const supabase = createClient();
+let _supabase: ReturnType<typeof createClient> | null = null;
+function getSupabase() {
+  if (!_supabase) _supabase = createClient();
+  return _supabase;
+}
 
 type AgentSessionState =
   | "idle" | "connecting" | "warming_up" | "ready"
@@ -683,6 +687,6 @@ export function useAgentSession(user: any) {
 }
 
 async function getAccessToken() {
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await getSupabase().auth.getSession();
   return session?.access_token ?? "";
 }

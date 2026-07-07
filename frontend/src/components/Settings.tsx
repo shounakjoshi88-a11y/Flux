@@ -32,7 +32,11 @@ interface SettingsProps {
   toggleTheme: () => void;
 }
 
-const supabase = createClient();
+let _supabase: ReturnType<typeof createClient> | null = null;
+function getSupabase() {
+  if (!_supabase) _supabase = createClient();
+  return _supabase;
+}
 
 // ─── Font definitions ──────────────────────────────────────
 const FONT_OPTIONS = [
@@ -171,7 +175,7 @@ export function Settings({
     if (ttsProvider === "local") {
       setIsSpeaking(true);
       try {
-        const token = (await supabase.auth.getSession()).data.session?.access_token || '';
+        const token = (await getSupabase().auth.getSession()).data.session?.access_token || '';
         const res = await fetch(`${BACKEND_URL}/api/tts/local`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -298,9 +302,9 @@ export function Settings({
   const loadSessions = async () => {
     if (!user) return; setLoadingSessions(true);
     try {
-      const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+      const { data: { session: currentSession }, error: sessionError } = await getSupabase().auth.getSession();
       if (sessionError || !currentSession) { setSessions([]); setLoadingSessions(false); return; }
-      const { data, error } = await supabase.rpc('get_user_sessions', { p_user_id: user.id });
+      const { data, error } = await getSupabase().rpc('get_user_sessions', { p_user_id: user.id });
       if (error) throw error;
       if (data && Array.isArray(data)) {
         setSessions(data.map((s: any) => {
@@ -325,7 +329,7 @@ export function Settings({
     setRevokingSessionId(sessionId);
     // Relocated setOpenMenuSessionId(null) to the success block
     try {
-      const { error } = await supabase.rpc('revoke_user_session', { p_session_id: sessionId });
+      const { error } = await getSupabase().rpc('revoke_user_session', { p_session_id: sessionId });
       if (error) throw error;
       setSessions(prev => prev.filter(s => s.id !== sessionId));
       setOpenMenuSessionId(null); // Finalize UI only on success
@@ -343,7 +347,7 @@ export function Settings({
     if (!user) return; setMemoriesLoading(true);
     setDebugError(null);
     try {
-      const token = (await supabase.auth.getSession()).data.session?.access_token || '';
+      const token = (await getSupabase().auth.getSession()).data.session?.access_token || '';
       
       // Also fetch whoami for debugging
       fetch(`${BACKEND_URL}/whoami`, { headers: { Authorization: `Bearer ${token}` } })
@@ -379,7 +383,7 @@ export function Settings({
   const handleDeleteMemory = async (memoryId: string) => {
     setDeletingMemoryId(memoryId);
     try {
-      const token = (await supabase.auth.getSession()).data.session?.access_token || '';
+      const token = (await getSupabase().auth.getSession()).data.session?.access_token || '';
       const res = await fetch(`${BACKEND_URL}/memories/${memoryId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
@@ -405,9 +409,9 @@ export function Settings({
       if (avatarFile) {
         const fileExt = avatarFile.name.split(".").pop();
         const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-        const { error: uploadError } = await supabase.storage.from("avatars").upload(fileName, avatarFile, { upsert: true });
+        const { error: uploadError } = await getSupabase().storage.from("avatars").upload(fileName, avatarFile, { upsert: true });
         if (uploadError) throw uploadError;
-        const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(fileName);
+        const { data: urlData } = getSupabase().storage.from("avatars").getPublicUrl(fileName);
         finalAvatarUrl = urlData.publicUrl; setAvatarUrl(finalAvatarUrl); setAvatarFile(null);
         if (prevBlobUrlRef.current) { URL.revokeObjectURL(prevBlobUrlRef.current); prevBlobUrlRef.current = null; }
       }
@@ -425,10 +429,10 @@ export function Settings({
       if (overrides && typeof overrides === "object") {
         Object.assign(metadata, overrides);
       }
-      const { data, error } = await supabase.auth.updateUser({ data: metadata });
+      const { data, error } = await getSupabase().auth.updateUser({ data: metadata });
       if (error) throw error;
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) { await supabase.auth.refreshSession(); const { data: { session: ns } } = await supabase.auth.getSession(); if (ns?.user && onUserUpdate) onUserUpdate(ns.user); }
+      const { data: { session } } = await getSupabase().auth.getSession();
+      if (session) { await getSupabase().auth.refreshSession(); const { data: { session: ns } } = await getSupabase().auth.getSession(); if (ns?.user && onUserUpdate) onUserUpdate(ns.user); }
       else if (data.user && onUserUpdate) onUserUpdate(data.user);
       setSavedMessage("Saved"); setTimeout(() => setSavedMessage(null), 1500);
     } catch (error: any) { console.error("Auto-save error:", error); setSavedMessage(`Error: ${error.message}`); setTimeout(() => setSavedMessage(null), 4000); }
@@ -448,7 +452,7 @@ export function Settings({
   const handleLogoutAllDevices = async () => {
     if (!confirm("Are you sure you want to sign out of all devices?")) return;
     setLoggingOutAllDevices(true);
-    try { await supabase.auth.signOut({ scope: "global" }); window.location.href = "/auth"; }
+    try { await getSupabase().auth.signOut({ scope: "global" }); window.location.href = "/auth"; }
     catch (error) { console.error("Error logging out all devices:", error); alert("Failed."); }
     finally { setLoggingOutAllDevices(false); }
   };
@@ -456,7 +460,7 @@ export function Settings({
   const handleDeleteAccount = async () => {
     if (!confirm("Are you sure you want to delete your account?")) return;
     setDeletingAccount(true);
-    try { await supabase.auth.signOut(); window.location.href = "/auth"; }
+    try { await getSupabase().auth.signOut(); window.location.href = "/auth"; }
     catch (error) { console.error("Error deleting account:", error); alert("Failed."); }
     finally { setDeletingAccount(false); }
   };
@@ -464,7 +468,7 @@ export function Settings({
   // ─── Google Integration Handlers ────────────────────────────
   const checkGoogleStatus = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await getSupabase().auth.getSession();
       if (!session?.access_token) return;
       const res = await fetch(`${BACKEND_URL}/api/integrations/google/status`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
@@ -479,7 +483,7 @@ export function Settings({
   const handleGoogleConnect = async () => {
     try {
       setGoogleConnecting(true);
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await getSupabase().auth.getSession();
       if (!session?.access_token) throw new Error('Not authenticated');
 
       const initRes = await fetch(`${BACKEND_URL}/api/integrations/google/init`, {
@@ -520,7 +524,7 @@ export function Settings({
 
   const handleGoogleDisconnect = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await getSupabase().auth.getSession();
       if (!session?.access_token) return;
       await fetch(`${BACKEND_URL}/api/integrations/google/disconnect`, {
         method: 'POST',
