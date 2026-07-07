@@ -323,4 +323,442 @@ function InlineImageDisplay({
   );
 }
 
+function MessageItem({
+  message,
+  sources: externalSources,
+  onCitationClick,
+  onFollowUpClick,
+  onRetry,
+  onRegenerate,
+  onSourceClick,
+  onFileClick,
+  onPreview,
+  onFileDelete,
+  onEdit,
+  onDelete,
+  activeGenerationStatus,
+  onHtmlPreview,
+  conversationId,
+}: MessageItemProps) {
+  const parsedContentBundle = useMemo(() => {
+    const rawText = message.content || "";
+
+    // Extract internal thinking text safely
+    const thoughtRegexMatch = rawText.match(/<(?:thought|think)>([\s\S]*?)(?:<\/(?:thought|think)>|$)/i);
+    const reasoningText = (thoughtRegexMatch && thoughtRegexMatch[1]) ? thoughtRegexMatch[1].trim() : null;
+
+    // Clean display answer
+    const cleanDisplayAnswer = deepCleanAnswer(rawText);
+
+    return { reasoningText, cleanDisplayAnswer };
+  }, [message.content]);
+
+  // ─── Unconditional hooks (moved up to avoid conditional hook count violations) ───
+  const [showActions, setShowActions] = useState(false);
+  const [liked, setLiked] = useState<'up' | 'down' | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(message.content || '');
+  const editRef = useRef<HTMLTextAreaElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const isStreaming = String(message.id).startsWith("temp-");
+  const hasError = message.error === true;
+  const errorMessage = message.errorMessage;
+
+  // Auto-approval ��� send approval responses automatically
+  const [autoApproved, setAutoApproved] = useState(false);
+
+  // ─── Destructure with defaults ─────────────────────────
+  const {
+    answer,
+    followUps = [],
+    fileAttachment = [],
+    generatedFiles = [],
+    type,
+  } = message;
+
+  // ─── Edit handlers ──────────────────────────────────────
+  const handleEditSave = useCallback(() => {
+    if (editText.trim() && editText !== message.content) {
+      onEdit?.(message.id, editText);
+    }
+    setEditing(false);
+  }, [editText, message.content, message.id, onEdit]);
+
+  const handleEditCancel = useCallback(() => {
+    setEditText(message.content || '');
+    setEditing(false);
+  }, [message.content]);
+
+  useEffect(() => {
+    if (editing && editRef.current) {
+      editRef.current.focus();
+      editRef.current.setSelectionRange(editRef.current.value.length, editRef.current.value.length);
+    }
+  }, [editing]);
+
+  // ─── Sources handling ─────────────────────────────────
+  const sources = useMemo(() => {
+    if (externalSources && externalSources.length > 0) return externalSources;
+
+    // Extract from message if not provided externally
+    const srcs: Source[] = [];
+    if (message.sources && Array.isArray(message.sources)) {
+      message.sources.forEach((s: any) => {
+        if (typeof s === 'string') {
+          srcs.push({ url: s, title: s });
+        } else if (s && s.url) {
+          srcs.push({ url: s.url, title: s.title || s.url });
+        }
+      });
+    }
+    return srcs;
+  }, [externalSources, message.sources]);
+
+  // ─── Active generation status ──────────────────────────
+  const isStatusActive = activeGenerationStatus?.subtype === 'calling_tool' || activeGenerationStatus?.subtype === 'file_generation' || activeGenerationStatus?.subtype === 'thinking' || activeGenerationStatus?.subtype === 'reasoning';
+
+  const activeMessage = activeGenerationStatus?.message || '';
+
+  // ─── Typewriter ─────────────────────────────────────────
+  const _typewriterText = useMemo(() => {
+    return answer || parsedContentBundle.cleanDisplayAnswer || message.content || '';
+  }, [answer, parsedContentBundle.cleanDisplayAnswer, message.content]);
+
+  const typewriterContent = useTypewriter(_typewriterText, message.id);
+
+  // ─── isAssistant ─────────────────────────────────────────
+  const isAssistant = message.role === 'assistant';
+
+  // ─── Helper: should we render the file section ──────────
+  const hasFiles = fileAttachment.length > 0 || generatedFiles.length > 0;
+
+  return (
+    <div
+      ref={scrollRef}
+      id={`msg-${message.id}`}
+      className={`group relative flex flex-col ${isAssistant ? 'items-start' : 'items-end'} w-full ${hasError ? 'opacity-80' : ''}`}
+      onMouseEnter={() => setShowActions(true)}
+      onMouseLeave={() => setShowActions(false)}
+    >
+      {/* ─── Bubble ──────────────────────────────────────── */}
+      <div className={`relative max-w-[92%] sm:max-w-[85%] 2xl:max-w-[80%] ${isAssistant ? 'pr-4 sm:pr-8' : 'pl-4 sm:pl-8'}`}>
+
+        {/* ═══════════════════════════════════════════════════════════
+           USER MESSAGE
+        ════════════════════════════════════════════════════════════ */}
+        {!isAssistant && (
+          <>
+            {/* Edited indicator */}
+            {message.edited && (
+              <div className="text-[10px] text-muted-foreground/40 font-mono mb-1 tracking-tight">
+                edited
+              </div>
+            )}
+
+            {/* Editable or static content */}
+            {editing ? (
+              <div className="flex flex-col gap-2">
+                <textarea
+                  ref={editRef}
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  className="w-full min-h-[60px] px-3 py-2 rounded-lg border border-[var(--surface-border)] bg-[var(--surface-bg)] text-sm text-[var(--text-primary)] resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                  onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleEditSave(); if (e.key === 'Escape') handleEditCancel(); }}
+                />
+                <div className="flex gap-2 justify-end">
+                  <button onClick={handleEditCancel} className="px-3 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
+                  <button onClick={handleEditSave} className="px-3 py-1 rounded-md text-xs bg-[var(--accent)] text-white hover:opacity-90 transition-opacity">Save</button>
+                </div>
+              </div>
+            ) : (
+              <div className="px-4 py-2.5 rounded-2xl bg-[var(--user-bubble)] text-[var(--text-primary)] text-[15px] leading-relaxed whitespace-pre-wrap break-words font-light shadow-sm">
+                <MessageRenderer content={message.content || ''} />
+                {hasError && errorMessage && (
+                  <div className="mt-2 text-xs text-red-400/80 italic">{errorMessage}</div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+           ASSISTANT MESSAGE
+        ════════════════════════════════════════════════════════════ */}
+        {isAssistant && (
+          <div className="flex flex-col gap-1.5">
+
+            {/* ─── Active generation status row ─────────────── */}
+            {activeGenerationStatus && isStatusActive && (
+              <StatusMessage
+                subtype={activeGenerationStatus.subtype as any}
+                message={activeMessage}
+              />
+            )}
+
+            {/* ─── Reasoning / thinking block ────────────────── */}
+            {parsedContentBundle.reasoningText && !isStreaming && (
+              <ThoughtBlock content={parsedContentBundle.reasoningText} />
+            )}
+
+            {/* ─── Main content ──────────────────────────────── */}
+            {!activeGenerationStatus && (
+              <div className="px-4 py-2.5 rounded-2xl bg-[var(--assistant-bubble)] text-[var(--text-primary)] text-[15px] leading-relaxed break-words font-light shadow-sm">
+                {isStreaming ? (
+                  <>
+                    <MessageRenderer content={typewriterContent} />
+                    {message.content && typewriterContent.length < message.content.length && (
+                      <span className="inline-block w-[2px] h-[1em] bg-[var(--accent)] ml-0.5 animate-pulse align-middle" />
+                    )}
+                  </>
+                ) : (
+                  <MessageRenderer content={parsedContentBundle.cleanDisplayAnswer || message.content || ''} />
+                )}
+                {hasError && errorMessage && (
+                  <div className="mt-2 text-xs text-red-400/80 italic">{errorMessage}</div>
+                )}
+              </div>
+            )}
+
+            {/* ─── Generated files ───────────────────────── */}
+            {generatedFiles.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mt-2">
+                {generatedFiles.map((file, idx) => {
+                  if (file.mime.startsWith('image/')) {
+                    return (
+                      <InlineImageDisplay
+                        key={`${message.id}-gen-${idx}`}
+                        file={file}
+                        messageId={message.id}
+                        index={idx}
+                        onDelete={onFileDelete ? () => onFileDelete(message.id, file.filename, 'generatedFiles') : undefined}
+                      />
+                    );
+                  }
+                  const b64url = file.base64 ? `data:${file.mime};base64,${file.base64}` : '';
+                  return (
+                    <a
+                      key={`${message.id}-gen-${idx}`}
+                      href={b64url}
+                      download={file.filename}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--surface-border)] bg-[var(--surface-bg)]/50 hover:bg-[var(--surface-bg)] transition-colors text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      <FileDown className="size-3.5 shrink-0" />
+                      <span className="truncate">{file.filename}</span>
+                    </a>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* ─── Code File Download ──────────────────────── */}
+            {fileAttachment.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {fileAttachment.map((file, idx) => {
+                  if (file.type === 'generated_file') return null;
+                  const isCode = file.name ? isCodeFile(file.name) : false;
+                  const content = file.content || '';
+                  const snippet = content.slice(0, 200);
+
+                  return (
+                    <FileDownloadButton
+                      key={`${message.id}-file-${idx}`}
+                      filename={file.name || `file-${idx}`}
+                      content={content}
+                      language={isCode ? extToLang(file.name || '') : undefined}
+                      snippet={snippet}
+                      onHtmlPreview={onHtmlPreview}
+                    />
+                  );
+                })}
+              </div>
+            )}
+
+            {/* ─── Tool / function call result display ─────── */}
+            {message.tool_calls && message.tool_calls.length > 0 && (
+              <div className="mt-2 space-y-2">
+                {message.tool_calls.map((tc: any, idx: number) => (
+                  <ToolSummary key={idx} toolCall={tc} messageId={message.id} />
+                ))}
+              </div>
+            )}
+
+            {/* ─── Timeline nodes ──────────────────────────── */}
+            {message.timeline && message.timeline.length > 0 && (
+              <div className="mt-2">
+                {message.timeline.map((node: any, idx: number) => (
+                  <TimelineNode
+                    key={idx}
+                    node={node}
+                    isLast={idx === message.timeline!.length - 1}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* ─── Sources ──────────────────────────────────── */}
+            {sources.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {sources.map((source, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => onCitationClick(idx)}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-mono text-muted-foreground/70 hover:text-foreground hover:bg-[var(--surface-bg)] border border-[var(--surface-border)]/50 transition-colors"
+                  >
+                    <span className="text-[10px] font-bold text-[var(--accent)] mr-0.5">{idx + 1}</span>
+                    {source.title || getDomain(source.url)}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* ─── Follow-up questions ───────────────────────── */}
+            {followUps.length > 0 && (
+              <div className="mt-3 space-y-1">
+                {followUps.map((question: string, idx: number) => (
+                  <button
+                    key={idx}
+                    onClick={() => onFollowUpClick(question)}
+                    className="group flex items-center gap-2 text-xs text-muted-foreground/60 hover:text-[var(--accent)] transition-colors"
+                  >
+                    <CornerDownRight className="size-3 opacity-40 group-hover:opacity-100 transition-opacity" />
+                    <span className="border-b border-dotted border-current/20 group-hover:border-current/40">
+                      {question}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* ─── Retry button (error state) ─────────────── */}
+            {hasError && onRetry && (
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={() => onRetry()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+                >
+                  <RefreshCw className="size-3" />
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {/* ─── Speaking indicator ─────────────────────── */}
+            {isSpeaking && (
+              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/40 font-mono mt-0.5">
+                <Volume2 className="size-3 animate-pulse" />
+                Speaking...
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── Action bar: timestamps + actions ─────────────── */}
+        <div className={`flex items-center gap-3 mt-1.5 ${isAssistant ? 'justify-start' : 'justify-end'} ${showActions || isStreaming ? 'opacity-100' : 'opacity-0'} transition-opacity duration-200`}>
+          {/* Timestamp */}
+          <span className="text-[10px] font-mono text-muted-foreground/30 select-none">
+            {message.created_at
+              ? (() => {
+                const d = new Date(message.created_at);
+                return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              })()
+              : ''}
+          </span>
+
+          {/* Action buttons - assistant only */}
+          {isAssistant && (
+            <div className="flex items-center gap-0.5">
+              {/* Speak */}
+              <button
+                onClick={async () => {
+                  if (isSpeaking) { window.speechSynthesis.cancel(); setIsSpeaking(false); return; }
+                  const text = (answer || message.content || '').replace(/<[^>]*>/g, '');
+                  if (!text) return;
+                  const utterance = new SpeechSynthesisUtterance(text);
+                  utterance.onend = () => setIsSpeaking(false);
+                  setIsSpeaking(true);
+                  window.speechSynthesis.speak(utterance);
+                }}
+                className="p-1 rounded-md transition-colors text-muted-foreground/40 hover:text-foreground"
+                title={isSpeaking ? 'Stop' : 'Read aloud'}
+              >
+                {isSpeaking ? <VolumeX className="size-3" /> : <Volume2 className="size-3" />}
+              </button>
+
+              {/* Copy */}
+              <button
+                onClick={() => {
+                  const text = (answer || message.content || '').replace(/<[^>]*>/g, '');
+                  navigator.clipboard.writeText(text).then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }).catch(() => { });
+                }}
+                className="p-1 rounded-md transition-colors text-muted-foreground/40 hover:text-foreground"
+                title="Copy"
+              >
+                {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
+              </button>
+
+              {/* Edit */}
+              {!editing && onEdit && (
+                <button
+                  onClick={() => { setEditing(true); setEditText(message.content || ''); }}
+                  className="p-1 rounded-md transition-colors text-muted-foreground/40 hover:text-foreground"
+                  title="Edit"
+                >
+                  <Pencil className="size-3" />
+                </button>
+              )}
+
+              {/* Delete */}
+              {onDelete && (
+                <button
+                  onClick={() => { if (confirm('Delete this message?')) onDelete(message.id); }}
+                  className="p-1 rounded-md transition-colors text-muted-foreground/40 hover:text-red-400"
+                  title="Delete"
+                >
+                  <Trash2 className="size-3" />
+                </button>
+              )}
+
+              {/* Thumbs up/down */}
+              {!isStreaming && (
+                <>
+                  <button
+                    onClick={() => setLiked(liked === 'up' ? null : 'up')}
+                    className={`p-1 rounded-md transition-colors ${liked === 'up' ? 'text-emerald-500' : 'text-muted-foreground/40 hover:text-foreground'}`}
+                    title="Good response"
+                  >
+                    <ThumbsUp className={`size-3 ${liked === 'up' ? 'fill-emerald-500' : ''}`} />
+                  </button>
+                  <button
+                    onClick={() => setLiked(liked === 'down' ? null : 'down')}
+                    className={`p-1 rounded-md transition-colors ${liked === 'down' ? 'text-red-500' : 'text-muted-foreground/40 hover:text-foreground'}`}
+                    title="Bad response"
+                  >
+                    <ThumbsDown className={`size-3 ${liked === 'down' ? 'fill-red-500' : ''}`} />
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ─── Source cascade ────────────────────────────────── */}
+        {sources.length > 0 && (
+          <div className="flex items-center gap-1.5 mt-2">
+            <span className="text-[10px] font-mono text-muted-foreground/40">
+              {sources.length} {sources.length === 1 ? 'source' : 'sources'}
+            </span>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
 export default React.memo(MessageItem);
