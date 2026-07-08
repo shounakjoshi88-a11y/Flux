@@ -582,7 +582,7 @@ function MessageItem({
               </div>
             ) : (
               <div className="px-4 py-2.5 rounded-2xl bg-[var(--user-bubble)] text-[var(--text-primary)] text-[15px] leading-relaxed whitespace-pre-wrap break-words font-light shadow-sm">
-                <MessageRenderer content={cleanContent} />
+                <MessageRenderer content={cleanContent} sources={sources} onCitationClick={onCitationClick} onHtmlPreview={onHtmlPreview} />
                 {hasError && errorMessage && (
                   <div className="mt-2 text-xs text-red-400/80 italic">{errorMessage}</div>
                 )}
@@ -615,13 +615,13 @@ function MessageItem({
               <div className="px-4 py-2.5 rounded-2xl bg-[var(--assistant-bubble)] text-[var(--text-primary)] text-[15px] leading-relaxed break-words font-light shadow-sm">
                 {isStreaming ? (
                   <>
-                    <MessageRenderer content={typewriterContent} />
+                    <MessageRenderer content={typewriterContent} sources={sources} onCitationClick={onCitationClick} onHtmlPreview={onHtmlPreview} />
                     {message.content && typewriterContent.length < message.content.length && (
                       <span className="inline-block w-[2px] h-[1em] bg-[var(--accent)] ml-0.5 animate-pulse align-middle" />
                     )}
                   </>
                 ) : (
-                  <MessageRenderer content={parsedContentBundle.cleanDisplayAnswer || message.content || ''} />
+                  <MessageRenderer content={parsedContentBundle.cleanDisplayAnswer || message.content || ''} sources={sources} onCitationClick={onCitationClick} onHtmlPreview={onHtmlPreview} />
                 )}
                 {hasError && errorMessage && (
                   <div className="mt-2 text-xs text-red-400/80 italic">{errorMessage}</div>
