@@ -5,28 +5,30 @@ import ToolSummary from "./ToolSummary";
 
 // ─── Typewriter hook — only for streaming messages ──────────
 function useTypewriter(fullText: string, messageId: string | number): string {
+  const safeText = fullText ?? "";
   const isStreaming = String(messageId).startsWith("temp-");
   const [displayedLength, setDisplayedLength] = useState(() =>
-    isStreaming ? 0 : fullText.length
+    isStreaming ? 0 : safeText.length
   );
 
   // Non-streaming: show full text immediately
   const showFull = !isStreaming;
   const prevShowFull = useRef(showFull);
   if (showFull && !prevShowFull.current) {
-    setDisplayedLength(fullText.length);
+    setDisplayedLength(safeText.length);
   }
   prevShowFull.current = showFull;
 
-  const fullTextRef = useRef(fullText);
-  fullTextRef.current = fullText;
+  const fullTextRef = useRef(safeText);
+  fullTextRef.current = safeText;
 
   useEffect(() => {
     if (!isStreaming) return;
     const interval = setInterval(() => {
       setDisplayedLength(prev => {
-        if (prev < fullTextRef.current.length) {
-          return Math.min(prev + 2, fullTextRef.current.length);
+        const currentText = fullTextRef.current ?? "";
+        if (prev < currentText.length) {
+          return Math.min(prev + 2, currentText.length);
         }
         return prev;
       });
@@ -35,7 +37,7 @@ function useTypewriter(fullText: string, messageId: string | number): string {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStreaming]);
 
-  return fullText.slice(0, displayedLength);
+  return safeText.slice(0, displayedLength);
 }
 import {
   CornerDownRight,
@@ -424,7 +426,7 @@ function MessageItem({
 
   // ─── Typewriter ─────────────────────────────────────────
   const _typewriterText = useMemo(() => {
-    return answer || parsedContentBundle.cleanDisplayAnswer || message.content || '';
+    return (answer || parsedContentBundle.cleanDisplayAnswer || message.content || '') ?? '';
   }, [answer, parsedContentBundle.cleanDisplayAnswer, message.content]);
 
   const typewriterContent = useTypewriter(_typewriterText, message.id);
