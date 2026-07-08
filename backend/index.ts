@@ -121,7 +121,8 @@ const MAGIC_BYTES: [RegExp, string][] = [
   [/^UEsDBAo/, 'application/x-tar'],
 ];
 function detectMimeFromBase64(b64: string): string | null {
-  const sig = b64.slice(0, 10);
+  const raw = b64.startsWith('data:') ? (b64.split(',')[1] || '') : b64;
+  const sig = raw.slice(0, 10);
   for (const [pattern, mime] of MAGIC_BYTES) {
     if (pattern.test(sig)) return mime;
   }
@@ -3660,6 +3661,18 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
 
 // ── PDF parsing (pymupdf4llm subprocess) ────────────────────────────────
 
+async function findPython(): Promise<string> {
+  const candidates = ['python3', 'python'];
+  for (const cmd of candidates) {
+    try {
+      const proc = Bun.spawn([cmd, '--version'], { timeout: 5_000 });
+      const exitCode = await proc.exited;
+      if (exitCode === 0) return cmd;
+    } catch { /* try next */ }
+  }
+  return 'python3';
+}
+
 interface ExtractionResult {
     metadata: { pages: number; ocr_pages: number; is_scanned: boolean; has_images: boolean };
     markdown: string;
@@ -3683,8 +3696,9 @@ async function extractPdf(rawBuf: Buffer): Promise<ExtractionResult> {
     const tmp = path.join(os.tmpdir(), `flux-pdf-${crypto.randomUUID()}.pdf`);
     try {
         await Bun.write(tmp, rawBuf);
-        const proc = Bun.spawn(['python3', path.resolve('pdf_parser.py'), tmp], {
-            timeout: 30_000,
+        const pythonCmd = await findPython();
+        const proc = Bun.spawn([pythonCmd, path.resolve('pdf_parser.py'), tmp], {
+            timeout: 60_000,
         });
         const [out, errOut] = await Promise.all([
             new Response(proc.stdout).text(),

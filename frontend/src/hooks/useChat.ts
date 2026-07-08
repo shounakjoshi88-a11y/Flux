@@ -305,7 +305,7 @@ export function useChat(user: any) {
           : prompt,
         createdAt: new Date().toISOString(),
         fileAttachment: attachedFiles
-          ? attachedFiles.map((f) => ({ name: f.name, content: f.content }))
+          ? attachedFiles.map((f) => ({ name: f.name, content: f.content, type: f.type }))
           : [],
       };
 
