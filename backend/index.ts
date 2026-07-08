@@ -3751,7 +3751,7 @@ async function processLargeDocument(
     sourceUrl?: string,
 ): Promise<void> {
     const contentHash = crypto.createHash('sha256').update(Buffer.from(result.markdown)).digest('hex');
-    const existing = await prisma.documentChunk.findFirst({ where: { contentHash, userId } });
+    const existing = await (prisma.documentChunk as any).findFirst({ where: { contentHash, userId } });
     if (existing) return;
 
     const chunks = chunkByHeadings(result.pages, docName);
@@ -3765,7 +3765,7 @@ async function processLargeDocument(
 
     await prisma.$transaction(
         embedded.map(({ chunk, embedding }) =>
-            prisma.documentChunk.create({
+            (prisma.documentChunk as any).create({
                 data: {
                     userId,
                     documentName: docName,
@@ -4408,7 +4408,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
 
             const reversed: { role: 'user' | 'assistant'; content: string }[] = [];
             for (let i = memos.length - 1; i >= skipCount; i--) {
-                const m = memos[i];
+                const m = memos[i]!;
                 const content = typeof m.content === 'string' ? m.content.slice(0, 2000) : '';
                 if (!content) continue;
                 const role = m.role === 'User' ? 'user' : 'assistant';
@@ -4487,7 +4487,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
         // ── Save user message ────────────────────────────────────────────
         await prisma.message.create({
             data: {
-                content: attachedFilesText ? `${attachedFilesText}\n--\n${nq}` : nq,
+                content: nq,
                 role: 'User',
                 conversationId: activeConversationId,
                 fileAttachment: safeAtt.length > 0 ? safeAtt : undefined,
@@ -4522,7 +4522,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                     if (isBinary) {
                         const rawBase64 = att.content.startsWith('data:') ? (att.content.split(',')[1] || '') : att.content;
                         if (rawBase64) {
-                            await codeExecutor.writeFile(cid, `/home/user/uploads/${fn}`, Buffer.from(rawBase64, 'base64'));
+                            await codeExecutor.writeFile(cid, `/home/user/uploads/${fn}`, rawBase64);
                             paths.push(`/home/user/uploads/${fn}`);
                         }
                     } else {

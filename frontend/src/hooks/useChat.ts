@@ -319,6 +319,7 @@ export function useChat(user: any) {
         sources: [],
         followUps: [],
         generatedFiles: [],
+        parts: [{ type: "agent_status", status: "processing", message: "Thinking..." }],
       };
 
       setMessages((prev) => {

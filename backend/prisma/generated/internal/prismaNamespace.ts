@@ -391,6 +391,7 @@ export const ModelName = {
   WikiEdge: 'WikiEdge',
   UserGoogleToken: 'UserGoogleToken',
   Memory: 'Memory',
+  DocumentChunk: 'DocumentChunk',
   Task: 'Task',
   TaskStep: 'TaskStep'
 } as const
@@ -408,7 +409,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "conversation" | "message" | "wikiNode" | "wikiEdge" | "userGoogleToken" | "memory" | "task" | "taskStep"
+    modelProps: "user" | "conversation" | "message" | "wikiNode" | "wikiEdge" | "userGoogleToken" | "memory" | "documentChunk" | "task" | "taskStep"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -914,6 +915,64 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    DocumentChunk: {
+      payload: Prisma.$DocumentChunkPayload<ExtArgs>
+      fields: Prisma.DocumentChunkFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.DocumentChunkFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentChunkPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.DocumentChunkFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentChunkPayload>
+        }
+        findFirst: {
+          args: Prisma.DocumentChunkFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentChunkPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.DocumentChunkFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentChunkPayload>
+        }
+        findMany: {
+          args: Prisma.DocumentChunkFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentChunkPayload>[]
+        }
+        delete: {
+          args: Prisma.DocumentChunkDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentChunkPayload>
+        }
+        update: {
+          args: Prisma.DocumentChunkUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentChunkPayload>
+        }
+        deleteMany: {
+          args: Prisma.DocumentChunkDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.DocumentChunkUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.DocumentChunkUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentChunkPayload>[]
+        }
+        aggregate: {
+          args: Prisma.DocumentChunkAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateDocumentChunk>
+        }
+        groupBy: {
+          args: Prisma.DocumentChunkGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DocumentChunkGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.DocumentChunkCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DocumentChunkCountAggregateOutputType> | number
+        }
+      }
+    }
     Task: {
       payload: Prisma.$TaskPayload<ExtArgs>
       fields: Prisma.TaskFieldRefs
@@ -1201,6 +1260,23 @@ export const MemoryScalarFieldEnum = {
 } as const
 
 export type MemoryScalarFieldEnum = (typeof MemoryScalarFieldEnum)[keyof typeof MemoryScalarFieldEnum]
+
+
+export const DocumentChunkScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  documentName: 'documentName',
+  source: 'source',
+  sourceUrl: 'sourceUrl',
+  chunkIndex: 'chunkIndex',
+  heading: 'heading',
+  text: 'text',
+  tokenCount: 'tokenCount',
+  contentHash: 'contentHash',
+  createdAt: 'createdAt'
+} as const
+
+export type DocumentChunkScalarFieldEnum = (typeof DocumentChunkScalarFieldEnum)[keyof typeof DocumentChunkScalarFieldEnum]
 
 
 export const TaskScalarFieldEnum = {
@@ -1541,6 +1617,7 @@ export type GlobalOmitConfig = {
   wikiEdge?: Prisma.WikiEdgeOmit
   userGoogleToken?: Prisma.UserGoogleTokenOmit
   memory?: Prisma.MemoryOmit
+  documentChunk?: Prisma.DocumentChunkOmit
   task?: Prisma.TaskOmit
   taskStep?: Prisma.TaskStepOmit
 }

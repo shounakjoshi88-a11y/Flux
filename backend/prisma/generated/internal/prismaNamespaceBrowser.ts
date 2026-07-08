@@ -58,6 +58,7 @@ export const ModelName = {
   WikiEdge: 'WikiEdge',
   UserGoogleToken: 'UserGoogleToken',
   Memory: 'Memory',
+  DocumentChunk: 'DocumentChunk',
   Task: 'Task',
   TaskStep: 'TaskStep'
 } as const
@@ -178,6 +179,23 @@ export const MemoryScalarFieldEnum = {
 } as const
 
 export type MemoryScalarFieldEnum = (typeof MemoryScalarFieldEnum)[keyof typeof MemoryScalarFieldEnum]
+
+
+export const DocumentChunkScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  documentName: 'documentName',
+  source: 'source',
+  sourceUrl: 'sourceUrl',
+  chunkIndex: 'chunkIndex',
+  heading: 'heading',
+  text: 'text',
+  tokenCount: 'tokenCount',
+  contentHash: 'contentHash',
+  createdAt: 'createdAt'
+} as const
+
+export type DocumentChunkScalarFieldEnum = (typeof DocumentChunkScalarFieldEnum)[keyof typeof DocumentChunkScalarFieldEnum]
 
 
 export const TaskScalarFieldEnum = {
