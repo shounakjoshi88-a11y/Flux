@@ -498,11 +498,13 @@ export default function Dashboard() {
             (msg as any).parts = parts;
           }
 
+          const msgGenerated = (msg as any).generatedFiles ?? [];
+          const msgFileAtt = (msg as any).fileAttachment ?? [];
           if (storedSources && storedSources.length > 0) {
-            return { ...msg, content: answer, sources: storedSources, followUps: finalFollowUps } as Message;
+            return { ...msg, content: answer, sources: storedSources, followUps: finalFollowUps, generatedFiles: msgGenerated, fileAttachment: msgFileAtt } as Message;
           }
           const { sources: parsedSources } = parseAssistantContent(msg.content);
-          return { ...msg, content: answer, sources: parsedSources.length > 0 ? parsedSources : (msg.sources ?? []), followUps: finalFollowUps } as Message;
+          return { ...msg, content: answer, sources: parsedSources.length > 0 ? parsedSources : (msg.sources ?? []), followUps: finalFollowUps, generatedFiles: msgGenerated, fileAttachment: msgFileAtt } as Message;
         }
         if (msg.role === "User") {
           const fileAttachment = (msg as any).fileAttachment as { name: string; content?: string }[] | undefined;

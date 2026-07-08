@@ -460,14 +460,14 @@ function MessageItem({
   // Auto-approval ��� send approval responses automatically
   const [autoApproved, setAutoApproved] = useState(false);
 
-  // ─── Destructure with defaults ─────────────────────────
+  // ─── Destructure with null-safe defaults ───────────────
   const {
     answer,
     followUps = [],
-    fileAttachment = [],
-    generatedFiles = [],
     type,
   } = message;
+  const fileAttachment = message.fileAttachment ?? [];
+  const generatedFiles = message.generatedFiles ?? [];
 
   // ─── Edit handlers ──────────────────────────────────────
   const handleEditSave = useCallback(() => {
