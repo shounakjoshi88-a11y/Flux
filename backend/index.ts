@@ -3670,6 +3670,7 @@ async function findPython(): Promise<string> {
       if (exitCode === 0) return cmd;
     } catch { /* try next */ }
   }
+  console.warn('[PDF_PARSER] Python not found, falling back to python3');
   return 'python3';
 }
 
@@ -3680,6 +3681,8 @@ interface ExtractionResult {
     pages: PageData[];
     token_count: number;
 }
+
+const PDF_PARSER_PATH = path.join(import.meta.dir, 'pdf_parser.py');
 
 async function extractPdf(rawBuf: Buffer): Promise<ExtractionResult> {
     const MAX_FILE_SIZE = 50 * 1024 * 1024;
@@ -3697,7 +3700,7 @@ async function extractPdf(rawBuf: Buffer): Promise<ExtractionResult> {
     try {
         await Bun.write(tmp, rawBuf);
         const pythonCmd = await findPython();
-        const proc = Bun.spawn([pythonCmd, path.resolve('pdf_parser.py'), tmp], {
+        const proc = Bun.spawn([pythonCmd, PDF_PARSER_PATH, tmp], {
             timeout: 60_000,
         });
         const [out, errOut] = await Promise.all([
