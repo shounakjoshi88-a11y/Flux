@@ -52,6 +52,7 @@ import {
   VolumeX,
   Pencil,
   FileDown,
+  X,
 } from "lucide-react";
 
 import { FileDownloadButton } from "./FileDownloadButton";
@@ -248,10 +249,10 @@ function InlineImageDisplay({
       : null;
 
   return (
-    <div className="mt-3 rounded-xl overflow-hidden border border-white/10 bg-black/20 group/img">
+    <div className="mt-3 rounded-xl overflow-hidden bg-black/20 group/img">
       {/* Image */}
       <div
-        className="relative cursor-zoom-in min-h-[100px] flex items-center justify-center bg-stone-900/50"
+        className="relative cursor-zoom-in flex items-center justify-center bg-stone-900/50 aspect-square"
         onClick={() => displaySrc && setExpanded(!expanded)}
       >
         {displaySrc ? (
@@ -260,7 +261,7 @@ function InlineImageDisplay({
               src={displaySrc}
               alt="AI generated image"
               onLoad={handleImgLoad}
-              className={`w-full object-cover transition-all duration-500 ${expanded ? "max-h-none" : "max-h-[420px]"} ${!fullBase64 ? "blur-[2px] opacity-90" : ""}`}
+              className={`w-full h-full object-contain transition-all duration-500 ${!fullBase64 ? "blur-[2px] opacity-90" : ""}`}
               style={{ display: "block" }}
             />
             {!expanded && (
@@ -374,42 +375,71 @@ function UserFileAttachment({
   const ext = file.name.split('.').pop()?.toUpperCase() || 'FILE';
   const lineCount = content ? content.split('\n').length : 0;
   const isImage = file.type?.startsWith('image/');
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  const imgSrc = content?.startsWith('data:') ? content : content ? `data:image/png;base64,${content}` : '';
 
   return (
-    <div
-      className="group/file relative flex flex-col bg-[var(--surface-bg)] border border-[var(--surface-border)] rounded-xl p-3 min-w-[140px] max-w-[200px] w-auto hover:border-[var(--accent)]/30 transition-all cursor-pointer"
-      onClick={() => onFileClick?.({ name: file.name, content: content ?? "" })}
-    >
-      {loading ? (
-        <div className="flex items-center justify-center h-20 mb-2">
-          <div className="size-4 border-2 border-[var(--border-border)] border-t-[var(--text-primary)] rounded-full animate-spin" />
+    <>
+      {previewOpen && isImage && imgSrc && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setPreviewOpen(false)}
+        >
+          <div className="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center">
+            <img src={imgSrc} alt={file.name} className="max-w-full max-h-[90vh] object-contain rounded-lg" />
+            <button
+              onClick={() => setPreviewOpen(false)}
+              className="absolute top-2 right-2 size-8 flex items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
         </div>
-      ) : isImage && content ? (
-        <img src={content.startsWith('data:') ? content : `data:image/png;base64,${content}`} alt={file.name} loading="lazy" className="w-full h-20 object-cover rounded-lg mb-2" />
-      ) : isImage && !content ? (
-        <div className="flex items-center justify-center h-20 mb-2 text-[var(--text-muted)] text-xs">Image unavailable</div>
-      ) : (
-        <>
-          <div className="font-medium text-sm text-[var(--text-primary)] truncate tracking-tight">{file.name}</div>
-          <div className="text-[11px] text-[var(--text-muted)] mt-1">{lineCount > 0 ? `${lineCount} lines` : 'Text file'}</div>
-        </>
       )}
-      <div className="mt-2 flex items-center justify-between">
-        <span className="text-[9px] px-2 py-0.5 border border-[var(--surface-border)] rounded bg-[var(--bg-primary)] text-[var(--text-muted)] font-medium">{ext}</span>
-        {onFileDelete && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onFileDelete(file.name);
-            }}
-            className="opacity-0 group-hover/file:opacity-100 p-1 rounded hover:bg-red-500/15 text-red-400 transition-all"
-            title="Delete attachment"
-          >
-            <Trash2 className="size-3" />
-          </button>
+      <div
+        className="group/file relative flex flex-col bg-[var(--surface-bg)] rounded-xl overflow-hidden hover:bg-[var(--surface-hover)] transition-all cursor-pointer w-[140px]"
+        onClick={() => {
+          if (isImage && imgSrc) {
+            setPreviewOpen(true);
+          } else {
+            onFileClick?.({ name: file.name, content: content ?? "" });
+          }
+        }}
+      >
+        {loading ? (
+          <div className="flex items-center justify-center aspect-square">
+            <div className="size-4 border-2 border-[var(--border-border)] border-t-[var(--text-primary)] rounded-full animate-spin" />
+          </div>
+        ) : isImage && content ? (
+          <div className="aspect-square">
+            <img src={imgSrc} alt={file.name} loading="lazy" className="w-full h-full object-cover" />
+          </div>
+        ) : isImage && !content ? (
+          <div className="flex items-center justify-center aspect-square text-[var(--text-muted)] text-xs">Image unavailable</div>
+        ) : (
+          <div className="p-3">
+            <div className="font-medium text-sm text-[var(--text-primary)] truncate tracking-tight">{file.name}</div>
+            <div className="text-[11px] text-[var(--text-muted)] mt-1">{lineCount > 0 ? `${lineCount} lines` : 'Text file'}</div>
+          </div>
         )}
+        <div className="mt-2 flex items-center justify-between">
+          <span className="text-[9px] px-2 py-0.5 border border-[var(--surface-border)] rounded bg-[var(--bg-primary)] text-[var(--text-muted)] font-medium">{ext}</span>
+          {onFileDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onFileDelete(file.name);
+              }}
+              className="opacity-0 group-hover/file:opacity-100 p-1 rounded hover:bg-red-500/15 text-red-400 transition-all"
+              title="Delete attachment"
+            >
+              <Trash2 className="size-3" />
+            </button>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
