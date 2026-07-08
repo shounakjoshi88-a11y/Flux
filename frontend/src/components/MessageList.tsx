@@ -139,6 +139,8 @@ export function MessageList({
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const atBottomRef = useRef(true);
   const prevLenRef = useRef(messages.length);
+  const scrollThrottleRef = useRef(0);
+  const messagesRef = useRef(messages);
 
   // Expose messages for retryPrompt lookup in MessageEntry
   useEffect(() => {
@@ -146,15 +148,23 @@ export function MessageList({
     return () => { (window as any).__flux_messages = null; };
   }, [messages]);
 
-  // Auto-scroll when new messages arrive
+  // Auto-scroll when new messages arrive OR streaming content updates
   useEffect(() => {
-    if (messages.length > prevLenRef.current && atBottomRef.current) {
+    const lenChanged = messages.length !== prevLenRef.current;
+    const lastMsgChanged = messages.length > 0 &&
+      messagesRef.current[messagesRef.current.length - 1] !== messages[messages.length - 1];
+
+    if (atBottomRef.current && (lenChanged || lastMsgChanged)) {
+      const now = Date.now();
+      if (now - scrollThrottleRef.current < 80) return;
+      scrollThrottleRef.current = now;
       setTimeout(() => {
         virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, align: "end", behavior: "auto" });
-      }, 50);
+      }, 30);
     }
     prevLenRef.current = messages.length;
-  }, [messages.length]);
+    messagesRef.current = messages;
+  }, [messages]);
 
   const handleAtBottomChange = useCallback((atBottom: boolean) => {
     atBottomRef.current = atBottom;
@@ -265,8 +275,9 @@ export function MessageList({
         style={{ minHeight: 0 }}
         data={messages}
         itemContent={itemContent}
-        followOutput={false}
+        followOutput={(isAtBottom) => isAtBottom ? "smooth" : false}
         atBottomStateChange={handleAtBottomChange}
+        overscan={400}
         components={{
           Header: () => (
             <>
@@ -284,7 +295,7 @@ export function MessageList({
           ),
           EmptyPlaceholder: () => null,
         }}
-        increaseViewportBy={{ top: 200, bottom: 200 }}
+        increaseViewportBy={{ top: 400, bottom: 600 }}
       />
     </div>
   );

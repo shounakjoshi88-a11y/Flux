@@ -12,6 +12,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, ReferenceLine, LabelList,
 } from "recharts";
+import { fixMalformedTags } from "../lib/chat-utils";
 
 // ─── Types ──────────────────────────────────────────────────
 interface ChartDataset {
@@ -485,27 +486,27 @@ export type TextOrVisual =
 
 export function parseVisuals(content: string): TextOrVisual[] {
   const segments: TextOrVisual[] = [];
-  const re = /<(CHART|MERMAID)>([\s\S]*?)<\/\1>/gi;
+  // Fix malformed tags so the regex always sees well-formed delimiters
+  const fixed = fixMalformedTags(content);
+  const re = /<(?:CHART|MERMAID)>([\s\S]*?)<\/(?:CHART|MERMAID)>/gi;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
-  while ((match = re.exec(content)) !== null) {
+  while ((match = re.exec(fixed)) !== null) {
     if (match.index > lastIndex) {
-      segments.push({ kind: "text", content: content.slice(lastIndex, match.index) });
+      segments.push({ kind: "text", content: fixed.slice(lastIndex, match.index) });
     }
-    const tagMatch = match[1];
-    if (tagMatch) {
-      const tag = tagMatch.toUpperCase() as "CHART" | "MERMAID";
-      segments.push({
-        kind: tag === "CHART" ? "chart" : "mermaid",
-        raw: match[2] ?? "",
-      });
-    }
+    const tagRaw = fixed.slice(match.index + 1, match.index + 1 + 10).toUpperCase();
+    const tag = tagRaw.startsWith("MERMAID") ? "MERMAID" : "CHART";
+    segments.push({
+      kind: tag === "CHART" ? "chart" : "mermaid",
+      raw: match[1] ?? "",
+    });
     lastIndex = re.lastIndex;
   }
 
-  if (lastIndex < content.length) {
-    segments.push({ kind: "text", content: content.slice(lastIndex) });
+  if (lastIndex < fixed.length) {
+    segments.push({ kind: "text", content: fixed.slice(lastIndex) });
   }
 
   return segments;
