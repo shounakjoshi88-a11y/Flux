@@ -1726,16 +1726,20 @@ function StatusMessage({
   }
 
   // ─── parsing ────────────────────────────────────────────────────────────────
-  if (status.subtype === "parsing" || status.subtype === "parsing_done") {
+  if (status.subtype === "parsing" || status.subtype === "parsing_done" || status.subtype === "parsing_error") {
+    const isError = status.subtype === "parsing_error";
     return (
       <StepRow rightSlot={rightSlot}
-        icon={!isActive
-          ? <DoneIcon cls="text-green-500" />
-          : <SpinnerIcon cls="text-[var(--accent)] animate-spin size-4" />
+        icon={isError
+          ? <WarnIcon cls="text-red-400" />
+          : (!isActive
+            ? <DoneIcon cls="text-green-500" />
+            : <SpinnerIcon cls="text-[var(--accent)] animate-spin size-4" />
+          )
         }
         message={status.message}
         isFirst={isFirst} isLast={isLast}
-        pulse={!!isActive}
+        pulse={!!isActive && !isError}
       />
     );
   }
