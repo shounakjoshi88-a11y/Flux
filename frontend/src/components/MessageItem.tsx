@@ -424,7 +424,7 @@ function UserFileAttachment({
           </div>
         )}
         <div className="mt-2 flex items-center justify-between">
-          <span className="text-[9px] px-2 py-0.5 border border-[var(--surface-border)] rounded bg-[var(--bg-primary)] text-[var(--text-muted)] font-medium">{ext}</span>
+          {!isImage && <span className="text-[9px] px-2 py-0.5 border border-[var(--surface-border)] rounded bg-[var(--bg-primary)] text-[var(--text-muted)] font-medium">{ext}</span>}
           {onFileDelete && (
             <button
               onClick={(e) => {
