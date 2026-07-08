@@ -22,7 +22,7 @@ import katex from "katex";
 import "katex/dist/katex.min.css";
 
 import type { Source } from "../types";
-import { getDomain } from "../lib/chat-utils";
+import { getDomain, fixMalformedTags } from "../lib/chat-utils";
 import { ChartRenderer, type ChartData } from "./ChartBlock";
 import SmilesDrawer from "smiles-drawer";
 import DOMPurify from "dompurify";
@@ -1344,10 +1344,11 @@ function restoreCode(text: string, store: string[]): string {
 }
 
 // ── Block regex: \3 backreference ensures \begin{CD} only matches \end{CD} ──
-const BLOCK_DELIM_REGEX = /(<(CHART|MERMAID|svg|TIKZ|LILYPOND|MUSIC|ABC|CHEMICAL|SMILES|MOL)(?:\s+[^>]*)?>[\s\S]*?<\/(?:CHART|MERMAID|svg|TIKZ|LILYPOND|MUSIC|ABC|CHEMICAL|SMILES|MOL)>|```[a-z]*[\s\S]*?```|(?<=\n|^)\s*\$\$[\s\S]*?\s*\$\$(?=\s*$|\n)|(?<!\\)\\\[(?!-?\d+pt)[\s\S]+?\\\]|\\begin\{([a-zA-Z*]+)\}[\s\S]*?\\end\{\3\})/gim;
+const BLOCK_DELIM_REGEX = /(<(?:CHART|MERMAID|svg|TIKZ|LILYPOND|MUSIC|ABC|CHEMICAL|SMILES|MOL)(?:\s+[^>]*)?>[\s\S]*?<\/(?:CHART|MERMAID|svg|TIKZ|LILYPOND|MUSIC|ABC|CHEMICAL|SMILES|MOL)>|```[a-z]*[\s\S]*?```|(?<=\n|^)\s*\$\$[\s\S]*?\s*\$\$(?=\s*$|\n)|(?<!\\)\\\[(?!-?\d+pt)[\s\S]+?\\\]|\\begin\{([a-zA-Z*]+)\}[\s\S]*?\\end\{\3\})/gim;
 
 function renderBlocks(text: string, onCitationClick: any, sources: Source[], onHtmlPreview?: (html: string) => void) {
   if (typeof text !== "string") return [];
+  text = fixMalformedTags(text);
   const codeStore: string[] = [];
   const masked = maskCode(text, codeStore);
   const withXy = extractXymatrixBlocks(masked);

@@ -85,12 +85,33 @@ export function MessageList({
   conversationId,
 }: MessageListProps) {
   const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const atBottomRef = useRef(true);
+  const prevLenRef = useRef(messages.length);
+  const scrollThrottleRef = useRef(0);
+  const messagesRef = useRef(messages);
 
   useEffect(() => {
-    if (isLoading || messages.length > 0) {
-      virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, behavior: "smooth" });
+    (window as any).__flux_messages = messages;
+    return () => { (window as any).__flux_messages = null; };
+  }, [messages]);
+
+  // Auto-scroll when new messages arrive OR streaming content updates
+  useEffect(() => {
+    const lenChanged = messages.length !== prevLenRef.current;
+    const lastMsgChanged = messages.length > 0 &&
+      messagesRef.current[messagesRef.current.length - 1] !== messages[messages.length - 1];
+
+    if (atBottomRef.current && (lenChanged || lastMsgChanged)) {
+      const now = Date.now();
+      if (now - scrollThrottleRef.current < 80) return;
+      scrollThrottleRef.current = now;
+      setTimeout(() => {
+        virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, align: "end", behavior: "auto" });
+      }, 30);
     }
-  }, [isLoading, messages.length]);
+    prevLenRef.current = messages.length;
+    messagesRef.current = messages;
+  }, [messages]);
 
   // ─── Links tab ────────────────────────────────────────────
   if (activeTab === "links") {
@@ -172,9 +193,11 @@ export function MessageList({
     <div className="flex-1 relative custom-scrollbar" style={{ minHeight: 0 }}>
       <Virtuoso
         ref={virtuosoRef}
-        followOutput={true}
+        followOutput={(isAtBottom) => isAtBottom ? "smooth" : false}
+        overscan={400}
         className="px-6 pt-6 pb-72"
         totalCount={messages.length}
+        increaseViewportBy={{ top: 400, bottom: 600 }}
         itemContent={(index) => {
           const message = messages[index];
           let retryPrompt: string | undefined;

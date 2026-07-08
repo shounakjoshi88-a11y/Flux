@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { flushSync } from "react-dom";
 import { createClient } from "@/lib/client";
 import { BACKEND_URL } from "@/lib/config";
-import { extractLiveContent, deepCleanAnswer } from "@/lib/chat-utils";
+import { extractLiveContent, deepCleanAnswer, fixMalformedTags } from "@/lib/chat-utils";
 import type { Message, AttachedFile, Source, GeneratedFile, MessagePart, PermissionRequest } from "@/types";
 import { queueMessage, getQueuedMessages, removeQueuedMessage, getQueueLength } from "@/lib/offline-queue";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
@@ -168,19 +168,20 @@ export function useChat(user: any) {
   }, []);
 
   function cleanThoughtText(raw: string): string {
-    // Handle both <THOUGHT> and <think> tags
-    const closeIdx = Math.max(raw.indexOf("</THOUGHT>"), raw.indexOf("</think>"));
+    // Fix malformed tags first, then handle both <THOUGHT> and <think> tags
+    const fixed = fixMalformedTags(raw);
+    const closeIdx = Math.max(fixed.indexOf("</THOUGHT>"), fixed.indexOf("</think>"));
     if (closeIdx === -1) return "";
-    const openThought = raw.lastIndexOf("<THOUGHT>", closeIdx);
-    const openThink = raw.lastIndexOf("<think>", closeIdx);
+    const openThought = fixed.lastIndexOf("<THOUGHT>", closeIdx);
+    const openThink = fixed.lastIndexOf("<think>", closeIdx);
     const openIdx = Math.max(openThought, openThink);
     if (openIdx === -1) return "";
     const openTagLen = openIdx === openThought ? 9 : 7; // "<THOUGHT>".length=9, "<think>".length=7
-    return raw.slice(openIdx + openTagLen, closeIdx).trim();
+    return fixed.slice(openIdx + openTagLen, closeIdx).trim();
   }
 
   function stripTags(s: string): string {
-    return s
+    return fixMalformedTags(s)
       .replace(/<FOLLOW_UPS>[\s\S]*?(?:<\/FOLLOW_UPS>|$)/gi, "")
       .replace(/<FOLLOW_UPS[\s\S]*/gi, "")
       .replace(/<THOUGHT>[\s\S]*?<\/THOUGHT>/gi, "")
@@ -194,10 +195,11 @@ export function useChat(user: any) {
   }
 
   function cleanAnswerText(raw: string): string {
-    if (!raw.trim()) return "";
-    const openIdx = raw.indexOf("<ANSWER>");
-    const closeIdx = raw.indexOf("</ANSWER>");
-    const followIdx = raw.indexOf("<FOLLOW_UPS>");
+    const fixed = fixMalformedTags(raw);
+    if (!fixed.trim()) return "";
+    const openIdx = fixed.indexOf("<ANSWER>");
+    const closeIdx = fixed.indexOf("</ANSWER>");
+    const followIdx = fixed.indexOf("<FOLLOW_UPS>");
     
     let endIdx = closeIdx;
     if (openIdx !== -1) {
@@ -205,11 +207,11 @@ export function useChat(user: any) {
         endIdx = followIdx;
       }
       if (endIdx !== -1 && endIdx > openIdx) {
-        return stripTags(raw.slice(openIdx + 8, endIdx));
+        return stripTags(fixed.slice(openIdx + 8, endIdx));
       }
-      return stripTags(raw.slice(openIdx + 8));
+      return stripTags(fixed.slice(openIdx + 8));
     }
-    return stripTags(raw);
+    return stripTags(fixed);
   }
 
   function flushPendingText() {

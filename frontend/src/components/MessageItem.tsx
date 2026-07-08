@@ -54,7 +54,7 @@ import {
 
 import { FileDownloadButton } from "./FileDownloadButton";
 import { CodeOutputBlock } from "./CodeOutputBlock";
-import { getDomain, deepCleanAnswer, rewriteSandboxUrls } from "../lib/chat-utils";
+import { getDomain, deepCleanAnswer, rewriteSandboxUrls, fixMalformedTags } from "../lib/chat-utils";
 import type { Message, MessagePart, Source } from "../types";
 
 type MessageItemProps = {
@@ -341,10 +341,10 @@ function MessageItem({
   conversationId,
 }: MessageItemProps) {
   const parsedContentBundle = useMemo(() => {
-    const rawText = message.content || "";
+    const rawText = fixMalformedTags(message.content || "");
 
     // Extract internal thinking text safely
-    const thoughtRegexMatch = rawText.match(/<(?:thought|think)>([\s\S]*?)(?:<\/(?:thought|think)>|$)/i);
+    const thoughtRegexMatch = rawText.match(/<(?:thought|think|THOUGHT|THINK)>([\s\S]*?)(?:<\/(?:thought|think|THOUGHT|THINK)>|$)/i);
     const reasoningText = (thoughtRegexMatch && thoughtRegexMatch[1]) ? thoughtRegexMatch[1].trim() : null;
 
     // Clean display answer

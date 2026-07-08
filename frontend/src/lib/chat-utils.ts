@@ -1,6 +1,40 @@
 // src/lib/chat-utils.ts
 export type Source = { url: string; content?: string };
 
+/**
+ * Fixes malformed opening/closing tags where the model drops the first 1-3
+ * characters (e.g. "ART>" instead of "<CHART>", "HOUGHT>" instead of
+ * "<THOUGHT>").  This runs as a pre-processing step so downstream renderers
+ * always see well-formed tags.
+ */
+export function fixMalformedTags(text: string): string {
+  if (!text) return text;
+  let s = text;
+
+  // ── Opening tags (model often drops leading "<C", "<T", "<F" etc.) ──
+  s = s.replace(/(?<![A-Za-z<])CHART>/gi, '<CHART>');
+  s = s.replace(/(?<![A-Za-z<])MERMAID>/gi, '<MERMAID>');
+  s = s.replace(/(?<![A-Za-z<])THOUGHT>/gi, '<THOUGHT>');
+  s = s.replace(/(?<![A-Za-z<])THINK>/gi, '<THINK>');
+  s = s.replace(/(?<![A-Za-z<])FOLLOW_UPS>/gi, '<FOLLOW_UPS>');
+  s = s.replace(/(?<![A-Za-z<])ANSWER>/gi, '<ANSWER>');
+
+  // ── Partial prefixes where 1-2 leading chars are missing ──
+  s = s.replace(/(?<![A-Za-z<])ART>/gi, '<CHART>');
+  s = s.replace(/(?<![A-Za-z<])HART>/gi, '<CHART>');
+  s = s.replace(/(?<![A-Za-z<])ERMAID>/gi, '<MERMAID>');
+  s = s.replace(/(?<![A-Za-z<])HOUGHT>/gi, '<THOUGHT>');
+  s = s.replace(/(?<![A-Za-z<])OUGHT>/gi, '<THOUGHT>');
+  s = s.replace(/(?<![A-Za-z<])HINK>/gi, '<THINK>');
+  s = s.replace(/(?<![A-Za-z<])INK>/gi, '<THINK>');
+  s = s.replace(/(?<![A-Za-z<])OLLOW_UPS>/gi, '<FOLLOW_UPS>');
+
+  // ── Closing tags missing the opening "<" ──
+  s = s.replace(/\/(CHART|MERMAID|THOUGHT|THINK|FOLLOW_UPS|ANSWER)>/gi, '</$1>');
+
+  return s;
+}
+
 export function parseAssistantContent(raw: string) {
   const sourcesRegex = /<SOURCES>([\s\S]*?)<\/SOURCES>/;
   const sourcesMatch = raw.match(sourcesRegex);
@@ -47,6 +81,7 @@ export function extractLiveContent(raw: string): {
 } {
   let answer = "";
   let followUps: string[] = [];
+  raw = fixMalformedTags(raw);
 
   // 1. Remove thought and follow-up blocks entirely from cleanRaw before processing fallback
   const cleanRaw = raw
@@ -113,7 +148,7 @@ export function extractLiveContent(raw: string): {
 
 export function deepCleanAnswer(raw: string): string {
   if (typeof raw !== 'string' || !raw.trim()) return "";
-  let clean = raw
+  let clean = fixMalformedTags(raw)
     .replace(/<FOLLOW_UPS>[\s\S]*?(?:<\/FOLLOW_UPS>|$)/gi, "")
     .replace(/<FOLLOW_UPS[\s\S]*/gi, "")
     .replace(/\{"type"[\s\S]*?\}/g, "")
