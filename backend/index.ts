@@ -4788,10 +4788,14 @@ IMPORTANT: After step 3, ALL subsequent operations use /home/user/edits/. Never 
 
                     if (rawBuf && rawBuf.length > 50) {
                         sendStatus(res, 'parsing', `Parsing ${att.name} (${(rawBuf.length / 1024).toFixed(0)} KB)...`, { name: att.name }, agentState.thoughtProcess);
+                        let parseError: string | null = null;
                         if (isPdfAtt) {
                             const pdfResult = await extractPdf(rawBuf);
                             parsedContent = pdfResult.markdown || pdfResult.text || '';
-                            if (pdfResult.token_count >= 4000 && uid) {
+                            if (parsedContent.startsWith('[PDF parsing')) {
+                                parseError = parsedContent.replace(/\[PDF parsing (failed|error):\s*/, '').replace(/\]$/, '');
+                                parsedContent = `[PDF file: ${att.name}]\nThe automated parser failed to extract text from this PDF (${parseError}). The raw file is at /home/user/uploads/${att.name}. Run Python with PyMuPDF (fitz) to extract its text content, then answer based on that.`;
+                            } else if (pdfResult.token_count >= 4000 && uid) {
                                 await processLargeDocument(pdfResult, uid, att.name || 'document', 'upload');
                                 const preview = (pdfResult.pages?.[0]?.text ?? parsedContent).slice(0, 1500);
                                 parsedContent = `[PDF DOCUMENT: ${att.name}]\n${pdfResult.metadata.pages} pages, ${(rawBuf.length / 1024).toFixed(0)} KB.\n\nThe document is large and has been chunked into searchable sections. Use retrieve_doc_chunks(query) to find relevant content.\n\nFirst section preview:\n${preview}`;
@@ -4799,7 +4803,11 @@ IMPORTANT: After step 3, ALL subsequent operations use /home/user/edits/. Never 
                         } else {
                             parsedContent = await extractDocxText(rawBuf);
                         }
-                        sendStatus(res, 'parsing_done', `Parsed ${att.name} (${(parsedContent.length / 1024).toFixed(0)} KB text)`, { name: att.name }, agentState.thoughtProcess);
+                        if (parseError) {
+                            sendStatus(res, 'parsing_error', `${att.name}: ${parseError}`, { name: att.name }, agentState.thoughtProcess);
+                        } else {
+                            sendStatus(res, 'parsing_done', `Parsed ${att.name} (${(parsedContent.length / 1024).toFixed(0)} KB text)`, { name: att.name }, agentState.thoughtProcess);
+                        }
                     }
                 }
 

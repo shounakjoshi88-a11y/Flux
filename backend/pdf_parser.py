@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
 PDF extraction engine for Flux.
-Uses pymupdf4llm to extract markdown, tables, headings, images from PDFs.
-Scanned pages get automatic OCR via Tesseract (per-page, only when needed).
+Uses PyMuPDF (fitz) directly to extract text from PDFs.
 Outputs JSON to stdout — designed to be called as a subprocess from Bun.
 """
 import sys
@@ -10,9 +9,9 @@ import json
 import traceback
 
 try:
-    import pymupdf4llm
+    import fitz
 except ImportError as e:
-    print(json.dumps({"error": f"Missing dependency: {e}. Run: pip install pymupdf4llm"}), file=sys.stderr)
+    print(json.dumps({"error": f"Missing dependency: {e}. Run: pip install PyMuPDF"}), file=sys.stderr)
     sys.exit(1)
 
 
@@ -20,52 +19,18 @@ def estimate_tokens(text: str) -> int:
     return len(text) // 4
 
 
-def extract(pdf_path: str) -> dict:
-    result = pymupdf4llm.to_markdown(
-        pdf_path,
-        page_chunks=True,
-        embed_images=True,
-        image_format="png",
-        ocr_dpi=200,
-    )
-
-    pages_output = []
-    full_markdown_parts = []
-    ocr_count = 0
-
-    for page in result:
-        text = page.get("text", "")
-        meta = page.get("metadata", {})
-        images = page.get("images", [])
-
-        was_ocr = meta.get("ocr_applied", False)
-        if was_ocr:
-            ocr_count += 1
-
-        pages_output.append({
-            "page": meta.get("page", 0),
-            "text": text,
-            "images": images,
-            "ocr_applied": was_ocr,
-            "heading": _detect_first_heading(text),
-        })
-        if text:
-            full_markdown_parts.append(text)
-
-    full_markdown = "\n\n".join(full_markdown_parts)
-    is_scanned = ocr_count > 0
-
-    return {
-        "metadata": {
-            "pages": len(result),
-            "ocr_pages": ocr_count,
-            "is_scanned": is_scanned,
-            "has_images": any(bool(page.get("images")) for page in result),
-        },
-        "markdown": full_markdown,
-        "pages": pages_output,
-        "token_count": estimate_tokens(full_markdown),
-    }
+def _page_to_markdown_text(page: fitz.Page) -> str:
+    blocks = page.get_text("dict")["blocks"]
+    lines = []
+    for block in blocks:
+        if block["type"] == 0:
+            for line in block["lines"]:
+                text = "".join(span["text"] for span in line["spans"])
+                if text.strip():
+                    lines.append(text)
+        elif block["type"] == 1:
+            lines.append(f"[Image block {block.get('number', '?')}]")
+    return "\n".join(lines)
 
 
 def _detect_first_heading(text: str) -> str | None:
@@ -74,6 +39,42 @@ def _detect_first_heading(text: str) -> str | None:
         if stripped.startswith("#"):
             return stripped.lstrip("# ").strip()
     return None
+
+
+def extract(pdf_path: str) -> dict:
+    doc = fitz.open(pdf_path)
+    total_pages = doc.page_count
+    pages_output = []
+    full_markdown_parts = []
+
+    for page_num in range(total_pages):
+        page = doc[page_num]
+        text = _page_to_markdown_text(page)
+        pages_output.append({
+            "page": page_num,
+            "text": text,
+            "images": [],
+            "ocr_applied": False,
+            "heading": _detect_first_heading(text),
+        })
+        if text.strip():
+            full_markdown_parts.append(text)
+
+    doc.close()
+
+    full_markdown = "\n\n".join(full_markdown_parts)
+
+    return {
+        "metadata": {
+            "pages": total_pages,
+            "ocr_pages": 0,
+            "is_scanned": False,
+            "has_images": False,
+        },
+        "markdown": full_markdown or "[PDF parser: fitz extracted no text — file may be image-only or corrupted]",
+        "pages": pages_output,
+        "token_count": estimate_tokens(full_markdown),
+    }
 
 
 if __name__ == "__main__":

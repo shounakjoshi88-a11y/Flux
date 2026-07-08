@@ -495,7 +495,8 @@ export function useChat(user: any) {
                   sub === 'image_generating' ||
                   sub === 'reading_skill' ||
                   sub === 'sandbox_start' ||
-                  sub === 'parsing'
+                  sub === 'parsing' ||
+                  sub === 'parsing_error'
                 ) {
                   setActiveGenerationStatus({ subtype: sub, message: parsed.message, data: parsed.data });
                 }
