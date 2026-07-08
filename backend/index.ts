@@ -4800,7 +4800,7 @@ IMPORTANT: After step 3, ALL subsequent operations use /home/user/edits/. Never 
                             parsedContent = pdfResult.markdown || pdfResult.text || '';
                             if (parsedContent.startsWith('[PDF parsing')) {
                                 parseError = parsedContent.replace(/\[PDF parsing (failed|error):\s*/, '').replace(/\]$/, '');
-                                parsedContent = '';
+                                parsedContent = `[PDF file: ${att.name}]\nThe automated parser failed to extract text from this PDF (${parseError}). The raw file is at /home/user/uploads/${att.name}. Run Python with PyMuPDF (fitz) to extract its text content, then answer based on that.`;
                             } else if (pdfResult.token_count >= 4000 && uid) {
                                 await processLargeDocument(pdfResult, uid, att.name || 'document', 'upload');
                                 const preview = (pdfResult.pages?.[0]?.text ?? parsedContent).slice(0, 1500);
