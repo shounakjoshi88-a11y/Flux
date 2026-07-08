@@ -341,9 +341,9 @@ export function ChatInput({
                   className="flex flex-col bg-[var(--bg-primary)] border border-[var(--surface-border)] rounded-lg p-3 min-w-[160px] max-w-[200px] w-auto hover:border-[var(--accent)]/35 transition-colors group"
                 >
                   {isImage ? (
-                    <img src={file.content} alt={file.name} className="w-full h-20 object-cover rounded-md mb-2" />
+                    <img src={file.content} alt={file.name} className="size-[140px] object-cover rounded-md mb-2" />
                   ) : isVideo ? (
-                    <video src={file.content} className="w-full h-20 object-cover rounded-md mb-2" />
+                    <video src={file.content} className="size-[140px] object-cover rounded-md mb-2" />
                   ) : (
                     <>
                       <div className="font-semibold text-sm text-[var(--text-primary)] truncate">{file.name}</div>
@@ -354,12 +354,14 @@ export function ChatInput({
                   )}
                   <div className="mt-2 flex items-center justify-between">
                     <span className="text-[10px] px-2 py-0.5 border border-[var(--surface-border)] rounded bg-[var(--surface-bg)] text-[var(--text-secondary)]">{ext}</span>
-                    <button
-                      onClick={() => setAttachedFiles(attachedFiles.filter((_, i) => i !== idx))}
-                      className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-0.5 rounded hover:bg-[var(--surface-bg)]"
-                    >
-                      <X className="size-3" />
-                    </button>
+                    {!isImage && (
+                      <button
+                        onClick={() => setAttachedFiles(attachedFiles.filter((_, i) => i !== idx))}
+                        className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-0.5 rounded hover:bg-[var(--surface-bg)]"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    )}
                   </div>
                 </div>
               );
