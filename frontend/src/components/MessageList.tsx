@@ -238,11 +238,19 @@ export function MessageList({
           );
         }}
         components={{
-          Footer: () => isLoading && (messages.length === 0 || !messages[messages.length - 1]?.parts?.length) ? (
-            <div className="mx-auto max-w-[700px] mt-4 pl-2">
-              <ThreeDotsLoader />
-            </div>
-          ) : null,
+          Footer: () => (
+            <>
+              {isLoading && (messages.length === 0 || !messages[messages.length - 1]?.parts?.length) && (
+                <div className="mx-auto max-w-[700px] mt-4 pl-2">
+                  <ThreeDotsLoader />
+                </div>
+              )}
+              <div
+                className="w-full shrink-0"
+                style={{ height: "calc(env(safe-area-inset-bottom, 0px) + 100px)" }}
+              />
+            </>
+          ),
         }}
       />
     </div>
