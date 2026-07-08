@@ -195,7 +195,6 @@ export function MessageList({
         ref={virtuosoRef}
         followOutput={(isAtBottom) => isAtBottom ? "smooth" : false}
         overscan={400}
-        className="px-6 pt-6 pb-72"
         totalCount={messages.length}
         increaseViewportBy={{ top: 400, bottom: 600 }}
         itemContent={(index) => {
@@ -212,7 +211,7 @@ export function MessageList({
           }
           return (
             <div data-message-id={message.id}>
-              <div className="mx-auto max-w-[700px] animate-in fade-in duration-500">
+              <div className="mx-auto max-w-[700px] px-5 animate-in fade-in duration-500">
                 <MessageItem
                   message={message}
                   sources={

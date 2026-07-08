@@ -566,6 +566,10 @@ export default function Dashboard() {
         return;
       }
       const data = (await res.json()) as { conversation: ConversationDetail };
+      if (!data?.conversation?.messages) {
+        console.warn('Conversation data is empty or malformed', data);
+        return;
+      }
       const entry = enrichConversationMessages(data.conversation.messages);
 
       // ── 4. Store in both caches ──────────────────────────────────────────
@@ -609,6 +613,7 @@ export default function Dashboard() {
         });
         if (!res.ok) return;
         const data = (await res.json()) as { conversation: ConversationDetail };
+        if (!data?.conversation?.messages) return;
         const entry = enrichConversationMessages(data.conversation.messages);
         conversationCacheRef.current.set(id, entry);
       } catch {

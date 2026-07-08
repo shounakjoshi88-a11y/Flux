@@ -325,6 +325,94 @@ function InlineImageDisplay({
   );
 }
 
+/* ── UserFileAttachment — lazy-loads content for historical messages ── */
+function UserFileAttachment({
+  file,
+  messageId,
+  index,
+  onFileClick,
+  onFileDelete,
+}: {
+  file: { name: string; content?: string; type?: string };
+  messageId: string | number;
+  index: number;
+  onFileClick?: (file: { name: string; content: string }) => void;
+  onFileDelete?: (name: string) => void;
+}) {
+  const [content, setContent] = useState<string | null>(file.content ?? null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (content) return;
+    const isOptimistic = typeof messageId !== 'number' || messageId < 0;
+    if (isOptimistic) return;
+
+    const fetchContent = async () => {
+      setLoading(true);
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (!token) return;
+
+        const res = await fetch(`${BACKEND_URL}/api/assets/${messageId}/upload/${index}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.base64) setContent(data.base64);
+        }
+      } catch (e) {
+        console.error("Failed to load attachment:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchContent();
+  }, [content, messageId, index]);
+
+  const ext = file.name.split('.').pop()?.toUpperCase() || 'FILE';
+  const lineCount = content ? content.split('\n').length : 0;
+  const isImage = file.type?.startsWith('image/');
+
+  return (
+    <div
+      className="group/file relative flex flex-col bg-[var(--surface-bg)] border border-[var(--surface-border)] rounded-xl p-3 min-w-[140px] max-w-[200px] w-auto hover:border-[var(--accent)]/30 transition-all cursor-pointer"
+      onClick={() => onFileClick?.({ name: file.name, content: content ?? "" })}
+    >
+      {loading ? (
+        <div className="flex items-center justify-center h-20 mb-2">
+          <div className="size-4 border-2 border-[var(--border-border)] border-t-[var(--text-primary)] rounded-full animate-spin" />
+        </div>
+      ) : isImage && content ? (
+        <img src={content.startsWith('data:') ? content : `data:image/png;base64,${content}`} alt={file.name} loading="lazy" className="w-full h-20 object-cover rounded-lg mb-2" />
+      ) : isImage && !content ? (
+        <div className="flex items-center justify-center h-20 mb-2 text-[var(--text-muted)] text-xs">Image unavailable</div>
+      ) : (
+        <>
+          <div className="font-medium text-sm text-[var(--text-primary)] truncate tracking-tight">{file.name}</div>
+          <div className="text-[11px] text-[var(--text-muted)] mt-1">{lineCount > 0 ? `${lineCount} lines` : 'Text file'}</div>
+        </>
+      )}
+      <div className="mt-2 flex items-center justify-between">
+        <span className="text-[9px] px-2 py-0.5 border border-[var(--surface-border)] rounded bg-[var(--bg-primary)] text-[var(--text-muted)] font-medium">{ext}</span>
+        {onFileDelete && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onFileDelete(file.name);
+            }}
+            className="opacity-0 group-hover/file:opacity-100 p-1 rounded hover:bg-red-500/15 text-red-400 transition-all"
+            title="Delete attachment"
+          >
+            <Trash2 className="size-3" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MessageItem({
   message,
   sources: externalSources,
@@ -446,7 +534,7 @@ function MessageItem({
       onMouseLeave={() => setShowActions(false)}
     >
       {/* ─── Bubble ──────────────────────────────────────── */}
-      <div className={`relative max-w-[92%] sm:max-w-[85%] 2xl:max-w-[80%] ${isAssistant ? 'pr-4 sm:pr-8' : 'pl-4 sm:pl-8'}`}>
+      <div className={`relative w-full ${isAssistant ? 'pr-4 sm:pr-8' : 'pl-4 sm:pl-8'}`}>
 
         {/* ═══════════════════════════════════════════════════════════
            USER MESSAGE
@@ -457,6 +545,22 @@ function MessageItem({
             {message.edited && (
               <div className="text-[10px] text-muted-foreground/40 font-mono mb-1 tracking-tight">
                 edited
+              </div>
+            )}
+
+            {/* File attachments — show as thumbnails above the bubble */}
+            {!editing && fileAttachment.length > 0 && (
+              <div className="flex flex-wrap justify-end gap-2 mb-2 w-full">
+                {fileAttachment.map((file, idx) => (
+                  <UserFileAttachment
+                    key={file.name + idx}
+                    file={file}
+                    messageId={message.id}
+                    index={idx}
+                    onFileClick={onFileClick}
+                    onFileDelete={onFileDelete ? (name) => onFileDelete(message.id, name, 'fileAttachment') : undefined}
+                  />
+                ))}
               </div>
             )}
 
@@ -477,7 +581,7 @@ function MessageItem({
               </div>
             ) : (
               <div className="px-4 py-2.5 rounded-2xl bg-[var(--user-bubble)] text-[var(--text-primary)] text-[15px] leading-relaxed whitespace-pre-wrap break-words font-light shadow-sm">
-                <MessageRenderer content={message.content || ''} />
+                <MessageRenderer content={(message.content || '').replace(/\s*\[attached: [^\]]+\]\s*/g, '').trim()} />
                 {hasError && errorMessage && (
                   <div className="mt-2 text-xs text-red-400/80 italic">{errorMessage}</div>
                 )}
