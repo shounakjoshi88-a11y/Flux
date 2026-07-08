@@ -5,28 +5,30 @@ import ToolSummary from "./ToolSummary";
 
 // ─── Typewriter hook — only for streaming messages ──────────
 function useTypewriter(fullText: string, messageId: string | number): string {
+  const safeText = fullText ?? "";
   const isStreaming = String(messageId).startsWith("temp-");
   const [displayedLength, setDisplayedLength] = useState(() =>
-    isStreaming ? 0 : fullText.length
+    isStreaming ? 0 : safeText.length
   );
 
   // Non-streaming: show full text immediately
   const showFull = !isStreaming;
   const prevShowFull = useRef(showFull);
   if (showFull && !prevShowFull.current) {
-    setDisplayedLength(fullText.length);
+    setDisplayedLength(safeText.length);
   }
   prevShowFull.current = showFull;
 
-  const fullTextRef = useRef(fullText);
-  fullTextRef.current = fullText;
+  const fullTextRef = useRef(safeText);
+  fullTextRef.current = safeText;
 
   useEffect(() => {
     if (!isStreaming) return;
     const interval = setInterval(() => {
       setDisplayedLength(prev => {
-        if (prev < fullTextRef.current.length) {
-          return Math.min(prev + 2, fullTextRef.current.length);
+        const currentText = fullTextRef.current ?? "";
+        if (prev < currentText.length) {
+          return Math.min(prev + 2, currentText.length);
         }
         return prev;
       });
@@ -35,7 +37,7 @@ function useTypewriter(fullText: string, messageId: string | number): string {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStreaming]);
 
-  return fullText.slice(0, displayedLength);
+  return safeText.slice(0, displayedLength);
 }
 import {
   CornerDownRight,
@@ -1312,7 +1314,7 @@ export const MessageItem = memo(function MessageItem({
   const _lastTextPart = _hasParts
     ? (message.parts as MessagePart[]).slice().reverse().find((p): p is MessagePart & { type: "text" } => p.type === "text")
     : null;
-  const _typewriterText = _lastTextPart ? _lastTextPart.text : parsedContentBundle.cleanDisplayAnswer;
+  const _typewriterText = _lastTextPart ? (_lastTextPart.text ?? parsedContentBundle.cleanDisplayAnswer) : parsedContentBundle.cleanDisplayAnswer;
   const typewriterContent = useTypewriter(_typewriterText, message.id);
 
   // ── User-message state (unconditional to avoid hook count violations) ──
