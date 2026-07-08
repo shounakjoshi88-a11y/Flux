@@ -389,7 +389,15 @@ export function ChatInput({
                 const isImage = file.type?.startsWith('image/');
                 const isVideo = file.type?.startsWith('video/');
                 return isImage ? (
-                  <img key={file.name + idx} src={file.content} alt={file.name} className="size-20 object-cover rounded-lg cursor-pointer" onClick={() => setPreviewImage(file.content)} />
+                  <div key={file.name + idx} className="relative size-20 group">
+                    <img src={file.content} alt={file.name} className="size-20 object-cover rounded-lg cursor-pointer" onClick={() => setPreviewImage(file.content)} />
+                    <button
+                      onClick={() => setAttachedFiles(attachedFiles.filter((_, i) => i !== idx))}
+                      className="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
                 ) : (
                   <div
                     key={file.name + idx}
