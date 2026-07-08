@@ -1110,22 +1110,22 @@ function UserFileAttachment({
         }}
       >
         {loading ? (
-          <div className="flex items-center justify-center aspect-square">
+          <div className="flex items-center justify-center size-[140px]">
             <div className="size-4 border-2 border-[var(--border-border)] border-t-[var(--text-primary)] rounded-full animate-spin" />
           </div>
         ) : isImage && content ? (
-            <div className="flex items-center justify-center aspect-square">
-              <img src={imgSrc} alt={file.name} loading="lazy" className="max-w-full max-h-full object-contain" />
+            <div className="size-[140px] overflow-hidden">
+              <img src={imgSrc} alt={file.name} loading="lazy" className="w-full h-full object-cover" />
             </div>
         ) : isImage && !content ? (
-          <div className="flex items-center justify-center aspect-square text-[var(--text-muted)] text-xs">Image unavailable</div>
+          <div className="flex items-center justify-center size-[140px] text-[var(--text-muted)] text-xs">Image unavailable</div>
         ) : (
           <div className="p-3">
             <div className="font-medium text-sm text-[var(--text-primary)] truncate tracking-tight">{file.name}</div>
             <div className="text-[11px] text-[var(--text-muted)] mt-1">{lineCount > 0 ? `${lineCount} lines` : 'Text file'}</div>
           </div>
         )}
-        <div className="mt-2 flex items-center justify-between">
+        <div className="flex items-center justify-between">
           {!isImage && <span className="text-[9px] px-2 py-0.5 border border-[var(--surface-border)] rounded bg-[var(--bg-primary)] text-[var(--text-muted)] font-medium">{ext}</span>}
           {onFileDelete && (
             <button
