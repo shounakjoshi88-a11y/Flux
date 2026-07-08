@@ -477,7 +477,7 @@ export function ChatInput({
           {/* Three separate hidden file inputs — one per action */}
           <input ref={galleryRef} type="file" className="hidden" multiple accept="image/png,image/jpeg,image/gif,image/webp" onChange={(e) => handleLocalFiles(e.target.files)} />
           <input ref={cameraRef} type="file" className="hidden" accept="image/*" capture="environment" onChange={(e) => handleLocalFiles(e.target.files)} />
-          <input ref={filesRef} type="file" className="hidden" multiple accept=".txt,.md,.js,.ts,.tsx,.py,.docx,.pdf,.pptx,image/png,image/jpeg,image/webp,video/mp4" onChange={(e) => handleLocalFiles(e.target.files)} />
+          <input ref={filesRef} type="file" className="hidden" multiple accept="image/*,video/*,.txt,.md,.docx,.doc,.pdf,.pptx,.ppt,.xlsx,.xls,.csv,.tsv,.c,.h,.cpp,.hpp,.cc,.cxx,.rs,.go,.java,.kt,.swift,.js,.jsx,.ts,.tsx,.py,.rb,.php,.css,.scss,.less,.html,.htm,.xml,.json,.yaml,.yml,.toml,.ini,.cfg,.conf,.sh,.bash,.zsh,.ps1,.bat,.cmd,.sql,.svg,.webp" onChange={(e) => handleLocalFiles(e.target.files)} />
 
           {/* Model selector on left side */}
           {!hideModelSelector && (
