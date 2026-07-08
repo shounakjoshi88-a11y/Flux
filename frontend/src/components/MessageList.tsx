@@ -2,7 +2,7 @@
 import { useRef, useEffect } from "react";
 import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import { motion } from "framer-motion";
-import MessageItem from "./MessageItem";
+import { MessageItem } from "./MessageItem";
 import { SourceCard } from "./SourceCard";
 import { getDomain } from "../lib/chat-utils";
 import { calculateReputationScore } from "../utils/ReputationScore";
