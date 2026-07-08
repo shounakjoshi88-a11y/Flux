@@ -1127,7 +1127,7 @@ function UserFileAttachment({
         )}
         <div className="flex items-center justify-between">
           {!isImage && <span className="text-[9px] px-2 py-0.5 border border-[var(--surface-border)] rounded bg-[var(--bg-primary)] text-[var(--text-muted)] font-medium">{ext}</span>}
-          {onFileDelete && (
+          {!isImage && onFileDelete && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
