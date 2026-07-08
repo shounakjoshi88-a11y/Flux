@@ -322,6 +322,7 @@ export function useChat(user: any) {
         sources: [],
         followUps: [],
         generatedFiles: [],
+        parts: [{ type: "agent_status", status: "processing", message: "Thinking..." }],
       };
 
       setMessages((prev) => {
@@ -445,7 +446,7 @@ export function useChat(user: any) {
                   const baseSub = sub.replace(/_(?:success|error|complete|done)$/, '');
                   let idx = -1;
                   for (let i = streamingPartsRef.current.length - 1; i >= 0; i--) {
-                    const p = streamingPartsRef.current[i];
+                    const p = streamingPartsRef.current[i]!;
                     if (p.type === 'tool_call' && p.name === baseSub) {
                       idx = i;
                       break;
@@ -453,7 +454,7 @@ export function useChat(user: any) {
                   }
                   if (idx < 0) {
                     for (let i = streamingPartsRef.current.length - 1; i >= 0; i--) {
-                      const p = streamingPartsRef.current[i];
+                      const p = streamingPartsRef.current[i]!;
                       if (p.type === 'tool_call' && p.name === `${baseSub}_start`) {
                         idx = i;
                         break;

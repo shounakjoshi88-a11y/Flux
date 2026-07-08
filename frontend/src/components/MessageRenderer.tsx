@@ -1344,7 +1344,7 @@ function restoreCode(text: string, store: string[]): string {
 }
 
 // ── Block regex: \3 backreference ensures \begin{CD} only matches \end{CD} ──
-const BLOCK_DELIM_REGEX = /(<(?:CHART|MERMAID|svg|TIKZ|LILYPOND|MUSIC|ABC|CHEMICAL|SMILES|MOL)(?:\s+[^>]*)?>[\s\S]*?<\/(?:CHART|MERMAID|svg|TIKZ|LILYPOND|MUSIC|ABC|CHEMICAL|SMILES|MOL)>|```[a-z]*[\s\S]*?```|(?<=\n|^)\s*\$\$[\s\S]*?\s*\$\$(?=\s*$|\n)|(?<!\\)\\\[(?!-?\d+pt)[\s\S]+?\\\]|\\begin\{([a-zA-Z*]+)\}[\s\S]*?\\end\{\3\})/gim;
+const BLOCK_DELIM_REGEX = /(<(?:CHART|MERMAID|svg|TIKZ|LILYPOND|MUSIC|ABC|CHEMICAL|SMILES|MOL)(?:\s+[^>]*)?>[\s\S]*?<\/(?:CHART|MERMAID|svg|TIKZ|LILYPOND|MUSIC|ABC|CHEMICAL|SMILES|MOL)>|```[a-z]*[\s\S]*?```|(?<=\n|^)\s*\$\$[\s\S]*?\s*\$\$(?=\s*$|\n)|(?<!\\)\\\[(?!-?\d+pt)[\s\S]+?\\\]|\\begin\{([a-zA-Z*]+)\}[\s\S]*?\\end\{\2\})/gim;
 
 function renderBlocks(text: string, onCitationClick: any, sources: Source[], onHtmlPreview?: (html: string) => void) {
   if (typeof text !== "string") return [];

@@ -1,6 +1,6 @@
 // src/components/MessageList.tsx
 import { useRef, useEffect } from "react";
-import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
+import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { motion } from "framer-motion";
 import { MessageItem } from "./MessageItem";
 import { SourceCard } from "./SourceCard";
@@ -198,7 +198,7 @@ export function MessageList({
         totalCount={messages.length}
         increaseViewportBy={{ top: 400, bottom: 600 }}
         itemContent={(index) => {
-          const message = messages[index];
+          const message = messages[index]!;
           let retryPrompt: string | undefined;
           if (message.role === "Assistant") {
             for (let j = index - 1; j >= 0; j--) {

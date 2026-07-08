@@ -53,6 +53,11 @@ export type UserGoogleToken = Prisma.UserGoogleTokenModel
  */
 export type Memory = Prisma.MemoryModel
 /**
+ * Model DocumentChunk
+ * 
+ */
+export type DocumentChunk = Prisma.DocumentChunkModel
+/**
  * Model Task
  * 
  */
