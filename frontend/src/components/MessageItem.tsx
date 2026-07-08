@@ -448,8 +448,9 @@ function MessageItem({
   const [liked, setLiked] = useState<'up' | 'down' | null>(null);
   const [copied, setCopied] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const cleanContent = (message.content || '').replace(/\s*\[attached: [^\]]+\]\s*/g, '').trim();
   const [editing, setEditing] = useState(false);
-  const [editText, setEditText] = useState(message.content || '');
+  const [editText, setEditText] = useState(cleanContent);
   const editRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -471,16 +472,16 @@ function MessageItem({
 
   // ─── Edit handlers ──────────────────────────────────────
   const handleEditSave = useCallback(() => {
-    if (editText.trim() && editText !== message.content) {
+    if (editText.trim() && editText !== cleanContent) {
       onEdit?.(message.id, editText);
     }
     setEditing(false);
-  }, [editText, message.content, message.id, onEdit]);
+  }, [editText, cleanContent, message.id, onEdit]);
 
   const handleEditCancel = useCallback(() => {
-    setEditText(message.content || '');
+    setEditText(cleanContent);
     setEditing(false);
-  }, [message.content]);
+  }, [cleanContent]);
 
   useEffect(() => {
     if (editing && editRef.current) {
@@ -581,7 +582,7 @@ function MessageItem({
               </div>
             ) : (
               <div className="px-4 py-2.5 rounded-2xl bg-[var(--user-bubble)] text-[var(--text-primary)] text-[15px] leading-relaxed whitespace-pre-wrap break-words font-light shadow-sm">
-                <MessageRenderer content={(message.content || '').replace(/\s*\[attached: [^\]]+\]\s*/g, '').trim()} />
+                <MessageRenderer content={cleanContent} />
                 {hasError && errorMessage && (
                   <div className="mt-2 text-xs text-red-400/80 italic">{errorMessage}</div>
                 )}
