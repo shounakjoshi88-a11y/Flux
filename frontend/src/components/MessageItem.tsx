@@ -1114,9 +1114,9 @@ function UserFileAttachment({
             <div className="size-4 border-2 border-[var(--border-border)] border-t-[var(--text-primary)] rounded-full animate-spin" />
           </div>
         ) : isImage && content ? (
-          <div className="aspect-square">
-            <img src={imgSrc} alt={file.name} loading="lazy" className="w-full h-full object-cover" />
-          </div>
+          <div className="flex items-center justify-center aspect-square">
+              <img src={imgSrc} alt={file.name} loading="lazy" className="max-w-full max-h-full object-contain" />
+            </div>
         ) : isImage && !content ? (
           <div className="flex items-center justify-center aspect-square text-[var(--text-muted)] text-xs">Image unavailable</div>
         ) : (
