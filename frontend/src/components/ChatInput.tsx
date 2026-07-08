@@ -190,6 +190,7 @@ export function ChatInput({
   const editorRef = useRef<HTMLDivElement>(null);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const isComposing = useRef(false);
   const hasText = query.trim().length > 0;
@@ -322,6 +323,24 @@ export function ChatInput({
         ${compact ? "rounded-none border-x-0" : "max-w-[740px]"}
       `}
     >
+      {/* ─── IMAGE PREVIEW LIGHTBOX ─── */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div className="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center">
+            <img src={previewImage} alt="" className="max-w-full max-h-[90vh] object-contain rounded-lg" />
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="absolute top-2 right-2 size-8 flex items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ─── FILE CARDS ─── */}
       <AnimatePresence>
         {attachedFiles.length > 0 && (
@@ -335,15 +354,21 @@ export function ChatInput({
               const ext = file.name.split('.').pop()?.toUpperCase() || 'FILE';
               const isImage = file.type?.startsWith('image/');
               const isVideo = file.type?.startsWith('video/');
-              return (
+              return isImage ? (
+                <img
+                  key={file.name + idx}
+                  src={file.content}
+                  alt={file.name}
+                  className="size-20 object-cover rounded-lg cursor-pointer"
+                  onClick={() => setPreviewImage(file.content)}
+                />
+              ) : (
                 <div
                   key={file.name + idx}
                   className="flex flex-col bg-[var(--bg-primary)] border border-[var(--surface-border)] rounded-lg p-3 min-w-[160px] max-w-[200px] w-auto hover:border-[var(--accent)]/35 transition-colors group"
                 >
-                  {isImage ? (
-                    <img src={file.content} alt={file.name} className="size-[140px] object-cover rounded-md mb-2" />
-                  ) : isVideo ? (
-                    <video src={file.content} className="size-[140px] object-cover rounded-md mb-2" />
+                  {isVideo ? (
+                    <video src={file.content} className="size-20 object-cover rounded-md mb-2" />
                   ) : (
                     <>
                       <div className="font-semibold text-sm text-[var(--text-primary)] truncate">{file.name}</div>
@@ -354,14 +379,12 @@ export function ChatInput({
                   )}
                   <div className="mt-2 flex items-center justify-between">
                     <span className="text-[10px] px-2 py-0.5 border border-[var(--surface-border)] rounded bg-[var(--surface-bg)] text-[var(--text-secondary)]">{ext}</span>
-                    {!isImage && (
-                      <button
-                        onClick={() => setAttachedFiles(attachedFiles.filter((_, i) => i !== idx))}
-                        className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-0.5 rounded hover:bg-[var(--surface-bg)]"
-                      >
-                        <X className="size-3" />
-                      </button>
-                    )}
+                    <button
+                      onClick={() => setAttachedFiles(attachedFiles.filter((_, i) => i !== idx))}
+                      className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-0.5 rounded hover:bg-[var(--surface-bg)]"
+                    >
+                      <X className="size-3" />
+                    </button>
                   </div>
                 </div>
               );
