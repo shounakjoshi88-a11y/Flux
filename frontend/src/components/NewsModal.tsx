@@ -744,7 +744,7 @@ export function NewsModal({ isOpen, onClose }: NewsModalProps) {
             {selectedArticle && (
               <motion.div className="absolute inset-0 z-30 flex flex-col will-change-transform" initial={{ x: "100%", opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: "100%", opacity: 0 }} transition={{ type: "spring", stiffness: 400, damping: 35, mass: 0.7 }} style={{ background: P.bg }}>
                 {/* Header */}
-                <div className="flex items-center gap-3 px-5 py-3 shrink-0" style={{ borderBottom: `1px solid ${P.border}`, background: `${P.bgPanel}fa` }}>
+                <div className="flex items-center gap-3 px-5 shrink-0" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)", paddingBottom: "12px", paddingLeft: "calc(env(safe-area-inset-left, 0px) + 20px)", paddingRight: "calc(env(safe-area-inset-right, 0px) + 20px)", borderBottom: `1px solid ${P.border}`, background: `${P.bgPanel}fa` }}>
                   <motion.button whileHover={{ x: -2 }} whileTap={{ scale: 0.95 }} onClick={() => { summaryAbortRef.current?.abort(); setSelectedArticle(null); }} className="flex items-center gap-2 rounded-lg font-semibold" style={{ fontSize: 12, color: P.inkMid, background: P.inkGhost, border: `1px solid ${P.borderFaint}`, padding: "6px 12px" }}>
                     ← Back
                   </motion.button>
@@ -756,7 +756,7 @@ export function NewsModal({ isOpen, onClose }: NewsModalProps) {
                   </motion.button>
                 </div>
                 {/* Article meta */}
-                <div className="px-6 pt-5 pb-4 shrink-0" style={{ borderBottom: `1px solid ${P.borderFaint}` }}>
+                <div className="shrink-0" style={{ paddingTop: "20px", paddingBottom: "16px", paddingLeft: "calc(env(safe-area-inset-left, 0px) + 24px)", paddingRight: "calc(env(safe-area-inset-right, 0px) + 24px)", borderBottom: `1px solid ${P.borderFaint}` }}>
                   <div className="flex items-center gap-2.5 mb-2.5">
                     <span className="font-bold px-2 py-0.5 rounded" style={{ fontSize: 10, letterSpacing: "0.05em", background: P.vermGlow, border: `1px solid ${P.vermBorder}`, color: P.gold }}> {selectedArticle.source} </span>
                     <span style={{ fontSize: 11, color: P.inkFaint }}> {timeAgo(selectedArticle.publishedDate)} · {readingTime(selectedArticle.content)} </span>
@@ -764,7 +764,7 @@ export function NewsModal({ isOpen, onClose }: NewsModalProps) {
                   <h2 className="font-bold leading-snug" style={{ fontSize: 17, color: P.paper, lineHeight: 1.5, fontFamily: "'Shippori Mincho', 'Noto Serif JP', serif" }}> {selectedArticle.title} </h2>
                 </div>
                 {/* Summary body */}
-                <div className="flex-1 overflow-y-auto px-6 py-5" style={{ scrollbarWidth: "thin", scrollbarColor: `${P.border} transparent` }}>
+                <div className="flex-1 overflow-y-auto py-5" style={{ paddingLeft: "calc(env(safe-area-inset-left, 0px) + 24px)", paddingRight: "calc(env(safe-area-inset-right, 0px) + 24px)", scrollbarWidth: "thin", scrollbarColor: `${P.border} transparent` }}>
                   <div className="flex items-center gap-2.5 mb-5">
                     <div style={{ width: 3, height: 14, borderRadius: 2, background: `linear-gradient(180deg, ${P.verm}, ${P.gold})` }} />
                     <span className="font-bold tracking-widest uppercase" style={{ fontSize: 10, color: P.verm }}> Summary </span>
@@ -804,7 +804,7 @@ export function NewsModal({ isOpen, onClose }: NewsModalProps) {
                   {peekUrl && <NewsPeekPanel url={peekUrl} onClose={() => setPeekUrl(null)} />}
                 </AnimatePresence>
                 {/* Footer CTA */}
-                <div className="px-5 py-3.5 shrink-0" style={{ borderTop: `1px solid ${P.borderFaint}`, background: `${P.bgPanel}f2` }}>
+                <div className="px-5 shrink-0" style={{ paddingTop: "14px", paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 14px)", paddingLeft: "calc(env(safe-area-inset-left, 0px) + 20px)", paddingRight: "calc(env(safe-area-inset-right, 0px) + 20px)", borderTop: `1px solid ${P.borderFaint}`, background: `${P.bgPanel}f2` }}>
                   <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.97 }} onClick={() => setPeekUrl(selectedArticle.url)} className="w-full flex items-center justify-center gap-2 font-semibold rounded-lg py-2.5" style={{ fontSize: 12, background: `linear-gradient(135deg, ${P.vermDim}, ${P.verm})`, color: "#fff", border: `1px solid ${P.vermBorder}` }}>
                     <BookOpen size={14} /> Read Full Article <ExternalLink size={12} />
                   </motion.button>
