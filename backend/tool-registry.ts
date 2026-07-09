@@ -96,7 +96,7 @@ toolRegistry.register('read_skill', {
   name: 'read_skill',
   description: 'Load the generation rules/skill file for a document type.',
   parameters: z.object({
-    doc_type: z.enum(['pdf', 'pptx', 'docx', 'xlsx', 'csv', 'tsv', 'md', 'json', 'sql', 'html', 'tech', 'finance', 'coder', 'creative', 'legal', 'design', 'file']),
+    doc_type: z.enum(['pdf', 'pptx', 'docx', 'xlsx', 'csv', 'tsv', 'md', 'json', 'sql', 'html', 'tech', 'finance', 'coder', 'creative', 'legal', 'design', 'file', 'live-viz']),
   }),
   execute: async () => 'Implemented in index.ts',
   category: 'data',

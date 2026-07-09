@@ -1858,6 +1858,7 @@ const SKILL_REGISTRY: Record<string, { fileName: string; label: string }> = {
     creative: { fileName: 'creative-skill', label: 'Creative copywriting' },
     legal: { fileName: 'legal-skill', label: 'Legal drafting' },
     design: { fileName: 'frontend-design', label: 'Frontend design & styling' },
+    'live-viz': { fileName: 'live-viz', label: 'Live interactive visualization' },
     file: { fileName: 'file-reading', label: 'File reading & analysis per type' },
 };
 
@@ -2906,7 +2907,7 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
                 'Use other doc types (pdf, docx, pptx, xlsx, etc.) before generate_document to get generation rules.',
             inputSchema: z.object({
                 doc_type: z
-                    .enum(['pdf', 'pptx', 'docx', 'xlsx', 'csv', 'tsv', 'md', 'json', 'sql', 'html', 'tech', 'finance', 'coder', 'creative', 'legal', 'design', 'file'])
+                    .enum(['pdf', 'pptx', 'docx', 'xlsx', 'csv', 'tsv', 'md', 'json', 'sql', 'html', 'tech', 'finance', 'coder', 'creative', 'legal', 'design', 'file', 'live-viz'])
                     .describe('The skill type to load rules for'),
             }),
             execute: async ({ doc_type }: any) => {
