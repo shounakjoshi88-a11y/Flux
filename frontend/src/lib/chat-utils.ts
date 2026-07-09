@@ -32,6 +32,9 @@ export function fixMalformedTags(text: string): string {
   // ── Closing tags missing the opening "<" ──
   s = s.replace(/\/(CHART|MERMAID|THOUGHT|THINK|FOLLOW_UPS|ANSWER)>/gi, '</$1>');
 
+  // ── Closing tags with extra "<" like "</<CHART>" ──
+  s = s.replace(/<\s*\/\s*<\s*(CHART|MERMAID|THOUGHT|THINK|FOLLOW_UPS|ANSWER|SOURCES)>/gi, '</$1>');
+
   return s;
 }
 
