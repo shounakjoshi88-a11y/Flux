@@ -738,7 +738,7 @@ export default function Auth() {
   };
 
   return (
-    <div className="relative w-full h-screen bg-background text-foreground overflow-y-auto overflow-x-hidden custom-scrollbar">
+    <div className="relative w-full h-screen bg-background text-foreground overflow-y-auto overflow-x-hidden custom-scrollbar" style={{ paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       {/* Film Grain Overlay */}
       <div className="pointer-events-none fixed inset-0 z-[100] opacity-[0.03] mix-blend-overlay" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.65\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")' }}></div>
 
@@ -755,7 +755,7 @@ export default function Auth() {
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: EASE }}
-        className="fixed inset-x-0 top-0 z-20 flex items-center justify-between px-6 py-5 backdrop-blur-md sm:px-10"
+        className="fixed inset-x-0 top-0 z-20 flex items-center justify-between backdrop-blur-md" style={{ padding: 'calc(env(safe-area-inset-top, 0px) + 20px) calc(env(safe-area-inset-right, 0px) + 24px) 20px calc(env(safe-area-inset-left, 0px) + 24px)' }}
       >
         <div className="flex items-center gap-2.5">
           <FluxLogo className="size-6 text-primary" />
