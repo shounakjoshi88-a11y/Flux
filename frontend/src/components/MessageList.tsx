@@ -246,7 +246,7 @@ export function MessageList({
               )}
               <div
                 className="w-full shrink-0"
-                style={{ height: "calc(env(safe-area-inset-bottom, 0px) + 100px)" }}
+                style={{ height: "calc(env(safe-area-inset-bottom, 0px) + 50vh)" }}
               />
             </>
           ),
