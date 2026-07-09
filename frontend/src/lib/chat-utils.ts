@@ -18,6 +18,7 @@ export function fixMalformedTags(text: string): string {
   s = s.replace(/(?<![A-Za-z<])THINK>/gi, '<THINK>');
   s = s.replace(/(?<![A-Za-z<])FOLLOW_UPS>/gi, '<FOLLOW_UPS>');
   s = s.replace(/(?<![A-Za-z<])ANSWER>/gi, '<ANSWER>');
+  s = s.replace(/(?<![A-Za-z<])LIVE>/gi, '<LIVE>');
 
   // ── Partial prefixes where 1-2 leading chars are missing ──
   s = s.replace(/(?<![A-Za-z<])ART>/gi, '<CHART>');
@@ -30,10 +31,10 @@ export function fixMalformedTags(text: string): string {
   s = s.replace(/(?<![A-Za-z<])OLLOW_UPS>/gi, '<FOLLOW_UPS>');
 
   // ── Closing tags missing the opening "<" ──
-  s = s.replace(/\/(CHART|MERMAID|THOUGHT|THINK|FOLLOW_UPS|ANSWER)>/gi, '</$1>');
+  s = s.replace(/\/(CHART|MERMAID|LIVE|THOUGHT|THINK|FOLLOW_UPS|ANSWER)>/gi, '</$1>');
 
   // ── Closing tags with extra "<" like "</<CHART>" ──
-  s = s.replace(/<\s*\/\s*<\s*(CHART|MERMAID|THOUGHT|THINK|FOLLOW_UPS|ANSWER|SOURCES)>/gi, '</$1>');
+  s = s.replace(/<\s*\/\s*<\s*(CHART|MERMAID|LIVE|THOUGHT|THINK|FOLLOW_UPS|ANSWER|SOURCES)>/gi, '</$1>');
 
   return s;
 }

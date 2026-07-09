@@ -30,6 +30,12 @@
       "skillPath": "SKILL.md",
       "computedHash": "ea266ce95f3b5a080794b757121086247955708e7effe73461ed33ad29301643"
     },
+    "d3-viz": {
+      "source": "chrisvoncsefalvay/claude-d3js-skill",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "d9e1c3898138cd384dba803afadb38554f033db94edee4f53bab781ade32b3eb"
+    },
     "frontend-design": {
       "source": "anthropics/skills",
       "sourceType": "github",

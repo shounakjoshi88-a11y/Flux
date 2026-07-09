@@ -715,7 +715,9 @@ export function WikiGraph({ isOpen, onClose }: WikiGraphProps) {
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 20px',
+        paddingTop: '12px', paddingBottom: '12px',
+        paddingLeft: 'calc(env(safe-area-inset-left, 0px) + 20px)',
+        paddingRight: 'calc(env(safe-area-inset-right, 0px) + 20px)',
         borderBottom: `1px solid ${headerBorder}`,
         background: isLight ? 'rgba(245,243,239,0.95)' : 'rgba(18,17,15,0.95)',
         backdropFilter: 'blur(20px)',

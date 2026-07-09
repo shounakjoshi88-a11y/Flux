@@ -24,6 +24,7 @@ import "katex/dist/katex.min.css";
 import type { Source } from "../types";
 import { getDomain, fixMalformedTags } from "../lib/chat-utils";
 import { ChartRenderer, type ChartData } from "./ChartBlock";
+import { LiveWidget } from "./LiveWidget";
 import SmilesDrawer from "smiles-drawer";
 import DOMPurify from "dompurify";
 
@@ -1344,7 +1345,7 @@ function restoreCode(text: string, store: string[]): string {
 // ── Block regex: \3 backreference ensures \begin{CD} only matches \end{CD} ──
 // Also matches malformed opening tags where leading chars are missing:
 // e.g. "ART>...</CHART>" instead of "<CHART>...</CHART>".
-const BLOCK_DELIM_REGEX = /(<(?:CHART|MERMAID|svg|TIKZ|LILYPOND|MUSIC|ABC|CHEMICAL|SMILES|MOL)(?:\s+[^>]*)?>[\s\S]*?<\/(?:CHART|MERMAID|svg|TIKZ|LILYPOND|MUSIC|ABC|CHEMICAL|SMILES|MOL)>|```[a-z]*[\s\S]*?```|(?<=\n|^)\s*\$\$[\s\S]*?\s*\$\$(?=\s*$|\n)|(?<!\\)\\\[(?!-?\d+pt)[\s\S]+?\\\]|\\begin\{([a-zA-Z*]+)\}[\s\S]*?\\end\{\2\})/gim;
+const BLOCK_DELIM_REGEX = /(<(?:CHART|MERMAID|LIVE|svg|TIKZ|LILYPOND|MUSIC|ABC|CHEMICAL|SMILES|MOL)(?:\s+[^>]*)?>[\s\S]*?<\/(?:CHART|MERMAID|LIVE|svg|TIKZ|LILYPOND|MUSIC|ABC|CHEMICAL|SMILES|MOL)>|```[a-z]*[\s\S]*?```|(?<=\n|^)\s*\$\$[\s\S]*?\s*\$\$(?=\s*$|\n)|(?<!\\)\\\[(?!-?\d+pt)[\s\S]+?\\\]|\\begin\{([a-zA-Z*]+)\}[\s\S]*?\\end\{\2\})/gim;
 
 function renderBlocks(text: string, onCitationClick: any, sources: Source[], onHtmlPreview?: (html: string) => void) {
   if (typeof text !== "string") return [];
@@ -1359,10 +1360,13 @@ function renderBlocks(text: string, onCitationClick: any, sources: Source[], onH
     part.value = restoreCode(part.value, codeStore);
     if (part.type === "delimiter") {
       const val = part.value;
-      const tagMatch = val.match(/<(?:CHART|MERMAID|svg|TIKZ|LILYPOND|MUSIC|ABC|CHEMICAL|SMILES|MOL)/i);
+      const tagMatch = val.match(/<(?:CHART|MERMAID|LIVE|svg|TIKZ|LILYPOND|MUSIC|ABC|CHEMICAL|SMILES|MOL)/i);
       if (tagMatch) {
         const tag = tagMatch[1]!.toUpperCase();
         const contentBase = val.replace(/<[^>]+>/gi, "").trim();
+        if (tag === "LIVE") {
+          return <LiveWidget key={pi} html={contentBase} />;
+        }
         if (tag === "CHART") {
           try {
             const data = JSON.parse(stripJsonComments(contentBase));
