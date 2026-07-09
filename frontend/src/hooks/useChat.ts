@@ -19,7 +19,7 @@ async function getAccessToken() {
 }
 
 type UseChatCallbacks = {
-  onNewConversationId?: (id: string) => void;
+  onNewConversationId?: (id: string, slug?: string) => void;
   onStreamUpdate?: (parsed: { content: string; sources: Source[] }) => void;
   onComplete?: () => void;
   onMessageId?: (id: string) => void;
@@ -371,8 +371,9 @@ export function useChat(user: any) {
         if (!response.ok || !response.body) throw new Error("Request failed");
 
         const incomingConversationId = response.headers.get("X-Conversation-Id");
+        const incomingConversationSlug = response.headers.get("X-Conversation-Slug") || undefined;
         if (incomingConversationId && callbacks?.onNewConversationId) {
-          callbacks.onNewConversationId(incomingConversationId);
+          callbacks.onNewConversationId(incomingConversationId, incomingConversationSlug);
           // Persist the real conversation ID into lastRequestRef so retry()
           // doesn't pass "" to the backend (which would create a new thread).
           lastRequestRef.current = {

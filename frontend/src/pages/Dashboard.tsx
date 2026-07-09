@@ -28,6 +28,9 @@ import { PromptHistoryCard } from "../components/PromptHistoryCard";
 import { ArtifactsModal, prefetchArtifacts } from "../components/ArtifactsModal";
 import { NewsModal } from "../components/NewsModal";
 import { WikiGraph } from "../components/WikiGraph";
+import { useIsMobile } from "../hooks/useMediaQuery";
+import { MobileBottomNav, MobileSidebarDrawer } from "../components/MobileBottomNav";
+import { MobileConversationList } from "../components/MobileConversationList";
 import { useChat } from "../hooks/useChat";
 import { useAgentSession } from "../hooks/useAgentSession";
 import { useModels } from "../hooks/useModels";
@@ -60,6 +63,16 @@ type GeneratedFile = {
   sections?: { heading: string; body: string }[];
   pages?: { text: string }[];
 };
+
+function slugifyFriendly(input: string) {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 80) || `conv-${Date.now()}`;
+}
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -116,6 +129,9 @@ export default function Dashboard() {
   const [peekFile, setPeekFile] = useState<{ name: string; content: string } | null>(null);
   const [htmlPreviewContent, setHtmlPreviewContent] = useState<string | null>(null);
   const [isArtifactsOpen, setIsArtifactsOpen] = useState(false);
+  const isMobile = useIsMobile();
+  const [mobileScreen, setMobileScreen] = useState<"chat" | "history" | "search">("chat");
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [isNewsOpen, setIsNewsOpen] = useState(false);
   const [isWikiOpen, setIsWikiOpen] = useState(false);
   const [toast, setToast] = useState<{ conversationId: string; title: string } | null>(null);
@@ -211,6 +227,14 @@ export default function Dashboard() {
   const sessionState = ws.sessionState;
 
   const previousSidebarOpen = useRef(isSidebarOpen);
+
+  // ─── Mobile: when "search" tab is tapped, open search modal ───
+  useEffect(() => {
+    if (isMobile && mobileScreen === "search") {
+      setIsSearchModalOpen(true);
+      setMobileScreen("chat");
+    }
+  }, [isMobile, mobileScreen]);
 
   const currentModelLabel = useMemo(
     () => (Array.isArray(allModels) ? allModels.find((m) => m.id === selectedModel)?.label : null) ?? "DeepSeek V4 Pro (DeepSeek)",
@@ -526,7 +550,9 @@ export default function Dashboard() {
       setActiveTab("answer");
       setActiveImages([]);
       const conv = conversations.find(c => c.id === id);
-      navigate(`/c/${conv?.slug || id}`, { replace: true });
+      if (conv?.slug) {
+        navigate(`/c/${conv.slug}`, { replace: true });
+      }
 
       // ── 1. Serve instantly from in-memory cache if still fresh ────────────
       const cached = conversationCacheRef.current.get(id);
@@ -572,6 +598,12 @@ export default function Dashboard() {
         console.warn('Conversation data is empty or malformed', data);
         return;
       }
+
+      // Update URL with the real slug from the server
+      if (data.conversation.slug && activeConversationIdRef.current === id) {
+        navigate(`/c/${data.conversation.slug}`, { replace: true });
+      }
+
       const entry = enrichConversationMessages(data.conversation.messages);
 
       // ── 4. Store in both caches ──────────────────────────────────────────
@@ -595,8 +627,21 @@ export default function Dashboard() {
     if (slug && conversations.length > 0 && !slugHandled.current) {
       slugHandled.current = true;
       const match = conversations.find(c => c.slug === slug);
-      if (match) openConversation(match.id);
-      else navigate("/", { replace: true });
+      if (match) {
+        openConversation(match.id);
+      } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)) {
+        // URL has a raw UUID (from a previous bug) — try to find by ID
+        const idMatch = conversations.find(c => c.id === slug);
+        if (idMatch) {
+          navigate(`/c/${idMatch.slug}`, { replace: true });
+          openConversation(idMatch.id);
+        } else {
+          // Fetch from backend directly
+          openConversation(slug);
+        }
+      } else {
+        navigate("/", { replace: true });
+      }
     }
   }, [slug, conversations, openConversation, navigate]);
 
@@ -778,9 +823,12 @@ export default function Dashboard() {
       // Auto-detect transport: use WS if available, fall back to SSE
       if (wsAvailableRef.current) {
         ws.sendMessage(prompt, activeConversationId, selectedModel, filesToSend, {
-          onNewConversationId: (id) => {
+          onNewConversationId: (id, slug) => {
             setActiveConversationId(id);
             activeConversationIdRef.current = id;
+            if (slug) {
+              navigate(`/c/${slug}`, { replace: true });
+            }
           },
           onComplete: () => {
             const id = activeConversationIdRef.current;
@@ -800,9 +848,12 @@ export default function Dashboard() {
           selectedModel,
           filesToSend,
           {
-            onNewConversationId: (id) => {
+            onNewConversationId: (id, slug) => {
               setActiveConversationId(id);
               activeConversationIdRef.current = id;
+              if (slug) {
+                navigate(`/c/${slug}`, { replace: true });
+              }
             },
             onStreamUpdate: (parsed) => setActiveSources(parsed.sources),
             onPermissionRequest: (request) => {
@@ -985,7 +1036,7 @@ export default function Dashboard() {
       {
         id: toast.conversationId,
         title: toast.title,
-        slug: "",
+        slug: toast.title ? slugifyFriendly(toast.title) : `restored-${Date.now()}`,
         lastMessageAt: new Date().toISOString(),
       },
       ...prev,
@@ -1084,70 +1135,74 @@ export default function Dashboard() {
   }
 
   return (
-  
     <div className="flex h-screen w-full main-container text-foreground overflow-hidden font-sans">
-      {isPerfLow ? (
-        <Sidebar
-          isOpen={isSidebarOpen}
-          onToggle={() => setIsSidebarOpen((p) => !p)}
-          user={user}
-          conversations={conversations}
-          activeConversationId={activeConversationId}
-          onCreateThread={createNewThread}
-          onSelectThread={openConversation}
-          onDeleteThread={deleteConversation}
-          onPrefetchThread={prefetchConversation}
-          onArtifactsPrefetch={() => prefetchArtifacts(BACKEND_URL)}
-          isDarkMode={isDark}
-          toggleTheme={toggleTheme}
-          onLogout={async () => {
-            await supabase.auth.signOut();
-            setUser(null);
-            navigate("/auth");
-          }}
-          searchConversations={searchConversations}
-          isSearchModalOpen={isSearchModalOpen}
-          onSearchModalOpen={handleSearchModalOpen}
-          onSearchModalClose={handleSearchModalClose}
-          onSettingsOpen={handleSettingsOpen}
-          onArtifactsOpen={() => setIsArtifactsOpen(true)}
-          onWikiOpen={() => setIsWikiOpen(true)}
-          onNewsOpen={() => setIsNewsOpen(true)}
-          onCustomAgentsOpen={() => setIsCustomAgentsOpen((p) => !p)}
-          onTeamOpen={() => setIsTeamPanelOpen((p) => !p)}
-        />
-      ) : (
-        <AnimatePresence>
-          <Sidebar
-            isOpen={isSidebarOpen}
-            onToggle={() => setIsSidebarOpen((p) => !p)}
-            user={user}
-            conversations={conversations}
-            activeConversationId={activeConversationId}
-            onCreateThread={createNewThread}
-            onSelectThread={openConversation}
-            onDeleteThread={deleteConversation}
-            onPrefetchThread={prefetchConversation}
-            onArtifactsPrefetch={() => prefetchArtifacts(BACKEND_URL)}
-            isDarkMode={isDark}
-            toggleTheme={toggleTheme}
-            onLogout={async () => {
-              await supabase.auth.signOut();
-              setUser(null);
-              navigate("/auth");
-            }}
-            searchConversations={searchConversations}
-            isSearchModalOpen={isSearchModalOpen}
-            onSearchModalOpen={handleSearchModalOpen}
-            onSearchModalClose={handleSearchModalClose}
-            onSettingsOpen={handleSettingsOpen}
-            onArtifactsOpen={() => setIsArtifactsOpen(true)}
-            onWikiOpen={() => setIsWikiOpen(true)}
-            onNewsOpen={() => setIsNewsOpen(true)}
-            onCustomAgentsOpen={() => setIsCustomAgentsOpen((p) => !p)}
-            onTeamOpen={() => setIsTeamPanelOpen((p) => !p)}
-          />
-        </AnimatePresence>
+      {/* Desktop sidebar */}
+      {!isMobile && (
+        <>
+          {isPerfLow ? (
+            <Sidebar
+              isOpen={isSidebarOpen}
+              onToggle={() => setIsSidebarOpen((p) => !p)}
+              user={user}
+              conversations={conversations}
+              activeConversationId={activeConversationId}
+              onCreateThread={createNewThread}
+              onSelectThread={openConversation}
+              onDeleteThread={deleteConversation}
+              onPrefetchThread={prefetchConversation}
+              onArtifactsPrefetch={() => prefetchArtifacts(BACKEND_URL)}
+              isDarkMode={isDark}
+              toggleTheme={toggleTheme}
+              onLogout={async () => {
+                await supabase.auth.signOut();
+                setUser(null);
+                navigate("/auth");
+              }}
+              searchConversations={searchConversations}
+              isSearchModalOpen={isSearchModalOpen}
+              onSearchModalOpen={handleSearchModalOpen}
+              onSearchModalClose={handleSearchModalClose}
+              onSettingsOpen={handleSettingsOpen}
+              onArtifactsOpen={() => setIsArtifactsOpen(true)}
+              onWikiOpen={() => setIsWikiOpen(true)}
+              onNewsOpen={() => setIsNewsOpen(true)}
+              onCustomAgentsOpen={() => setIsCustomAgentsOpen((p) => !p)}
+              onTeamOpen={() => setIsTeamPanelOpen((p) => !p)}
+            />
+          ) : (
+            <AnimatePresence>
+              <Sidebar
+                isOpen={isSidebarOpen}
+                onToggle={() => setIsSidebarOpen((p) => !p)}
+                user={user}
+                conversations={conversations}
+                activeConversationId={activeConversationId}
+                onCreateThread={createNewThread}
+                onSelectThread={openConversation}
+                onDeleteThread={deleteConversation}
+                onPrefetchThread={prefetchConversation}
+                onArtifactsPrefetch={() => prefetchArtifacts(BACKEND_URL)}
+                isDarkMode={isDark}
+                toggleTheme={toggleTheme}
+                onLogout={async () => {
+                  await supabase.auth.signOut();
+                  setUser(null);
+                  navigate("/auth");
+                }}
+                searchConversations={searchConversations}
+                isSearchModalOpen={isSearchModalOpen}
+                onSearchModalOpen={handleSearchModalOpen}
+                onSearchModalClose={handleSearchModalClose}
+                onSettingsOpen={handleSettingsOpen}
+                onArtifactsOpen={() => setIsArtifactsOpen(true)}
+                onWikiOpen={() => setIsWikiOpen(true)}
+                onNewsOpen={() => setIsNewsOpen(true)}
+                onCustomAgentsOpen={() => setIsCustomAgentsOpen((p) => !p)}
+                onTeamOpen={() => setIsTeamPanelOpen((p) => !p)}
+              />
+            </AnimatePresence>
+          )}
+        </>
       )}
 
       <ArtifactsModal 
@@ -1176,8 +1231,8 @@ export default function Dashboard() {
 
       <main
         className={`relative flex-1 flex flex-col min-w-0 transition-[margin] duration-300 ease-in-out ${
-          isSidebarOpen ? "md:ml-[260px]" : "md:ml-0"
-        } ${!isSidebarOpen ? 'px-[48px]' : ''}`}
+          !isMobile && isSidebarOpen ? "md:ml-[260px]" : "md:ml-0"
+        } ${!isMobile && !isSidebarOpen ? 'px-[48px]' : ''} ${isMobile ? 'pb-16' : ''}`}
         style={{ minHeight: 0, height: '100%' }}
       >
         {hasStarted && (
@@ -1187,10 +1242,18 @@ export default function Dashboard() {
           />
         )}
         <section className={`flex-1 flex flex-col transition-all duration-300 ${
-          !hasStarted ? '' : 'rounded-xl border border-[var(--surface-border)] bg-[var(--bg-primary)]'
+          !hasStarted ? '' : `${isMobile ? 'border-x-0 border-b-0' : 'rounded-xl'} border border-[var(--surface-border)] bg-[var(--bg-primary)]`
         }`} style={{ minHeight: 0 }}>
           {hasStarted && (
             <header className="flex items-center justify-between border-b border-[var(--surface-border)] px-4 py-2">
+              {isMobile && (
+                <button
+                  onClick={() => setIsMobileDrawerOpen(true)}
+                  className="p-1.5 hover:bg-[var(--surface-bg)] rounded-lg text-muted-foreground hover:text-foreground shrink-0"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
+                </button>
+              )}
               <div className="flex items-center gap-6 flex-1 justify-center">
                 <button type="button" onClick={() => setActiveTab("answer")} className={tabClass("answer")}>Answer</button>
                 <button type="button" onClick={() => setActiveTab("links")} className={tabClass("links")}>
@@ -1208,7 +1271,7 @@ export default function Dashboard() {
 
           {!hasStarted ? (
             <div className="flex-1 overflow-y-auto px-6 flex flex-col justify-start items-center pt-[30vh] pb-12 custom-scrollbar" style={{ minHeight: 0 }}>
-              <div className="w-full max-w-2xl mx-auto flex flex-col items-center">
+              <div className={`w-full ${isMobile ? '' : 'max-w-2xl'} mx-auto flex flex-col items-center`}>
                 {/* Claude-style warm greeting */}
                 <div className="flex items-center justify-center gap-4 mb-8 select-none">
                   {/* Flux logo: mountain with rising sun/moon */}
@@ -1262,13 +1325,13 @@ export default function Dashboard() {
                       />
                     </svg>
                   </button>
-                  <h1 className="serif-display text-4xl md:text-5xl text-[#cc785c] leading-tight">
-                    {getGreeting()}
+<h1 className="serif-display text-3xl sm:text-4xl md:text-5xl text-[#cc785c] leading-tight">
+                      {getGreeting()}
                   </h1>
                 </div>
 
                 <div className="w-full">
-                  <div className="border border-[var(--surface-border)] rounded-2xl shadow-xl backdrop-blur-sm">
+                  <div className={`border border-[var(--surface-border)] ${isMobile ? 'rounded-none border-x-0' : 'rounded-2xl'} shadow-xl backdrop-blur-sm`}>
                     <ChatInput
                       query={query}
                       setQuery={setQuery}
@@ -1285,6 +1348,7 @@ export default function Dashboard() {
                       setModelDropdownOpen={setModelDropdownOpen}
                       handleAttachFiles={handleAttachFiles}
                       onStop={handleStop}
+                      compact={isMobile}
                     />
                   </div>
                 </div>
@@ -1339,13 +1403,15 @@ export default function Dashboard() {
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
             className={`fixed bottom-0 z-50 pointer-events-none px-5
               bg-[var(--bg-primary)]
-              transition-[left,right] duration-300`}
+              transition-[left,right] duration-300 ${
+                isMobile ? 'pb-16' : ''
+              }`}
             style={{
-              left: isSidebarOpen ? "290px" : "48px",
-              right: isSidebarOpen ? "48px" : "48px",
+              left: !isMobile && isSidebarOpen ? "290px" : isMobile ? "0" : "48px",
+              right: isMobile ? "0" : isSidebarOpen ? "48px" : "48px",
             }}
           >
-            <div className="w-full max-w-[700px] mx-auto pointer-events-auto">
+            <div className={`mx-auto pointer-events-auto ${isMobile ? 'w-full' : 'w-full max-w-[700px]'}`}>
               <ChatInput
                 query={query}
                 setQuery={setQuery}
@@ -1362,6 +1428,7 @@ export default function Dashboard() {
                 setModelDropdownOpen={setModelDropdownOpen}
                 handleAttachFiles={handleAttachFiles}
                 onStop={handleStop}
+                compact={isMobile}
               />
             </div>
             <InputSeparator />
@@ -1558,6 +1625,48 @@ export default function Dashboard() {
           </AnimatePresence>
         )}
       </main>
+
+      {/* Mobile history screen */}
+      {isMobile && mobileScreen === "history" && (
+        <MobileConversationList
+          conversations={conversations}
+          activeConversationId={activeConversationId}
+          onSelectThread={openConversation}
+          onDeleteThread={deleteConversation}
+          onNewChat={createNewThread}
+          onClose={() => setMobileScreen("chat")}
+        />
+      )}
+
+      {/* Mobile bottom nav */}
+      {isMobile && (
+        <>
+          <MobileBottomNav
+            activeScreen={mobileScreen}
+            onScreenChange={setMobileScreen}
+            hasStarted={hasStarted}
+            onCreateThread={createNewThread}
+          />
+          <MobileSidebarDrawer
+            isOpen={isMobileDrawerOpen}
+            onClose={() => setIsMobileDrawerOpen(false)}
+            onArtifactsOpen={() => setIsArtifactsOpen(true)}
+            onWikiOpen={() => setIsWikiOpen(true)}
+            onNewsOpen={() => setIsNewsOpen(true)}
+            onCustomAgentsOpen={() => setIsCustomAgentsOpen((p) => !p)}
+            onTeamOpen={() => setIsTeamPanelOpen((p) => !p)}
+            onSettingsOpen={handleSettingsOpen}
+            onLogout={async () => {
+              await supabase.auth.signOut();
+              setUser(null);
+              navigate("/auth");
+            }}
+            isDarkMode={isDark}
+            toggleTheme={toggleTheme}
+            userEmail={user?.email}
+          />
+        </>
+      )}
 
       <Settings
         isOpen={isSettingsOpen}

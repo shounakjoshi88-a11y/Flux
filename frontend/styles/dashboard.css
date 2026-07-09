@@ -483,3 +483,78 @@ table td {
 .gpu-layer { transform: translateZ(0); backface-visibility: hidden; }
 .sidebar-panel { will-change: transform; contain: layout style; }
 .fixed-input-area { will-change: transform; contain: layout style; }
+
+/* ===================================================
+   Mobile browser responsive overrides
+   =================================================== */
+
+@media (max-width: 767px) {
+  /* Larger touch targets for all buttons */
+  button, a, [role="button"], .citation-btn {
+    cursor: default;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  /* User messages wider on mobile */
+  .user-message {
+    max-width: 95%;
+  }
+
+  /* Prevent horizontal scroll on mobile */
+  .main-container {
+    overflow-x: hidden;
+    overflow-y: hidden;
+  }
+
+  /* Larger scroll area for message list */
+  .assistant-section {
+    font-size: 0.9375rem !important;
+  }
+
+  /* Model selector should be more compact on mobile */
+  .model-selector [class*="w-64"] {
+    width: 90vw !important;
+    right: 0 !important;
+    left: auto !important;
+  }
+
+  /* Attach menu full width */
+  .attach-menu-mobile {
+    width: 90vw !important;
+  }
+
+  /* Suggested actions grid on mobile */
+  .suggested-actions-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Input bar: no border radius on mobile for edge-to-edge look */
+  .chat-input-container {
+    border-radius: 0 !important;
+  }
+
+  /* Quick actions area */
+  .welcome-suggestions {
+    gap: 0.5rem;
+  }
+
+  /* Full-width peek panels */
+  .peek-panel-mobile {
+    width: 100% !important;
+  }
+
+  /* Full-width modals */
+  .modal-mobile-full {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 0 !important;
+    height: 100% !important;
+    max-height: 100% !important;
+  }
+
+  /* Mobile bottom padding to account for nav */
+  .mobile-safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 64px);
+  }
+}
