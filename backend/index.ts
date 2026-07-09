@@ -67,7 +67,7 @@ const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000,http:
 
 app.use(cors({
     origin: true, // Reflect the request origin
-    exposedHeaders: ['X-Conversation-Id'],
+    exposedHeaders: ['X-Conversation-Id', 'X-Conversation-Slug'],
     methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Conversation-Id', 'x-health-secret'],
     credentials: true,
@@ -4366,12 +4366,12 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
                 include: { messages: { orderBy: { createdAt: 'asc' } } },
             });
         }
-        activeConversationId = existingConv?.id ?? (
-            await prisma.conversation.create({
-                data: { title: nq.slice(0, 120), slug: slugify(nq), userId: uid },
-            })
-        ).id;
-        if (!existingConv) broadcastSyncEvent(suid, { type: 'conversation_created' });
+        const convIsNew = !existingConv && !conversationId;
+        const newConv = convIsNew ? await prisma.conversation.create({
+            data: { title: nq.slice(0, 120), slug: slugify(nq), userId: uid },
+        }) : null;
+        activeConversationId = existingConv?.id ?? newConv!.id;
+        if (convIsNew) broadcastSyncEvent(suid, { type: 'conversation_created' });
 
         // ── SSE setup ───────────────────────────────────────────────────
         res.setHeader('Cache-Control', 'no-cache');
@@ -4379,6 +4379,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
         res.setHeader('Connection', 'keep-alive');
         res.setHeader('X-Accel-Buffering', 'no');
         res.setHeader('X-Conversation-Id', activeConversationId);
+        if (newConv) res.setHeader('X-Conversation-Slug', newConv.slug);
         res.flushHeaders();
 
         trackSseConnection(uid, req, res);
@@ -4431,11 +4432,10 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
         if (isLongTask) {
             const uid = req.appUserId!;
             const convCreated = !conversationId;
-            const convId = conversationId ?? (
-                await prisma.conversation.create({
-                    data: { title: nq.slice(0, 120), slug: slugify(nq), userId: uid },
-                })
-            ).id;
+            const newConv = convCreated ? await prisma.conversation.create({
+                data: { title: nq.slice(0, 120), slug: slugify(nq), userId: uid },
+            }) : null;
+            const convId = conversationId ?? newConv!.id;
             if (convCreated) broadcastSyncEvent(suid, { type: 'conversation_created' });
             activeConversationId = convId;
 
@@ -4443,6 +4443,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
             res.setHeader('Cache-Control', 'no-cache');
             res.setHeader('Connection', 'keep-alive');
             res.setHeader('X-Conversation-Id', convId);
+            if (newConv) res.setHeader('X-Conversation-Slug', newConv.slug);
 
             trackSseConnection(uid, req, res);
 

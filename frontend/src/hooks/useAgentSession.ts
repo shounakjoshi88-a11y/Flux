@@ -37,7 +37,7 @@ interface AgentMessage {
 }
 
 interface UseAgentSessionCallbacks {
-  onNewConversationId?: (id: string) => void;
+  onNewConversationId?: (id: string, slug?: string) => void;
   onComplete?: () => void;
   onMessageId?: (id: string) => void;
   onPermissionRequest?: (request: any) => void;

@@ -116,6 +116,16 @@ type GeneratedFile = {
   pages?: { text: string }[];
 };
 
+function slugifyFriendly(input: string) {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 80) || `conv-${Date.now()}`;
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const { isDark, toggle: toggleTheme } = useTheme();
@@ -617,7 +627,9 @@ export default function Dashboard() {
       setActiveTab("answer");
       setActiveImages([]);
       const conv = conversations.find(c => c.id === id);
-      navigate(`/c/${conv?.slug || id}`, { replace: true });
+      if (conv?.slug) {
+        navigate(`/c/${conv.slug}`, { replace: true });
+      }
 
       // ── 1. Serve instantly from conversationCache if available ────────────
       const cachedFromDb = await conversationCache.getMessages(id);
@@ -654,6 +666,12 @@ export default function Dashboard() {
         return;
       }
       const data = (await res.json()) as { conversation: ConversationDetail };
+
+      // Update URL with the real slug from the server
+      if (data.conversation.slug && activeConversationIdRef.current === id) {
+        navigate(`/c/${data.conversation.slug}`, { replace: true });
+      }
+
       const entry = enrichConversationMessages(data.conversation.messages);
 
       // ── 4. Store in both caches ───────────────────────────────────────────
@@ -677,8 +695,19 @@ export default function Dashboard() {
     if (slug && conversations.length > 0 && !slugHandled.current) {
       slugHandled.current = true;
       const match = conversations.find(c => c.slug === slug);
-      if (match) openConversation(match.id);
-      else navigate("/", { replace: true });
+      if (match) {
+        openConversation(match.id);
+      } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)) {
+        const idMatch = conversations.find(c => c.id === slug);
+        if (idMatch) {
+          navigate(`/c/${idMatch.slug}`, { replace: true });
+          openConversation(idMatch.id);
+        } else {
+          openConversation(slug);
+        }
+      } else {
+        navigate("/", { replace: true });
+      }
     }
   }, [slug, conversations, openConversation, navigate]);
 
@@ -859,9 +888,12 @@ export default function Dashboard() {
       // Auto-detect transport: use WS if available, fall back to SSE
       if (wsAvailableRef.current) {
         ws.sendMessage(prompt, activeConversationId, selectedModel, filesToSend, {
-          onNewConversationId: (id) => {
+          onNewConversationId: (id, slug) => {
             setActiveConversationId(id);
             activeConversationIdRef.current = id;
+            if (slug) {
+              navigate(`/c/${slug}`, { replace: true });
+            }
           },
           onComplete: () => {
             const id = activeConversationIdRef.current;
@@ -876,9 +908,12 @@ export default function Dashboard() {
           selectedModel,
           filesToSend,
           {
-            onNewConversationId: (id) => {
+            onNewConversationId: (id, slug) => {
               setActiveConversationId(id);
               activeConversationIdRef.current = id;
+              if (slug) {
+                navigate(`/c/${slug}`, { replace: true });
+              }
             },
             onStreamUpdate: (parsed) => setActiveSources(parsed.sources),
             onPermissionRequest: (request) => {
@@ -1033,7 +1068,7 @@ export default function Dashboard() {
       {
         id: toast.conversationId,
         title: toast.title,
-        slug: "",
+        slug: toast.title ? slugifyFriendly(toast.title) : `restored-${Date.now()}`,
         lastMessageAt: new Date().toISOString(),
       },
       ...prev,
