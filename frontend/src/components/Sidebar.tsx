@@ -519,7 +519,7 @@ export const Sidebar = memo(function Sidebar({
                     <motion.circle
                       cx="17"
                       r="2.8"
-                      fill={isDay ? "#cc785c" : "#faf9f5"}
+                      fill={isDay ? "#e8856a" : "#fdf8f6"}
                       initial={false}
                       animate={{
                         cy: logoRisen ? 1.5 : 11,
@@ -534,7 +534,7 @@ export const Sidebar = memo(function Sidebar({
                         cx="17"
                         r="5"
                         fill="none"
-                        stroke="#cc785c"
+                        stroke="#e8856a"
                         strokeWidth="0.8"
                         initial={false}
                         animate={{
@@ -548,7 +548,7 @@ export const Sidebar = memo(function Sidebar({
                     <path
                       d="M2 16C5 6 8 18 11 10S17 6 22 12"
                       fill="none"
-                      stroke="#cc785c"
+                      stroke="#e8856a"
                       strokeWidth="1.8"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -669,8 +669,8 @@ export const Sidebar = memo(function Sidebar({
               }`}
               title="Custom Agents"
             >
-              <span className="flex items-center justify-center size-6 rounded-full bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 shrink-0">
-                <Bot className="size-4 text-emerald-400" />
+              <span className="flex items-center justify-center size-6 rounded-full bg-gradient-to-br from-rose-500/20 to-pink-600/10 shrink-0">
+                <Bot className="size-4 text-rose-400" />
               </span>
               {isOpen && (
                 <span className="text-sm font-medium whitespace-nowrap overflow-hidden">
@@ -688,8 +688,8 @@ export const Sidebar = memo(function Sidebar({
               }`}
               title="Team Mode"
             >
-              <span className="flex items-center justify-center size-6 rounded-full bg-gradient-to-br from-indigo-500/20 to-indigo-600/10 shrink-0">
-                <Users className="size-4 text-indigo-400" />
+              <span className="flex items-center justify-center size-6 rounded-full bg-gradient-to-br from-orange-400/20 to-coral-600/10 shrink-0">
+                <Users className="size-4 text-orange-400" />
               </span>
               {isOpen && (
                 <span className="text-sm font-medium whitespace-nowrap overflow-hidden">
