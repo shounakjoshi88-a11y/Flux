@@ -43,7 +43,7 @@ Switch between 19+ models from a unified chat interface with automatic fallback 
 
 | Category | Models |
 |----------|--------|
-| **General Purpose** | Mistral Large 3 675B, GLM 5.1, Kimi K2.6, Nemotron 3 Ultra 550B, Nemotron 3 Super 120B, Nemotron 3 Nano Omni 30B, Mistral Medium 3.5 128B, DeepSeek V4 Flash/Pro, Qwen 3.5 397B, Step 3.7 Flash, Step 3.5 Flash, MiniMax M2.7/M3, Sarvam-M, Stockmark 2 100B |
+| **General Purpose** | Mistral Large 3 675B, GLM 5.2, Kimi K2.6, Nemotron 3 Ultra 550B, Nemotron 3 Super 120B, Nemotron 3 Nano Omni 30B, Mistral Medium 3.5 128B, DeepSeek V4 Flash/Pro, Qwen 3.5 397B, Step 3.7 Flash, Step 3.5 Flash, MiniMax M2.7/M3, Sarvam-M, Stockmark 2 100B |
 | **Vision** | Nemotron Nano 12B V2 VL, Kimi K2.6, MiniMax M3, DeepSeek V4 Pro — handle image attachments |
 | **Planning** | Kimi K2.6 — multi-step task decomposition |
 

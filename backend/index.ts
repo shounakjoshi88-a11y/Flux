@@ -264,7 +264,7 @@ function sanitizeTitle(title: string): string {
 const NIM_MODELS: Record<string, string> = {
     "llama-4-maverick": "meta/llama-4-maverick-17b-128e-instruct",
     "mistral-large-675b": "mistralai/mistral-large-3-675b-instruct-2512",
-    "glm-5.1": "z-ai/glm-5.1",
+    "glm-5.2": "z-ai/glm-5.2",
     "kimi-k2.6": "moonshotai/kimi-k2.6",
     "nemotron-3-ultra-550b": "nvidia/nemotron-3-ultra-550b-a55b",
     "nemotron-3-nano-omni-30b-a3b-reasoning": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
@@ -6468,7 +6468,7 @@ const AVAILABLE_MODELS = [
     {
         category: "General Purpose", models: [
             { id: "mistral-large-675b", label: "Mistral Large 3 675B (Mistral AI)" },
-            { id: "glm-5.1", label: "GLM 5.1 (Z‑AI)" },
+            { id: "glm-5.2", label: "GLM 5.2 (Z‑AI)" },
             { id: "kimi-k2.6", label: "Kimi K2.6 (Moonshot AI)" },
             { id: "nemotron-3-ultra-550b", label: "Nemotron 3 Ultra 550B (NVIDIA)" },
             { id: "mistral-medium-3.5-128b", label: "Mistral Medium 3.5 128B (Mistral AI)" },

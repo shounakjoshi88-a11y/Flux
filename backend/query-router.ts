@@ -3,7 +3,7 @@
 const CHEAP_MODEL_ID = "step-3.7-flash";
 const EXPENSIVE_MODELS = new Set([
   "mistral-large-675b",
-  "glm-5.1",
+  "glm-5.2",
   "nemotron-3-ultra-550b",
   "mistral-medium-3.5-128b",
   "qwen3.5-397b-a17b",

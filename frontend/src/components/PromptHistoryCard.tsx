@@ -85,8 +85,8 @@ export function PromptHistoryCard({ messages, onJumpToPrompt, visibleRange }: Pr
 
   return (
     <div
-      className="fixed right-20 top-1/2 -translate-y-1/2 z-50 flex items-center"
-      style={{ pointerEvents: "none" }}
+      className="fixed top-1/2 -translate-y-1/2 z-50 flex items-center"
+      style={{ pointerEvents: "none", right: 100 }}
     >
       {/* ── Popup card ── */}
       <AnimatePresence>

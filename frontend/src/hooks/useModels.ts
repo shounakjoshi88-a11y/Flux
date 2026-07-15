@@ -88,7 +88,7 @@ function getFallbackModels(): ModelCategory[] {
       category: "General Purpose",
       models: [
         { id: "mistral-large-675b", label: "Mistral Large 3 675B (Mistral AI)" },
-        { id: "glm-5.1", label: "GLM 5.1 (Z‑AI)" },
+        { id: "glm-5.2", label: "GLM 5.2 (Z‑AI)" },
         { id: "kimi-k2.6", label: "Kimi K2.6 (Moonshot AI)" },
         { id: "nemotron-3-ultra-550b", label: "Nemotron 3 Ultra 550B (NVIDIA)" },
         { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash (DeepSeek)" },
