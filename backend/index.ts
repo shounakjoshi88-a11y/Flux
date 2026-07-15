@@ -5962,6 +5962,36 @@ app.delete("/conversations/:conversationId", middleware, async (req, res) => {
     }
 });
 
+// ─── UPDATE CONVERSATION ────────────────────────────────────
+app.patch("/conversations/:conversationId", middleware, async (req, res) => {
+    try {
+        const appUserId = req.appUserId!;
+        const conversationId = req.params.conversationId as string;
+        const { title } = req.body as { title?: string };
+        if (!conversationId) return res.status(400).json({ message: "conversationId is required" });
+        if (!title || !title.trim()) return res.status(400).json({ message: "title is required" });
+
+        const conversation = await prisma.conversation.findFirst({
+            where: { id: conversationId, userId: appUserId },
+            select: { id: true },
+        });
+        if (!conversation) return res.status(404).json({ message: "Conversation not found" });
+
+        const slug = title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || `thread-${Date.now()}`;
+        const updated = await prisma.conversation.update({
+            where: { id: conversationId },
+            data: { title: title.trim(), slug },
+            select: { id: true, title: true, slug: true },
+        });
+
+        broadcastSyncEvent(req.userId!, { type: 'conversation_updated', id: conversationId, title: updated.title });
+        return res.status(200).json({ conversation: updated });
+    } catch (error) {
+        console.error("Update conversation error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+
 // ── TTS PROXY ──────────────────────────────────────────────
 app.post("/api/tts/local", middleware, async (req, res) => {
     try {

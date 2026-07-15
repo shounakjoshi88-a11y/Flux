@@ -1,75 +1,60 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Message } from "../types";
 
 interface PromptHistoryCardProps {
   messages: Message[];
   onJumpToPrompt: (messageId: string | number) => void;
+  visibleRange: { startIndex: number; endIndex: number };
 }
 
-const MINIMAP_H = 280; // px — fixed height of the minimap track
-const DOT_MIN = 3;     // px — minimum dot height
-const DOT_MAX = 8;     // px — maximum dot height
-const GAP_MIN = 2;     // px — minimum gap
-const GAP_MAX = 6;     // px — maximum gap
+const MINIMAP_H = 280;
+const DOT_MIN = 3;
+const DOT_MAX = 8;
+const GAP_MIN = 2;
+const GAP_MAX = 6;
 
-export function PromptHistoryCard({ messages, onJumpToPrompt }: PromptHistoryCardProps) {
+export function PromptHistoryCard({ messages, onJumpToPrompt, visibleRange }: PromptHistoryCardProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const listRef = useRef<HTMLDivElement>(null);
-  const observerRef = useRef<IntersectionObserver | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const userPrompts = messages.filter((m) => m.role === "User");
+  const userPrompts = useMemo(() => messages.filter((m) => m.role === "User"), [messages]);
 
-  // ── Compute dot / gap sizes so all dots always fit ──────────
   const total = userPrompts.length;
   const itemSlot = total > 0 ? MINIMAP_H / total : MINIMAP_H;
   const dotH = Math.max(DOT_MIN, Math.min(DOT_MAX, itemSlot * 0.5));
-  const gap  = Math.max(GAP_MIN, Math.min(GAP_MAX, itemSlot * 0.5));
+  const gap = Math.max(GAP_MIN, Math.min(GAP_MAX, itemSlot * 0.5));
 
-  // ── Track which prompt is in viewport ───────────────────────
+  // ── Active index from Virtuoso's visible range ─────────────
   useEffect(() => {
-    if (observerRef.current) observerRef.current.disconnect();
-
-    const ratioMap = new Map<Element, number>();
-    let rafId = 0;
-
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (e.isIntersecting) ratioMap.set(e.target, e.intersectionRatio);
-          else ratioMap.delete(e.target);
-        }
-        cancelAnimationFrame(rafId);
-        rafId = requestAnimationFrame(() => {
-          let best: Element | null = null;
-          let bestR = 0;
-          for (const [el, r] of ratioMap) {
-            if (r > bestR) { bestR = r; best = el; }
-          }
-          if (best) {
-            const id = best.getAttribute("data-message-id");
-            const idx = userPrompts.findIndex((m) => String(m.id) === id);
-            if (idx !== -1) setActiveIndex(idx);
-          }
-        });
-      },
-      { threshold: [0, 0.25, 0.5, 0.75, 1], rootMargin: "-80px 0px -80px 0px" }
-    );
-
-    for (const msg of userPrompts) {
-      const el = document.querySelector(`[data-message-id="${msg.id}"]`);
-      if (el) observerRef.current.observe(el);
+    if (total === 0) { setActiveIndex(-1); return; }
+    let bestIdx = -1;
+    let bestOverlap = 0;
+    for (let i = 0; i < messages.length; i++) {
+      if (messages[i]?.role !== "User") continue;
+      const promptIdx = userPrompts.indexOf(messages[i] as Message);
+      if (promptIdx === -1) continue;
+      const overlapStart = Math.max(i, visibleRange.startIndex);
+      const overlapEnd = Math.min(i, visibleRange.endIndex);
+      const overlap = Math.max(0, overlapEnd - overlapStart + 1);
+      if (overlap > bestOverlap) {
+        bestOverlap = overlap;
+        bestIdx = promptIdx;
+      }
     }
+    setActiveIndex(bestIdx);
+  }, [visibleRange, messages, userPrompts, total]);
 
-    return () => {
-      observerRef.current?.disconnect();
-      cancelAnimationFrame(rafId);
-    };
-  }, [userPrompts]);
+  // ── Track centering math ───────────────────────────────────
+  const totalContentH = total * dotH + (total - 1) * gap;
+  const centeringOffset = Math.max(0, (MINIMAP_H - totalContentH) / 2);
+  const activeDotCenter = activeIndex >= 0
+    ? centeringOffset + activeIndex * (dotH + gap) + dotH / 2
+    : 0;
 
-  // ── Auto-scroll the popup list to keep active item visible ──
+  // ── Auto-scroll popup list to active item ──────────────────
   useEffect(() => {
     if (!isOpen || activeIndex < 0 || !listRef.current) return;
     const btns = listRef.current.querySelectorAll<HTMLElement>("[data-item]");
@@ -81,7 +66,7 @@ export function PromptHistoryCard({ messages, onJumpToPrompt }: PromptHistoryCar
     return () => clearTimeout(t);
   }, [activeIndex, isOpen]);
 
-  // ── Hover show / hide ────────────────────────────────────────
+  // ── Hover show / hide ──────────────────────────────────────
   const handleEnter = useCallback(() => {
     if (closeTimerRef.current) { clearTimeout(closeTimerRef.current); closeTimerRef.current = null; }
     setIsOpen(true);
@@ -100,7 +85,7 @@ export function PromptHistoryCard({ messages, onJumpToPrompt }: PromptHistoryCar
 
   return (
     <div
-      className="fixed right-0 top-1/2 -translate-y-1/2 z-50 flex items-center"
+      className="fixed right-20 top-1/2 -translate-y-1/2 z-50 flex items-center"
       style={{ pointerEvents: "none" }}
     >
       {/* ── Popup card ── */}
@@ -111,7 +96,7 @@ export function PromptHistoryCard({ messages, onJumpToPrompt }: PromptHistoryCar
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: 12, scale: 0.97 }}
             transition={{ duration: 0.16, ease: [0.25, 0.46, 0.45, 0.94] }}
-            style={{ pointerEvents: "auto", marginRight: "6px" }}
+            style={{ pointerEvents: "auto", marginRight: "10px" }}
             onMouseEnter={handleEnter}
             onMouseLeave={handleLeave}
           >
@@ -179,7 +164,6 @@ export function PromptHistoryCard({ messages, onJumpToPrompt }: PromptHistoryCar
                           background: isActive ? "rgba(204,120,92,0.08)" : "transparent",
                         }}
                       >
-                        {/* Indicator dot */}
                         <span
                           className="shrink-0 rounded-full transition-all duration-200"
                           style={{
@@ -190,7 +174,6 @@ export function PromptHistoryCard({ messages, onJumpToPrompt }: PromptHistoryCar
                             flexShrink: 0,
                           }}
                         />
-                        {/* Text */}
                         <span
                           className="text-xs leading-snug truncate"
                           style={{
@@ -227,26 +210,41 @@ export function PromptHistoryCard({ messages, onJumpToPrompt }: PromptHistoryCar
         onMouseLeave={handleLeave}
         style={{
           pointerEvents: "auto",
-          width: 20,
+          width: 24,
           height: MINIMAP_H,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          paddingRight: 4,
           cursor: "pointer",
+          position: "relative",
         }}
       >
-        {/* Track line */}
+        {/* Track line bg */}
         <div
-          className="absolute"
           style={{
             width: 2,
             height: MINIMAP_H,
-            background: "rgba(255,255,255,0.04)",
-            borderRadius: 2,
+            background: "rgba(255,255,255,0.06)",
+            borderRadius: 4,
+            position: "absolute",
           }}
         />
+        {/* Track line active highlight */}
+        {activeIndex >= 0 && (
+          <div
+            style={{
+              width: 2,
+              height: dotH + 2,
+              background: "#cc785c",
+              borderRadius: 4,
+              position: "absolute",
+              top: centeringOffset + activeIndex * (dotH + gap) - 1,
+              boxShadow: "0 0 6px rgba(204,120,92,0.5)",
+              transition: "top 0.3s ease",
+            }}
+          />
+        )}
         {/* Dots */}
         <div
           style={{
@@ -267,20 +265,21 @@ export function PromptHistoryCard({ messages, onJumpToPrompt }: PromptHistoryCar
                 key={msg.id}
                 onClick={() => handleClick(msg)}
                 style={{
-                  width: isActive ? 14 : 8,
+                  width: isActive ? 12 : 6,
                   height: dotH,
                   minHeight: dotH,
                   maxHeight: dotH,
                   borderRadius: 9999,
                   background: isActive
                     ? "#cc785c"
-                    : "rgba(255,255,255,0.12)",
+                    : "rgba(255,255,255,0.15)",
                   boxShadow: isActive
                     ? "0 0 8px rgba(204,120,92,0.7), 0 0 16px rgba(204,120,92,0.3)"
                     : "none",
                   margin: `${gap / 2}px auto`,
                   transition: "width 0.25s ease, background 0.25s ease, box-shadow 0.25s ease",
                   flexShrink: 0,
+                  cursor: "pointer",
                 }}
               />
             );

@@ -35,6 +35,7 @@ type MessageListProps = {
     filename: string
   }) => void;
   onHtmlPreview?: (html: string) => void;
+  onVisibleRangeChange?: (range: { startIndex: number; endIndex: number }) => void;
 };
 
 // ─── Three dots loader ──────────────────────────────────────
@@ -83,6 +84,7 @@ export function MessageList({
   onPreview,
   onHtmlPreview,
   conversationId,
+  onVisibleRangeChange,
 }: MessageListProps) {
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const atBottomRef = useRef(true);
@@ -197,6 +199,9 @@ export function MessageList({
         overscan={400}
         totalCount={messages.length}
         increaseViewportBy={{ top: 400, bottom: 600 }}
+        rangeChanged={(range) => {
+          onVisibleRangeChange?.(range);
+        }}
         itemContent={(index) => {
           const message = messages[index]!;
           let retryPrompt: string | undefined;

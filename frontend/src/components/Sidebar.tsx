@@ -489,123 +489,71 @@ export const Sidebar = memo(function Sidebar({
           border-r border-sidebar-border
           overflow-hidden
         `}
-        animate={{ width: isOpen ? 260 : 48 }}
-        transition={{ type: "spring", stiffness: 400, damping: 40, mass: 0.8 }}
+        animate={{ width: isOpen ? 260 : 64 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
         style={{ willChange: "width" }}
       >
-        <div className="flex flex-col h-full py-3 w-full">
-          {/* Top Row: Logo left, Search and Toggle right */}
-          <div className="relative flex items-center mb-4 h-8 shrink-0 px-4 justify-between">
-            {isOpen && (
-              <div className="flex items-center gap-2.5 select-none">
-                {/* Flux logo: mountain with rising sun/moon */}
-                <button
-                  onClick={() => {
-                    if (!logoRisen) {
-                      setLogoRisen(true);
-                      setTimeout(() => setLogoRisen(false), 1200);
-                    }
-                  }}
-                  className="p-0 border-none bg-transparent cursor-pointer outline-none"
-                  title="Toggle dawn"
-                >
-                  <svg className="size-5" viewBox="0 0 24 24" style={{ overflow: 'visible' }}>
-                    {/* Landmass (hides the sun when below) */}
-                    <path
-                      d="M2 16C5 6 8 18 11 10S17 6 22 12 L22 24 L2 24 Z"
-                      fill="var(--sidebar)"
-                    />
-                    {/* Sun / Moon */}
-                    <motion.circle
-                      cx="17"
-                      r="2.8"
-                      fill={isDay ? "#e8856a" : "#fdf8f6"}
-                      initial={false}
-                      animate={{
-                        cy: logoRisen ? 1.5 : 11,
-                        opacity: logoRisen ? 1 : 0,
-                        scale: logoRisen ? 1 : 0.5,
-                      }}
-                      transition={{ type: "spring", stiffness: 180, damping: 16, mass: 0.8 }}
-                    />
-                    {/* Sun glow */}
-                    {isDay && (
-                      <motion.circle
-                        cx="17"
-                        r="5"
-                        fill="none"
-                        stroke="#e8856a"
-                        strokeWidth="0.8"
-                        initial={false}
-                        animate={{
-                          cy: logoRisen ? 1.5 : 11,
-                          opacity: logoRisen ? 0.25 : 0,
-                        }}
-                        transition={{ type: "spring", stiffness: 180, damping: 16, mass: 0.8 }}
-                      />
-                    )}
-                    {/* Mountain outline */}
-                    <path
-                      d="M2 16C5 6 8 18 11 10S17 6 22 12"
-                      fill="none"
-                      stroke="#e8856a"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-                <span className="text-sm font-semibold tracking-tight text-sidebar-foreground">
-                  Flux
-                </span>
+        <div className="flex flex-col h-full py-3 px-2">
+          {/* Top Header Area */}
+          <div className="flex items-center justify-between mb-5 px-1 h-9">
+            {isOpen ? (
+              <div className="flex items-center gap-2 select-none">
+                <svg className="size-5" viewBox="0 0 24 24" style={{ overflow: 'visible' }}>
+                  <path d="M2 16C5 6 8 18 11 10S17 6 22 12 L22 24 L2 24 Z" fill="var(--sidebar)" />
+                  <path d="M2 16C5 6 8 18 11 10S17 6 22 12" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span className="text-[15px] font-semibold tracking-tight text-sidebar-foreground">Flux</span>
+              </div>
+            ) : (
+              <div className="w-full flex justify-center">
+                <svg className="size-5" viewBox="0 0 24 24">
+                  <path d="M2 16C5 6 8 18 11 10S17 6 22 12" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </div>
             )}
-
-            <div className={`flex items-center gap-1 ${!isOpen ? 'absolute right-0 w-[48px] justify-center' : ''}`}>
-              {isOpen && (
-                <button
-                  type="button"
-                  onClick={openSearchModal}
-                  className="p-1.5 hover:bg-sidebar-accent rounded-lg transition-all text-sidebar-foreground/50 hover:text-sidebar-foreground/90 cursor-pointer"
-                  title="Search chats"
-                >
-                  <Search className="size-4" />
-                </button>
-              )}
+            <div className={`flex items-center gap-0.5 ${!isOpen ? 'hidden' : ''}`}>
+              <button
+                type="button"
+                onClick={openSearchModal}
+                className="p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/45 hover:text-sidebar-foreground/80 transition-colors cursor-pointer"
+                title="Search chats"
+              >
+                <Search className="size-4" />
+              </button>
               <button
                 type="button"
                 onClick={onToggle}
-                className="p-1.5 hover:bg-sidebar-accent rounded-lg transition-all text-sidebar-foreground/50 hover:text-sidebar-foreground/90 cursor-pointer"
-                aria-label={isOpen ? "Close sidebar" : "Open sidebar"}
+                className="p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/45 hover:text-sidebar-foreground/80 transition-colors cursor-pointer"
+                aria-label="Close sidebar"
               >
-                {isOpen ? (
-                  <PanelLeftClose className="size-4" />
-                ) : (
-                  <PanelLeftOpen className="size-4" />
-                )}
+                <PanelLeftClose className="size-4" />
               </button>
             </div>
+            {!isOpen && (
+              <button
+                type="button"
+                onClick={onToggle}
+                className="absolute right-0 top-3 p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/45 hover:text-sidebar-foreground/80 transition-colors cursor-pointer w-[64px] flex justify-center"
+                aria-label="Open sidebar"
+              >
+                <PanelLeftOpen className="size-4" />
+              </button>
+            )}
           </div>
 
-          {/* Core Actions Rail */}
-          <div className="flex flex-col gap-1 shrink-0">
+          {/* Nav Section */}
+          <div className="flex flex-col gap-0.5 mb-5">
             {/* New Chat */}
             <button
               type="button"
               onClick={onCreateThread}
-              className={`flex items-center h-9 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-sidebar-foreground transition-all gap-2.5 cursor-pointer ${
-                isOpen ? "w-[calc(100%-16px)] mx-2 px-2.5 justify-start" : "w-9 mx-1.5 px-0 justify-center"
-              }`}
+              className={`flex items-center h-9 rounded-xl transition-all cursor-pointer gap-2.5
+                border border-sidebar-border hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground
+                ${isOpen ? "w-full px-3 justify-start" : "w-10 mx-auto justify-center"}`}
               title="New chat"
             >
-              <span className="flex items-center justify-center size-6 rounded-full bg-white/[0.07] shrink-0">
-                <Plus className="size-4" />
-              </span>
-              {isOpen && (
-                <span className="text-sm font-medium whitespace-nowrap overflow-hidden">
-                  New chat
-                </span>
-              )}
+              <Plus className="size-4 shrink-0 text-sidebar-foreground/50" />
+              {isOpen && <span className="text-[13px] font-medium whitespace-nowrap">New chat</span>}
             </button>
 
             {/* Artifacts */}
@@ -613,89 +561,60 @@ export const Sidebar = memo(function Sidebar({
               type="button"
               onClick={onArtifactsOpen}
               onMouseEnter={onArtifactsPrefetch}
-              className={`flex items-center h-9 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-sidebar-foreground transition-all gap-2.5 cursor-pointer ${
-                isOpen ? "w-[calc(100%-16px)] mx-2 px-2.5 justify-start" : "w-9 mx-1.5 px-0 justify-center"
-              }`}
+              className={`flex items-center h-9 rounded-xl hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-all gap-2.5 cursor-pointer
+                ${isOpen ? "w-full px-3 justify-start" : "w-10 mx-auto justify-center"}`}
               title="Artifacts"
             >
               <Component className="size-4 shrink-0" />
-              {isOpen && (
-                <span className="text-sm font-medium whitespace-nowrap overflow-hidden">
-                  Artifacts
-                </span>
-              )}
+              {isOpen && <span className="text-[13px] font-medium whitespace-nowrap">Artifacts</span>}
             </button>
 
             {/* Knowledge Graph */}
             <button
               type="button"
               onClick={onWikiOpen}
-              className={`flex items-center h-9 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-sidebar-foreground transition-all gap-2.5 cursor-pointer ${
-                isOpen ? "w-[calc(100%-16px)] mx-2 px-2.5 justify-start" : "w-9 mx-1.5 px-0 justify-center"
-              }`}
+              className={`flex items-center h-9 rounded-xl hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-all gap-2.5 cursor-pointer
+                ${isOpen ? "w-full px-3 justify-start" : "w-10 mx-auto justify-center"}`}
               title="Knowledge Graph"
             >
               <Network className="size-4 shrink-0" />
-              {isOpen && (
-                <span className="text-sm font-medium whitespace-nowrap overflow-hidden">
-                  Knowledge Graph
-                </span>
-              )}
+              {isOpen && <span className="text-[13px] font-medium whitespace-nowrap">Knowledge Graph</span>}
             </button>
 
             {/* Live News */}
             <button
               type="button"
               onClick={onNewsOpen}
-              className={`flex items-center h-9 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-sidebar-foreground transition-all gap-2.5 cursor-pointer ${
-                isOpen ? "w-[calc(100%-16px)] mx-2 px-2.5 justify-start" : "w-9 mx-1.5 px-0 justify-center"
-              }`}
+              className={`flex items-center h-9 rounded-xl hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-all gap-2.5 cursor-pointer
+                ${isOpen ? "w-full px-3 justify-start" : "w-10 mx-auto justify-center"}`}
               title="Live News"
             >
               <Newspaper className="size-4 shrink-0" />
-              {isOpen && (
-                <span className="text-sm font-medium whitespace-nowrap overflow-hidden">
-                  Live News
-                </span>
-              )}
+              {isOpen && <span className="text-[13px] font-medium whitespace-nowrap">Live News</span>}
             </button>
 
             {/* Agents */}
             <button
               type="button"
               onClick={onCustomAgentsOpen}
-              className={`flex items-center h-9 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-sidebar-foreground transition-all gap-2.5 cursor-pointer ${
-                isOpen ? "w-[calc(100%-16px)] mx-2 px-2.5 justify-start" : "w-9 mx-1.5 px-0 justify-center"
-              }`}
+              className={`flex items-center h-9 rounded-xl hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-all gap-2.5 cursor-pointer
+                ${isOpen ? "w-full px-3 justify-start" : "w-10 mx-auto justify-center"}`}
               title="Custom Agents"
             >
-              <span className="flex items-center justify-center size-6 rounded-full bg-gradient-to-br from-rose-500/20 to-pink-600/10 shrink-0">
-                <Bot className="size-4 text-rose-400" />
-              </span>
-              {isOpen && (
-                <span className="text-sm font-medium whitespace-nowrap overflow-hidden">
-                  Agents
-                </span>
-              )}
+              <Bot className="size-4 shrink-0" />
+              {isOpen && <span className="text-[13px] font-medium whitespace-nowrap">Agents</span>}
             </button>
 
             {/* Team */}
             <button
               type="button"
               onClick={onTeamOpen}
-              className={`flex items-center h-9 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-sidebar-foreground transition-all gap-2.5 cursor-pointer ${
-                isOpen ? "w-[calc(100%-16px)] mx-2 px-2.5 justify-start" : "w-9 mx-1.5 px-0 justify-center"
-              }`}
+              className={`flex items-center h-9 rounded-xl hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-all gap-2.5 cursor-pointer
+                ${isOpen ? "w-full px-3 justify-start" : "w-10 mx-auto justify-center"}`}
               title="Team Mode"
             >
-              <span className="flex items-center justify-center size-6 rounded-full bg-gradient-to-br from-orange-400/20 to-coral-600/10 shrink-0">
-                <Users className="size-4 text-orange-400" />
-              </span>
-              {isOpen && (
-                <span className="text-sm font-medium whitespace-nowrap overflow-hidden">
-                  Team
-                </span>
-              )}
+              <Users className="size-4 shrink-0" />
+              {isOpen && <span className="text-[13px] font-medium whitespace-nowrap">Team</span>}
             </button>
           </div>
 

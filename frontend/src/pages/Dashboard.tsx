@@ -11,6 +11,9 @@ import {
   FileText,
   Users,
   Bot,
+  Pencil,
+  Trash2,
+  ChevronDown,
 } from "lucide-react";
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -140,6 +143,30 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<"answer" | "links" | "images">("answer");
   const [shared, setShared] = useState(false);
 
+  // ─── Thread title menu state/refs (handlers defined after getAccessToken) ───
+  const [threadMenuOpen, setThreadMenuOpen] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const threadMenuRef = useRef<HTMLDivElement>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  // Close thread menu on outside click
+  useEffect(() => {
+    if (!threadMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (threadMenuRef.current && !threadMenuRef.current.contains(e.target as Node)) {
+        setThreadMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [threadMenuOpen]);
+
+  // Focus rename input when it opens
+  useEffect(() => {
+    if (isRenaming) setTimeout(() => renameInputRef.current?.select(), 50);
+  }, [isRenaming]);
+
   const handleShare = useCallback(async () => {
     try {
       if (navigator.share) {
@@ -188,6 +215,7 @@ export default function Dashboard() {
   const [isTeamPanelOpen, setIsTeamPanelOpen] = useState(false);
   const [isCustomAgentsOpen, setIsCustomAgentsOpen] = useState(false);
   const [activeTransport, setActiveTransport] = useState<"sse" | "ws">("sse");
+  const [visibleRange, setVisibleRange] = useState({ startIndex: 0, endIndex: 0 });
 
 // ── Auto-detect transport: try WS, fall back to SSE ──
   const wsAvailableRef = useRef(false);
@@ -306,6 +334,33 @@ export default function Dashboard() {
     }
     return t;
   }, []);
+
+  // ─── Rename handlers (after getAccessToken) ──────────────
+  const handleRenameOpen = useCallback(() => {
+    const conv = conversations.find(c => c.id === activeConversationId);
+    setRenameValue(conv?.title || '');
+    setThreadMenuOpen(false);
+    setIsRenaming(true);
+  }, [conversations, activeConversationId]);
+
+  const handleRenameSubmit = useCallback(async () => {
+    if (!activeConversationId || !renameValue.trim()) { setIsRenaming(false); return; }
+    const token = await getAccessToken();
+    if (!token) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/conversations/${activeConversationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: renameValue.trim() }),
+      });
+      if (res.ok) {
+        const { conversation: updated } = await res.json();
+        setConversations(prev => prev.map(c => c.id === activeConversationId ? { ...c, title: updated.title, slug: updated.slug } : c));
+        document.title = `${updated.title} - Flux`;
+      }
+    } catch (err) { console.error('Rename failed:', err); }
+    setIsRenaming(false);
+  }, [activeConversationId, renameValue, getAccessToken]);
 
   const createNewThread = useCallback(() => {
     resetMessages();
@@ -1061,10 +1116,10 @@ export default function Dashboard() {
   // ── Tab styling ──
   const tabClass = useCallback(
     (tab: string) =>
-      `relative pb-2 text-sm font-medium transition-all duration-200 ${
+      `px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-150 cursor-pointer ${
         activeTab === tab
-          ? "text-foreground scale-105 after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:h-[2px] after:w-4/5 after:bg-[var(--accent)] after:rounded-full"
-          : "text-muted-foreground hover:text-foreground hover:scale-105"
+          ? "bg-[var(--user-msg-bg)] text-[var(--text-primary)] shadow-sm"
+          : "text-[var(--text-secondary)]/70 hover:text-[var(--text-primary)]"
       }`,
     [activeTab]
   );
@@ -1246,33 +1301,93 @@ export default function Dashboard() {
           <PromptHistoryCard
             messages={messages}
             onJumpToPrompt={handleJumpToPrompt}
+            visibleRange={visibleRange}
           />
         )}
-        <section className={`flex-1 flex flex-col transition-all duration-300 ${
-          !hasStarted ? '' : `${isMobile ? 'border-x-0 border-b-0' : 'rounded-xl'} border border-[var(--surface-border)] bg-[var(--bg-primary)]`
-        }`} style={{ minHeight: 0 }}>
+        <section className="flex-1 flex flex-col bg-[var(--bg-primary)]" style={{ minHeight: 0 }}>
           {hasStarted && (
-            <header className="flex items-center justify-between border-b border-[var(--surface-border)] px-4 py-2">
-              {isMobile && (
+            <header className="flex items-center justify-between border-b border-[var(--surface-border)] px-4 py-2 bg-[var(--bg-primary)] shrink-0 min-h-[48px] w-full">
+              {/* Left Column – Thread title + menu */}
+              <div className="flex-1 flex items-center min-w-0">
+                {isMobile && (
+                  <button
+                    onClick={() => setIsMobileDrawerOpen(true)}
+                    className="p-1.5 hover:bg-[var(--surface-bg)] rounded-lg text-muted-foreground hover:text-foreground shrink-0 mr-1"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
+                  </button>
+                )}
+                {!isMobile && (
+                  <div className="relative flex items-center min-w-0 max-w-[280px] lg:max-w-[380px]" ref={threadMenuRef}>
+                    {isRenaming ? (
+                      <input
+                        ref={renameInputRef}
+                        value={renameValue}
+                        onChange={e => setRenameValue(e.target.value)}
+                        onBlur={handleRenameSubmit}
+                        onKeyDown={e => { if (e.key === 'Enter') handleRenameSubmit(); if (e.key === 'Escape') setIsRenaming(false); }}
+                        className="text-xs font-medium text-[var(--text-primary)] bg-[var(--surface-bg)] border border-[var(--accent)]/50 rounded px-2 py-0.5 outline-none w-full max-w-[260px]"
+                        autoFocus
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setThreadMenuOpen(o => !o)}
+                        className="flex items-center gap-1 min-w-0 group rounded px-1.5 py-0.5 hover:bg-[var(--surface-bg)] transition-colors"
+                      >
+                        <span className="text-xs font-semibold text-[var(--text-primary)] truncate">
+                          {conversations.find(c => c.id === activeConversationId)?.title || 'Untitled Chat'}
+                        </span>
+                        <ChevronDown className="size-3 text-[var(--text-muted)] shrink-0 group-hover:text-[var(--text-secondary)] transition-colors" />
+                      </button>
+                    )}
+
+                    {/* Dropdown menu */}
+                    {threadMenuOpen && (
+                      <div className="absolute top-full left-0 mt-1.5 w-44 bg-[var(--user-msg-bg)] border border-[var(--surface-border)] rounded-xl shadow-xl z-50 py-1 overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={handleRenameOpen}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-[var(--text-primary)]/80 hover:bg-[var(--surface-bg)] hover:text-[var(--text-primary)] transition-colors"
+                        >
+                          <Pencil className="size-3.5 opacity-60" />
+                          Rename
+                        </button>
+                        <div className="h-px bg-[var(--surface-border)] mx-2 my-0.5" />
+                        <button
+                          type="button"
+                          onClick={() => { setThreadMenuOpen(false); if (activeConversationId) deleteConversation(activeConversationId); }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-red-400 hover:bg-red-500/8 hover:text-red-300 transition-colors"
+                        >
+                          <Trash2 className="size-3.5 opacity-70" />
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Center Column - Segmented Control Pill Tabs */}
+              <div className="flex items-center justify-center shrink-0">
+                <div className="flex items-center p-[3px] bg-[var(--surface-bg)] border border-[var(--surface-border)] rounded-full gap-0.5">
+                  <button type="button" onClick={() => setActiveTab("answer")} className={tabClass("answer")}>Answer</button>
+                  <button type="button" onClick={() => setActiveTab("links")} className={tabClass("links")}>Links</button>
+                  <button type="button" onClick={() => setActiveTab("images")} className={tabClass("images")}>Images</button>
+                </div>
+              </div>
+
+              {/* Right Column */}
+              <div className="flex-1 flex items-center justify-end shrink-0">
                 <button
-                  onClick={() => setIsMobileDrawerOpen(true)}
-                  className="p-1.5 hover:bg-[var(--surface-bg)] rounded-lg text-muted-foreground hover:text-foreground shrink-0"
+                  onClick={handleShare}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-[var(--surface-border)] hover:bg-[var(--surface-bg)] text-[var(--text-primary)]/80 hover:text-[var(--text-primary)] transition"
+                  title="Share conversation"
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
-                </button>
-              )}
-              <div className="flex items-center gap-6 flex-1 justify-center">
-                <button type="button" onClick={() => setActiveTab("answer")} className={tabClass("answer")}>Answer</button>
-                <button type="button" onClick={() => setActiveTab("links")} className={tabClass("links")}>
-                  <Globe className="size-3 inline mr-1" /> Links
-                </button>
-                <button type="button" onClick={() => setActiveTab("images")} className={tabClass("images")}>
-                  <Image className="size-3 inline mr-1" /> Images
+                  {shared && <Check className="size-3 text-emerald-400" />}
+                  <span>Share</span>
                 </button>
               </div>
-              <button onClick={handleShare} className="text-xs font-medium px-3 py-1 rounded-md bg-[var(--surface-border)]/60 hover:bg-[var(--surface-border)] transition text-white/80 hover:text-white shrink-0" title="Share conversation">
-                {shared ? <Check className="size-3.5 text-emerald-400 inline mr-0.5" /> : null}Share
-              </button>
             </header>
           )}
 
@@ -1300,7 +1415,7 @@ export default function Dashboard() {
                       <motion.circle
                         cx="17"
                         r="2.8"
-                        fill={new Date().getHours() >= 6 && new Date().getHours() < 18 ? "#cc785c" : "#faf9f5"}
+                        fill={new Date().getHours() >= 6 && new Date().getHours() < 18 ? "var(--accent)" : "var(--text-primary)"}
                         initial={false}
                         animate={{
                           cy: logoRisen ? 1.5 : 11,
@@ -1313,7 +1428,7 @@ export default function Dashboard() {
                         cx="17"
                         r="5"
                         fill="none"
-                        stroke="#cc785c"
+                        stroke="var(--accent)"
                         strokeWidth="0.8"
                         initial={false}
                         animate={{
@@ -1325,14 +1440,14 @@ export default function Dashboard() {
                       <path
                         d="M2 16C5 6 8 18 11 10S17 6 22 12"
                         fill="none"
-                        stroke="#cc785c"
+                        stroke="var(--accent)"
                         strokeWidth="1.8"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       />
                     </svg>
                   </button>
-<h1 className="serif-display text-3xl sm:text-4xl md:text-5xl text-[#cc785c] leading-tight">
+<h1 className="serif-display text-3xl sm:text-4xl md:text-5xl text-[var(--accent)] leading-tight">
                       {getGreeting()}
                   </h1>
                 </div>
@@ -1397,6 +1512,7 @@ export default function Dashboard() {
                   onFileDelete={handleDeleteFile}
                   activeGenerationStatus={activeGenerationStatus}
                   conversationId={activeConversationId ?? undefined}
+                  onVisibleRangeChange={setVisibleRange}
                 />
               </div>
             </div>

@@ -455,7 +455,7 @@ export function ChatInput({
             <button
               type="button"
               onClick={() => setAttachMenuOpen(!attachMenuOpen)}
-              className="flex items-center justify-center rounded-full text-[var(--text-secondary)]/50 hover:text-[var(--text-primary)] hover:bg-[var(--surface-bg)] transition p-1"
+              className="flex items-center justify-center rounded-full text-white/90 hover:text-white hover:bg-[var(--surface-bg)] transition p-1"
               title="Attach files"
             >
               <Plus className="size-4" />
@@ -515,9 +515,9 @@ export function ChatInput({
             <div className="relative model-selector">
               <button
                 onClick={() => setModelDropdownOpen((prev) => !prev)}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-[var(--text-secondary)]/70 hover:text-[var(--text-primary)] hover:bg-[var(--surface-bg)] transition"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-white/85 hover:text-white hover:bg-[var(--surface-bg)] transition"
               >
-                <span className="max-w-[120px] truncate">{currentModelLabel}</span>
+                <span className="max-w-[125px] truncate">{currentModelLabel.replace(/\s*\([^)]*\)/g, "")}</span>
                 <ChevronDown className="size-3 opacity-40" />
               </button>
               {isPerfLow ? (
@@ -540,7 +540,7 @@ export function ChatInput({
                               : "text-[var(--text-primary)]/70 hover:bg-[var(--surface-bg)]"
                               }`}
                           >
-                            <span>{model.label}</span>
+                            <span>{model.label.replace(/\s*\([^)]*\)/g, "")}</span>
                             {selectedModel === model.id && <span className="text-[var(--accent)]">●</span>}
                           </button>
                         ))}
@@ -574,7 +574,7 @@ export function ChatInput({
                                 : "text-[var(--text-primary)]/70 hover:bg-[var(--surface-bg)]"
                                 }`}
                             >
-                              <span>{model.label}</span>
+                              <span>{model.label.replace(/\s*\([^)]*\)/g, "")}</span>
                               {selectedModel === model.id && <span className="text-[var(--accent)]">●</span>}
                             </button>
                           ))}

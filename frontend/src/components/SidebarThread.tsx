@@ -41,14 +41,11 @@ function SidebarThread({
           w-full text-left truncate rounded-lg px-2.5 h-9 flex items-center text-sm transition-all duration-150 cursor-pointer relative
           ${
             isActive
-              ? "bg-[var(--accent)]/[0.09] text-sidebar-foreground font-medium"
-              : "text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+              ? "bg-sidebar-accent text-sidebar-foreground font-semibold"
+              : "text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
           }
         `}
       >
-        {isActive && (
-          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[60%] rounded-r-full bg-[var(--accent)] opacity-90" />
-        )}
         <span
           className="block truncate pr-6 flex-1 leading-snug"
           style={{
