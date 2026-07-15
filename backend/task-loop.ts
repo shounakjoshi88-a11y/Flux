@@ -36,7 +36,10 @@ Complete the current step. You are part of a multi-step build process — only b
 Previous steps have already been completed and their files exist in the sandbox.`;
 
 export async function planTask(taskId: string): Promise<void> {
-  const task = await prisma.task.findUnique({ where: { id: taskId } });
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { id: true, goal: true, maxSteps: true },
+  });
   if (!task) throw new Error(`Task ${taskId} not found`);
 
   await prisma.task.update({ where: { id: taskId }, data: { status: 'PLANNING' } });
@@ -113,7 +116,10 @@ async function executeStep(
   writer?: SSEWriter,
   cancelRef?: { cancelled: boolean },
 ): Promise<'done' | 'failed'> {
-  const step = await prisma.taskStep.findUnique({ where: { taskId_index: { taskId, index: stepIdx } } });
+  const step = await prisma.taskStep.findUnique({
+    where: { taskId_index: { taskId, index: stepIdx } },
+    select: { id: true, title: true },
+  });
   if (!step) return 'failed';
 
   await prisma.taskStep.update({ where: { id: step.id }, data: { status: 'RUNNING', startedAt: new Date() } });
@@ -123,6 +129,7 @@ async function executeStep(
   const previousSteps = await prisma.taskStep.findMany({
     where: { taskId, status: 'DONE' },
     orderBy: { index: 'asc' },
+    select: { index: true, title: true, result: true },
   });
   const contextSummary = previousSteps.map(s => `Step ${s.index + 1} (${s.title}): ${s.result || 'completed'}`).join('\n');
 
@@ -263,7 +270,10 @@ export async function runTaskLoop(
   writer?: SSEWriter,
   cancelRef?: { cancelled: boolean },
 ): Promise<void> {
-  const task = await prisma.task.findUnique({ where: { id: taskId } });
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { id: true, title: true, conversationId: true, maxDurationSecs: true },
+  });
   if (!task) throw new Error(`Task ${taskId} not found`);
 
   await prisma.task.update({
@@ -280,12 +290,20 @@ export async function runTaskLoop(
   }, HEARTBEAT_INTERVAL_MS);
 
   try {
-    const steps = await prisma.taskStep.findMany({ where: { taskId }, orderBy: { index: 'asc' } });
+    const steps = await prisma.taskStep.findMany({
+      where: { taskId },
+      orderBy: { index: 'asc' },
+      select: { index: true, status: true, dependsOn: true },
+    });
     if (steps.length === 0) {
       await planTask(taskId);
     }
 
-    const allSteps = await prisma.taskStep.findMany({ where: { taskId }, orderBy: { index: 'asc' } });
+    const allSteps = await prisma.taskStep.findMany({
+      where: { taskId },
+      orderBy: { index: 'asc' },
+      select: { index: true, status: true, dependsOn: true },
+    });
     const startTime = Date.now();
     const maxDurationMs = task.maxDurationSecs * 1000;
 
@@ -300,7 +318,11 @@ export async function runTaskLoop(
         return;
       }
 
-      const currentSteps = await prisma.taskStep.findMany({ where: { taskId }, orderBy: { index: 'asc' } });
+      const currentSteps = await prisma.taskStep.findMany({
+        where: { taskId },
+        orderBy: { index: 'asc' },
+        select: { index: true, status: true, dependsOn: true, title: true },
+      });
       const eligible = nextEligibleStep(currentSteps);
 
       if (!eligible) {
@@ -343,6 +365,7 @@ export async function recoverInterruptedTasks(): Promise<void> {
       status: { in: ['RUNNING', 'PLANNING'] },
       lastHeartbeatAt: { lt: new Date(Date.now() - HEARTBEAT_INTERVAL_MS * 3) },
     },
+    select: { id: true, title: true },
   });
 
   for (const task of stale) {

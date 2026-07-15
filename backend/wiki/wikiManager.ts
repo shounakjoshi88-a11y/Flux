@@ -51,6 +51,7 @@ export class WikiManager {
     const messages = await prisma.message.findMany({
       where: { conversation: { userId } },
       orderBy: { createdAt: 'asc' },
+      select: { content: true, role: true, createdAt: true },
     });
 
     if (messages.length < 2) {
@@ -306,7 +307,11 @@ Text: ${text.slice(0, 3000)}`;
   }
 
   async getGraph(userId: string) {
-    const nodes = await prisma.wikiNode.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } });
+    const nodes = await prisma.wikiNode.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, label: true, description: true, type: true, x: true, y: true, createdAt: true },
+    });
     const nodeIds = nodes.map(n => n.id);
     const edges = nodeIds.length > 0
       ? await prisma.wikiEdge.findMany({
@@ -319,7 +324,7 @@ Text: ${text.slice(0, 3000)}`;
   }
 
   async deleteNode(nodeId: string, userId: string) {
-    const node = await prisma.wikiNode.findFirst({ where: { id: nodeId, userId } });
+    const node = await prisma.wikiNode.findFirst({ where: { id: nodeId, userId }, select: { id: true } });
     if (!node) throw new Error('Node not found');
     await prisma.wikiEdge.deleteMany({
       where: { OR: [{ sourceId: nodeId }, { targetId: nodeId }] },
@@ -336,6 +341,7 @@ Text: ${text.slice(0, 3000)}`;
           { description: { contains: query, mode: 'insensitive' } },
         ],
       },
+      select: { id: true, label: true, description: true, type: true },
       take: 10,
     });
     return nodes;

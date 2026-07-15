@@ -15,7 +15,7 @@ taskRouter.post('/api/tasks', async (req: any, res: any) => {
     if (!goal?.trim()) return res.status(400).json({ error: 'Goal is required' });
     if (!conversationId) return res.status(400).json({ error: 'conversationId is required' });
 
-    const conv = await prisma.conversation.findFirst({ where: { id: conversationId, userId: uid } });
+    const conv = await prisma.conversation.findFirst({ where: { id: conversationId, userId: uid }, select: { id: true } });
     if (!conv) return res.status(404).json({ error: 'Conversation not found' });
 
     const title = goal.trim().slice(0, 120);
@@ -28,6 +28,7 @@ taskRouter.post('/api/tasks', async (req: any, res: any) => {
         goal: goal.trim(),
         planApprovalMode: !!planApprovalMode,
       },
+      select: { id: true },
     });
 
     res.status(202).json({ taskId: task.id, title, status: 'PENDING' });
@@ -47,7 +48,17 @@ taskRouter.get('/api/tasks/:id', async (req: any, res: any) => {
     const uid = req.appUserId!;
     const task = await prisma.task.findFirst({
       where: { id: req.params.id, userId: uid },
-      include: { steps: { orderBy: { index: 'asc' } } },
+      select: {
+        id: true, conversationId: true, status: true, title: true, goal: true,
+        planApprovalMode: true, contextSummary: true, costEstimateSecs: true,
+        maxDurationSecs: true, maxSteps: true, createdAt: true, updatedAt: true,
+        startedAt: true, completedAt: true, lastHeartbeatAt: true, sandboxId: true,
+        steps: {
+          orderBy: { index: 'asc' },
+          select: { id: true, index: true, title: true, status: true, dependsOn: true,
+                    result: true, startedAt: true, completedAt: true, retryCount: true },
+        },
+      },
     });
     if (!task) return res.status(404).json({ error: 'Task not found' });
     res.json(task);
@@ -60,7 +71,10 @@ taskRouter.get('/api/tasks/:id/stream', async (req: any, res: any) => {
   const uid = req.appUserId!;
   const taskId = req.params.id;
 
-  const task = await prisma.task.findFirst({ where: { id: taskId, userId: uid } });
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, userId: uid },
+    select: { id: true, status: true, title: true },
+  });
   if (!task) return res.status(404).json({ error: 'Task not found' });
 
   res.setHeader('Content-Type', 'text/event-stream');
@@ -94,7 +108,11 @@ taskRouter.get('/api/tasks/:id/stream', async (req: any, res: any) => {
     await planTask(taskId);
     runTaskLoop(taskId, writer, cancelRef).catch(e => console.error('[TASK] Loop error:', e));
   } else if (task.status === 'RUNNING') {
-    const currentSteps = await prisma.taskStep.findMany({ where: { taskId }, orderBy: { index: 'asc' } });
+    const currentSteps = await prisma.taskStep.findMany({
+      where: { taskId },
+      orderBy: { index: 'asc' },
+      select: { id: true, index: true, title: true, status: true, dependsOn: true, result: true },
+    });
     writer.writeEvent('task_created', { taskId, title: task.title, existingSteps: currentSteps });
   } else {
     writer.writeEvent(`task_${task.status.toLowerCase()}`, { taskId });
@@ -105,7 +123,7 @@ taskRouter.get('/api/tasks/:id/stream', async (req: any, res: any) => {
 taskRouter.post('/api/tasks/:id/cancel', async (req: any, res: any) => {
   try {
     const uid = req.appUserId!;
-    const task = await prisma.task.findFirst({ where: { id: req.params.id, userId: uid } });
+    const task = await prisma.task.findFirst({ where: { id: req.params.id, userId: uid }, select: { id: true } });
     if (!task) return res.status(404).json({ error: 'Task not found' });
     await prisma.task.update({ where: { id: req.params.id }, data: { status: 'CANCELLED' } });
     res.json({ success: true });
@@ -117,7 +135,7 @@ taskRouter.post('/api/tasks/:id/cancel', async (req: any, res: any) => {
 taskRouter.post('/api/tasks/:id/pause', async (req: any, res: any) => {
   try {
     const uid = req.appUserId!;
-    const task = await prisma.task.findFirst({ where: { id: req.params.id, userId: uid } });
+    const task = await prisma.task.findFirst({ where: { id: req.params.id, userId: uid }, select: { id: true } });
     if (!task) return res.status(404).json({ error: 'Task not found' });
     await prisma.task.update({ where: { id: req.params.id }, data: { status: 'PAUSED' } });
     res.json({ success: true });
@@ -129,7 +147,7 @@ taskRouter.post('/api/tasks/:id/pause', async (req: any, res: any) => {
 taskRouter.post('/api/tasks/:id/resume', async (req: any, res: any) => {
   try {
     const uid = req.appUserId!;
-    const task = await prisma.task.findFirst({ where: { id: req.params.id, userId: uid } });
+    const task = await prisma.task.findFirst({ where: { id: req.params.id, userId: uid }, select: { id: true, goal: true } });
     if (task && !task.goal) {
       await planTask(task.id);
     }
@@ -147,7 +165,15 @@ taskRouter.get('/api/tasks', async (req: any, res: any) => {
       where: { userId: uid },
       orderBy: { createdAt: 'desc' },
       take: 50,
-      include: { steps: { orderBy: { index: 'asc' } }, _count: { select: { steps: true } } },
+      select: {
+        id: true, title: true, status: true, createdAt: true, updatedAt: true,
+        startedAt: true, completedAt: true, conversationId: true,
+        steps: {
+          orderBy: { index: 'asc' },
+          select: { index: true, title: true, status: true },
+        },
+        _count: { select: { steps: true } },
+      },
     });
     res.json(tasks);
   } catch (e: any) {

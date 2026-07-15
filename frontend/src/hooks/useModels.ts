@@ -24,7 +24,7 @@ interface ModelDiscoveryResult {
 
 // Backend host for direct API calls
 function getApiHost(): string {
-  return BACKEND_URL || "https://localhost:3001";
+  return BACKEND_URL || "http://localhost:3001";
 }
 
 export function useModels(): ModelDiscoveryResult {
@@ -70,8 +70,8 @@ export function useModels(): ModelDiscoveryResult {
 
     fetchModels();
 
-    // Poll every 30s for model changes (like AionUi)
-    const interval = setInterval(fetchModels, 30000);
+    // Poll every 5min for model changes (models rarely change at runtime)
+    const interval = setInterval(fetchModels, 300_000);
 
     return () => {
       cancelled = true;

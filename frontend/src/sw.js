@@ -1,3 +1,7 @@
+if (self.location && (self.location.hostname.startsWith("localhost") || self.location.hostname === "127.0.0.1")) {
+  self.registration.unregister();
+}
+
 const CACHE_NAME = "flux-shell-v3";
 const STATIC_ASSETS = [
   "/",
@@ -66,17 +70,36 @@ self.addEventListener("fetch", (event) => {
       caches.match(event.request).then((cached) => {
         const fetchPromise = fetch(event.request).then((response) => {
           if (response.ok) {
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response.clone()));
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
           }
           return response;
-        }).catch(() => cached);
-        return cached || fetchPromise;
+        });
+
+        if (cached) {
+          fetchPromise.catch(() => {}); // Suppress uncaught background errors
+          return cached;
+        }
+
+        return fetchPromise;
       }),
     );
     return;
   }
 
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match("/index.html")),
+    );
+    return;
+  }
+
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request)),
+    fetch(event.request).catch((err) => {
+      return caches.match(event.request).then((cached) => {
+        if (cached) return cached;
+        throw err;
+      });
+    }),
   );
 });

@@ -1,5 +1,6 @@
 // src/components/Sidebar.tsx
 import { AnimatePresence, motion } from "framer-motion";
+import { BACKEND_URL } from "../lib/config";
 import { usePerformance } from "../lib/performance-context";
 import {
   ChevronDown,
@@ -340,7 +341,7 @@ export const Sidebar = memo(function Sidebar({
     debounceRef.current = setTimeout(async () => {
       try {
         const token = await (window as any).getAccessToken?.();
-        const res = await fetch(`${(window as any).BACKEND_URL || 'https://localhost:3001'}/search?q=${encodeURIComponent(search.trim())}`, {
+        const res = await fetch(`${BACKEND_URL}/search?q=${encodeURIComponent(search.trim())}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await res.json();

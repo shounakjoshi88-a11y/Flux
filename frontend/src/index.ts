@@ -1,61 +1,51 @@
-import { serve, file } from "bun";
-import index from "./index.html";
+import { serve } from "bun";
 
 const SRC = import.meta.dir;
+const DIST = import.meta.dir + "/../dist";
 
-const CACHE_10Y = "public, max-age=31536000, immutable";
-const CACHE_1H = "public, max-age=3600";
-
-const STATIC_ROUTES: Record<string, any> = {
-  "/manifest.json": new Response(await Bun.file(SRC + "/manifest.json").bytes(), {
-    headers: { "Content-Type": "application/json", "Cache-Control": CACHE_1H },
-  }),
-  "/sw.js": new Response(await Bun.file(SRC + "/sw.js").bytes(), {
-    headers: { "Content-Type": "application/javascript", "Cache-Control": CACHE_1H },
-  }),
-  "/logo.svg": new Response(await Bun.file(SRC + "/logo.svg").bytes(), {
-    headers: { "Content-Type": "image/svg+xml", "Cache-Control": CACHE_10Y },
-  }),
-  "/icon-192.svg": new Response(await Bun.file(SRC + "/icon-192.svg").bytes(), {
-    headers: { "Content-Type": "image/svg+xml", "Cache-Control": CACHE_10Y },
-  }),
-  "/icon-512.svg": new Response(await Bun.file(SRC + "/icon-512.svg").bytes(), {
-    headers: { "Content-Type": "image/svg+xml", "Cache-Control": CACHE_10Y },
-  }),
-  "/icon-192.png": new Response(await Bun.file(SRC + "/icon-192.png").bytes(), {
-    headers: { "Content-Type": "image/png", "Cache-Control": CACHE_10Y },
-  }),
-  "/icon-512.png": new Response(await Bun.file(SRC + "/icon-512.png").bytes(), {
-    headers: { "Content-Type": "image/png", "Cache-Control": CACHE_10Y },
-  }),
-  "/icon-192-maskable.png": new Response(await Bun.file(SRC + "/icon-192-maskable.png").bytes(), {
-    headers: { "Content-Type": "image/png", "Cache-Control": CACHE_10Y },
-  }),
-  "/icon-512-maskable.png": new Response(await Bun.file(SRC + "/icon-512-maskable.png").bytes(), {
-    headers: { "Content-Type": "image/png", "Cache-Control": CACHE_10Y },
-  }),
-  "/apple-touch-icon.png": new Response(await Bun.file(SRC + "/apple-touch-icon.png").bytes(), {
-    headers: { "Content-Type": "image/png", "Cache-Control": CACHE_10Y },
-  }),
+const MIME: Record<string, string> = {
+  ".html": "text/html", ".js": "application/javascript", ".css": "text/css",
+  ".json": "application/json", ".png": "image/png", ".svg": "image/svg+xml",
+  ".ico": "image/x-icon", ".woff2": "font/woff2", ".woff": "font/woff",
+  ".map": "application/json",
 };
 
 const certPath = import.meta.dir + "/../../certs";
-const certFile = Bun.file(certPath + "/cert.pem");
-const keyFile = Bun.file(certPath + "/key.pem");
+const [certExists, keyExists] = await Promise.all([
+  Bun.file(certPath + "/cert.pem").exists(),
+  Bun.file(certPath + "/key.pem").exists(),
+]);
+const tls = certExists && keyExists
+  ? { cert: Bun.file(certPath + "/cert.pem"), key: Bun.file(certPath + "/key.pem") }
+  : undefined;
 
-const [certExists, keyExists] = await Promise.all([certFile.exists(), keyFile.exists()]);
-const tls = certExists && keyExists ? { cert: certFile, key: keyFile } : undefined;
-
-function gzipMiddleware(response: Response): Response {
-  const headers = new Headers(response.headers);
-  headers.set("Content-Encoding", "gzip");
-  return new Response(response.body, { headers, status: response.status });
+async function serveFile(filePath: string): Promise<Response> {
+  const buf = await Bun.file(filePath).bytes();
+  const ext = filePath.substring(filePath.lastIndexOf("."));
+  return new Response(buf, {
+    headers: { "Content-Type": MIME[ext] || "application/octet-stream" },
+  });
 }
 
 const server = serve({
-  routes: {
-    ...STATIC_ROUTES,
-    "/*": index,
+  async fetch(req) {
+    const url = new URL(req.url);
+    let path = url.pathname === "/" ? "/index.html" : url.pathname;
+
+    // Try dist/
+    const distPath = DIST + path;
+    const distFile = Bun.file(distPath);
+    if (await distFile.exists()) return serveFile(distPath);
+
+    // Try src/
+    const srcPath = SRC + path;
+    const srcFile = Bun.file(srcPath);
+    if (await srcFile.exists()) return serveFile(srcPath);
+
+    // SPA fallback
+    const distIndex = DIST + "/index.html";
+    if (await Bun.file(distIndex).exists()) return serveFile(distIndex);
+    return serveFile(SRC + "/index.html");
   },
 
   development: process.env.NODE_ENV !== "production" && {

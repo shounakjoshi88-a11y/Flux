@@ -52,7 +52,7 @@
   <body>
     <div id="root"><div id="root-loading" style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#181715;color:#cc785c;font-family:system-ui,sans-serif;font-size:24px;font-weight:600">Flux</div></div>
     <script>
-      if ("serviceWorker" in navigator) {
+      if ("serviceWorker" in navigator && !location.hostname.startsWith("localhost") && location.hostname !== "127.0.0.1") {
         window.addEventListener("load", () => {
           navigator.serviceWorker.register("./sw.js").catch(() => {});
         });

@@ -155,11 +155,11 @@ async function checkSsrFree(urlStr: string): Promise<boolean> {
 const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200 });
 const aiLimiter = rateLimit({
   windowMs: 60 * 1000, max: 10, message: { error: "Too many requests" },
-  keyGenerator: (req: any) => req.appUserId || req.ip,
+  keyGenerator: (req: any) => req.appUserId || 'local',
 });
 const newConvLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, max: 30, message: { error: "Too many new threads" },
-  keyGenerator: (req: any) => req.appUserId || req.ip,
+  keyGenerator: (req: any) => req.appUserId || 'local',
 });
 
 app.use(globalLimiter);
@@ -3860,7 +3860,7 @@ app.post('/api/sandbox/upload', middleware, async (req: any, res: any) => {
         if (!conversationId || !filename || content === undefined) {
             return res.status(400).json({ error: 'conversationId, filename, and content required' });
         }
-        const conv = await prisma.conversation.findFirst({ where: { id: conversationId, userId: uid } });
+        const conv = await prisma.conversation.findFirst({ where: { id: conversationId, userId: uid }, select: { id: true } });
         if (!conv) return res.status(404).json({ error: 'Conversation not found' });
         const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
         const remotePath = await sandboxManager.uploadFile(conversationId, safeName, Buffer.from(content, 'base64'));
@@ -3874,7 +3874,7 @@ app.get('/api/sandbox/download/:conversationId/:filename', middleware, async (re
     try {
         const uid = req.appUserId!;
         const { conversationId, filename } = req.params;
-        const conv = await prisma.conversation.findFirst({ where: { id: conversationId, userId: uid } });
+        const conv = await prisma.conversation.findFirst({ where: { id: conversationId, userId: uid }, select: { id: true } });
         if (!conv) return res.status(404).json({ error: 'Conversation not found' });
         const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
         const remotePath = `/home/user/${safeName}`;
@@ -3955,8 +3955,8 @@ app.get("/conversations", middleware, async (req, res) => {
         const convs = await prisma.conversation.findMany({
             where: { userId: uid },
             orderBy: { id: 'desc' },
+            select: { id: true, title: true, slug: true, messages: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } } },
             take, skip: (page - 1) * take,
-            include: { messages: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } } }
         });
         const mapped = convs.map(c => ({ id: c.id, title: c.title, slug: c.slug, lastMessageAt: c.messages[0]?.createdAt ?? null }));
         return res.json({ conversations: mapped, page, take });
@@ -3967,7 +3967,8 @@ app.post("/conversations/new", middleware, newConvLimiter, async (req, res) => {
     try {
         const uid = req.appUserId!;
         const c = await prisma.conversation.create({
-            data: { title: "New Thread", slug: `new-thread-${Date.now()}`, userId: uid }
+            data: { title: "New Thread", slug: `new-thread-${Date.now()}`, userId: uid },
+            select: { id: true, title: true, slug: true },
         });
         broadcastSyncEvent(req.userId!, { type: 'conversation_created' });
         return res.status(201).json({ conversation: { id: c.id, title: c.title, slug: c.slug, lastMessageAt: null } });
@@ -4006,7 +4007,7 @@ app.post("/conversation/:conversationId", middleware, async (req, res) => {
         `, cid, uid);
 
         if (!messages.length) {
-            const conv = await prisma.conversation.findFirst({ where: { id: cid, userId: uid } });
+            const conv = await prisma.conversation.findFirst({ where: { id: cid, userId: uid }, select: { id: true, title: true, slug: true } });
             if (!conv) return res.status(404).json({ message: "Conversation not found" });
             return res.json({ conversation: { ...conv, messages: [] } });
         }
@@ -4078,8 +4079,8 @@ app.get("/conversations/search", middleware, async (req, res) => {
                     { messages: { some: { content: { contains: q, mode: 'insensitive' } } } }
                 ]
             },
+            select: { id: true, title: true, slug: true, messages: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } } },
             take: 50,
-            include: { messages: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } } }
         });
         const mapped = convs.map(c => ({ id: c.id, title: c.title, slug: c.slug, lastMessageAt: c.messages[0]?.createdAt ?? null }));
         return res.json({ conversations: mapped });
@@ -4177,7 +4178,12 @@ app.get("/memories", middleware, async (req, res) => {
         console.log(`[MEMORIES] Fetching memories for appUserId: ${uid}`);
         const memories = await prisma.memory.findMany({
             where: { userId: uid },
-            orderBy: { createdAt: 'desc' }
+            orderBy: { createdAt: 'desc' },
+            select: {
+                id: true, category: true, fact: true,
+                importance: true, accessCount: true,
+                createdAt: true, sourceConversationId: true,
+            },
         });
         console.log(`[MEMORIES] Found ${memories.length} memories for UID: ${uid}`);
         return res.json({ memories, debugUid: uid });
@@ -4192,7 +4198,8 @@ app.delete("/memories/:id", middleware, async (req, res) => {
         const uid = req.appUserId!;
         const id = req.params.id as string;
         const memory = await prisma.memory.findFirst({
-            where: { id, userId: uid }
+            where: { id, userId: uid },
+            select: { id: true },
         });
         if (!memory) return res.status(404).json({ message: "Memory not found" });
         await prisma.memory.delete({ where: { id } });
@@ -4333,7 +4340,7 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
         };
 
         if (!query?.trim()) return res.status(400).json({ error: 'Query is required' });
-        nq = query.trim().slice(0, 10_000);
+        nq = query.trim();
 
         // ── Long-running task detection (multi-step project builder) ──
         const taskIntent = await classifyTaskIntent(nq).catch(() => 'SIMPLE' as const);
@@ -4433,7 +4440,15 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
         if (conversationId) {
             existingConv = await prisma.conversation.findFirst({
                 where: { id: conversationId, userId: uid },
-                include: { messages: { orderBy: { createdAt: 'asc' } } },
+                select: {
+                    id: true,
+                    compaction: true,
+                    compactMsgCount: true,
+                    messages: {
+                        orderBy: { createdAt: 'asc' },
+                        select: { content: true, role: true, createdAt: true },
+                    },
+                },
             });
         }
         const convIsNew = !existingConv && !conversationId;
@@ -4494,16 +4509,16 @@ app.post('/flux_ask', middleware, aiLimiter, async (req: any, res: any) => {
             }
         }
 
-        // ── Save user message ────────────────────────────────────────────
+        // ── Save user message (fire-and-forget — don't block streaming) ──
         const userMsgFileText = '';
-        await prisma.message.create({
+        prisma.message.create({
             data: {
                 content: userMsgFileText ? `${userMsgFileText}\n--\n${nq}` : nq,
                 role: 'User',
                 conversationId: activeConversationId,
                 fileAttachment: safeAtt.length > 0 ? safeAtt : undefined,
             },
-        });
+        }).catch((e: any) => console.warn('[SAVE] Failed to save user message:', e?.message));
 
         // ── Model routing — classify query and route to appropriate tier ──
         const route = routeModel(pref, nq, previousQuery);
@@ -5905,10 +5920,12 @@ app.delete("/conversations/:conversationId/messages/:messageId", middleware, asy
         if (!conversationId || isNaN(messageId)) return res.status(400).json({ message: "Invalid parameters" });
         const conversation = await prisma.conversation.findFirst({
             where: { id: conversationId, userId: appUserId },
+            select: { id: true },
         });
         if (!conversation) return res.status(404).json({ message: "Conversation not found" });
         const message = await prisma.message.findFirst({
             where: { id: messageId, conversationId },
+            select: { id: true },
         });
         if (!message) return res.status(404).json({ message: "Message not found" });
         await prisma.message.delete({ where: { id: messageId } });
@@ -5928,6 +5945,7 @@ app.delete("/conversations/:conversationId", middleware, async (req, res) => {
         if (!conversationId) return res.status(400).json({ message: "conversationId is required" });
         const conversation = await prisma.conversation.findFirst({
             where: { id: conversationId, userId: appUserId },
+            select: { id: true },
         });
         if (!conversation) return res.status(404).json({ message: "Conversation not found" });
         await prisma.$transaction([

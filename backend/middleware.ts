@@ -25,7 +25,15 @@ export async function middleware(req: Request, res: Response, next: NextFunction
         return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const { data: { user: authUser } } = await client.auth.getUser(token);
+    let authUser: any;
+    try {
+        const result = await client.auth.getUser(token);
+        authUser = result.data?.user;
+    } catch (e: any) {
+        console.error('[AUTH] Supabase auth call failed:', e?.message ?? e);
+        return res.status(502).json({ message: "Authentication service unavailable" });
+    }
+
     if (!authUser) {
         return res.status(401).json({ message: "Invalid or revoked token" });
     }
@@ -38,17 +46,21 @@ export async function middleware(req: Request, res: Response, next: NextFunction
         "Unknown User";
     const email = authUser.email ?? `${supabaseUserId}@no-email.local`;
 
-    // Upsert the user – this guarantees a local user record exists
-    const dbUser = await prisma.user.upsert({
-        where: { supabaseId: supabaseUserId },
-        update: { email, provider, name },
-        create: { email, provider, name, supabaseId: supabaseUserId },
-    });
+    let dbUser: any;
+    try {
+        dbUser = await prisma.user.upsert({
+            where: { supabaseId: supabaseUserId },
+            update: { email, provider, name },
+            create: { email, provider, name, supabaseId: supabaseUserId },
+        });
+    } catch (e: any) {
+        console.error('[AUTH] User upsert failed:', e?.message ?? e);
+        return res.status(502).json({ message: "Database unavailable" });
+    }
 
-    // Attach both IDs to the request
-    req.userId = supabaseUserId;          // Supabase ID
+    req.userId = supabaseUserId;
     req.authUser = authUser;
-    req.appUserId = dbUser.id;            // Local UUID (the one used in foreign keys)
+    req.appUserId = dbUser.id;
 
     next();
 }

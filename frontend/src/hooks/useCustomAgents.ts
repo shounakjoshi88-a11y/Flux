@@ -18,7 +18,7 @@ export interface CustomAgent {
 }
 
 function apiHost(): string {
-  return BACKEND_URL || "https://localhost:3001";
+  return BACKEND_URL || "http://localhost:3001";
 }
 
 export function useCustomAgents() {

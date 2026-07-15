@@ -83,6 +83,7 @@ export function useAgentSession(user: any) {
   type ThoughtData = { subject?: string; description?: string; elapsed: number } | null;
 
   const wsRef = useRef<WebSocket | null>(null);
+  const connectPromiseRef = useRef<Promise<void> | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const conversationIdRef = useRef<string | null>(null);
   const isLoadingRef = useRef(false);
@@ -143,62 +144,7 @@ export function useAgentSession(user: any) {
     }
   }, []);
 
-  // ΓöÇΓöÇ WebSocket Connection ΓöÇΓöÇΓöÇ AionUi patterns: exponential backoff, singleton guard, connect timeout ΓöÇΓöÇ
-  const CONNECT_TIMEOUT_MS = 8000;
-  const connect = useCallback(async () => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
-    const token = await getAccessToken();
-    if (!token) return;
-
-    const protocol = BACKEND_URL.startsWith("https") ? "wss" : "ws";
-    const wsUrl = `${protocol}://${BACKEND_URL.replace(/^https?:\/\//, "")}/agent`;
-
-    // AionUi pattern: connect timeout
-    const connectTimeout = setTimeout(() => {
-      if (wsRef.current?.readyState !== WebSocket.OPEN) {
-        wsRef.current?.close();
-        wsRef.current = null;
-        setSessionState("error");
-      }
-    }, CONNECT_TIMEOUT_MS);
-
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      clearTimeout(connectTimeout);
-      reconnectAttemptsRef.current = 0;
-      ws.send(JSON.stringify({ type: "auth", payload: { token } }));
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const msg: AgentMessage = JSON.parse(event.data);
-        handleAgentMessage(msg);
-      } catch (e) {
-        console.error("[WS] Parse error:", e);
-      }
-    };
-
-    ws.onclose = () => {
-      clearTimeout(connectTimeout);
-      cancelledRef.current = true;
-      // AionUi pattern: singleton reconnect guard
-      if (reconnectTimerRef.current) return;
-      if (reconnectAttemptsRef.current < maxReconnectAttempts) {
-        reconnectAttemptsRef.current++;
-        const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000);
-        reconnectTimerRef.current = setTimeout(() => {
-          reconnectTimerRef.current = null;
-          cancelledRef.current = false;
-          connect();
-        }, delay);
-      }
-    };
-
-    ws.onerror = () => {};
-  }, []);
 
   const disconnect = useCallback(() => {
     // AionUi pattern: enterTerminal ΓÇö null out ALL handlers to prevent double-fire
@@ -478,6 +424,99 @@ export function useAgentSession(user: any) {
     throttledSetThought(null as any);
     flushPartsToMessage();
   }, [stopThoughtTimer, throttledSetThought, flushPartsToMessage]);
+
+  // ── WebSocket Connection ───────────────────────────────────────
+  const CONNECT_TIMEOUT_MS = 8000;
+  const connect = useCallback(async (): Promise<void> => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    if (connectPromiseRef.current) return connectPromiseRef.current;
+
+    const token = await getAccessToken();
+    if (!token) return;
+
+    let wsUrl: string;
+    if (BACKEND_URL.startsWith("http://") || BACKEND_URL.startsWith("https://")) {
+      const protocol = BACKEND_URL.startsWith("https") ? "wss" : "ws";
+      wsUrl = `${protocol}://${BACKEND_URL.replace(/^https?:\/\//, "")}/agent`;
+    } else {
+      const protocol = typeof window !== 'undefined' && window.location.protocol === "https:" ? "wss" : "ws";
+      const host = typeof window !== 'undefined' ? window.location.host : "localhost:3000";
+      const cleanPath = BACKEND_URL.startsWith("/") ? BACKEND_URL : `/${BACKEND_URL}`;
+      wsUrl = `${protocol}://${host}${cleanPath}/agent`;
+    }
+
+    const promise = new Promise<void>((resolve, reject) => {
+      let isAuthenticated = false;
+
+      const connectTimeout = setTimeout(() => {
+        if (wsRef.current?.readyState !== WebSocket.OPEN) {
+          wsRef.current?.close();
+          wsRef.current = null;
+          setSessionState("error");
+          connectPromiseRef.current = null;
+          reject(new Error("Connection timeout"));
+        }
+      }, CONNECT_TIMEOUT_MS);
+
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ type: "auth", payload: { token } }));
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg: AgentMessage = JSON.parse(event.data);
+
+          if (msg.type === "agent_status" && msg.payload?.status === "authenticated") {
+            isAuthenticated = true;
+            clearTimeout(connectTimeout);
+            reconnectAttemptsRef.current = 0;
+            connectPromiseRef.current = null;
+            resolve();
+          }
+
+          if (msg.type === "error" && !isAuthenticated) {
+            clearTimeout(connectTimeout);
+            ws.close();
+            wsRef.current = null;
+            connectPromiseRef.current = null;
+            reject(new Error(msg.payload?.message || "Authentication failed"));
+          }
+
+          handleAgentMessage(msg);
+        } catch (e) {
+          console.error("[WS] Parse error:", e);
+        }
+      };
+
+      ws.onclose = () => {
+        clearTimeout(connectTimeout);
+        cancelledRef.current = true;
+        connectPromiseRef.current = null;
+        if (reconnectTimerRef.current) return;
+        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+          reconnectAttemptsRef.current++;
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000);
+          reconnectTimerRef.current = setTimeout(() => {
+            reconnectTimerRef.current = null;
+            cancelledRef.current = false;
+            connect().catch(() => {});
+          }, delay);
+        }
+        if (!isAuthenticated) reject(new Error("Connection closed before auth"));
+      };
+
+      ws.onerror = (err) => {
+        connectPromiseRef.current = null;
+        reject(err);
+      };
+    });
+
+    connectPromiseRef.current = promise;
+    return promise;
+  }, [handleAgentMessage]);
 
   // ΓöÇΓöÇ Send Message ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   const sendMessage = useCallback(

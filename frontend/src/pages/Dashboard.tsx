@@ -334,30 +334,37 @@ export default function Dashboard() {
     return data.conversations as ConversationListItem[];
   }, [getAccessToken]);
 
-  // ── Load conversations ──
+  // ── Debounced load conversations ──
+  const loadConversationsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadConversations = useCallback(async (forceRefresh?: boolean) => {
     if (!user) return;
 
-    if (!forceRefresh && adaptive.cachePreference === 'cache-first') {
-      const cached = await conversationCache.getConversations();
-      if (cached && cached.length > 0) {
-        setConversations(cached);
-        try { localStorage.setItem("flux-conversations", JSON.stringify(cached)); } catch {}
-        return;
-      }
+    // Debounce: cancel previous timer; schedule actual fetch 1s after last call
+    if (loadConversationsTimerRef.current) {
+      clearTimeout(loadConversationsTimerRef.current);
     }
+    loadConversationsTimerRef.current = setTimeout(async () => {
+      if (!forceRefresh && adaptive.cachePreference === 'cache-first') {
+        const cached = await conversationCache.getConversations();
+        if (cached && cached.length > 0) {
+          setConversations(cached);
+          try { localStorage.setItem("flux-conversations", JSON.stringify(cached)); } catch {}
+          return;
+        }
+      }
 
-    const token = await getAccessToken();
-    if (!token) return;
-    const res = await fetch(`${BACKEND_URL}/conversations`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) return;
-    const data = (await res.json()) as { conversations: ConversationListItem[] };
-    const list = data.conversations ?? [];
-    setConversations(list);
-    try { localStorage.setItem("flux-conversations", JSON.stringify(list)); } catch {}
-    conversationCache.putConversations(list).catch(() => {});
+      const token = await getAccessToken();
+      if (!token) return;
+      const res = await fetch(`${BACKEND_URL}/conversations`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { conversations: ConversationListItem[] };
+      const list = data.conversations ?? [];
+      setConversations(list);
+      try { localStorage.setItem("flux-conversations", JSON.stringify(list)); } catch {}
+      conversationCache.putConversations(list).catch(() => {});
+    }, 1000);
   }, [user, getAccessToken, adaptive.cachePreference]);
 
   // ── Wire offline queue flush to refresh conversation list ────────────────
