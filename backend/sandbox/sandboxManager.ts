@@ -57,6 +57,16 @@ export class SandboxManager {
     return Buffer.from(await sandbox.files.read(remotePath));
   }
 
+  async listFiles(conversationId: string, dir = '/home/user'): Promise<string[]> {
+    const sandbox = await this.getOrCreate(conversationId);
+    try {
+      return (await sandbox.files.list(dir)).map((f: any) => f.path);
+    } catch {
+      const result = await sandbox.commands.run(`find ${dir} -type f`, { timeoutMs: 10_000 });
+      return result.stdout.trim().split('\n').filter(Boolean);
+    }
+  }
+
   async kill(conversationId: string): Promise<void> {
     const existing = this.sandboxes.get(conversationId);
     if (existing) {

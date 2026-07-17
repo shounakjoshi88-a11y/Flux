@@ -18,9 +18,11 @@ const NIM_MODELS: Record<string, string> = {
   "minimax-m2.7": "minimaxai/minimax-m2.7",
   "stockmark-2-100b-instruct": "stockmark/stockmark-2-100b-instruct",
   "nemotron-nano-12b-v2-vl": "nvidia/nemotron-nano-12b-v2-vl",
+  "inkling": "thinkingmachines/inkling",
+  "laguna-xs-2.1": "poolside/laguna-xs-2.1",
 };
 
-const VISION_MODELS = new Set(["nemotron-nano-12b-v2-vl", "kimi-k2.6"]);
+const VISION_MODELS = new Set(["nemotron-nano-12b-v2-vl", "kimi-k2.6", "inkling"]);
 
 function createFallbackModel(primaryModel: any, preferredModelId: string | undefined, modelsMap: Record<string, string>): any {
   const getFallbackSequence = (prefId?: string) => {

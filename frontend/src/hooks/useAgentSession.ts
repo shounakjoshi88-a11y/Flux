@@ -431,8 +431,14 @@ export function useAgentSession(user: any) {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
     if (connectPromiseRef.current) return connectPromiseRef.current;
 
-    const token = await getAccessToken();
-    if (!token) return;
+    let token: string;
+    try {
+      token = await getAccessToken();
+    } catch {
+      connectPromiseRef.current = null;
+      return;
+    }
+    if (!token) { connectPromiseRef.current = null; return; }
 
     let wsUrl: string;
     if (BACKEND_URL.startsWith("http://") || BACKEND_URL.startsWith("https://")) {

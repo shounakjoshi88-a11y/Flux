@@ -69,6 +69,14 @@ export function useChat(user: any) {
   const assistantRawRef = useRef<string>("");
   const streamingPartsRef = useRef<MessagePart[]>([]);
   const textAccumRef = useRef<string>("");
+  const statusClearedRef = useRef(false);
+  function clearInitialStatus() {
+    if (statusClearedRef.current) return;
+    statusClearedRef.current = true;
+    streamingPartsRef.current = streamingPartsRef.current.filter(
+      p => !(p.type === "agent_status" && p.status === "processing" && p.message === "Thinking...")
+    );
+  }
 
   // AionUi pattern: cancelled flag for async hydration safety
   const cancelledRef = useRef(false);
@@ -285,7 +293,14 @@ export function useChat(user: any) {
       };
       lastCallbacksRef.current = callbacks;
 
-      const token = await getAccessToken();
+      let token: string;
+      try {
+        token = await getAccessToken();
+      } catch {
+        setIsLoading(false);
+        isLoadingRef.current = false;
+        return;
+      }
 
       const body: any = {
         query: prompt,
@@ -359,6 +374,8 @@ export function useChat(user: any) {
       let finalAssistantId: string | null = null;
 
       try {
+        const timeoutId = setTimeout(() => controller.abort(), 120_000);
+
         const response = await fetch(endpoint, {
           method: "POST",
           headers: {
@@ -368,6 +385,7 @@ export function useChat(user: any) {
           body: JSON.stringify(body),
           signal: controller.signal,
         });
+        clearTimeout(timeoutId);
         if (!response.ok || !response.body) throw new Error("Request failed");
 
         const incomingConversationId = response.headers.get("X-Conversation-Id");
@@ -438,6 +456,7 @@ export function useChat(user: any) {
             // ΓöÇΓöÇΓöÇ STATUS ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             else if (eventType === "status") {
               try {
+                clearInitialStatus();
                 const parsed = JSON.parse(data);
                 flushPendingText();
                 const sub = parsed.subtype as string;
@@ -510,6 +529,7 @@ export function useChat(user: any) {
             // ΓöÇΓöÇΓöÇ THOUGHT ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             else if (eventType === "thought") {
               try {
+                clearInitialStatus();
                 const parsed = JSON.parse(data);
                 const cleanContent = cleanThoughtText(parsed.content || "");
                 if (cleanContent) {
@@ -798,6 +818,7 @@ export function useChat(user: any) {
             }
             // ─── TEXT ANSWER (default) ───────────────
             else {
+              clearInitialStatus();
               if (data === "[DONE]") continue;
               assistantRawRef.current += data;
               textAccumRef.current += data;

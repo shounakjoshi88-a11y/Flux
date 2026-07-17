@@ -98,6 +98,7 @@ function getFallbackModels(): ModelCategory[] {
         { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro (DeepSeek)" },
         { id: "sarvam-m", label: "Sarvam-M (Sarvam AI)" },
         { id: "nemotron-nano-12b-v2-vl", label: "Nemotron Nano 12B v2 VL (NVIDIA)" },
+        { id: "laguna-xs-2.1", label: "Laguna XS 2.1 (Poolside)" },
       ],
     },
     {
@@ -105,6 +106,7 @@ function getFallbackModels(): ModelCategory[] {
       models: [
         { id: "step-3.7-flash", label: "Step 3.7 Flash (StepFun)" },
         { id: "step-3.5-flash", label: "Step 3.5 Flash (StepFun)" },
+        { id: "inkling", label: "Inkling (Thinking Machines)" },
       ],
     },
   ];

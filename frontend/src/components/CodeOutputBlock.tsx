@@ -49,6 +49,77 @@ function formatElapsed(secs: number): string {
   return `${m}m ${s}s`;
 }
 
+// ── Code typewriter — reveals the script text while isRunning ──────────────
+function useCodeTypewriter(code: string | undefined, isRunning: boolean): string {
+  const safe = code ?? '';
+  const [len, setLen] = useState(() => (isRunning ? 0 : safe.length));
+  const codeRef = useRef(safe);
+  codeRef.current = safe;
+
+  useEffect(() => {
+    if (!isRunning) {
+      setLen(codeRef.current.length);
+    } else {
+      setLen(0);
+    }
+  }, [isRunning, safe]);
+
+  useEffect(() => {
+    if (!isRunning) return;
+    const id = setInterval(() => {
+      setLen(prev => {
+        const full = codeRef.current;
+        if (prev >= full.length) return prev;
+        return Math.min(prev + 12, full.length);
+      });
+    }, 16);
+    return () => clearInterval(id);
+  }, [isRunning, safe]);
+
+  if (!isRunning) return safe;
+  return safe.slice(0, len);
+}
+
+// ── Output lines typewriter — streams output lines character-by-character ──────
+function useOutputLinesTypewriter(outputLines: CodeOutputLine[], isRunning: boolean): number {
+  const totalLength = outputLines.reduce((acc, line) => acc + line.content.length, 0);
+  const [displayedLength, setDisplayedLength] = useState(() => (isRunning ? 0 : totalLength));
+  
+  const lastTotalRef = useRef(totalLength);
+  const isRunningRef = useRef(isRunning);
+
+  if (isRunning && !isRunningRef.current) {
+    setDisplayedLength(0);
+  }
+  isRunningRef.current = isRunning;
+
+  useEffect(() => {
+    if (totalLength < lastTotalRef.current) {
+      setDisplayedLength(isRunning ? 0 : totalLength);
+    }
+    lastTotalRef.current = totalLength;
+  }, [totalLength, isRunning]);
+
+  useEffect(() => {
+    if (!isRunning) {
+      setDisplayedLength(totalLength);
+      return;
+    }
+    const interval = setInterval(() => {
+      setDisplayedLength(prev => {
+        if (prev < totalLength) {
+          return Math.min(prev + 18, totalLength);
+        }
+        return prev;
+      });
+    }, 16);
+    return () => clearInterval(interval);
+  }, [isRunning, totalLength]);
+
+  if (!isRunning) return totalLength;
+  return displayedLength;
+}
+
 // ── Syntax highlighting (shared with StatusMessage TerminalBlock) ──────────
 function highlightBash(cmd: string): React.ReactNode {
   const tokens = cmd.match(/(\|\||&&|\|)|("[^"]*"|'[^']*'|\S+)/g) || [];
@@ -105,13 +176,34 @@ export function CodeOutputBlock({
   const [showOutput, setShowOutput] = useState(true);
   const outputRef = useRef<HTMLPreElement>(null);
   const liveElapsed = useElapsedSeconds(isRunning, duration ? duration / 1000 : undefined);
+  const displayedCode = useCodeTypewriter(code, isRunning);
+  const displayedLength = useOutputLinesTypewriter(outputLines, isRunning);
 
-  // Auto-scroll output to bottom when new lines arrive
+  // Slice outputLines according to displayedLength
+  let accumulated = 0;
+  const visibleOutputLines = [];
+  for (const line of outputLines) {
+    const lineLen = line.content.length;
+    if (accumulated >= displayedLength) {
+      break;
+    }
+    if (accumulated + lineLen <= displayedLength) {
+      visibleOutputLines.push(line);
+    } else {
+      visibleOutputLines.push({
+        type: line.type,
+        content: line.content.slice(0, displayedLength - accumulated)
+      });
+    }
+    accumulated += lineLen;
+  }
+
+  // Auto-scroll output to bottom when visible output length changes
   useEffect(() => {
     if (outputRef.current) {
       outputRef.current.scrollTop = outputRef.current.scrollHeight;
     }
-  }, [outputLines.length]);
+  }, [visibleOutputLines.length, displayedLength]);
 
   const langLabel = language || 'python';
   const prompt = langLabel === 'python' ? '>>>' : '$';
@@ -194,7 +286,7 @@ export function CodeOutputBlock({
       </div>
 
       {/* ── Command area with prompt + syntax highlighting */}
-      {code && (
+      {displayedCode && (
         <div className="relative">
           {isRunning && (
             <div
@@ -207,7 +299,7 @@ export function CodeOutputBlock({
             style={{ color: '#c0caf5' }}
           >
             <span style={{ color: promptColor, marginRight: '6px' }}>{prompt}</span>
-            {langLabel === 'python' ? highlightPython(code) : highlightBash(code)}
+            {langLabel === 'python' ? highlightPython(displayedCode) : highlightBash(displayedCode)}
             {isRunning && (
               <span
                 className="inline-block w-[7px] h-[14px] ml-0.5 align-middle rounded-sm"
@@ -247,10 +339,10 @@ export function CodeOutputBlock({
               className="text-[11.5px] leading-[1.6] font-mono px-4 py-2.5 overflow-x-auto max-h-[320px] overflow-y-auto whitespace-pre-wrap break-words border-t border-white/[0.03]"
               style={{ color: '#b5b2aa' }}
             >
-              {outputLines.length === 0 && isRunning && (
+              {visibleOutputLines.length === 0 && isRunning && (
                 <span style={{ color: '#565f89', fontStyle: 'italic' }}>▶ Executing…</span>
               )}
-              {outputLines.map((line, i) => (
+              {visibleOutputLines.map((line, i) => (
                 <div
                   key={i}
                   style={{
@@ -262,7 +354,7 @@ export function CodeOutputBlock({
                   {line.content}
                 </div>
               ))}
-              {isRunning && outputLines.length > 0 && (
+              {isRunning && visibleOutputLines.length > 0 && (
                 <span
                   className="inline-block w-[6px] h-[12px] ml-0.5 align-middle rounded-sm"
                   style={{ background: 'var(--accent)', opacity: 0.7, animation: 'smBlink 1s step-end infinite' }}

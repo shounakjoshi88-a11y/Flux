@@ -41,6 +41,9 @@ import { createGoogleTools } from './google-tools';
 import { chunkByHeadings } from './lib/chunking';
 import type { PageData } from './lib/chunking';
 import { retrieveDocChunks } from './lib/hybrid-retrieval';
+import { toOpenAIChunk, fromOpenAITools, mapModelId, sseLine, BUILD_PROJECT_TOOL } from './openai-compat';
+import { openAICompatAuth } from './openai-auth';
+import { runMultiAgentBuild } from './orchestrator-multiagent';
 
 const client = tavily({ apiKey: process.env.TAVILY_API_KEY });
 const app = express();
@@ -261,7 +264,7 @@ function sanitizeTitle(title: string): string {
 }
 
 // ── Model map ───────────────────────────────────────────────
-const NIM_MODELS: Record<string, string> = {
+export const NIM_MODELS: Record<string, string> = {
     "llama-4-maverick": "meta/llama-4-maverick-17b-128e-instruct",
     "mistral-large-675b": "mistralai/mistral-large-3-675b-instruct-2512",
     "glm-5.2": "z-ai/glm-5.2",
@@ -280,6 +283,8 @@ const NIM_MODELS: Record<string, string> = {
     "sarvam-m": "sarvamai/sarvam-m",
     "stockmark-2-100b-instruct": "stockmark/stockmark-2-100b-instruct",
     "nemotron-nano-12b-v2-vl": "nvidia/nemotron-nano-12b-v2-vl",
+    "inkling": "thinkingmachines/inkling",
+    "laguna-xs-2.1": "poolside/laguna-xs-2.1",
 };
 
 // ── Vision-capable models ──────────────────────────────────
@@ -288,6 +293,7 @@ const VISION_MODELS = new Set([
     "kimi-k2.6",
     "minimax-m3",
     "deepseek-v4-pro",
+    "inkling",
 ]);
 
 // ── selectModel returns a proper AI SDK model instance ──
@@ -5493,7 +5499,7 @@ ${memCtx}
                     try {
                         const synthRes = await generateText({
                             model,
-                            system: `You are Flux's synthesis engine. Transform raw context into a precise, high-value answer.
+                            system: `You are Flux's synthesis engine. Transform raw context into a precise, high-value answer. Be warm and conversational with a touch of wit — use playful analogies, light sarcasm, and the occasional dad joke when appropriate. Can be real sarcastic sometimes too for better personality. Don't use em dashes 99% of the time.
 
 STEP 1 — DETECT QUERY TYPE and adapt your output:
 • FACTUAL/DIRECT (confirmations, quick lookups): One bold direct answer → tight supporting table or 3–5 bullets.
@@ -6473,7 +6479,7 @@ const AVAILABLE_MODELS = [
             { id: "nemotron-3-ultra-550b", label: "Nemotron 3 Ultra 550B (NVIDIA)" },
             { id: "mistral-medium-3.5-128b", label: "Mistral Medium 3.5 128B (Mistral AI)" },
             { id: "nemotron-3-super-120b-a12b", label: "Nemotron 3 Super 120B (NVIDIA)" },
-            { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash (DeepSeek)" },
+            { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash Free (DeepSeek)" },
             { id: "qwen3.5-397b-a17b", label: "Qwen 3.5 397B (Qwen)" },
             { id: "minimax-m2.7", label: "MiniMax M2.7 (MiniMax)" },
             { id: "minimax-m3", label: "MiniMax M3 (MiniMax)" },
@@ -6481,6 +6487,7 @@ const AVAILABLE_MODELS = [
             { id: "sarvam-m", label: "Sarvam-M (Sarvam AI)" },
             { id: "stockmark-2-100b-instruct", label: "Stockmark 2 100B (Stockmark)" },
             { id: "nemotron-nano-12b-v2-vl", label: "Nemotron Nano 12B v2 VL (NVIDIA)" },
+            { id: "laguna-xs-2.1", label: "Laguna XS 2.1 (Poolside)" },
             { id: "sarvamai", label: "Sarvamai (Sarvamai)" },
         ]
     },
@@ -6489,12 +6496,151 @@ const AVAILABLE_MODELS = [
             { id: "step-3.7-flash", label: "Step 3.7 Flash (StepFun)" },
             { id: "step-3.5-flash", label: "Step 3.5 Flash (StepFun)" },
             { id: "nemotron-3-nano-omni-30b-a3b-reasoning", label: "Nemotron 3 Nano Omni 30B Reasoning (NVIDIA)" },
+            { id: "inkling", label: "Inkling (Thinking Machines)" },
         ]
     },
 ];
 
 app.get("/api/models", (_req, res) => {
     res.json({ categories: AVAILABLE_MODELS, all: AVAILABLE_MODELS.flatMap((c) => c.models) });
+});
+
+// ── OPENAI-COMPATIBLE CHAT COMPLETIONS (opencode connector) ──
+const openAICompatLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 30,
+    message: { error: { message: 'Rate limit exceeded', type: 'rate_limit_error' } },
+    keyGenerator: (req: any) => req.headers.authorization || 'anonymous',
+});
+
+app.post('/v1/chat/completions', openAICompatLimiter, openAICompatAuth, async (req: any, res: any) => {
+    const { model, messages, stream = true, temperature, tools: openAiTools } = req.body;
+
+    let mappedModel: string;
+    try {
+        mappedModel = mapModelId(model, NIM_MODELS);
+    } catch (e: any) {
+        return res.status(400).json({ error: { message: e.message, type: 'invalid_request_error' } });
+    }
+
+    const completionId = `chatcmpl-${crypto.randomUUID()}`;
+    const selectedModel = nim.chatModel(NIM_MODELS[mappedModel]);
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    try {
+        const mergedTools = {
+            ...(openAiTools ? fromOpenAITools(openAiTools) : {}),
+            build_project_with_subagents: (tool as any)({
+                description: BUILD_PROJECT_TOOL.function.description,
+                inputSchema: z.object({ projectDescription: z.string() }),
+                execute: async ({ projectDescription }: { projectDescription: string }) => {
+                    const buildId = crypto.randomUUID();
+                    const statusMessages: string[] = [];
+                    const onStatus = (event: string, data: any) => {
+                        const line = `[${data?.subagentId || 'orchestrator'}] ${event}: ${JSON.stringify(data)}`;
+                        statusMessages.push(line);
+                        if (!res.writableEnded) {
+                            res.write(sseLine(toOpenAIChunk({
+                                completionId, model: mappedModel,
+                                delta: { content: `\n${line}` },
+                            })));
+                        }
+                    };
+                    const result = await runMultiAgentBuild({ buildId, projectDescription }, onStatus);
+                    return {
+                        success: result.success,
+                        buildId: result.buildId,
+                        summary: result.finalOutput,
+                        note: 'Project built in a live sandbox.',
+                    };
+                },
+            }),
+        };
+
+        const result = streamText({
+            model: selectedModel,
+            messages,
+            temperature: temperature ?? 0.7,
+            tools: Object.keys(mergedTools).length > 0 ? mergedTools : undefined,
+            providerOptions: getProviderOptions(mappedModel),
+        } as any);
+
+        for await (const part of (result as any).fullStream) {
+            if (res.writableEnded) break;
+            if (part.type === 'text-delta') {
+                res.write(sseLine(toOpenAIChunk({
+                    completionId, model: mappedModel,
+                    delta: { content: part.textDelta },
+                })));
+            } else if (part.type === 'tool-call') {
+                res.write(sseLine(toOpenAIChunk({
+                    completionId, model: mappedModel,
+                    delta: {
+                        tool_calls: [{
+                            index: 0,
+                            id: part.toolCallId,
+                            type: 'function',
+                            function: { name: part.toolName, arguments: JSON.stringify(part.args) },
+                        }],
+                    },
+                })));
+            } else if (part.type === 'finish') {
+                res.write(sseLine(toOpenAIChunk({
+                    completionId, model: mappedModel,
+                    delta: {},
+                    finishReason: part.toolCalls?.length ? 'tool_calls' : 'stop',
+                })));
+            } else if (part.type === 'error') {
+                res.write(sseLine({ error: { message: part.error || 'Stream error', type: 'server_error' } }));
+            }
+        }
+        if (!res.writableEnded) {
+            res.write('data: [DONE]\n\n');
+            res.end();
+        }
+    } catch (e: any) {
+        console.error('[v1/chat/completions] error:', e?.message);
+        if (res.headersSent) {
+            if (!res.writableEnded) {
+                res.write(sseLine({ error: { message: e?.message || 'Internal error', type: 'server_error' } }));
+                res.end();
+            }
+        } else {
+            res.status(500).json({ error: { message: e?.message || 'Internal error', type: 'server_error' } });
+        }
+    }
+});
+
+// ── MULTI-AGENT BUILD (standalone, independent of opencode) ──
+app.post('/api/multiagent-build', middleware, async (req: any, res: any) => {
+    const { projectDescription } = req.body;
+    if (!projectDescription) return res.status(400).json({ error: 'projectDescription required' });
+
+    const buildId = crypto.randomUUID();
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    const onStatus = (event: string, data: any) => {
+        if (!res.writableEnded) {
+            res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+        }
+    };
+
+    try {
+        const result = await runMultiAgentBuild({ buildId, projectDescription }, onStatus);
+        if (!res.writableEnded) {
+            res.write(`event: final_result\ndata: ${JSON.stringify(result)}\n\n`);
+        }
+    } catch (e: any) {
+        if (!res.writableEnded) {
+            res.write(`event: error\ndata: ${JSON.stringify({ message: e?.message || 'Build failed' })}\n\n`);
+        }
+    }
+    if (!res.writableEnded) res.end();
 });
 
 // ── ACP HANDSHAKE / CAPABILITIES ───────────────────────────

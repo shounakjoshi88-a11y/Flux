@@ -38,29 +38,7 @@ type MessageListProps = {
   onVisibleRangeChange?: (range: { startIndex: number; endIndex: number }) => void;
 };
 
-// ─── Three dots loader ──────────────────────────────────────
-function ThreeDotsLoader() {
-  return (
-    <div className="flex items-center gap-1.5">
-      {[0, 1, 2].map((i) => (
-        <motion.span
-          key={i}
-          className="size-2 rounded-full bg-zinc-500"
-          animate={{
-            y: [0, -6, 0],
-            opacity: [0.4, 1, 0.4],
-          }}
-          transition={{
-            duration: 1.2,
-            repeat: Infinity,
-            delay: i * 0.2,
-            ease: "easeInOut",
-          }}
-        />
-      ))}
-    </div>
-  );
-}
+
 
 // ─── Main component ────────────────────────────────────────
 export function MessageList({
@@ -243,17 +221,10 @@ export function MessageList({
         }}
         components={{
           Footer: () => (
-            <>
-              {isLoading && (messages.length === 0 || !messages[messages.length - 1]?.parts?.length) && (
-                <div className="mx-auto max-w-[700px] mt-4 pl-2">
-                  <ThreeDotsLoader />
-                </div>
-              )}
-              <div
-                className="w-full shrink-0"
-                style={{ height: "calc(env(safe-area-inset-bottom, 0px) + 50vh)" }}
-              />
-            </>
+            <div
+              className="w-full shrink-0"
+              style={{ height: "calc(env(safe-area-inset-bottom, 0px) + 50vh)" }}
+            />
           ),
         }}
       />

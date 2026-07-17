@@ -265,6 +265,37 @@ function formatElapsed(secs: number): string {
   return `${m}m ${s}s`;
 }
 
+// ── String typewriter hook ──────────────────────────────────────────────────
+function useStringTypewriter(text: string | undefined, isRunning: boolean, speed = 15): string {
+  const safe = text ?? '';
+  const [len, setLen] = useState(() => (isRunning ? 0 : safe.length));
+  const textRef = useRef(safe);
+  textRef.current = safe;
+
+  useEffect(() => {
+    if (!isRunning) {
+      setLen(textRef.current.length);
+    } else {
+      setLen(0);
+    }
+  }, [isRunning, safe]);
+
+  useEffect(() => {
+    if (!isRunning) return;
+    const id = setInterval(() => {
+      setLen(prev => {
+        const full = textRef.current;
+        if (prev >= full.length) return prev;
+        return Math.min(prev + speed, full.length);
+      });
+    }, 16);
+    return () => clearInterval(id);
+  }, [isRunning, safe, speed]);
+
+  if (!isRunning) return safe;
+  return safe.slice(0, len);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TerminalBlock v2 — Claude/VS Code-style bash terminal with syntax coloring,
 // live timer, stdout/stderr split, and exit badge.
@@ -291,6 +322,11 @@ function TerminalBlock({
   const [stdoutOpen, setStdoutOpen] = useState(true);
   const [stderrOpen, setStderrOpen] = useState(true);
   const elapsed = useElapsedSeconds(isRunning);
+
+  const displayedCommand = useStringTypewriter(command, isRunning, 12);
+  const displayedStdout = useStringTypewriter(stdout, isRunning, 15);
+  const displayedStderr = useStringTypewriter(stderr, isRunning, 15);
+  const displayedError = useStringTypewriter(error, isRunning, 15);
 
   if (!command) return null;
 
@@ -360,9 +396,9 @@ function TerminalBlock({
     });
   };
 
-  const stdoutTrimmed = (stdout || '').replace(/\n+$/, '');
-  const stderrTrimmed = (stderr || '').replace(/\n+$/, '');
-  const errorTrimmed = (error || '').replace(/\n+$/, '');
+  const stdoutTrimmed = (displayedStdout || '').replace(/\n+$/, '');
+  const stderrTrimmed = (displayedStderr || '').replace(/\n+$/, '');
+  const errorTrimmed = (displayedError || '').replace(/\n+$/, '');
   const hasStdout = stdoutTrimmed.length > 0;
   const hasStderr = stderrTrimmed.length > 0 || errorTrimmed.length > 0;
   const stdoutLines = hasStdout ? stdoutTrimmed.split('\n').length : 0;
@@ -445,7 +481,7 @@ function TerminalBlock({
         <pre className="text-[12.5px] leading-[1.65] font-mono px-4 py-3 overflow-x-auto whitespace-pre-wrap break-words"
           style={{ color: '#c0caf5' }}>
           <span style={{ color: promptColor, marginRight: '6px' }}>{prompt}</span>
-          {renderCommand(command)}
+          {renderCommand(displayedCommand)}
           {isRunning && (
             <span
               className="inline-block w-[7px] h-[14px] ml-0.5 align-middle rounded-sm"
