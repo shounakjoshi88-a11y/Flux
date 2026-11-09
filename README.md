@@ -30,10 +30,17 @@
   <img src="https://img.shields.io/badge/search-Tavily-ff6b6b?style=flat-square" alt="Tavily">
   <img src="https://img.shields.io/badge/frontend-Vercel-black?logo=vercel&style=flat-square" alt="Vercel">
   <img src="https://img.shields.io/badge/backend-Azure_Container_Apps-0078d4?logo=microsoftazure&style=flat-square" alt="Azure Container Apps">
+  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License">
 </p>
 
 ---
 
+<p align="center">
+  <img src="screenshots/Screenshot%202026-06-11%20162914.png" alt="Flux answering a web-search question with cited sources" width="860">
+</p>
+<p align="center">
+  <img src="screenshots/image%20generation%20capability.png" alt="Flux generating an image from a prompt" width="860">
+</p>
 <h2 id="features">✨ Features</h2>
 
 <details open>
@@ -918,5 +925,5 @@ This is a personal project, but contributions are welcome!
   <br>
   <sub>📍 Flux — AI research companion with agentic tools, code sandbox, knowledge graph, and long-term memory</sub>
   <br>
-  <sub><strong>Status:</strong> Active Development | <strong>License:</strong> MIT (coming soon)</sub>
+  <sub><strong>Status:</strong> Active Development | <strong>License:</strong> MIT</sub>
 </p>
