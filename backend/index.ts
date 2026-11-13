@@ -53,6 +53,7 @@ import {
     sendPermissionRequest,
     sendToolGroup,
     sendToolCall,
+    writerFor,
 } from './http/sse/writers';
 import { trackSseConnection } from './http/sse/connections';
 import { applySecurityMiddleware } from './http/middleware/security';
@@ -88,6 +89,8 @@ import {
     getProviderOptions,
 } from './agents/model-router';
 import { resolvePermission } from './agents/permissions';
+import { createFileTools } from './agents/tools/files';
+import type { ToolContext } from './agents/tools/context';
 import {
     generateDocumentWithSkill,
     fetchSkillFile,
@@ -1044,6 +1047,17 @@ function withToolTimeout(tools: Record<string, any>, timeouts: Record<string, nu
 }
 
 function createFluxTools(res: any, model: any, state: AgentState, userQuery?: string, activeConversationId?: string, uid?: string, abortSignal?: AbortSignal) {
+    const ctx: ToolContext = {
+        res,
+        writer: writerFor(res),
+        model,
+        state,
+        userQuery,
+        activeConversationId,
+        uid,
+        abortSignal,
+    };
+
     return {
 
         // ── web_search ────────────────────────────────────────────────────
@@ -1664,135 +1678,7 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
             },
         }),
 
-        // ── read_file ─────────────────────────────────────────────────────
-        read_file: (tool as any)({
-            description: 'Read contents of a TEXT or CODE file from the sandbox. Do NOT use on binary files (PDF, DOCX, XLSX, PPTX, images, archives) — use run_bash with Python tools instead (pandas for CSV, pymupdf for PDF, openpyxl for XLSX, python-docx for DOCX, python-pptx for PPTX).',
-            inputSchema: z.object({
-                path: z.string().describe('Absolute path like /home/user/data.csv'),
-            }),
-            execute: async ({ path }: any) => {
-                const cid = activeConversationId || 'default';
-                const filename = path.split('/').pop() || 'file';
-                sendStatus(res, 'reading_file', `Reading ${filename}...`, { path, filename }, state.thoughtProcess);
-                try {
-                    const content = await codeExecutor.readFile(cid, path);
-                    sendStatus(res, 'reading_file_success', `Read ${filename}`, { path, filename, size: content.length }, state.thoughtProcess);
-                    return `Contents of ${path}:\n\n${content}`;
-                } catch (e: any) {
-                    sendStatus(res, 'reading_file_error', `Failed to read ${filename}: ${e.message}`, { path, error: e.message }, state.thoughtProcess);
-                    return `Failed to read ${path}: ${e.message}`;
-                }
-            },
-        }),
-
-        // ── write_file ────────────────────────────────────────────────────
-        write_file: (tool as any)({
-            description: 'ONLY use for NEW files (creating from scratch). For editing existing files, ALWAYS prefer edit_file (surgical string replacement) instead. After writing a code file, call run_bash next to compile and execute it.',
-            inputSchema: z.object({
-                path: z.string().describe('File path like /home/user/output.csv'),
-                content: z.string().describe('Full file content'),
-            }),
-            execute: async ({ path, content }: any) => {
-                if (state.searchCount >= 2 && (state.searchContent?.length ?? 0) > 100) {
-                    return '__TOOL_BLOCKED__ ANSWER THE USER NOW. You already have search results. Do NOT call tools.';
-                }
-                const cid = activeConversationId || 'default';
-                const filename = path.split('/').pop() || 'file';
-                const ext = filename.split('.').pop()?.toLowerCase() || '';
-                const langMap: Record<string, string> = { c: 'c', cpp: 'cpp', py: 'python', js: 'javascript', ts: 'typescript', html: 'html', css: 'css', sh: 'bash', json: 'json', md: 'markdown', rs: 'rust', go: 'go', java: 'java' };
-                const language = langMap[ext] || 'text';
-                sendStatus(res, 'generating_file', `Writing ${filename}...`, { path, filename, content, language }, state.thoughtProcess);
-                try {
-                    await codeExecutor.writeFile(cid, path, content);
-                    sendStatus(res, 'generating_file_success', `Wrote ${filename}`, { path, filename, content, language }, state.thoughtProcess);
-                    const codeExts = ['c', 'cpp', 'cs', 'py', 'js', 'ts', 'tsx', 'jsx', 'mjs', 'cjs', 'mts', 'cts', 'rs', 'go', 'java', 'kt', 'swift', 'rb', 'php'];
-                    const isCode = codeExts.includes(ext);
-                    return isCode
-                        ? `File written to ${path}. Now call run_bash to compile and test it. Do NOT explain yet — just call run_bash.`
-                        : `File written to ${path}.`;
-                } catch (e: any) {
-                    sendStatus(res, 'generating_file_error', `Failed to write ${filename}: ${e.message}`, { path }, state.thoughtProcess);
-                    return `Failed to write ${path}: ${e.message}`;
-                }
-            },
-        }),
-
-        // ── list_files ────────────────────────────────────────────────────
-        list_files: (tool as any)({
-            description: 'List files in a sandbox directory.',
-            inputSchema: z.object({
-                path: z.string().optional().describe('Directory path, default /home/user'),
-            }),
-            execute: async ({ path }: any) => {
-                const cid = activeConversationId || 'default';
-                try {
-                    const files = await codeExecutor.listFiles(cid, path || '/home/user');
-                    return `Files in ${path || '/home/user'}:\n${files.join('\n') || '(empty)'}`;
-                } catch (e: any) {
-                    return `Failed to list files: ${e.message}`;
-                }
-            },
-        }),
-
-        // ── install_package ───────────────────────────────────────────────
-        install_package: (tool as any)({
-            description: 'Install a Python package via pip in the sandbox.',
-            inputSchema: z.object({
-                package: z.string().describe('Package name e.g. tensorflow or opencv-python'),
-            }),
-            execute: async ({ package: pkg }: any) => {
-                if (state.searchCount >= 2 && (state.searchContent?.length ?? 0) > 100) {
-                    return '__TOOL_BLOCKED__ ANSWER THE USER NOW. You already have search results. Do NOT call tools.';
-                }
-                const cid = activeConversationId || 'default';
-                sendStatus(res, 'sandbox_start', `Installing ${pkg}...`, { tool: 'install_package' }, state.thoughtProcess);
-                try {
-                    await codeExecutor.installPackage(cid, pkg || '', (type, line) => {
-                        if (!res.writableEnded) {
-                            res.write(`event: code_output\ndata: ${JSON.stringify({ type, content: line })}\n\n`);
-                        }
-                    });
-                    sendStatus(res, 'sandbox_success', `${pkg} installed`, { tool: 'install_package' }, state.thoughtProcess);
-                    return `Package ${pkg} installed successfully.`;
-                } catch (e: any) {
-                    sendStatus(res, 'sandbox_error', `Install failed: ${e.message}`, { tool: 'install_package' }, state.thoughtProcess);
-                    return `Install failed: ${e.message}`;
-                }
-            },
-        }),
-
-        // ── edit_file ─────────────────────────────────────────────────────
-        edit_file: (tool as any)({
-            description: 'Surgically edit a file by replacing the FIRST occurrence of old_str with new_str. ALWAYS read_file first to see the full content. Include enough surrounding context in old_str to make it unique. PREFER edit_file over write_file for targeted changes — only use write_file for entirely new files.',
-            inputSchema: z.object({
-                path: z.string().describe('File path'),
-                old_str: z.string().describe('EXACT string to replace (must be unique)'),
-                new_str: z.string().describe('Replacement string'),
-            }),
-            execute: async ({ path, old_str, new_str }: any) => {
-                if (state.searchCount >= 2 && (state.searchContent?.length ?? 0) > 100) {
-                    return '__TOOL_BLOCKED__ ANSWER THE USER NOW. You already have search results. Do NOT call tools.';
-                }
-                const cid = activeConversationId || 'default';
-                const filename = path.split('/').pop() || 'file';
-                const addedLines = (new_str?.match(/\n/g) || []).length;
-                const removedLines = (old_str?.match(/\n/g) || []).length;
-                sendStatus(res, 'generating_file', `Editing ${filename}...`, { path, old_str: old_str.slice(0, 120), new_str: new_str.slice(0, 120), diffAdded: addedLines, diffRemoved: removedLines }, state.thoughtProcess);
-                try {
-                    const result = await codeExecutor.editFile(cid, path, old_str || '', new_str || '');
-                    if (result.success) {
-                        sendStatus(res, 'generating_file_success', `Edited ${filename}`, { path, old_str: old_str.slice(0, 120), new_str: new_str.slice(0, 120), diffAdded: addedLines, diffRemoved: removedLines }, state.thoughtProcess);
-                        return `File ${path} edited successfully. After editing code, call run_bash to re-compile and re-run to verify the fix.`;
-                    }
-                    sendStatus(res, 'generating_file_error', `Edit failed on ${filename}: ${result.error}`, { path }, state.thoughtProcess);
-                    return `Edit failed: ${result.error} -- read the file and try edit_file again with more surrounding context so the old_str is unique.`;
-                } catch (e: any) {
-                    sendStatus(res, 'generating_file_error', `Edit failed on ${filename}: ${e.message}`, { path }, state.thoughtProcess);
-                    return `Edit failed: ${e.message}`;
-                }
-            },
-        }),
-
+        ...createFileTools(ctx),
         // ── wiki_search ───────────────────────────────────────────────────
         wiki_search: (tool as any)({
             description: 'Search the knowledge graph / wiki for concepts, entities, and topics extracted from this conversation. Returns related nodes and their relationships. Use this when the user asks about topics or concepts previously discussed. May only be called ONCE per query.',
