@@ -102,6 +102,10 @@ import { getDomain, getUrlTitle } from './http/util/url';
 import { tavilyClient } from './services/search/tavily';
 import { createFluxTools } from './agents/tools/factory';
 import { withToolTimeout, TOOL_TIMEOUTS } from './agents/tools/timeout';
+import { createDiagnosticsRouter } from './http/routes/diagnostics';
+import { createIntegrationsRouter } from './http/routes/integrations';
+import type { RoutesContext } from './http/routes/context';
+import { availableModels } from './http/routes/catalog';
 import { extractDocxText, extractPdf } from './services/pdf/extract';
 import { processLargeDocument } from './services/documents/chunks';
 import { sanitizeLocation, sanitizeTitle } from './http/util/sanitize';
@@ -117,7 +121,23 @@ import { checkSsrFree } from './services/net/ssrf';
 
 assertEnv();
 
+// /health needs a secret. Failing at boot beats answering 404 forever.
+if (!env.HEALTH_SECRET && !isSmoke) {
+    throw new Error('FATAL: Missing HEALTH_SECRET environment variable.');
+}
+
 const app = express();
+
+/** Collaborators the route modules receive instead of reaching into this file. */
+const routesContext: RoutesContext = {
+    env,
+    isSmoke,
+    healthSecret: env.HEALTH_SECRET ?? '',
+    prisma,
+    toolRegistry,
+    resolvePermission,
+    availableModels,
+};
 
 applySecurityMiddleware(app);
 // ── SSE connection tracking & token re-validation ─────────
@@ -134,87 +154,8 @@ function broadcastSyncEvent(supabaseUserId: string, payload: SyncEvent) {
   });
 }
 
-// ─── DIAGNOSTICS & SYSTEM ──────────────────────────────────
-// ── Google OAuth callback (no auth middleware — called by Google redirect) ──
-app.get('/api/integrations/google/callback', handleGoogleCallback);
-
-app.get("/ping", (req, res) => {
-    res.json({ status: "ok", time: new Date().toISOString() });
-});
-
-// ── Google OAuth protected routes ──────────────────────────────────
-app.post('/api/integrations/google/init', middleware, initGoogleAuth);
-app.get('/api/integrations/google/status', middleware, getGoogleStatus);
-app.post('/api/integrations/google/disconnect', middleware, disconnectGoogle);
-
-app.get("/whoami", middleware, (req, res) => {
-    console.log(`[WHOAMI] Request from ${req.appUserId}`);
-    res.json({
-        appUserId: req.appUserId,
-        supabaseUserId: req.userId,
-        email: req.authUser?.email
-    });
-});
-
-// ── Skill file registry & generic endpoint ─────────────────────────────────
-// Add a filename here to expose a new skill; names not in this map are rejected.
-const SKILL_FILES: Record<string, string> = {
-    pdf: "pdf-skill.md",
-    pptx: "pptx-skill.md",
-    docx: "docx-skill.md",
-    xlsx: "xlsx-skill.md",
-    csv: "csv-skill.md",
-    tsv: "tsv-skill.md",
-    md: "md-skill.md",
-    json: "json-skill.md",
-    sql: "sql-skill.md",
-    html: "html-skill.md",
-    tech: "tech-writer-skill.md",
-    finance: "finance-skill.md",
-    coder: "coder-skill.md",
-    creative: "creative-skill.md",
-    legal: "legal-skill.md",
-};
-
-app.get('/skills/:name', (req, res) => {
-    const safeName = (req.params.name as string).replace(/[^a-z0-9-]/g, '').slice(0, 80);
-    if (!safeName) return res.status(400).send('# Invalid\n');
-    const p = path.join(__dirname, 'skills', `${safeName}.md`);
-    if (!fs.existsSync(p)) return res.status(404).send('# Not found\n');
-    res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
-    res.sendFile(p);
-});
-
-// ── Health check ────────────────────────────────────────────
-if (!env.HEALTH_SECRET && !isSmoke) {
-    throw new Error("FATAL: Missing HEALTH_SECRET environment variable.");
-}
-const HEALTH_SECRET = env.HEALTH_SECRET ?? '';
-
-app.get("/health", async (req, res) => {
-    if (isSmoke) return res.status(200).json({ status: "ok", db: "skipped", mode: "smoke" });
-
-    const provided = req.headers['x-health-secret'];
-    if (typeof provided !== 'string') return res.status(404).send('Not Found');
-
-    const pb = Buffer.from(provided);
-    const sb = Buffer.from(HEALTH_SECRET);
-    if (pb.length !== sb.length || !crypto.timingSafeEqual(pb, sb)) {
-        return res.status(404).send('Not Found');
-    }
-    try {
-        await prisma.$queryRaw`SELECT 1`;
-        res.status(200).json({ status: "ok", db: "connected" });
-    } catch (e) {
-        console.error("Health check failed:", e);
-        res.status(503).json({ status: "degraded", db: "disconnected" });
-    }
-});
-
-// ── Tool registry API ──────────────────────────────────────
-app.get('/api/tools', (req, res) => {
-    res.json({ tools: toolRegistry.getToolList() });
-});
+app.use(createDiagnosticsRouter(routesContext));
+app.use(createIntegrationsRouter());
 
 // Sanitisation helpers live in http/util/sanitize.ts
 // Model catalog, selection and fallback live in agents/model-router.ts
@@ -315,15 +256,6 @@ async function autoRenameConversation(
 // Pending permissions live in agents/permissions.ts
 
 // Permission approval endpoint
-app.post('/api/permissions/respond', middleware, async (req: any, res: any) => {
-    const { id, approved } = req.body || {};
-    if (!id) return res.status(400).json({ error: 'Missing permission id' });
-    const outcome = resolvePermission(id, req.appUserId!, approved);
-    if (outcome === 'not_found') return res.status(404).json({ error: 'Permission request not found or expired' });
-    if (outcome === 'forbidden') return res.status(403).json({ error: 'Not your permission request' });
-    res.json({ success: true });
-});
-
 function cleanAnswerChunk(text: string): string {
     if (!text) return "";
     let cleaned = text;
@@ -3573,41 +3505,7 @@ app.get("/preview", middleware, async (req: any, res: any) => {
     }
 });
 
-// ── MODEL DISCOVERY ──────────────────────────────────────────
-const AVAILABLE_MODELS = [
-    {
-        category: "General Purpose", models: [
-            { id: "mistral-large-675b", label: "Mistral Large 3 675B (Mistral AI)" },
-            { id: "glm-5.2", label: "GLM 5.2 (Z‑AI)" },
-            { id: "kimi-k2.6", label: "Kimi K2.6 (Moonshot AI)" },
-            { id: "nemotron-3-ultra-550b", label: "Nemotron 3 Ultra 550B (NVIDIA)" },
-            { id: "mistral-medium-3.5-128b", label: "Mistral Medium 3.5 128B (Mistral AI)" },
-            { id: "nemotron-3-super-120b-a12b", label: "Nemotron 3 Super 120B (NVIDIA)" },
-            { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash Free (DeepSeek)" },
-            { id: "qwen3.5-397b-a17b", label: "Qwen 3.5 397B (Qwen)" },
-            { id: "minimax-m2.7", label: "MiniMax M2.7 (MiniMax)" },
-            { id: "minimax-m3", label: "MiniMax M3 (MiniMax)" },
-            { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro (DeepSeek)" },
-            { id: "sarvam-m", label: "Sarvam-M (Sarvam AI)" },
-            { id: "stockmark-2-100b-instruct", label: "Stockmark 2 100B (Stockmark)" },
-            { id: "nemotron-nano-12b-v2-vl", label: "Nemotron Nano 12B v2 VL (NVIDIA)" },
-            { id: "laguna-xs-2.1", label: "Laguna XS 2.1 (Poolside)" },
-            { id: "sarvamai", label: "Sarvamai (Sarvamai)" },
-        ]
-    },
-    {
-        category: "Reasoning & Agents", models: [
-            { id: "step-3.7-flash", label: "Step 3.7 Flash (StepFun)" },
-            { id: "step-3.5-flash", label: "Step 3.5 Flash (StepFun)" },
-            { id: "nemotron-3-nano-omni-30b-a3b-reasoning", label: "Nemotron 3 Nano Omni 30B Reasoning (NVIDIA)" },
-            { id: "inkling", label: "Inkling (Thinking Machines)" },
-        ]
-    },
-];
-
-app.get("/api/models", (_req, res) => {
-    res.json({ categories: AVAILABLE_MODELS, all: AVAILABLE_MODELS.flatMap((c) => c.models) });
-});
+// Model discovery lives in http/routes/diagnostics.ts
 
 // ── OPENAI-COMPATIBLE CHAT COMPLETIONS (opencode connector) ──
 const openAICompatLimiter = rateLimit({
