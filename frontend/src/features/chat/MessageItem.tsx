@@ -105,7 +105,8 @@ type MessageItemProps = {
 import { TimelineNode, ThoughtBlock } from "./ThoughtBlock";
 import StatusMessage from "./StatusMessage";
 import PermissionDialog from "./PermissionDialog";
-import { MessageRenderer, InlineMath } from "./MessageRenderer";
+import { MessageRenderer } from "./MessageRenderer";
+import { InlineMath } from "./MathRenderer";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 

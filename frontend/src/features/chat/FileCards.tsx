@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { X, Trash2 } from "lucide-react";
 import { FileDownloadButton } from "../content/FileDownloadButton";
-import { MessageRenderer, InlineMath } from "./MessageRenderer";
+import { MessageRenderer } from "./MessageRenderer";
+import { InlineMath } from "./MathRenderer";
 import { BACKEND_URL } from "../../lib/config";
 import { createClient } from "../../lib/client";
 import { getDomain, rewriteSandboxUrls } from "../../lib/chat-utils";
