@@ -1,4 +1,1 @@
-index.ts(5998,43): error TS2820: Type '"conversation_updated"' is not assignable to type '"conversation_created" | "conversation_deleted" | "message_created" | "message_deleted" | "settings_updated"'. Did you mean '"conversation_created"'?
-index.ts(6532,41): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
-  Type 'undefined' is not assignable to type 'string'.
 openai-compat.ts(55,24): error TS2532: Object is possibly 'undefined'.
