@@ -1,5 +1,5 @@
 import { MessageSquare, X } from "lucide-react";
-import type { ConversationListItem } from "../types";
+import type { ConversationListItem } from "../../types";
 import { SidebarThread } from "./SidebarThread";
 
 interface MobileConversationListProps {

@@ -21,7 +21,7 @@ import { Copy, Check, ChevronDown, Download } from "lucide-react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 
-import type { Source } from "../types";
+import type { Source } from "../../types";
 import { getDomain, fixMalformedTags } from "../../lib/chat-utils";
 import { ChartRenderer, type ChartData } from "../content/ChartBlock";
 import { LiveWidget } from "./LiveWidget";

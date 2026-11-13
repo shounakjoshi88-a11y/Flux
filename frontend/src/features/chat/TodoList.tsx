@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import type { TodoItem } from "../types";
+import type { TodoItem } from "../../types";
 
 export default function TodoList({ items }: { items: TodoItem[] }) {
   if (!items || items.length === 0) return null;
