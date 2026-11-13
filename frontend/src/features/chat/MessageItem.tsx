@@ -99,7 +99,8 @@ type MessageItemProps = {
   conversationId?: string | null;
 };
 
-import { StatusMessage, TimelineNode, ThoughtBlock } from "./StatusMessage";
+import { TimelineNode, ThoughtBlock } from "./ThoughtBlock";
+import StatusMessage from "./StatusMessage";
 import PermissionDialog from "./PermissionDialog";
 import { MessageRenderer, InlineMath } from "./MessageRenderer";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
