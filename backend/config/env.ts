@@ -63,7 +63,6 @@ const REQUIRED_IN_PRODUCTION: (keyof Env)[] = [
     'SUPABASE_API_SECRET',
     'NIM_API_KEY',
     'TAVILY_API_KEY',
-    'HEALTH_SECRET',
 ];
 
 /** Variables strongly recommended outside production; missing means the feature is off. */
