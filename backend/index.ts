@@ -104,6 +104,8 @@ import { createFluxTools } from './agents/tools/factory';
 import { withToolTimeout, TOOL_TIMEOUTS } from './agents/tools/timeout';
 import { createDiagnosticsRouter } from './http/routes/diagnostics';
 import { createIntegrationsRouter } from './http/routes/integrations';
+import { createSandboxRouter } from './http/routes/sandbox';
+import { createWikiRouter } from './http/routes/wiki';
 import type { RoutesContext } from './http/routes/context';
 import { availableModels } from './http/routes/catalog';
 import { extractDocxText, extractPdf } from './services/pdf/extract';
@@ -137,6 +139,8 @@ const routesContext: RoutesContext = {
     toolRegistry,
     resolvePermission,
     availableModels,
+    wikiManager,
+    sandboxManager,
 };
 
 applySecurityMiddleware(app);
@@ -935,93 +939,8 @@ WHEN ASKED FOR "a demo chart" or "any chart" or "show me a chart":
 // SANDBOX / CODE INTERPRETER ROUTES
 // ═══════════════════════════════════════════════════════════
 
-app.post('/api/sandbox/upload', middleware, async (req: any, res: any) => {
-    try {
-        const uid = req.appUserId!;
-        const { conversationId, filename, content } = req.body;
-        if (!conversationId || !filename || content === undefined) {
-            return res.status(400).json({ error: 'conversationId, filename, and content required' });
-        }
-        const conv = await prisma.conversation.findFirst({ where: { id: conversationId, userId: uid }, select: { id: true } });
-        if (!conv) return res.status(404).json({ error: 'Conversation not found' });
-        const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const remotePath = await sandboxManager.uploadFile(conversationId, safeName, Buffer.from(content, 'base64'));
-        res.json({ success: true, filename: safeName, remotePath });
-    } catch (e: any) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-app.get('/api/sandbox/download/:conversationId/:filename', middleware, async (req: any, res: any) => {
-    try {
-        const uid = req.appUserId!;
-        const { conversationId, filename } = req.params;
-        const conv = await prisma.conversation.findFirst({ where: { id: conversationId, userId: uid }, select: { id: true } });
-        if (!conv) return res.status(404).json({ error: 'Conversation not found' });
-        const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const remotePath = `/home/user/${safeName}`;
-        const buffer = await sandboxManager.downloadFile(conversationId, remotePath);
-        res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
-        res.setHeader('Content-Type', 'application/octet-stream');
-        res.send(buffer);
-    } catch (e: any) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-// ═══════════════════════════════════════════════════════════
-// WIKI / KNOWLEDGE GRAPH ROUTES
-// ═══════════════════════════════════════════════════════════
-
-app.get('/api/wiki', middleware, async (req: any, res: any) => {
-    try {
-        const uid = req.appUserId!;
-        const graph = await wikiManager.getGraph(uid);
-        res.json(graph);
-    } catch (e: any) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-app.delete('/api/wiki/node/:nodeId', middleware, async (req: any, res: any) => {
-    try {
-        const uid = req.appUserId!;
-        await wikiManager.deleteNode(req.params.nodeId, uid);
-        res.json({ success: true });
-    } catch (e: any) {
-        const msg = (e as Error).message;
-        if (msg === 'Node not found') return res.status(404).json({ error: msg });
-        res.status(500).json({ error: msg });
-    }
-});
-
-app.get('/api/wiki/search', middleware, async (req: any, res: any) => {
-    try {
-        const uid = req.appUserId!;
-        const query = (req.query.q as string) || '';
-        const nodes = await wikiManager.searchConcepts(uid, query);
-        res.json(nodes);
-    } catch (e: any) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-app.get('/api/wiki/rebuild/progress', middleware, async (req: any, res: any) => {
-    const uid = req.appUserId!;
-    const progress = wikiManager.getProgress(uid);
-    res.json(progress || { phase: 'idle' });
-});
-
-app.post('/api/wiki/rebuild', middleware, async (req: any, res: any) => {
-    try {
-        const uid = req.appUserId!;
-        const result = await wikiManager.rebuildAll(uid);
-        res.json(result || { nodes: [], edges: [] });
-    } catch (e: any) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
+app.use(createSandboxRouter(routesContext));
+app.use(createWikiRouter(routesContext));
 // ── Long-running Task System ──────────────────────────────────────
 app.use(taskRouter);
 
