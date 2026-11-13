@@ -44,8 +44,11 @@ import { retrieveDocChunks } from './lib/hybrid-retrieval';
 import { toOpenAIChunk, fromOpenAITools, mapModelId, sseLine, BUILD_PROJECT_TOOL } from './openai-compat';
 import { openAICompatAuth } from './openai-auth';
 import { runMultiAgentBuild } from './orchestrator-multiagent';
+import { env, assertEnv, isSmoke } from './config/env';
 
-const client = tavily({ apiKey: process.env.TAVILY_API_KEY });
+assertEnv();
+
+const client = tavily({ apiKey: env.TAVILY_API_KEY });
 const app = express();
 
 // ── Global Request Logger ──────────────────────────────────
@@ -226,12 +229,14 @@ app.get('/skills/:name', (req, res) => {
 });
 
 // ── Health check ────────────────────────────────────────────
-if (!process.env.HEALTH_SECRET) {
+if (!env.HEALTH_SECRET && !isSmoke) {
     throw new Error("FATAL: Missing HEALTH_SECRET environment variable.");
 }
-const HEALTH_SECRET = process.env.HEALTH_SECRET;
+const HEALTH_SECRET = env.HEALTH_SECRET ?? '';
 
 app.get("/health", async (req, res) => {
+    if (isSmoke) return res.status(200).json({ status: "ok", db: "skipped", mode: "smoke" });
+
     const provided = req.headers['x-health-secret'];
     if (typeof provided !== 'string') return res.status(404).send('Not Found');
 
@@ -6736,7 +6741,7 @@ if (fs.existsSync(path.join(certPath, 'cert.pem')) && fs.existsSync(path.join(ce
 }
 
 // Seed search cache from recent DB history (non-blocking)
-(async () => {
+if (!isSmoke) (async () => {
     try {
         const { seedCacheFromHistory } = await import('./search-cache');
         const recentMsgs = await prisma.message.findMany({
@@ -6766,7 +6771,7 @@ if (fs.existsSync(path.join(certPath, 'cert.pem')) && fs.existsSync(path.join(ce
 })();
 
 // Recover any interrupted long-running tasks from previous server instances
-recoverInterruptedTasks().then(count => console.log('[TASK] Recovery pass complete'));
+if (!isSmoke) recoverInterruptedTasks().then(count => console.log('[TASK] Recovery pass complete'));
 
 // Attach Agent Protocol WebSocket handler
 createAgentWebSocket(server);
