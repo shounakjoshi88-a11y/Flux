@@ -55,3 +55,4 @@ backend/prisma/generated/
 
 # Root npm lockfile (project uses bun)
 package-lock.json
+*.err
