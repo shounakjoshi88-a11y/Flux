@@ -172,5 +172,45 @@ export function createFileTools(ctx: ToolContext) {
                 }
             },
         }),
+
+        get_generated_file: (tool as any)({
+            description:
+                'Download a file from the sandbox and return its base64-encoded content with MIME type. Use this to return files (images, PDFs, CSVs, code files, edited documents) directly to the user in chat. Call this AFTER you finish editing or generating a file the user should receive.',
+            inputSchema: z.object({
+                path: z.string().describe(
+                    'Absolute path to the file in the sandbox. For edited files use /home/user/edits/<filename>, for originals use /home/user/uploads/<filename>, for new files use /home/user/<filename>.',
+                ),
+            }),
+            execute: async ({ path }: any) => {
+                const cid = conversationKey(ctx);
+                const filename = path.split('/').pop() || 'file';
+                writer.status('generating_file', `Delivering ${filename}...`, { path, filename }, state.thoughtProcess);
+                try {
+                    const { base64, mimeType } = await codeExecutor.getGeneratedFile(cid, path);
+                    writer.file({
+                        filename,
+                        path,
+                        mime: mimeType,
+                        base64,
+                        downloadUrl: `/api/sandbox/download/${cid}/${filename}`,
+                    });
+                    writer.status(
+                        'generating_file_success',
+                        `Delivered ${filename}`,
+                        { path, filename, mime: mimeType },
+                        state.thoughtProcess,
+                    );
+                    return `File "${filename}" (${mimeType}, ${Math.round((base64.length * 0.75) / 1024)}KB) has been sent to the user. Download URL: /api/sandbox/download/${cid}/${filename}`;
+                } catch (e: any) {
+                    writer.status(
+                        'generating_file_error',
+                        `Failed to deliver ${path.split('/').pop() || 'file'}: ${e.message}`,
+                        { path, error: e.message },
+                        state.thoughtProcess,
+                    );
+                    return `Failed to get file: ${e.message}`;
+                }
+            },
+        }),
     };
 }
