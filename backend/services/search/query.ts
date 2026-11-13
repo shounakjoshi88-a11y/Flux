@@ -227,3 +227,58 @@ export function smartRewriteQuery(rawModelQuery: string, userQuery: string): str
     return finalQuery.slice(0, TAVILY_MAX);
 }
 
+
+export function isGenericQuery(q: string): boolean {
+    const clean = q.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+    const genericPatterns = [
+        /^tell me more( about (it|this|that))?$/i,
+        /^can you tell me more( about (it|this|that))?$/i,
+        /^could you tell me more( about (it|this|that))?$/i,
+        /^elaborate( further| more)?$/i,
+        /^can you elaborate( further| more)?$/i,
+        /^please elaborate( further| more)?$/i,
+        /^explain( further| more)?$/i,
+        /^give me more details$/i,
+        /^more details$/i,
+        /^what else$/i,
+        /^continue$/i,
+        /^go on$/i,
+        /^what do you mean$/i,
+        /^(why|how|what|more|tell)$/i,
+        /^can you tell( (me|us))? (in detail|more)/i,
+        /^(tell|explain|elaborate|expand) (me|us)? (more|further|in detail)/i,
+        /^what about (it|this|that|the)/i,
+        /^i'd like to know (more|further)/i,
+    ];
+    return genericPatterns.some(pat => pat.test(clean));
+}
+
+/** Returns true if the user's message is a generic follow-up that
+ *  doesn't contain the topic itself. In this case we trust the model's
+ *  own generated query rather than requiring token overlap. */
+export function isFollowUpQuery(q: string): boolean {
+    const clean = q.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+    return [
+        /^can you tell( (me|us))? in detail/i,
+        /^can you tell( (me|us))? more/i,
+        /^can you (explain|elaborate|expand)( (further|more))?/i,
+        /^(tell|explain|elaborate|expand) (me|us)? (more|further|in detail)/i,
+        /^what about (it|this|that|the)/i,
+        /^tell (me|us) (more|about)/i,
+        /^i'd like to know (more|further)/i,
+    ].some(p => p.test(clean));
+}
+
+// ── Query relevance guard ──────────────────────────────────────────
+// Prevents the model from searching for topics completely unrelated
+// to what the user actually asked (hallucination guard).
+// Query relevance and rewriting live in services/search/query.ts
+
+export function deriveSearchQuery(query: string): string {
+    return query
+        .replace(/^(?:what(?:'s| is| are| was| were)|how (?:do|does|did|can|to|about)|why (?:is|does|are|did)|when (?:is|was|did|will)|where (?:is|are|can|do)|who (?:is|are|was|were)|can you|please|tell me(?: about)?|explain|i want to know|i need to know|i'm looking for|give me|show me|find me|do you know)\s+/i, '')
+        .replace(/\?+$/, '')
+        .trim()
+        .slice(0, 200) || query.slice(0, 200);
+}
+

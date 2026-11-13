@@ -71,10 +71,15 @@ import {
     extractEntityQuery,
     extractProperNouns,
     extractTokens,
+    isFollowUpQuery,
+    isGenericQuery,
     isQueryRelevant,
     smartRewriteQuery,
+    deriveSearchQuery,
     STOPWORDS,
 } from './services/search/query';
+import { fetchWeatherFromAPI } from './services/weather';
+import type { AgentState } from './agents/tools/state';
 import { checkSsrFree } from './services/net/ssrf';
 
 assertEnv();
@@ -1190,127 +1195,7 @@ WHEN ASKED FOR "a demo chart" or "any chart" or "show me a chart":
 `;
 
 // ── Weather helpers ──────────────────────────────────────────────────────
-async function geocodeCity(city: string): Promise<{ lat: number; lon: number; displayName: string } | null> {
-    try {
-        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1`;
-        const r = await fetch(url, { headers: { 'User-Agent': 'FluxApp/1.0' } });
-        if (!r.ok) return null;
-        const d = await r.json() as any[];
-        if (!d.length) return null;
-        const result = d[0]!;
-        return { lat: parseFloat(result.lat), lon: parseFloat(result.lon), displayName: result.display_name?.split(',')[0] ?? city };
-    } catch { return null; }
-}
-
-function wmoDescription(code: number): string {
-    if (code === 0) return 'clear sky';
-    if (code <= 3) return 'partly cloudy';
-    if (code <= 9) return 'foggy';
-    if (code <= 19) return 'drizzle';
-    if (code <= 29) return 'rain';
-    if (code <= 39) return 'snow';
-    if (code <= 49) return 'fog';
-    if (code <= 59) return 'drizzle';
-    if (code <= 69) return 'rain';
-    if (code <= 79) return 'snow';
-    if (code <= 84) return 'rain showers';
-    if (code <= 94) return 'thunderstorm';
-    return 'heavy thunderstorm';
-}
-
-interface WeatherResult {
-    temperature: number; feelsLike: number; humidity: number;
-    windSpeed: number; description: string; resolvedCity: string;
-    source: "OpenWeatherMap" | "Open-Meteo";
-}
-
-const OW_KEY = process.env.OPENWEATHER_API_KEY;
-
-async function fetchWeatherFromOpenWeatherMap(city: string): Promise<WeatherResult | null> {
-    if (!OW_KEY) return null;
-    try {
-        const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${OW_KEY}&units=metric`;
-        const r = await fetch(url);
-        if (!r.ok) { console.warn(`[WEATHER] OpenWeatherMap error ${r.status} for: ${city}`); return null; }
-        const d = await r.json() as any;
-        if (!d?.main?.temp) return null;
-        return {
-            temperature: Math.round(d.main.temp * 10) / 10,
-            feelsLike: Math.round(d.main.feels_like * 10) / 10,
-            humidity: d.main.humidity ?? 0,
-            windSpeed: Math.round((d.wind?.speed ?? 0) * 3.6 * 10) / 10,
-            description: d.weather?.[0]?.description ?? 'unknown',
-            resolvedCity: d.name + (d.sys?.country ? `, ${d.sys.country}` : ''),
-            source: "OpenWeatherMap",
-        };
-    } catch (e) { console.error('[WEATHER] OpenWeatherMap fetch error:', e); return null; }
-}
-
-async function fetchWeatherFromOpenMeteo(city: string): Promise<WeatherResult | null> {
-    try {
-        const geo = await geocodeCity(city);
-        if (!geo) { console.warn(`[WEATHER] Geocode failed for: ${city}`); return null; }
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${geo.lat}&longitude=${geo.lon}` +
-            `&current=temperature_2m,apparent_temperature,relativehumidity_2m,windspeed_10m,weathercode&timezone=auto`;
-        const r = await fetch(url);
-        if (!r.ok) { console.warn(`[WEATHER] Open-Meteo error ${r.status}`); return null; }
-        const d = await r.json() as any;
-        const c = d.current;
-        if (c?.temperature_2m === undefined) return null;
-        return {
-            temperature: Math.round(c.temperature_2m * 10) / 10,
-            feelsLike: Math.round(c.apparent_temperature * 10) / 10,
-            humidity: c.relativehumidity_2m ?? 0,
-            windSpeed: Math.round(c.windspeed_10m * 10) / 10,
-            description: wmoDescription(c.weathercode ?? 0),
-            resolvedCity: geo.displayName,
-            source: "Open-Meteo",
-        };
-    } catch (e) { console.error('[WEATHER] Open-Meteo fetch error:', e); return null; }
-}
-
-async function fetchWeatherFromAPI(city: string): Promise<WeatherResult | null> {
-    const owm = await fetchWeatherFromOpenWeatherMap(city);
-    if (owm) return owm;
-    console.info('[WEATHER] Falling back to Open-Meteo for:', city);
-    return fetchWeatherFromOpenMeteo(city);
-}
-
-function extractCityFromQuery(query: string): string | null {
-    const q = query.slice(0, 200);
-    const T = "temp[a-z]{1,5}tur[ae]?";
-    const W = `(?:weather|${T}|forecast|rain|sunny|cloudy|wind(?:y)?)`;
-    const WF = `(?:weather|${T}|forecast)`;
-    const patterns = [
-        new RegExp(`${W}\\s+(?:in|for|at|of)\\s+((?:[A-Za-z]+(?:\\s+[A-Za-z]+){0,2}))`, 'i'),
-        new RegExp(`current\\s+(?:weather|${T})\\s+(?:in|for|at)?\\s*((?:[A-Za-z]+(?:\\s+[A-Za-z]+){0,2}))`, 'i'),
-        new RegExp(`(?:in|at|for)\\s+((?:[A-Za-z]+(?:\\s+[A-Za-z]+){0,2}))\\s+${WF}`, 'i'),
-        new RegExp(`${WF}\\s+((?:[A-Za-z]+(?:\\s+[A-Za-z]+){0,2}))`, 'i'),
-        new RegExp(`((?:[A-Za-z]+(?:\\s+[A-Za-z]+){0,2}))\\s+${WF}`, 'i'),
-    ];
-    const stopWords = /^(the|current|today|now|outside|here|local|right|what|is|how)$/i;
-    for (const p of patterns) {
-        const m = q.match(p);
-        if (m?.[1]) {
-            const city = m[1].trim();
-            const firstWord = city.split(' ')[0] || "";
-            if (firstWord && !stopWords.test(firstWord)) return city;
-        }
-    }
-    return null;
-}
-
-function deriveSearchQuery(query: string): string {
-    return query
-        .replace(/^(?:what(?:'s| is| are| was| were)|how (?:do|does|did|can|to|about)|why (?:is|does|are|did)|when (?:is|was|did|will)|where (?:is|are|can|do)|who (?:is|are|was|were)|can you|please|tell me(?: about)?|explain|i want to know|i need to know|i'm looking for|give me|show me|find me|do you know)\s+/i, '')
-        .replace(/\?+$/, '')
-        .trim()
-        .slice(0, 200) || query.slice(0, 200);
-}
-
-const wrapUser = (label: string, content: string) =>
-    `[USER_INPUT - ${label}]\n${content}\n[/USER_INPUT]`;
-
+// Weather helpers live in services/weather/
 // ─── Document intent detection ──────────────────────────────────────────────
 type DocType = 'pptx' | 'docx' | 'pdf' | 'xlsx' | 'csv' | 'tsv' | 'md' | 'json' | 'sql' | 'html' | 'tech' | 'finance' | 'coder' | 'creative' | 'legal' | null;
 
@@ -2043,61 +1928,7 @@ async function generateDocumentWithSkill(
 }
 
 // ── PER-REQUEST AGENT STATE ────────────────────────────────────────────────
-interface AgentState {
-    sources: { url: string; index: number }[];
-    generatedFiles: any[];
-    thoughtProcess: any[];
-    searchContent?: string;
-    searchCount: number;
-    wikiSearchCount: number;
-    weatherDone?: boolean;
-}
-
-function isGenericQuery(q: string): boolean {
-    const clean = q.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
-    const genericPatterns = [
-        /^tell me more( about (it|this|that))?$/i,
-        /^can you tell me more( about (it|this|that))?$/i,
-        /^could you tell me more( about (it|this|that))?$/i,
-        /^elaborate( further| more)?$/i,
-        /^can you elaborate( further| more)?$/i,
-        /^please elaborate( further| more)?$/i,
-        /^explain( further| more)?$/i,
-        /^give me more details$/i,
-        /^more details$/i,
-        /^what else$/i,
-        /^continue$/i,
-        /^go on$/i,
-        /^what do you mean$/i,
-        /^(why|how|what|more|tell)$/i,
-        /^can you tell( (me|us))? (in detail|more)/i,
-        /^(tell|explain|elaborate|expand) (me|us)? (more|further|in detail)/i,
-        /^what about (it|this|that|the)/i,
-        /^i'd like to know (more|further)/i,
-    ];
-    return genericPatterns.some(pat => pat.test(clean));
-}
-
-/** Returns true if the user's message is a generic follow-up that
- *  doesn't contain the topic itself. In this case we trust the model's
- *  own generated query rather than requiring token overlap. */
-function isFollowUpQuery(q: string): boolean {
-    const clean = q.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
-    return [
-        /^can you tell( (me|us))? in detail/i,
-        /^can you tell( (me|us))? more/i,
-        /^can you (explain|elaborate|expand)( (further|more))?/i,
-        /^(tell|explain|elaborate|expand) (me|us)? (more|further|in detail)/i,
-        /^what about (it|this|that|the)/i,
-        /^tell (me|us) (more|about)/i,
-        /^i'd like to know (more|further)/i,
-    ].some(p => p.test(clean));
-}
-
-// ── Query relevance guard ──────────────────────────────────────────
-// Prevents the model from searching for topics completely unrelated
-// to what the user actually asked (hallucination guard).
-// Query relevance and rewriting live in services/search/query.ts
+// AgentState lives in agents/tools/state.ts
 // ── TOOL FACTORY ───────────────────────────────────────────────────────────
 // Creates all 5 tools scoped to the current request (has access to res + state).
 // Wraps a tool's execute with a hard timeout (graceful degradation — returns error msg, doesn't hang)
