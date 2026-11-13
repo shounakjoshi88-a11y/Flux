@@ -42,6 +42,7 @@ import AgentStatusBar from "../features/agent/AgentStatusBar";
 import TeamPanel from "../features/agent/TeamPanel";
 import CustomAgentsPanel from "../features/agent/CustomAgentsPanel";
 import { useTheme } from "../hooks/useTheme";
+import { slugifyFriendly } from "../utils/slugify";
 import { useSessionRevocationListener } from "../hooks/useSessionRevocationListener";
 import { useSync } from "../hooks/useSync";
 import type {
@@ -66,16 +67,6 @@ type GeneratedFile = {
   sections?: { heading: string; body: string }[];
   pages?: { text: string }[];
 };
-
-function slugifyFriendly(input: string) {
-  return input
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .slice(0, 80) || `conv-${Date.now()}`;
-}
 
 export default function Dashboard() {
   const navigate = useNavigate();
