@@ -97,6 +97,9 @@ import { createWeatherTools } from './agents/tools/weather';
 import { createImageTools } from './agents/tools/images';
 import { createWikiTools } from './agents/tools/wiki';
 import { createResearchTools } from './agents/tools/research';
+import { createSearchTools } from './agents/tools/search';
+import { getDomain, getUrlTitle } from './http/util/url';
+import { tavilyClient } from './services/search/tavily';
 import { extractDocxText, extractPdf } from './services/pdf/extract';
 import { processLargeDocument } from './services/documents/chunks';
 import { sanitizeLocation, sanitizeTitle } from './http/util/sanitize';
@@ -112,7 +115,6 @@ import { checkSsrFree } from './services/net/ssrf';
 
 assertEnv();
 
-const client = tavily({ apiKey: env.TAVILY_API_KEY });
 const app = express();
 
 applySecurityMiddleware(app);
@@ -301,34 +303,6 @@ async function autoRenameConversation(
             console.warn("Failed to auto-rename conversation:", err?.message ?? err);
         }
     }
-}
-
-function getDomain(url: string): string {
-    try {
-        const { hostname } = new URL(url);
-        return hostname.replace(/^www\./, '');
-    } catch { return url; }
-}
-
-function getUrlTitle(url: string): string {
-    try {
-        const { pathname, hostname } = new URL(url);
-        const segments = pathname.replace(/\/+$/, '').split('/').filter(Boolean);
-        // Take the last meaningful path segment (file name or last folder)
-        let candidate = segments.pop() || '';
-        // Remove file extensions
-        candidate = candidate.replace(/\.(html?|php|asp|aspx|jsp|shtml)$/i, '');
-        // Decode URL encoding
-        candidate = decodeURIComponent(candidate);
-        // Replace hyphens/underscores with spaces and capitalize words
-        candidate = candidate.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
-        if (candidate.length > 4) {
-            return candidate.split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-        }
-        // If path gave nothing useful, use hostname
-        const host = hostname.replace(/^www\./, '');
-        return host.split('.').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-    } catch { return url; }
 }
 
 // SSE writers live in http/sse/writers.ts
@@ -1061,271 +1035,7 @@ function createFluxTools(res: any, model: any, state: AgentState, userQuery?: st
     };
 
     return {
-
-        // ── web_search ────────────────────────────────────────────────────
-        web_search: (tool as any)({
-            description:
-                'Search the web to retrieve LIVE, CURRENT data (recent news, events, facts). ' +
-                'MAX 2 CALLS TOTAL. After 2 searches, answer immediately. Further calls will be blocked. ' +
-                'Your training data is from 2024-2025 — this tool returns FRESH results from the present day. ' +
-                'CRITICAL: After this tool returns, IGNORE what your training data says and answer ONLY from these results. ' +
-                'Always include the current year/month in your query. ' +
-                'Do NOT use for general knowledge, logic, math, or basic greetings. ' +
-                'Call this tool SILENTLY — no preamble. Never say "The user is asking me to" or "Let me search". Just call the tool directly. ' +
-                'The query MUST be directly related to the user\'s topic.',
-            inputSchema: z.object({
-                query: z.string().describe(
-                    'TARGETED search (6–10 words). Extract KEY ENTITIES only: specific names, topics, years. ' +
-                    'NEVER include instruction words (search for, find, tell me), filler (information about), or verification words (true, false, verify). ' +
-                    'Example: "Statue Unity tour packages Nagpur prices 2026". ' +
-                    'Example: "Meta cancelling AI projects 2026". ' +
-                    'Example: "RBU Nagpur Btech CSE 2nd year courses 2026". ' +
-                    'Should look like a browser search bar query, not a sentence. Always append current year.'
-                ),
-                queries: z.array(z.string()).describe(
-                    'MAX 3 parallel queries max (each targeted, same rules as query). ' +
-                    'Only use for multi-part questions needing separate angles. ' +
-                    'Example: "tours Nagpur to Statue of Unity prices" + "Kevadiya Statue Unity entry ticket 2026".'
-                ).optional(),
-            }),
-                execute: async ({ query, queries: queriesArr }: any) => {
-                // ── Re-search guard: max 1 auto + 1 re-search before blocking ──
-                if (state.searchCount >= 2) {
-                    console.warn(`[TOOL] web_search blocked (already searched ${state.searchCount}x)`);
-                    const blockedMsg = `__SEARCH_BLOCKED__ SEARCH LIMIT REACHED. You already performed ${state.searchCount} search(es). Do NOT call any more tools. Answer the user IMMEDIATELY using the search results already in context. If you call web_search again, your response will be discarded.`;
-                    return blockedMsg;
-                }
-
-                // Block re-search when we already have results from the first search
-                if (state.searchCount >= 1 && (state.searchContent?.length ?? 0) > 500) {
-                    console.warn(
-                        `[TOOL] web_search — re-search blocked; already have ` +
-                        `${state.searchContent!.length} chars from first search. Forcing synthesis.`
-                    );
-                    return (
-                        `__SEARCH_SKIPPED__ Already have comprehensive search results ` +
-                        `${state.searchContent!.length} chars. Answer using the information you already have.`
-                    );
-                }
-
-                // ── Skip search if query doesn't ask for factual information ──
-                if (typeof userQuery === 'string') {
-                    const uq = userQuery.trim().toLowerCase();
-                    const words = uq.split(/\s+/).filter(Boolean);
-                    const isShort = words.length < 5;
-                    const hasQuestionWord = /\b(what|who|why|how|when|where)\b/.test(uq);
-                    const hasSearchWord = /\b(find|search|look\s*up|tell me about|latest|news|explain|define|compare|vs\b|versus|tutorial|guide|review|price|cost|specs|status|how to|verify|check|confirm|validate|prove|disprove|debunk|fact.?check|legitimate|authentic|true|false|claim|rumor)\b/.test(uq);
-                    const isMetaChat = /\b(who are you|what can you|are you .{0,20}?|do you .{0,20}?)\b/.test(uq);
-                    const isPersonal = /\b(i|my|me|we)\b/.test(uq) && !hasQuestionWord && !hasSearchWord;
-                    const isSystemQuery = /\b(architecture|design|codebase|how.*(work|built|implement|structur)|your (code|design|architecture|system)|this (system|code|function|class|file|router))\b/i.test(uq);
-                    const hasEntity = /\b(university|college|institute|school|company|course|syllabus|program|department|faculty|professor|exam|admission|fee|placement)\b/i.test(uq);
-
-                    if (isSystemQuery || (!hasQuestionWord && !hasSearchWord && !hasEntity && (isShort || isMetaChat || isPersonal))) {
-                        console.log(`[TOOL] web_search skipped — not a factual query`);
-                        return `__SEARCH_SKIPPED__ Answer naturally without searching.`;
-                    }
-                }
-
-                // ── Build query list ─────────────────────────────────────────
-                // Collect model-generated queries FIRST — these get priority.
-                // Only auto-include user's full query as a LAST RESORT if model
-                // didn't generate any valid queries.
-                const queriesToRun: string[] = [];
-
-                const modelQueries: string[] = [];
-                if (Array.isArray(queriesArr) && queriesArr.length > 0) {
-                    modelQueries.push(...queriesArr.filter((q: any) => typeof q === 'string').map((q: string) => q.trim()).filter(Boolean));
-                } else if (typeof query === 'string' && query.trim()) {
-                    modelQueries.push(query.trim());
-                }
-
-                for (const mq of modelQueries) {
-                    if (userQuery && mq.toLowerCase() === userQuery?.toLowerCase()) {
-                        if (state.searchCount === 0) queriesToRun.push(mq);
-                        continue;
-                    }
-                    if (userQuery && !isFollowUpQuery(userQuery) && !isQueryRelevant(userQuery, mq)) {
-                        console.warn(`[TOOL] web_search dropped hallucinated query — model query "${mq}" has no relation to user query "${userQuery}"`);
-                        continue;
-                    }
-                    queriesToRun.push(mq);
-                }
-
-                // Fallback: only add user's raw query if model generated nothing
-                if (queriesToRun.length === 0 && state.searchCount === 0 && typeof userQuery === 'string' && userQuery.trim()) {
-                    queriesToRun.push(userQuery.trim());
-                }
-
-                // Rewrite each query: strip instruction echo, extract key entities,
-                // add year for time-sensitive queries, smart-truncate to ≤10 words.
-                let safeQueries = queriesToRun.slice(0, 3).map(q =>
-                    smartRewriteQuery(q, userQuery ?? q)
-                );
-                // Deduplicate and remove empty/stopword-only queries
-                safeQueries = [...new Set(safeQueries.filter((q: string) => {
-                    if (q.trim().length === 0) return false;
-                    // Must have at least one meaningful (non-stopword, >=3 chars) token
-                    const meaningful = q.toLowerCase().split(/\s+/).filter(t => t.length >= 3 && !STOPWORDS.has(t));
-                    return meaningful.length > 0;
-                }))];
-
-                // No valid queries after filtering
-                if (safeQueries.length === 0) {
-                    const msg = state.searchContent
-                        ? `__SEARCH_SKIPPED__ Your search query was unrelated to the user's question. You already have search results below — answer using those instead of searching again.`
-                        : 'No search query was provided. Answer from training knowledge instead.';
-                    console.warn('[TOOL] web_search — no valid query:', msg);
-                    sendStatus(res, 'error', 'Search skipped: no valid query.', undefined, state.thoughtProcess);
-                    return msg;
-                }
-
-                const nonGeneric = safeQueries.filter(q => !isGenericQuery(q));
-                if (nonGeneric.length === 0) {
-                    const genQ = safeQueries.find(q => isGenericQuery(q));
-                    console.warn('[TOOL] web_search — all queries are generic/filler, skipping:', genQ);
-                    sendStatus(res, 'error', 'Search skipped: generic request.', undefined, state.thoughtProcess);
-                    return `Search skipped: The query is generic ('${genQ}'). Do NOT search the web for generic phrases or requests to elaborate (e.g. 'tell me more'). Instead, answer by elaborating on the information already present in the conversation history, or ask the user to specify what they want to search for.`;
-                }
-                safeQueries.length = 0;
-                safeQueries.push(...nonGeneric);
-
-                // Validation passed — this counts as a real search
-                state.searchCount++;
-
-                sendStatus(res, 'searching',
-                    `Searching for: ${safeQueries.map(q => `"${q}"`).join(', ')}...`,
-                    { query: safeQueries[0] || userQuery || '' },
-                    state.thoughtProcess);
-
-                // ── Check search cache ────────────────────────────────────────
-                const { getCached, setCache } = await import('./search-cache');
-                const cacheKey = (safeQueries[0] || userQuery || '');
-                const cached = getCached(cacheKey);
-                if (cached) {
-                    console.log(`[TOOL] Using cached search results (${cached.sources.length} sources)`);
-                    const idxOffset = state.sources.length;
-                    const withIndex = cached.sources.map((s, i) => ({ url: s.url, index: idxOffset + i + 1 }));
-                    state.sources.push(...withIndex);
-                    // Emit found_sources and reading status so the frontend shows each search cycle's steps
-                    const cachedUrls = cached.sources.map((s: any) => s.url);
-                    const cachedTitles = cached.sources.map((s: any) => s.title || getUrlTitle(s.url));
-                    sendStatus(res, 'found_sources',
-                        `Found ${cached.sources.length} source${cached.sources.length > 1 ? 's' : ''}`,
-                        { sources: cachedUrls, titles: cachedTitles, query: safeQueries[0] || userQuery || '' },
-                        state.thoughtProcess);
-                    sendStatus(res, 'reading', `Reading ${Math.min(cachedTitles.length, 7)} sources...`,
-                        { titles: cachedTitles.slice(0, 7), urls: cachedUrls.slice(0, 7) },
-                        state.thoughtProcess);
-                    const hedgeInstr = `Above are ALL search results accumulated across your searches. When answering, match your confidence to the evidence: if numbers appear in only one source, present them as estimates rather than facts. Use hedging language ("appears to", "suggests", "reportedly", "according to") — especially for claims that rely on secondary reporting. Never state an unsupported claim as settled fact. Answer now. Do NOT search again.`;
-                    if (cached.content) {
-                        state.searchContent = (state.searchContent || "") + "\n\n" + cached.content;
-                        return `[ACCUMULATED SEARCH RESULTS — ALL SEARCHES COMBINED]\n${state.searchContent}\n\n---\nINSTRUCTION: ${hedgeInstr}`;
-                    }
-                    const cacheText = cached.sources.map((s, i) =>
-                        `[${i + 1}] ${s.url}\n${(s.content || '').slice(0, 3000)}`
-                    ).join('\n\n');
-                    state.searchContent = (state.searchContent || "") + "\n\n[Search Results (cached)]\n\n" + cacheText;
-                    return `[ACCUMULATED SEARCH RESULTS — ALL SEARCHES COMBINED]\n${state.searchContent}\n\n---\nINSTRUCTION: ${hedgeInstr}`;
-                }
-
-                try {
-                    const searchPromises = safeQueries.map(q => 
-                        (client as any).search(q, {
-                            search_depth: /\b(price|cost|tour|package|hotel|restaurant|book|buy|ticket|deal|offer|rate|schedule|review|itinerary|resort|flight|train|bus)\b/i.test(q)
-                                ? 'advanced'
-                                : 'basic',
-                            max_results: 7,
-                        }).catch((err: any) => {
-                            console.error(`[TOOL] Tavily search failed for "${q}":`, err);
-                            return null;
-                        })
-                    );
-                    const searchOutputs = await Promise.all(searchPromises);
-
-                    const allResults: any[] = [];
-                    const seenUrls = new Set<string>();
-                    for (const out of searchOutputs) {
-                        if (out && Array.isArray(out.results)) {
-                            for (const r of out.results) {
-                                if (r.url && !seenUrls.has(r.url)) {
-                                    seenUrls.add(r.url);
-                                    allResults.push(r);
-                                }
-                            }
-                        }
-                    }
-
-                    const uniqueResults = allResults.slice(0, 10);
-
-                    const srcs = uniqueResults.map((r: any, i: number) => ({
-                        url: r.url,
-                        index: (state.sources?.length ?? 0) + i + 1,
-                        content: ((r.content || r.snippet || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, 400),
-                    }));
-                    state.sources.push(...srcs);
-
-                    if (!srcs.length) {
-                        sendStatus(res, 'no_results', 'No relevant results found.', undefined, state.thoughtProcess);
-                        return 'No search results found.';
-                    }
-
-                    const foundTitles = uniqueResults.slice(0, 10).map((r: any) => r.title || getUrlTitle(r.url));
-                    sendStatus(res, 'found_sources',
-                        `Found ${srcs.length} source${srcs.length > 1 ? 's' : ''}`,
-                        { sources: srcs.map((s: any) => s.url), titles: foundTitles, query: safeQueries[0] || userQuery || '' },
-                        state.thoughtProcess);
-
-                    const titles = uniqueResults.slice(0, 7).map((r: any) => r.title || getUrlTitle(r.url));
-                    const urls = uniqueResults.slice(0, 7).map((r: any) => r.url);
-                    sendStatus(res, 'reading', `Reading ${titles.length} sources...`, { titles, urls }, state.thoughtProcess);
-
-                    const resultsText = uniqueResults.map((r: any, i: number) => {
-                        let c = (r.content || r.snippet || '')
-                            .replace(/<[^>]*>/g, ' ')
-                            .replace(/\s+/g, ' ')
-                            .trim();
-                        if (c.length > 3000) c = c.slice(0, 3000) + '...';
-                        return `[${i + 1}] ${r.url}\n${r.title ? r.title + '\n' : ''}${c}`;
-                    }).join('\n\n');
-                    let extraContent = '';
-                    try {
-                        const topUrls = uniqueResults.slice(0, 3).map((r: any) => r.url).filter(Boolean);
-                        if (topUrls.length > 0) {
-                            sendStatus(res, 'extracting', 'Extracting full content from top sources...', {}, state.thoughtProcess);
-                            const extractResult = await client.extract(topUrls);
-                            const extracted = extractResult?.results?.filter((r: any) => r.rawContent) ?? [];
-                            if (extracted.length > 0) {
-                                extraContent = '\n\n--- Full page content from top sources ---\n' + extracted.map((r: any, i: number) => {
-                                    const txt = r.rawContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-                                    return `[SOURCE ${i + 1}] ${r.url || topUrls[i]}\n${txt.slice(0, 3000)}`;
-                                }).join('\n\n');
-                            }
-                        }
-                    } catch (e: any) {
-                        console.warn('[TOOL] web_search extract failed (non-fatal):', e?.message ?? e);
-                    }
-
-                    const safeQueryStr = safeQueries.join('; ');
-                    const fullSearchRes = `[Search Results for "${safeQueryStr}"]\n\n${resultsText}${extraContent}`;
-                    state.searchContent = (state.searchContent || "") + "\n\n" + fullSearchRes;
-
-                    // ── Cache search results (after building full text) ──────
-                    setCache(cacheKey, srcs, fullSearchRes);
-
-                    sendStatus(res, 'done', `Search complete: "${safeQueryStr}"`, { searchCount: state.searchCount }, state.thoughtProcess);
-
-                    return `[ACCUMULATED SEARCH RESULTS — ALL SEARCHES COMBINED]
-${state.searchContent}
-
----
-INSTRUCTION: Above are ALL search results accumulated across your searches. Use ALL of this information together to answer the user comprehensively. Match your confidence to the evidence: if numbers appear in only one source, present them as estimates rather than facts. Use hedging language ("appears to", "suggests", "reportedly", "according to") — especially for claims that rely on secondary reporting. Never state an unsupported claim as settled fact. Do NOT search again — answer now using everything above.`;
-                } catch (e: any) {
-                    sendStatus(res, 'error', 'Search failed.', undefined, state.thoughtProcess);
-                    return `Search failed: ${e.message}`;
-                }
-            },
-        }),
-
+        ...createSearchTools(ctx),
         ...createDocumentTools(ctx),
         ...createWeatherTools(ctx),
         ...createImageTools(ctx),
@@ -3717,7 +3427,7 @@ app.get("/news/search", middleware, async (req: any, res: any) => {
     console.log(`[NEWS SEARCH] query="${q}"`);
 
     try {
-        const result = await client.search(q, {
+        const result = await tavilyClient.search(q, {
             searchDepth: "basic",
             topic: "news",
             days: 3,
@@ -3763,7 +3473,7 @@ app.post("/summarize", middleware, async (req: any, res: any) => {
         if (url) {
             try {
                 console.log(`[SUMMARIZE] Attempting content extraction for: ${url}`);
-                const extractResult = await client.extract([url]);
+                const extractResult = await tavilyClient.extract([url]);
                 const firstResult = extractResult?.results?.[0];
                 if (firstResult?.rawContent) {
                     fullContent = firstResult.rawContent;
