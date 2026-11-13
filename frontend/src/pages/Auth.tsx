@@ -4,7 +4,7 @@ import { Loader2, Search, Network, Brain, Layers, ChevronDown, ArrowRight, Check
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
-import { MessageRenderer } from "../components/MessageRenderer";
+import { MessageRenderer } from "../features/chat/MessageRenderer";
 import "../../styles/dashboard.css";
 
 // Elite smooth easing curves

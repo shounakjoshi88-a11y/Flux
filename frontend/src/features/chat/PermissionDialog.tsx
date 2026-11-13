@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, Check, X, AlertTriangle } from "lucide-react";
-import { BACKEND_URL } from "../lib/config";
-import { createClient } from "../lib/client";
+import { BACKEND_URL } from "../../lib/config";
+import { createClient } from "../../lib/client";
 import type { PermissionRequest } from "../types";
 
 let _supabase: ReturnType<typeof createClient> | null = null;

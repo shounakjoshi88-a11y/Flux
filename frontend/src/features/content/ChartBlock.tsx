@@ -4,7 +4,7 @@
 // that the model embeds inside its answers.
 
 import { useMemo, useState, useEffect, useRef } from "react";
-import { fixMalformedTags } from "../lib/chat-utils";
+import { fixMalformedTags } from "../../lib/chat-utils";
 import {
   BarChart, Bar,
   LineChart, Line, Area, AreaChart,

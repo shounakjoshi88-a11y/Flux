@@ -2,9 +2,9 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Search, ExternalLink, RefreshCw, Clock, BookOpen } from "lucide-react";
-import { BACKEND_URL } from "../lib/config";
-import { createClient } from "../lib/client";
-import { MessageRenderer } from "./MessageRenderer";
+import { BACKEND_URL } from "../../lib/config";
+import { createClient } from "../../lib/client";
+import { MessageRenderer } from "../chat/MessageRenderer";
 let _supabase: ReturnType<typeof createClient> | null = null;
 function getSupabase() {
 if (!_supabase) _supabase = createClient();

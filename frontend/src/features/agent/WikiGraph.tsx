@@ -3,8 +3,8 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Text } from "@react-three/drei";
 import * as THREE from "three";
 import { X, Search, LoaderCircle, RefreshCw, AlertCircle, Network } from "lucide-react";
-import { BACKEND_URL } from "../lib/config";
-import { createClient } from "../lib/client";
+import { BACKEND_URL } from "../../lib/config";
+import { createClient } from "../../lib/client";
 
 let _supabase: ReturnType<typeof createClient> | null = null;
 function getSupabase() {
