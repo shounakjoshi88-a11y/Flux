@@ -1,6 +1,6 @@
 import { tool } from 'ai';
 import { z } from 'zod';
-import { getValidToken, getAuthenticatedClient } from './google-auth';
+import { getValidToken, getAuthenticatedClient } from './auth';
 
 function sendStatus(res: any, subtype: string, message: string) {
   if (res.writableEnded) return;

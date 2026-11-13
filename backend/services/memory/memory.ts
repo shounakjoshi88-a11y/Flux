@@ -1,8 +1,8 @@
 // backend/memory.ts
 import { generateText } from 'ai';
 import * as crypto from 'crypto';
-import { prisma } from './db/prisma';
-import { getEmbedding, getEmbeddings } from './local-embedder';
+import { prisma } from '../../db/prisma';
+import { getEmbedding, getEmbeddings } from './embedder';
 
 async function getEmbeddingVector(text: string): Promise<number[]> {
   return getEmbedding(text);

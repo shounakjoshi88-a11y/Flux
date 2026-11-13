@@ -26,7 +26,7 @@ export async function processLargeDocument(
     const chunks = chunkByHeadings(result.pages, docName);
     const embedded = await Promise.all(
         chunks.map(async (chunk) => {
-            const { getEmbedding } = await import('../../local-embedder');
+            const { getEmbedding } = await import('../../services/memory/embedder');
             const embedding = await getEmbedding(chunk.text);
             return { chunk, embedding };
         }),

@@ -10,7 +10,7 @@ import { middleware } from '../middleware/auth';
 import { checkSsrFree } from '../../services/net/ssrf';
 import { tavilyClient } from '../../services/search/tavily';
 import { getDomain } from '../../http/util/url';
-import { nim } from '../../nim-client';
+import { nim } from '../../services/models/nim-client';
 import { streamText } from 'ai';
 import { writeSafeSSE } from '../../http/sse/writers';
 import type { NewsItemType } from '../../services/news/feed';

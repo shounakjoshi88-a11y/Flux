@@ -188,7 +188,7 @@ export function createSearchTools(ctx: ToolContext) {
                 );
 
                 // Check the search cache.
-                const { getCached, setCache } = await import('../../search-cache');
+                const { getCached, setCache } = await import('../../services/search/cache');
                 const cacheKey = safeQueries[0] || userQuery || '';
                 const cached = getCached(cacheKey);
                 if (cached) {

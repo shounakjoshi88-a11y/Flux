@@ -7,7 +7,7 @@
 import { Router } from 'express';
 import * as crypto from 'crypto';
 import { middleware } from '../middleware/auth';
-import { runMultiAgentBuild } from '../../orchestrator-multiagent';
+import { runMultiAgentBuild } from '../../agents/orchestrator/multiagent';
 
 export function createMultiAgentRouter(): Router {
     const router = Router();

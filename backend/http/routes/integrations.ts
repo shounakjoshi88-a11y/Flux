@@ -11,7 +11,7 @@ import {
     handleGoogleCallback,
     getGoogleStatus,
     disconnectGoogle,
-} from '../../google-auth';
+} from '../../services/google/auth';
 
 export function createIntegrationsRouter(): Router {
     const router = Router();

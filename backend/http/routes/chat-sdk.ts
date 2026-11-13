@@ -12,10 +12,10 @@ import { sanitizeLocation } from '../../http/util/sanitize';
 import { routeModel, selectModel, getProviderOptions } from '../../agents/model-router';
 import { createFluxTools } from '../../agents/tools/factory';
 import { withToolTimeout } from '../../agents/tools/timeout';
-import { SYSTEM_PROMPT } from '../../prompt';
+import { SYSTEM_PROMPT } from '../../prompts/prompt';
 import { AGENT_SYSTEM_EXTENSION } from '../../prompts/agent-extension';
-import { retrieveMemories, buildMemoryContext } from '../../memory';
-import { nim } from '../../nim-client';
+import { retrieveMemories, buildMemoryContext } from '../../services/memory/memory';
+import { nim } from '../../services/models/nim-client';
 import { streamText, stepCountIs } from 'ai';
 import type { AgentState } from '../../agents/tools/state';
 export function createChatSdkRouter(): Router {

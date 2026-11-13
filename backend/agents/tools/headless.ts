@@ -1,9 +1,9 @@
 import { tool } from 'ai';
 import { z } from 'zod';
-import { codeExecutor } from './tools/codeExecutor';
-import { wikiManager } from './wiki/wikiManager';
-import { sandboxManager } from './sandbox/sandboxManager';
-import { createGoogleTools } from './google-tools';
+import { codeExecutor } from '../../sandbox/executor';
+import { wikiManager } from '../../services/wiki/manager';
+import { sandboxManager } from '../../sandbox/sandboxManager';
+import { createGoogleTools } from '../../services/google/tools';
 
 type StatusCallback = (event: string, data: any) => void;
 
@@ -440,7 +440,7 @@ export function createHeadlessFluxTools(
       }),
       execute: async ({ query, documentName, topK }: any) => {
         if (!uid || !query) return 'No user or query.';
-        const { retrieveDocChunks } = await import('./lib/hybrid-retrieval');
+        const { retrieveDocChunks } = await import('../../lib/hybrid-retrieval');
         const results = await retrieveDocChunks(query, uid, documentName, Math.min(topK ?? 5, 10));
         if (results.length === 0) return 'No matching sections found.';
         return results.map((r: any, i: number) => `[Section ${i + 1}]${r.heading ? ` (${r.heading})` : ''}\n${r.text}`).join('\n\n---\n\n');

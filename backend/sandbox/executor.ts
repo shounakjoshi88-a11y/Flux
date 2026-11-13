@@ -1,4 +1,4 @@
-import { sandboxManager } from '../sandbox/sandboxManager';
+import { sandboxManager } from './sandboxManager';
 
 export interface CodeExecutionResult {
   stdout: string[];

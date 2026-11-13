@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import * as crypto from 'crypto';
-import { prisma } from './db/prisma';
+import { prisma } from '../../db/prisma';
 
 const OAUTH_STATE_TTL = 10 * 60 * 1000;
 const oauthStateStore = new Map<string, { userId: string; expiresAt: number }>();

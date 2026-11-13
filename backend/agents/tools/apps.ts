@@ -8,7 +8,7 @@
  */
 import { tool } from 'ai';
 import { z } from 'zod';
-import { codeExecutor } from '../../tools/codeExecutor';
+import { codeExecutor } from '../../sandbox/executor';
 import { conversationKey, shouldBlockFurtherTools, TOOL_BLOCKED_MESSAGE } from './context';
 import type { ToolContext } from './context';
 

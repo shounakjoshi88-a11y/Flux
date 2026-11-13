@@ -12,8 +12,8 @@ import * as path from 'path';
 import { isSmoke } from './config/env';
 import { prisma } from './db/prisma';
 import { Prisma } from './prisma/generated/client';
-import { createAgentWebSocket } from './agent-protocol';
-import { recoverInterruptedTasks } from './task-routes';
+import { createAgentWebSocket } from './agents/protocol';
+import { recoverInterruptedTasks } from './agents/task/routes';
 import { createApp } from './app';
 
 export async function startServer(): Promise<void> {
@@ -40,7 +40,7 @@ export async function startServer(): Promise<void> {
     if (!isSmoke) {
         (async () => {
             try {
-                const { seedCacheFromHistory } = await import('./search-cache');
+                const { seedCacheFromHistory } = await import('./services/search/cache');
                 const recentMsgs = await prisma.message.findMany({
                     where: { sources: { not: Prisma.DbNull }, role: 'Assistant' },
                     orderBy: { createdAt: 'desc' },

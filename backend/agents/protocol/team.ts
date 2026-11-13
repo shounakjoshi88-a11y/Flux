@@ -1,8 +1,8 @@
 // Team/Leader-Teammate orchestration — real execution via NVIDIA NIM
 import { generateText } from 'ai';
-import { nim } from '../nim-client';
+import { nim } from '../../services/models/nim-client';
 import { AgentSession, sessionRegistry } from "./session";
-import { toolRegistry } from '../tool-registry';
+import { toolRegistry } from '../tools/registry';
 import type {
   AgentSessionConfig,
   AgentMessage,

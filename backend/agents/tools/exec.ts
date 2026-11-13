@@ -8,7 +8,7 @@
  */
 import { tool } from 'ai';
 import { z } from 'zod';
-import { codeExecutor } from '../../tools/codeExecutor';
+import { codeExecutor } from '../../sandbox/executor';
 import { conversationKey } from './context';
 import type { ToolContext } from './context';
 

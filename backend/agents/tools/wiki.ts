@@ -6,7 +6,7 @@
  */
 import { tool } from 'ai';
 import { z } from 'zod';
-import { wikiManager } from '../../wiki/wikiManager';
+import { wikiManager } from '../../services/wiki/manager';
 import { shouldBlockFurtherTools } from './context';
 import type { ToolContext } from './context';
 
