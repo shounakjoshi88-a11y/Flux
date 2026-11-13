@@ -1,0 +1,318 @@
+{
+  "generatedAt": "2026-11-13T11:06:36.931Z",
+  "total": 44,
+  "unique": 43,
+  "duplicates": [
+    {
+      "key": "GET /news",
+      "at": [
+        "backend/index.ts:4225",
+        "backend/index.ts:6212"
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "key": "DELETE /api/agents/custom/:id",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:6723"
+      ]
+    },
+    {
+      "key": "DELETE /api/wiki/node/:nodeId",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:3915"
+      ]
+    },
+    {
+      "key": "DELETE /conversations/:conversationId",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:5952"
+      ]
+    },
+    {
+      "key": "DELETE /conversations/:conversationId/messages/:messageId",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:5926"
+      ]
+    },
+    {
+      "key": "DELETE /memories/:id",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:4207"
+      ]
+    },
+    {
+      "key": "GET /api/acp/capabilities",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:6652"
+      ]
+    },
+    {
+      "key": "GET /api/agents/custom",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:6707"
+      ]
+    },
+    {
+      "key": "GET /api/assets/:messageId/:type/:index",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:4046"
+      ]
+    },
+    {
+      "key": "GET /api/integrations/google/callback",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:182"
+      ]
+    },
+    {
+      "key": "GET /api/integrations/google/status",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:190"
+      ]
+    },
+    {
+      "key": "GET /api/models",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:6509"
+      ]
+    },
+    {
+      "key": "GET /api/sandbox/download/:conversationId/:filename",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:3884"
+      ]
+    },
+    {
+      "key": "GET /api/tools",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:258"
+      ]
+    },
+    {
+      "key": "GET /api/wiki",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:3905"
+      ]
+    },
+    {
+      "key": "GET /api/wiki/rebuild/progress",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:3938"
+      ]
+    },
+    {
+      "key": "GET /api/wiki/search",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:3927"
+      ]
+    },
+    {
+      "key": "GET /artifacts",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:4101"
+      ]
+    },
+    {
+      "key": "GET /conversations",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:3961"
+      ]
+    },
+    {
+      "key": "GET /conversations/search",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:4080"
+      ]
+    },
+    {
+      "key": "GET /health",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:237"
+      ]
+    },
+    {
+      "key": "GET /memories",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:4186"
+      ]
+    },
+    {
+      "key": "GET /news",
+      "count": 2,
+      "occurrences": [
+        "backend/index.ts:4225",
+        "backend/index.ts:6212"
+      ]
+    },
+    {
+      "key": "GET /news/search",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:6243"
+      ]
+    },
+    {
+      "key": "GET /ping",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:184"
+      ]
+    },
+    {
+      "key": "GET /preview",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:6442"
+      ]
+    },
+    {
+      "key": "GET /proxy",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:6351"
+      ]
+    },
+    {
+      "key": "GET /skills/:name",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:222"
+      ]
+    },
+    {
+      "key": "GET /whoami",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:193"
+      ]
+    },
+    {
+      "key": "PATCH /conversations/:conversationId",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:5977"
+      ]
+    },
+    {
+      "key": "POST /api/agents/custom",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:6711"
+      ]
+    },
+    {
+      "key": "POST /api/chat-sdk",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:5816"
+      ]
+    },
+    {
+      "key": "POST /api/integrations/google/disconnect",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:191"
+      ]
+    },
+    {
+      "key": "POST /api/integrations/google/init",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:189"
+      ]
+    },
+    {
+      "key": "POST /api/multiagent-build",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:6623"
+      ]
+    },
+    {
+      "key": "POST /api/permissions/respond",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:785"
+      ]
+    },
+    {
+      "key": "POST /api/sandbox/upload",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:3867"
+      ]
+    },
+    {
+      "key": "POST /api/tts/local",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:6007"
+      ]
+    },
+    {
+      "key": "POST /api/wiki/rebuild",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:3944"
+      ]
+    },
+    {
+      "key": "POST /conversation/:conversationId",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:3989"
+      ]
+    },
+    {
+      "key": "POST /conversations/new",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:3977"
+      ]
+    },
+    {
+      "key": "POST /flux_ask",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:4324"
+      ]
+    },
+    {
+      "key": "POST /summarize",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:6277"
+      ]
+    },
+    {
+      "key": "POST /v1/chat/completions",
+      "count": 1,
+      "occurrences": [
+        "backend/index.ts:6521"
+      ]
+    }
+  ]
+}
