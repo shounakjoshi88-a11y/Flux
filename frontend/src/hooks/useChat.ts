@@ -818,10 +818,10 @@ export function useChat(user: any) {
             }
             // ─── TEXT ANSWER (default) ───────────────
             else {
-              clearInitialStatus();
               if (data === "[DONE]") continue;
               assistantRawRef.current += data;
               textAccumRef.current += data;
+              if (textAccumRef.current.trim().length > 0) clearInitialStatus();
             }
 
             // ─── Update assistant message ───
