@@ -100,6 +100,8 @@ import { createResearchTools } from './agents/tools/research';
 import { createSearchTools } from './agents/tools/search';
 import { getDomain, getUrlTitle } from './http/util/url';
 import { tavilyClient } from './services/search/tavily';
+import { createFluxTools } from './agents/tools/factory';
+import { withToolTimeout, TOOL_TIMEOUTS } from './agents/tools/timeout';
 import { extractDocxText, extractPdf } from './services/pdf/extract';
 import { processLargeDocument } from './services/documents/chunks';
 import { sanitizeLocation, sanitizeTitle } from './http/util/sanitize';
@@ -995,56 +997,6 @@ WHEN ASKED FOR "a demo chart" or "any chart" or "show me a chart":
 // ─── Document generation ──────────────────────────────────────────────────
 
 // Document generation lives in services/documents/generate.ts
-// ── TOOL FACTORY ───────────────────────────────────────────────────────────
-// Creates all 5 tools scoped to the current request (has access to res + state).
-// Wraps a tool's execute with a hard timeout (graceful degradation — returns error msg, doesn't hang)
-function withToolTimeout(tools: Record<string, any>, timeouts: Record<string, number>): void {
-    for (const [name, timeoutMs] of Object.entries(timeouts)) {
-        const tool = tools[name];
-        if (!tool || !tool.execute || typeof tool.execute !== 'function') continue;
-        const originalExecute = tool.execute;
-        tool.execute = async (args: any) => {
-            const ctrl = new AbortController();
-            const timer = setTimeout(() => { ctrl.abort(); }, timeoutMs);
-            try {
-                return await Promise.race([
-                    originalExecute(args),
-                    new Promise<never>((_, reject) =>
-                        ctrl.signal.addEventListener('abort', () =>
-                            reject(new Error(`Tool "${name}" timed out after ${timeoutMs}ms`))
-                        )
-                    ),
-                ]);
-            } finally {
-                clearTimeout(timer);
-            }
-        };
-    }
-}
-
-function createFluxTools(res: any, model: any, state: AgentState, userQuery?: string, activeConversationId?: string, uid?: string, abortSignal?: AbortSignal) {
-    const ctx: ToolContext = {
-        res,
-        writer: writerFor(res),
-        model,
-        state,
-        userQuery,
-        activeConversationId,
-        uid,
-        abortSignal,
-    };
-
-    return {
-        ...createSearchTools(ctx),
-        ...createDocumentTools(ctx),
-        ...createWeatherTools(ctx),
-        ...createImageTools(ctx),
-        ...createExecTools(ctx),
-        ...createFileTools(ctx),
-        ...createWikiTools(ctx),
-        ...createResearchTools(ctx),
-    };
-}
 
 // PDF and DOCX extraction live in services/pdf/extract.ts
 // ═══════════════════════════════════════════════════════════
@@ -1873,38 +1825,6 @@ IMPORTANT: After step 3, ALL subsequent operations use /home/user/edits/. Never 
             }
         }
 
-        // ── Apply per-tool timeouts so no single tool can hang the response ──
-        const TOOL_TIMEOUTS: Record<string, number> = {
-            web_search: 30_000,
-            read_skill: 10_000,
-            generate_document: 60_000,
-            get_weather: 10_000,
-            generate_image: 90_000,
-            wiki_search: 10_000,
-            read_url: 10_000,
-            run_bash: 60_000,
-            run_python: 60_000,
-            shell_execute: 30_000,
-            create_project: 30_000,
-            start_app: 30_000,
-            stop_app: 10_000,
-            list_apps: 10_000,
-            get_app_logs: 10_000,
-            get_app_url: 10_000,
-            get_generated_file: 10_000,
-            file_list: 10_000,
-            file_read: 10_000,
-            file_write: 10_000,
-            gmail_search: 30_000,
-            gmail_read: 30_000,
-            gmail_send: 30_000,
-            gmail_list_threads: 30_000,
-            calendar_list_events: 30_000,
-            calendar_create_event: 30_000,
-            drive_search_files: 30_000,
-            drive_read_file: 30_000,
-            drive_list_folder: 30_000,
-        };
         withToolTimeout(tools, TOOL_TIMEOUTS);
 
         // ── StreamWriter adapter for orchestrator ──────────────────────────
