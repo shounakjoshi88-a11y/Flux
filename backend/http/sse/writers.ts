@@ -101,6 +101,12 @@ export function sendFileGenerated(res: any, payload: {
     res.write(`event: file_generated\ndata: ${JSON.stringify(payload)}\n\n`);
 }
 
+/** A generated document, pushed to the client so it can offer a download. */
+export function sendFile(res: any, payload: any): void {
+    if (res.writableEnded) return;
+    res.write(`event: file\ndata: ${JSON.stringify(payload)}\n\n`);
+}
+
 /**
  * A writer bound to one response, for code that should not know about Express.
  * This is the seam tools will move onto: same behaviour, no `res` in the signature.
@@ -122,6 +128,8 @@ export interface StreamWriter {
         base64?: string;
         downloadUrl?: string;
     }): void;
+    /** A generated document, pushed to the client so it can offer a download. */
+    file(payload: any): void;
     ended(): boolean;
 }
 
@@ -136,6 +144,7 @@ export function writerFor(res: any): StreamWriter {
         codeOutput: (type, content) => sendCodeOutput(res, type, content),
         codeDone: (exitCode, duration) => sendCodeDone(res, exitCode, duration),
         fileGenerated: (payload) => sendFileGenerated(res, payload),
+        file: (payload) => sendFile(res, payload),
         ended: () => Boolean(res.writableEnded),
     };
 }
