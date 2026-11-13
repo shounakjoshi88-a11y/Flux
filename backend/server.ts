@@ -73,7 +73,7 @@ export async function startServer(): Promise<void> {
         recoverInterruptedTasks().then((count) => console.log('[TASK] Recovery pass complete'));
     }
 
-    const proto = server instanceof https.Server ? 'https' : 'http';
+    const proto = fs.existsSync(path.join(certPath, 'cert.pem')) ? 'https' : 'http';
     const PORT = parseInt(process.env.PORT || '3001', 10);
     server.listen(PORT, () => {
         console.log(`Flux backend running on ${proto}://localhost:${PORT}`);
