@@ -166,3 +166,35 @@ export function getProviderOptions(modelId: string | undefined) {
     return {};
 }
 
+
+export const AVAILABLE_MODELS = [
+    {
+        category: "General Purpose", models: [
+            { id: "mistral-large-675b", label: "Mistral Large 3 675B (Mistral AI)" },
+            { id: "glm-5.2", label: "GLM 5.2 (Z‑AI)" },
+            { id: "kimi-k2.6", label: "Kimi K2.6 (Moonshot AI)" },
+            { id: "nemotron-3-ultra-550b", label: "Nemotron 3 Ultra 550B (NVIDIA)" },
+            { id: "mistral-medium-3.5-128b", label: "Mistral Medium 3.5 128B (Mistral AI)" },
+            { id: "nemotron-3-super-120b-a12b", label: "Nemotron 3 Super 120B (NVIDIA)" },
+            { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash Free (DeepSeek)" },
+            { id: "qwen3.5-397b-a17b", label: "Qwen 3.5 397B (Qwen)" },
+            { id: "minimax-m2.7", label: "MiniMax M2.7 (MiniMax)" },
+            { id: "minimax-m3", label: "MiniMax M3 (MiniMax)" },
+            { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro (DeepSeek)" },
+            { id: "sarvam-m", label: "Sarvam-M (Sarvam AI)" },
+            { id: "stockmark-2-100b-instruct", label: "Stockmark 2 100B (Stockmark)" },
+            { id: "nemotron-nano-12b-v2-vl", label: "Nemotron Nano 12B v2 VL (NVIDIA)" },
+            { id: "laguna-xs-2.1", label: "Laguna XS 2.1 (Poolside)" },
+            { id: "sarvamai", label: "Sarvamai (Sarvamai)" },
+        ]
+    },
+    {
+        category: "Reasoning & Agents", models: [
+            { id: "step-3.7-flash", label: "Step 3.7 Flash (StepFun)" },
+            { id: "step-3.5-flash", label: "Step 3.5 Flash (StepFun)" },
+            { id: "nemotron-3-nano-omni-30b-a3b-reasoning", label: "Nemotron 3 Nano Omni 30B Reasoning (NVIDIA)" },
+            { id: "inkling", label: "Inkling (Thinking Machines)" },
+        ]
+    },
+];
+
