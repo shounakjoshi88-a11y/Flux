@@ -1,9 +1,7 @@
-import { createClient } from '@supabase/supabase-js';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { SyncEvent } from './types';
+import { createSupabaseClient } from '../db/supabase';
 
-const SUPABASE_URL = process.env.SUPABASE_URL!;
-const SUPABASE_SECRET = process.env.SUPABASE_API_SECRET!;
 
 const CHANNEL_CLEANUP_MS = 5 * 60 * 1000;
 const SUBSCRIBE_TIMEOUT_MS = 5000;
@@ -11,10 +9,10 @@ const SUBSCRIBE_TIMEOUT_MS = 5000;
 export class SyncManager {
   private channels = new Map<string, { channel: RealtimeChannel; lastUsed: number }>();
   private cleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();
-  private supabase: ReturnType<typeof createClient>;
+  private supabase: ReturnType<typeof createSupabaseClient>;
 
   constructor() {
-    this.supabase = createClient(SUPABASE_URL, SUPABASE_SECRET);
+    this.supabase = createSupabaseClient();
   }
 
   async broadcast(userId: string, event: SyncEvent): Promise<void> {
