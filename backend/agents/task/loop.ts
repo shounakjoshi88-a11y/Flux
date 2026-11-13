@@ -1,9 +1,9 @@
 import { generateText, streamText, tool } from 'ai';
 import { z } from 'zod';
 import * as crypto from 'crypto';
-import { prisma } from './db/prisma';
-import { nim } from './nim-client';
-import { codeExecutor } from './tools/codeExecutor';
+import { prisma } from '../../db/prisma';
+import { nim } from '../../services/models/nim-client';
+import { codeExecutor } from '../../sandbox/executor';
 
 const HEARTBEAT_INTERVAL_MS = 10_000;
 const MAX_RETRIES_PER_STEP = 2;

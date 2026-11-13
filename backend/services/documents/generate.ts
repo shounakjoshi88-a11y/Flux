@@ -9,8 +9,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { generateText } from 'ai';
-import { buildPPTX, buildDOCX, buildPDF, buildXLSX, buildCSV, buildTSV, buildMD, buildJSON, buildSQL, buildHTML } from '../../agent-tools';
-import type { GeneratedFileResult } from '../../agent-tools';
+import { buildPPTX, buildDOCX, buildPDF, buildXLSX, buildCSV, buildTSV, buildMD, buildJSON, buildSQL, buildHTML } from '../../agents/tools/builders';
+import type { GeneratedFileResult } from '../../agents/tools/builders';
 import { sendStatus } from '../../http/sse/writers';
 import { robustParseJSON } from './json';
 import { extractTopicFromQuery } from './intent';

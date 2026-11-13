@@ -7,9 +7,9 @@
  */
 import type { Env } from '../../config/env';
 import type { prisma } from '../../db/prisma';
-import type { toolRegistry } from '../../tool-registry';
+import type { toolRegistry } from '../../agents/tools/registry';
 import type { resolvePermission } from '../../agents/permissions';
-import type { wikiManager } from '../../wiki/wikiManager';
+import type { wikiManager } from '../../services/wiki/manager';
 import type { sandboxManager } from '../../sandbox/sandboxManager';
 import type { availableModels } from './catalog';
 import type { SyncEvent } from '../../sync';

@@ -1,9 +1,9 @@
 import * as crypto from 'crypto';
 import { generateText } from 'ai';
-import { nim } from './nim-client';
-import { sandboxManager } from './sandbox/sandboxManager';
-import { runSubagent } from './subagent';
-import type { SubagentTask, SubagentResult } from './subagent';
+import { nim } from '../../services/models/nim-client';
+import { sandboxManager } from '../../sandbox/sandboxManager';
+import { runSubagent } from '../subagent';
+import type { SubagentTask, SubagentResult } from '../subagent';
 
 const MAX_SUBAGENTS = 3;
 const MAX_ITERATIONS = 2;

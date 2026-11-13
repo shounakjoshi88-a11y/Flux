@@ -1,5 +1,5 @@
 // Model selector — shared between WebSocket and REST handlers
-import { nim } from '../nim-client';
+import { nim } from '../../services/models/nim-client';
 import { isModelHealthy, recordFailure, recordSuccess, getShortTimeout } from '../model-health';
 
 const NIM_MODELS: Record<string, string> = {

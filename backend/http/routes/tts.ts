@@ -16,7 +16,7 @@ export function createTtsRouter(): Router {
             if (!text) return res.status(400).json({ error: 'text is required' });
             const safeText = text.slice(0, 5000);
 
-            const { ensureModel, findPiperBinary, synthesizeToWav } = await import('../../tts-local');
+            const { ensureModel, findPiperBinary, synthesizeToWav } = await import('../../services/tts/local');
             const piperPath = findPiperBinary();
             if (!piperPath) {
                 return res.status(500).json({

@@ -6,7 +6,7 @@
  * message when the model call fails or times out.
  */
 import { generateText } from 'ai';
-import { nim } from '../../nim-client';
+import { nim } from '../../services/models/nim-client';
 import { prisma } from '../../db/prisma';
 import { sanitizeTitle } from '../../http/util/sanitize';
 import { slugify } from '../../http/util/slug';

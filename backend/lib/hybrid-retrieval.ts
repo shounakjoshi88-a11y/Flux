@@ -1,5 +1,5 @@
 import { prisma } from "../db/prisma";
-import { getEmbedding } from "../local-embedder";
+import { getEmbedding } from "../services/memory/embedder";
 
 export interface RankedResult {
   id: string;

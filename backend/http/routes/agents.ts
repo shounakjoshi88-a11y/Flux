@@ -6,7 +6,7 @@
  * agents. State is per-process and does not survive a restart.
  */
 import { Router } from 'express';
-import { toolRegistry } from '../../tool-registry';
+import { toolRegistry } from '../../agents/tools/registry';
 
 interface CustomAgentEntry {
     id: string;

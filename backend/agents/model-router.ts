@@ -6,8 +6,8 @@
  * primary fails or times out, it walks the catalog, healthy models first, and
  * retries. routeModel picks the tier from the query.
  */
-import { nim } from '../nim-client';
-import { isModelHealthy, recordFailure, recordSuccess, getShortTimeout } from '../model-health';
+import { nim } from '../services/models/nim-client';
+import { isModelHealthy, recordFailure, recordSuccess, getShortTimeout } from './model-health';
 
 export const NIM_MODELS: Record<string, string> = {
     "llama-4-maverick": "meta/llama-4-maverick-17b-128e-instruct",
@@ -151,7 +151,7 @@ export function routeModel(preferredModel: string | undefined, query: string, pr
     wasRouted: boolean;
 } {
     try {
-        const { routeModel: rm } = require('../query-router');
+        const { routeModel: rm } = require('../services/search/query-router');
         return rm(preferredModel, query, previousQuery);
     } catch {
         return { modelId: preferredModel || "deepseek-v4-pro", tier: "power", score: 0.5, wasRouted: false };

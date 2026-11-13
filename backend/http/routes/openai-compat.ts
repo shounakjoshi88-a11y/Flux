@@ -8,13 +8,13 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { middleware } from '../middleware/auth';
-import { openAICompatAuth } from '../../openai-auth';
-import { nim } from '../../nim-client';
+import { openAICompatAuth } from '../util/openai-auth';
+import { nim } from '../../services/models/nim-client';
 import { NIM_MODELS, getProviderOptions } from '../../agents/model-router';
 import { createFluxTools } from '../../agents/tools/factory';
 import { withToolTimeout } from '../../agents/tools/timeout';
-import { mapModelId, toOpenAIChunk, fromOpenAITools, sseLine, BUILD_PROJECT_TOOL } from '../../openai-compat';
-import { runMultiAgentBuild } from '../../orchestrator-multiagent';
+import { mapModelId, toOpenAIChunk, fromOpenAITools, sseLine, BUILD_PROJECT_TOOL } from '../util/openai-compat';
+import { runMultiAgentBuild } from '../../agents/orchestrator/multiagent';
 import { streamText, tool } from 'ai';
 import { z } from 'zod';
 import * as crypto from 'crypto';

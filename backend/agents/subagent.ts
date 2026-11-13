@@ -1,7 +1,7 @@
 import { streamText, stepCountIs } from 'ai';
-import { nim } from './nim-client';
-import { sandboxManager } from './sandbox/sandboxManager';
-import { createHeadlessFluxTools } from './agent-tools-headless';
+import { nim } from '../services/models/nim-client';
+import { sandboxManager } from '../sandbox/sandboxManager';
+import { createHeadlessFluxTools } from './tools/headless';
 
 export interface SubagentTask {
   id: string;
