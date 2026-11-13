@@ -45,6 +45,8 @@ import { toOpenAIChunk, fromOpenAITools, mapModelId, sseLine, BUILD_PROJECT_TOOL
 import { openAICompatAuth } from './openai-auth';
 import { runMultiAgentBuild } from './orchestrator-multiagent';
 import { env, assertEnv, isSmoke } from './config/env';
+import { BODY_LIMIT, MAX_SSE_PER_USER, RATE_LIMITS, SSE_REVALIDATE_MS } from './config/constants';
+import { corsOptions } from './config/cors';
 
 assertEnv();
 
@@ -67,24 +69,12 @@ app.use(helmet());
 app.use(compression({ level: 6, threshold: 512 }));
 
 // ── CORS – expanded for local dev stability ─────────────────────────────
-const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173,http://localhost:3001,http://127.0.0.1:3001')
-    .split(',')
-    .map(o => o.trim());
-
-app.use(cors({
-    origin: true, // Reflect the request origin
-    exposedHeaders: ['X-Conversation-Id', 'X-Conversation-Slug'],
-    methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Conversation-Id', 'x-health-secret'],
-    credentials: true,
-}));
+app.use(cors(corsOptions));
 
 // ── Body parser with size limit ────────────────────────────
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: BODY_LIMIT }));
 
 // ── SSE connection tracking & token re-validation ─────────
-const MAX_SSE_PER_USER = 5;
-const SSE_REVALIDATE_MS = 60_000;
 const supabaseAdmin = createSupabaseClient();
 const sseConnections = new Map<string, Set<any>>();
 
@@ -158,13 +148,13 @@ async function checkSsrFree(urlStr: string): Promise<boolean> {
 }
 
 // ── Rate limiters ──────────────────────────────────────────
-const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200 });
+const globalLimiter = rateLimit(RATE_LIMITS.global);
 const aiLimiter = rateLimit({
-  windowMs: 60 * 1000, max: 10, message: { error: "Too many requests" },
+  ...RATE_LIMITS.ai,
   keyGenerator: (req: any) => req.appUserId || 'local',
 });
 const newConvLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, max: 30, message: { error: "Too many new threads" },
+  ...RATE_LIMITS.newConversation,
   keyGenerator: (req: any) => req.appUserId || 'local',
 });
 
