@@ -19,9 +19,9 @@ import {
   Play,
   Plug,
 } from "lucide-react";
-import { createClient } from "../lib/client";
-import { BACKEND_URL } from "../lib/config";
-import { usePerformance } from "../lib/performance-context";
+import { createClient } from "../../lib/client";
+import { BACKEND_URL } from "../../lib/config";
+import { usePerformance } from "../../lib/performance-context";
 
 interface SettingsProps {
   isOpen: boolean;

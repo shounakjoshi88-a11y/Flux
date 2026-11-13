@@ -11,7 +11,7 @@ import {
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import type { AttachedFile } from "@/types";
 import { marked } from "marked";
-import { usePerformance } from "../lib/performance-context";
+import { usePerformance } from "../../lib/performance-context";
 
 const ANIMATED_AUDIO_DURATIONS = [0.45, 0.5, 0.55, 0.5, 0.45];
 const ANIMATED_AUDIO_DELAYS = [0, 0.1, 0.2, 0.1, 0];

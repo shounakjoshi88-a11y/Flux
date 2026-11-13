@@ -1,7 +1,7 @@
 // src/components/Sidebar.tsx
 import { AnimatePresence, motion } from "framer-motion";
-import { BACKEND_URL } from "../lib/config";
-import { usePerformance } from "../lib/performance-context";
+import { BACKEND_URL } from "../../lib/config";
+import { usePerformance } from "../../lib/performance-context";
 import {
   ChevronDown,
   LogOut,

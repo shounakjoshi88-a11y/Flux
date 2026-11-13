@@ -24,7 +24,8 @@
 
     "paths": {
       "@renderer/hooks/*": ["./src/hooks/flux/*", "./src/hooks/*"],
-      "@renderer/components/*": ["./src/components/flux/*", "./src/components/*"],
+      "@renderer/features/*": ["./src/features/*"],
+      "@renderer/components/*": ["./src/components/*"],
       "@renderer/utils/*": ["./src/utils/flux/*", "./src/utils/*"],
       "@renderer/*": ["./src/*"],
       "@common": ["../shared/flux-common/index"],

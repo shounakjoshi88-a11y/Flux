@@ -3,9 +3,9 @@ import { useRef, useEffect } from "react";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { motion } from "framer-motion";
 import { MessageItem } from "./MessageItem";
-import { SourceCard } from "./SourceCard";
-import { getDomain } from "../lib/chat-utils";
-import { calculateReputationScore } from "../utils/ReputationScore";
+import { SourceCard } from "../content/SourceCard";
+import { getDomain } from "../../lib/chat-utils";
+import { calculateReputationScore } from "../../utils/ReputationScore";
 import type { Message, Source } from "../types";
 
 // ─── Props ──────────────────────────────────────────────────

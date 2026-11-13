@@ -55,9 +55,9 @@ import {
   X,
 } from "lucide-react";
 
-import { FileDownloadButton } from "./FileDownloadButton";
-import { CodeOutputBlock } from "./CodeOutputBlock";
-import { getDomain, rewriteSandboxUrls, fixMalformedTags } from "../lib/chat-utils";
+import { FileDownloadButton } from "../content/FileDownloadButton";
+import { CodeOutputBlock } from "../content/CodeOutputBlock";
+import { getDomain, rewriteSandboxUrls, fixMalformedTags } from "../../lib/chat-utils";
 import type { Message, MessagePart, Source } from "../types";
 
 type MessageItemProps = {
@@ -104,9 +104,9 @@ import { MessageRenderer, InlineMath } from "./MessageRenderer";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 
-import { BACKEND_URL } from "../lib/config";
-import { createClient } from "../lib/client";
-import { useIsMobile } from "../hooks/useMediaQuery";
+import { BACKEND_URL } from "../../lib/config";
+import { createClient } from "../../lib/client";
+import { useIsMobile } from "../../hooks/useMediaQuery";
 
 // ─── Code file detection ──────────────────────────────────────────────────
 const CODE_EXTENSIONS = new Set([

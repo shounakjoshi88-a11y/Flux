@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import { MessageRenderer } from "./MessageRenderer";
-import { calculateReputationScore } from "../utils/ReputationScore";
+import { calculateReputationScore } from "../../utils/ReputationScore";
 
 // ── Icons — 20×20 viewport, size-4, 1.6px stroke ───────────────────────────
 type IProps = { cls?: string };

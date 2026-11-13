@@ -2,12 +2,12 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ExternalLink, AlertTriangle, Globe, FileType, FileText, Table } from "lucide-react";
 import { useState, useEffect } from "react";
-import { PptxPreview } from "./PptxPreview";
-import { XlsxPreview } from "./XlsxPreview";
-import { MarkdownPreview } from "./MarkdownPreview";
-import { createClient } from "../lib/client";
-import { usePerformance } from "../lib/performance-context";
-import { BACKEND_URL } from "../lib/config";
+import { PptxPreview } from "../content/PptxPreview";
+import { XlsxPreview } from "../content/XlsxPreview";
+import { MarkdownPreview } from "../content/MarkdownPreview";
+import { createClient } from "../../lib/client";
+import { usePerformance } from "../../lib/performance-context";
+import { BACKEND_URL } from "../../lib/config";
 
 type PeekPanelProps = {
   url: string | null;

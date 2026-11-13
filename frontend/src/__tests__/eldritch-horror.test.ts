@@ -1,6 +1,6 @@
 import katex from "katex";
 import { describe, expect, test } from "bun:test";
-import { needsMathJax, repairLatex, convertCDtoMatrix, MACROS } from "../components/MessageRenderer.tsx";
+import { needsMathJax, repairLatex, convertCDtoMatrix, MACROS } from "../features/chat/MessageRenderer.tsx";
 
 function tryKaTeX(formula: string, display = true): boolean {
   try {
