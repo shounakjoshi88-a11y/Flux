@@ -14,9 +14,9 @@ import { z } from 'zod';
 import { OrchestratorEngine } from './orchestrator';
 import type { StreamWriter } from './orchestrator';
 import { SYSTEM_PROMPT } from './prompt';
-import { prisma } from "./db";
+import { prisma } from "./db/prisma";
 import { Prisma } from "./prisma/generated/client";
-import { middleware } from './middleware';
+import { middleware } from './http/middleware/auth';
 import { nim } from './nim-client';
 import { buildPPTX, buildDOCX, buildPDF, buildXLSX, buildCSV, buildTSV, buildMD, buildJSON, buildSQL, buildHTML } from './agent-tools';
 import type { GeneratedFileResult } from './agent-tools';
@@ -57,94 +57,24 @@ import {
     sendToolCall,
 } from './http/sse/writers';
 import { trackSseConnection } from './http/sse/connections';
+import { applySecurityMiddleware } from './http/middleware/security';
+import { aiLimiter, globalLimiter, newConvLimiter } from './http/middleware/rate-limit';
+import { detectMimeFromBase64 } from './services/files/mime';
+import { checkSsrFree } from './services/net/ssrf';
 
 assertEnv();
 
 const client = tavily({ apiKey: env.TAVILY_API_KEY });
 const app = express();
 
-// ── Global Request Logger ──────────────────────────────────
-app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} - Origin: ${req.headers.origin || 'N/A'}`);
-    next();
-});
-
-// ── Trust proxy for accurate client IP ──
-app.set('trust proxy', 1);
-
-// ── Security headers ──────────────────────────────────────
-app.use(helmet());
-
-// ── Compression (gzip/brotli) ─────────────────────────────
-app.use(compression({ level: 6, threshold: 512 }));
-
-// ── CORS – expanded for local dev stability ─────────────────────────────
-app.use(cors(corsOptions));
-
-// ── Body parser with size limit ────────────────────────────
-app.use(express.json({ limit: BODY_LIMIT }));
-
+applySecurityMiddleware(app);
 // ── SSE connection tracking & token re-validation ─────────
 // SSE connection tracking lives in http/sse/connections.ts
 
-// ── Magic byte detection ──────────────────────────────────
-const MAGIC_BYTES: [RegExp, string][] = [
-  [/^\/9j[0-9A-Za-z]/, 'image/jpeg'],
-  [/^iVBORw0KGgo/, 'image/png'],
-  [/^R0lGOD/, 'image/gif'],
-  [/^UklGR/, 'image/webp'],
-  [/^J0lEQVQ/, 'image/avif'],
-  [/^Qk0/, 'image/bmp'],
-  [/^PHN2Zy/, 'image/svg+xml'],
-  [/^JVBERi0/, 'application/pdf'],
-  [/^UEsDBBQ/, 'application/zip'],
-  [/^UEsDBBAB/, 'application/vnd.openxmlformats-officedocument'],
-  [/^UEsDBAo/, 'application/x-tar'],
-];
-function detectMimeFromBase64(b64: string): string | null {
-  const raw = b64.startsWith('data:') ? (b64.split(',')[1] || '') : b64;
-  const sig = raw.slice(0, 10);
-  for (const [pattern, mime] of MAGIC_BYTES) {
-    if (pattern.test(sig)) return mime;
-  }
-  return null;
-}
-
-// ── SSRF prevention ────────────────────────────────────────
-import * as dns from "dns";
-const PRIVATE_IP_PATTERNS = [
-  /^127\./, /^10\./, /^172\.(1[6-9]|2\d|3[01])\./, /^192\.168\./, /^169\.254\./, /^0\./, /^::1$/, /^fc00:/, /^fe80:/,
-];
-function isPrivateHostname(hostname: string): boolean {
-  const lower = hostname.toLowerCase();
-  if (lower === 'localhost' || lower === 'localhost.localdomain' || lower === '0.0.0.0') return true;
-  if (PRIVATE_IP_PATTERNS.some(p => p.test(lower))) return true;
-  return false;
-}
-async function checkSsrFree(urlStr: string): Promise<boolean> {
-  try {
-    const parsed = new URL(urlStr);
-    const hostname = parsed.hostname;
-    if (isPrivateHostname(hostname)) return false;
-    const { address } = await dns.promises.lookup(hostname, { family: 4 }).catch(() => ({ address: '' }));
-    if (address && isPrivateHostname(address)) return false;
-    return true;
-  } catch { return false; }
-}
-
+// detectMimeFromBase64 lives in services/files/mime.ts
+// SSRF helpers live in services/net/ssrf.ts
 // ── Rate limiters ──────────────────────────────────────────
-const globalLimiter = rateLimit(RATE_LIMITS.global);
-const aiLimiter = rateLimit({
-  ...RATE_LIMITS.ai,
-  keyGenerator: (req: any) => req.appUserId || 'local',
-});
-const newConvLimiter = rateLimit({
-  ...RATE_LIMITS.newConversation,
-  keyGenerator: (req: any) => req.appUserId || 'local',
-});
-
 app.use(globalLimiter);
-
 // ── Cross-device sync (Supabase Realtime Broadcast) ─────────
 function broadcastSyncEvent(supabaseUserId: string, payload: SyncEvent) {
   syncManager.broadcast(supabaseUserId, payload).catch((e: unknown) => {

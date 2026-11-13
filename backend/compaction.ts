@@ -1,6 +1,6 @@
 // backend/compaction.ts
 import { generateText } from 'ai';
-import { prisma } from './db';
+import { prisma } from './db/prisma';
 
 export async function compactConversation(
   conversationId: string,

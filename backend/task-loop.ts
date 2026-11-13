@@ -1,7 +1,7 @@
 import { generateText, streamText, tool } from 'ai';
 import { z } from 'zod';
 import * as crypto from 'crypto';
-import { prisma } from './db';
+import { prisma } from './db/prisma';
 import { nim } from './nim-client';
 import { codeExecutor } from './tools/codeExecutor';
 

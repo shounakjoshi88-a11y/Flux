@@ -1,6 +1,6 @@
 import { generateText } from 'ai';
 import { nim } from '../nim-client';
-import { prisma } from '../db';
+import { prisma } from '../db/prisma';
 
 const EXTRACT_MODEL = nim.chatModel('meta/llama-4-maverick-17b-128e-instruct');
 const CHUNK_SIZE = 3;
