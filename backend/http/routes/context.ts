@@ -12,6 +12,7 @@ import type { resolvePermission } from '../../agents/permissions';
 import type { wikiManager } from '../../wiki/wikiManager';
 import type { sandboxManager } from '../../sandbox/sandboxManager';
 import type { availableModels } from './catalog';
+import type { SyncEvent } from '../../sync';
 
 export interface RoutesContext {
     env: Env;
@@ -24,4 +25,6 @@ export interface RoutesContext {
     wikiManager: typeof wikiManager;
     sandboxManager: typeof sandboxManager;
     availableModels: typeof availableModels;
+    /** Tell other devices about a conversation change. */
+    broadcastSyncEvent: (supabaseUserId: string, payload: SyncEvent) => void;
 }
