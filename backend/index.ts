@@ -87,6 +87,7 @@ import {
     routeModel,
     getProviderOptions,
 } from './agents/model-router';
+import { resolvePermission } from './agents/permissions';
 import {
     generateDocumentWithSkill,
     fetchSkillFile,
@@ -330,60 +331,17 @@ function getUrlTitle(url: string): string {
 // File analysis helpers (used by synthesis path)
 
 // File analysis helpers live in services/files/files.ts
-// ── Permission approval store (in-memory, per-session) ────
-interface PendingPermission {
-    id: string;
-    toolName: string;
-    args: any;
-    description: string;
-    userId: string;
-    resolve: (approved: boolean) => void;
-    timestamp: number;
-}
-const pendingPermissions = new Map<string, PendingPermission>();
-const PERMISSION_TIMEOUT = 60_000; // 1 minute
-
-// Periodic cleanup of expired permissions
-setInterval(() => {
-    const now = Date.now();
-    for (const [id, perm] of pendingPermissions) {
-        if (now - perm.timestamp > PERMISSION_TIMEOUT) {
-            perm.resolve(false);
-            pendingPermissions.delete(id);
-        }
-    }
-}, 30_000);
+// Pending permissions live in agents/permissions.ts
 
 // Permission approval endpoint
 app.post('/api/permissions/respond', middleware, async (req: any, res: any) => {
-    const uid = req.appUserId!;
-    const { id, approved } = req.body as { id: string; approved: boolean };
+    const { id, approved } = req.body || {};
     if (!id) return res.status(400).json({ error: 'Missing permission id' });
-    const perm = pendingPermissions.get(id);
-    if (!perm) return res.status(404).json({ error: 'Permission request not found or expired' });
-    if (perm.userId !== uid) return res.status(403).json({ error: 'Not your permission request' });
-    perm.resolve(!!approved);
-    pendingPermissions.delete(id);
+    const outcome = resolvePermission(id, req.appUserId!, approved);
+    if (outcome === 'not_found') return res.status(404).json({ error: 'Permission request not found or expired' });
+    if (outcome === 'forbidden') return res.status(403).json({ error: 'Not your permission request' });
     res.json({ success: true });
 });
-
-function createPermissionRequest(uid: string, toolName: string, args: any, description: string): Promise<boolean> {
-    return new Promise((resolve) => {
-        const id = `perm_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        pendingPermissions.set(id, {
-            id, toolName, args, description, userId: uid,
-            resolve, timestamp: Date.now(),
-        });
-        // Auto-approve after timeout if no response (safety valve)
-        setTimeout(() => {
-            const perm = pendingPermissions.get(id);
-            if (perm) {
-                perm.resolve(true);
-                pendingPermissions.delete(id);
-            }
-        }, PERMISSION_TIMEOUT);
-    });
-}
 
 function cleanAnswerChunk(text: string): string {
     if (!text) return "";
