@@ -9,6 +9,8 @@ import type { Env } from '../../config/env';
 import type { prisma } from '../../db/prisma';
 import type { toolRegistry } from '../../tool-registry';
 import type { resolvePermission } from '../../agents/permissions';
+import type { wikiManager } from '../../wiki/wikiManager';
+import type { sandboxManager } from '../../sandbox/sandboxManager';
 import type { availableModels } from './catalog';
 
 export interface RoutesContext {
@@ -19,5 +21,7 @@ export interface RoutesContext {
     prisma: typeof prisma;
     toolRegistry: typeof toolRegistry;
     resolvePermission: typeof resolvePermission;
+    wikiManager: typeof wikiManager;
+    sandboxManager: typeof sandboxManager;
     availableModels: typeof availableModels;
 }
