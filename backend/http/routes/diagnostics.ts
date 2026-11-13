@@ -51,14 +51,18 @@ export function createDiagnosticsRouter(ctx: RoutesContext): Router {
     router.get('/health', async (req, res) => {
         if (isSmoke) return res.status(200).json({ status: 'ok', db: 'skipped', mode: 'smoke' });
 
-        const provided = req.headers['x-health-secret'];
-        if (typeof provided !== 'string') return res.status(404).send('Not Found');
+        // When no secret is configured, /health is open (dev convenience).
+        if (healthSecret) {
+            const provided = req.headers['x-health-secret'];
+            if (typeof provided !== 'string') return res.status(404).send('Not Found');
 
-        const pb = Buffer.from(provided);
-        const sb = Buffer.from(healthSecret);
-        if (pb.length !== sb.length || !crypto.timingSafeEqual(pb, sb)) {
-            return res.status(404).send('Not Found');
+            const pb = Buffer.from(provided);
+            const sb = Buffer.from(healthSecret);
+            if (pb.length !== sb.length || !crypto.timingSafeEqual(pb, sb)) {
+                return res.status(404).send('Not Found');
+            }
         }
+
         try {
             await prisma.$queryRaw`SELECT 1`;
             res.status(200).json({ status: 'ok', db: 'connected' });

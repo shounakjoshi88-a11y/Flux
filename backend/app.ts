@@ -39,11 +39,6 @@ import { createAgentsRouter } from './http/routes/agents';
 export function createApp(): express.Application {
     const app = express();
 
-    // /health needs a secret. Failing at boot beats answering 404 forever.
-    if (!env.HEALTH_SECRET && !isSmoke) {
-        throw new Error('FATAL: Missing HEALTH_SECRET environment variable.');
-    }
-
     const routesContext: RoutesContext = {
         env,
         isSmoke,
