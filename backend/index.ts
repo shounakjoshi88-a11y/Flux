@@ -92,6 +92,7 @@ import { resolvePermission } from './agents/permissions';
 import { createFileTools } from './agents/tools/files';
 import { createAppTools } from './agents/tools/apps';
 import { createExecTools } from './agents/tools/exec';
+import { createDocumentTools } from './agents/tools/documents';
 import type { ToolContext } from './agents/tools/context';
 import {
     generateDocumentWithSkill,
@@ -1326,113 +1327,7 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
             },
         }),
 
-        // ── read_skill ────────────────────────────────────────────────────
-        read_skill: (tool as any)({
-            description:
-                'Load rules for handling files or generating documents. ' +
-                'Use doc_type="file" when a user uploads a file — this is the FIRST thing you should call. ' +
-                'Use doc_type="design" for UI/styling rules on uploaded HTML/CSS files. ' +
-                'Use other doc types (pdf, docx, pptx, xlsx, etc.) before generate_document to get generation rules.',
-            inputSchema: z.object({
-                doc_type: z
-                    .enum(['pdf', 'pptx', 'docx', 'xlsx', 'csv', 'tsv', 'md', 'json', 'sql', 'html', 'tech', 'finance', 'coder', 'creative', 'legal', 'design', 'file', 'live-viz'])
-                    .describe('The skill type to load rules for'),
-            }),
-            execute: async ({ doc_type }: any) => {
-                if (state.searchCount >= 2 && (state.searchContent?.length ?? 0) > 100) {
-                    return '__TOOL_BLOCKED__ ANSWER THE USER NOW using the search results already accumulated from 3 web searches. Do NOT call read_skill or any other tool.';
-                }
-                const entry = SKILL_REGISTRY[doc_type];
-                if (!entry) {
-                    return `No skill file registered for "${doc_type}" yet. Proceed with defaults.`;
-                }
-                sendStatus(res, 'reading_skill',
-                    `Reading ${entry.label} rules...`,
-                    { docType: doc_type },
-                    state.thoughtProcess);
-                const content = await fetchSkillFile(entry.fileName);
-                if (!content) {
-                    sendStatus(res, 'reading_skill_error',
-                        `Skill file for "${doc_type}" not found on disk.`,
-                        { docType: doc_type },
-                        state.thoughtProcess);
-                    return `Skill file for "${doc_type}" not found on disk. Proceed with defaults.`;
-                }
-                sendStatus(res, 'reading_skill_success',
-                    `${entry.label} rules loaded`,
-                    { docType: doc_type },
-                    state.thoughtProcess);
-                return content;
-            },
-        }),
-
-        // ── generate_document ─────────────────────────────────────────────
-        generate_document: (tool as any)({
-            description:
-                'Generate a downloadable document file. Do NOT use this tool for requests to create charts, graphs, diagrams, or flowcharts, unless the user explicitly requested a document file format (like "create a chart PDF" or "put the chart in a Word document"). For standard chart/diagram requests, render them inline instead. ' +
-                'Always call read_skill first and pass the content here.',
-            inputSchema: z.object({
-                doc_type: z.enum(['pdf', 'pptx', 'docx', 'xlsx', 'csv', 'tsv', 'md', 'json', 'sql', 'html', 'tech', 'finance', 'coder', 'creative', 'legal']),
-                topic: z.string().describe(
-                    'The detailed topic, content, research findings, and data to be included in the document. ' +
-                    'Provide all specific facts, sections, text, questions, or answers that must be written into the document. ' +
-                    'The document generator ONLY sees this parameter, so you MUST pass all relevant content here.'
-                ),
-                skill_content: z
-                    .string()
-                    .optional()
-                    .describe('The skill file content returned by read_skill'),
-            }),
-            execute: async ({ doc_type, topic, skill_content }: any) => {
-                if (state.searchCount >= 2 && (state.searchContent?.length ?? 0) > 100) {
-                    return '__TOOL_BLOCKED__ ANSWER THE USER NOW using the search results already accumulated from 3 web searches. Do NOT call generate_document or any other tool.';
-                }
-                const safeDocType = typeof doc_type === 'string' ? doc_type : '';
-                const safeTopic = typeof topic === 'string' ? topic.trim() : '';
-                if (!safeDocType || !safeTopic) {
-                    console.warn('[TOOL] generate_document called with missing doc_type or topic');
-                    return 'Document generation failed: missing doc_type or topic. Please try again.';
-                }
-                sendStatus(res, 'generating_file',
-                    `Building your ${safeDocType.toUpperCase()} on "${safeTopic.slice(0, 30)}"...`,
-                    { docType: safeDocType, topic: safeTopic }, state.thoughtProcess);
-                const fakeQuery = `Create a ${safeDocType} about: ${safeTopic}`;
-
-                // Map persona types to md if needed for the builder
-                let actualDocType: any = safeDocType;
-                if (['tech', 'finance', 'coder', 'creative', 'legal'].includes(safeDocType)) {
-                    actualDocType = 'md';
-                }
-
-                const generatedFile = await generateDocumentWithSkill(
-                    actualDocType,
-                    fakeQuery,
-                    model,
-                    skill_content ?? '',
-                    state.searchContent ?? ''
-                );
-                if (!generatedFile) {
-                    sendStatus(res, 'generating_file_error',
-                        `Failed to generate the ${safeDocType.toUpperCase()} document.`,
-                        { docType: safeDocType },
-                        state.thoughtProcess);
-                    return `Failed to generate the ${safeDocType.toUpperCase()} document. Tell the user to try again.`;
-                }
-                state.generatedFiles.push(generatedFile);
-                if (!res.writableEnded) {
-                    res.write(`event: file\ndata: ${JSON.stringify(generatedFile)}\n\n`);
-                }
-                sendStatus(res, 'generating_file_success',
-                    `${safeDocType.toUpperCase()} "${generatedFile.filename}" ready`,
-                    { docType: safeDocType, filename: generatedFile.filename },
-                    state.thoughtProcess);
-                return (
-                    `${safeDocType.toUpperCase()} file "${generatedFile.filename}" generated successfully. ` +
-                    `Tell the user it is ready to download.`
-                );
-            },
-        }),
-
+        ...createDocumentTools(ctx),
         // ── get_weather ───────────────────────────────────────────────────
         get_weather: (tool as any)({
             description: 'Fetch real-time weather data for a specific city. ONLY call when the user explicitly asks about weather, temperature, or forecast for a location. NEVER call this when the user is asking about code, architecture, routing, classifiers, prototypes, or any technical/system topic — even if the word "weather" appears in their message as part of an example or quote. If in doubt, do NOT call this tool.',
