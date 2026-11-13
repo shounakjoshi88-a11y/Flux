@@ -91,6 +91,7 @@ import {
 import { resolvePermission } from './agents/permissions';
 import { createFileTools } from './agents/tools/files';
 import { createAppTools } from './agents/tools/apps';
+import { createExecTools } from './agents/tools/exec';
 import type { ToolContext } from './agents/tools/context';
 import {
     generateDocumentWithSkill,
@@ -1552,133 +1553,7 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
             },
         }),
 
-        // ── run_python ────────────────────────────────────────────────────
-        run_python: (tool as any)({
-            description: 'Execute Python code in an isolated sandbox. Use for data analysis, visualization, file processing, calculations. Has pandas, numpy, matplotlib, seaborn, plotly, scipy, scikit-learn pre-installed.',
-            inputSchema: z.object({
-                code: z.string().describe('Complete, runnable Python code to execute'),
-            }),
-            execute: async ({ code }: any) => {
-                // Post-search guard: if model already has search results, it should answer, not run code
-                if (state.searchCount >= 2 && (state.searchContent?.length ?? 0) > 100) {
-                    return '__TOOL_BLOCKED__ You already have substantial search results from 3 searches. ANSWER THE USER NOW using the accumulated information. Do NOT call any more tools.';
-                }
-                const cid = activeConversationId || 'default';
-                // Emit code_execution FIRST so streaming output lines have a visible container
-                if (!res.writableEnded) {
-                    res.write(`event: code_execution\ndata: ${JSON.stringify({ code: code || '', language: 'python' })}\n\n`);
-                }
-                sendStatus(res, 'sandbox_start', 'Starting Python execution...', { tool: 'run_python' }, state.thoughtProcess);
-                try {
-                    const result = await codeExecutor.runPython(cid, code || '', (type, line) => {
-                        if (!res.writableEnded) {
-                            res.write(`event: code_output\ndata: ${JSON.stringify({ type, content: line })}\n\n`);
-                        }
-                    }, abortSignal);
-                    if (!res.writableEnded) {
-                        res.write(`event: code_done\ndata: ${JSON.stringify({ exitCode: result.exitCode, duration: result.duration })}\n\n`);
-                    }
-                    for (const filePath of result.generatedFiles) {
-                        const filename = filePath.split('/').pop() || 'output';
-                        try {
-                            const { base64, mimeType } = await codeExecutor.getGeneratedFile(cid, filePath);
-                            if (!res.writableEnded) {
-                                res.write(`event: file_generated\ndata: ${JSON.stringify({ filename, path: filePath, mime: mimeType, base64, downloadUrl: `/api/sandbox/download/${cid}/${filename}` })}\n\n`);
-                            }
-                        } catch {
-                            if (!res.writableEnded) {
-                                res.write(`event: file_generated\ndata: ${JSON.stringify({ filename, path: filePath, downloadUrl: `/api/sandbox/download/${cid}/${filename}` })}\n\n`);
-                            }
-                        }
-                    }
-                    sendStatus(res, 'sandbox_success',
-                        `Python finished (exit ${result.exitCode}, ${(result.duration / 1000).toFixed(1)}s)`,
-                        {
-                            tool: 'run_python',
-                            exitCode: result.exitCode,
-                            code,
-                            stdout: result.stdout.join('\n'),
-                            stderr: result.stderr.join('\n'),
-                            duration: result.duration
-                        },
-                        state.thoughtProcess);
-                    const outFull = result.stdout.join('\n');
-                    const errFull = result.stderr.join('\n');
-                    const out = outFull.slice(0, 4000);
-                    const err = errFull.slice(0, 2000);
-                    const outTruncated = outFull.length > 4000 ? '\n[output truncated]' : '';
-                    const errTruncated = errFull.length > 2000 ? '\n[output truncated]' : '';
-                    return `Exit code: ${result.exitCode} (${(result.duration / 1000).toFixed(1)}s)\n${out ? `STDOUT:\n${out}${outTruncated}\n` : ''}${err ? `STDERR:\n${err}${errTruncated}\n` : ''}${result.generatedFiles.length ? `Generated files: ${result.generatedFiles.join(', ')} (sent to user)\n` : ''}${result.error ? `Error: ${result.error}` : ''}`;
-                } catch (e: any) {
-                    sendStatus(res, 'sandbox_error', `Python execution failed: ${e.message}`, { tool: 'run_python', code, error: e.message }, state.thoughtProcess);
-                    return `Python execution failed: ${e.message}`;
-                }
-            },
-        }),
-
-        // ── run_bash ──────────────────────────────────────────────────────
-        run_bash: (tool as any)({
-            description: 'Run a bash command in the sandbox. Used for compiling/running code (gcc, python3, node, etc.), running linters/type-checkers, and file operations. NEVER run "which", "echo", "ls", "cd", "pwd", "type", "--version", or install packages — the sandbox already has everything pre-installed. After write_file creates a code file, call this to compile and test it.',
-            inputSchema: z.object({
-                command: z.string().describe('Bash command to execute'),
-            }),
-            execute: async ({ command }: any) => {
-                if (state.searchCount >= 2 && (state.searchContent?.length ?? 0) > 100) {
-                    return '__TOOL_BLOCKED__ ANSWER THE USER NOW. You already have detailed search results from earlier searches. Do NOT call any more tools.';
-                }
-                const cid = activeConversationId || 'default';
-                // Emit code_execution FIRST so streaming output lines have a visible container
-                if (!res.writableEnded) {
-                    res.write(`event: code_execution\ndata: ${JSON.stringify({ code: command || '', language: 'bash' })}\n\n`);
-                }
-                sendStatus(res, 'sandbox_start', `$ ${(command || '').slice(0, 80)}`, { tool: 'run_bash', command }, state.thoughtProcess);
-                try {
-                    const result = await codeExecutor.runBash(cid, command || '', (type, line) => {
-                        if (!res.writableEnded) {
-                            res.write(`event: code_output\ndata: ${JSON.stringify({ type, content: line })}\n\n`);
-                        }
-                    }, abortSignal);
-                    if (!res.writableEnded) {
-                        res.write(`event: code_done\ndata: ${JSON.stringify({ exitCode: result.exitCode, duration: result.duration })}\n\n`);
-                    }
-                    for (const filePath of result.generatedFiles) {
-                        const filename = filePath.split('/').pop() || 'output';
-                        try {
-                            const { base64, mimeType } = await codeExecutor.getGeneratedFile(cid, filePath);
-                            if (!res.writableEnded) {
-                                res.write(`event: file_generated\ndata: ${JSON.stringify({ filename, path: filePath, mime: mimeType, base64, downloadUrl: `/api/sandbox/download/${cid}/${filename}` })}\n\n`);
-                            }
-                        } catch {
-                            if (!res.writableEnded) {
-                                res.write(`event: file_generated\ndata: ${JSON.stringify({ filename, path: filePath, downloadUrl: `/api/sandbox/download/${cid}/${filename}` })}\n\n`);
-                            }
-                        }
-                    }
-                    sendStatus(res, 'sandbox_success',
-                        `Bash finished (exit ${result.exitCode}, ${(result.duration / 1000).toFixed(1)}s)`,
-                        {
-                            tool: 'run_bash',
-                            exitCode: result.exitCode,
-                            command,
-                            stdout: result.stdout.join('\n'),
-                            stderr: result.stderr.join('\n'),
-                            duration: result.duration
-                        },
-                        state.thoughtProcess);
-                    const outFull = result.stdout.join('\n');
-                    const errFull = result.stderr.join('\n');
-                    const out = outFull.slice(0, 4000);
-                    const err = errFull.slice(0, 2000);
-                    const outTruncated = outFull.length > 4000 ? '\n[output truncated]' : '';
-                    const errTruncated = errFull.length > 2000 ? '\n[output truncated]' : '';
-                    return `Exit code: ${result.exitCode} (${(result.duration / 1000).toFixed(1)}s)\n${out ? `STDOUT:\n${out}${outTruncated}\n` : ''}${err ? `STDERR:\n${err}${errTruncated}\n` : ''}${result.generatedFiles.length ? `Generated files: ${result.generatedFiles.join(', ')} (sent to user)\n` : ''}`;
-                } catch (e: any) {
-                    sendStatus(res, 'sandbox_error', `Bash failed: ${e.message}`, { tool: 'run_bash', command, error: e.message }, state.thoughtProcess);
-                    return `Bash failed: ${e.message}`;
-                }
-            },
-        }),
-
+        ...createExecTools(ctx),
         ...createFileTools(ctx),
         // ── wiki_search ───────────────────────────────────────────────────
         wiki_search: (tool as any)({

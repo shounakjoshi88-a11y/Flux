@@ -77,6 +77,30 @@ export function sendCodeOutput(res: any, type: string, content: string): void {
     res.write(`event: code_output\ndata: ${JSON.stringify({ type, content })}\n\n`);
 }
 
+/** The code about to run, so the client can show a container before any output. */
+export function sendCodeExecution(res: any, code: string, language: string): void {
+    if (res.writableEnded) return;
+    res.write(`event: code_execution\ndata: ${JSON.stringify({ code, language })}\n\n`);
+}
+
+/** The command finished: exit code and wall time. */
+export function sendCodeDone(res: any, exitCode: number | undefined, duration: number | undefined): void {
+    if (res.writableEnded) return;
+    res.write(`event: code_done\ndata: ${JSON.stringify({ exitCode, duration })}\n\n`);
+}
+
+/** A file the sandbox produced, with its content inlined when it could be read. */
+export function sendFileGenerated(res: any, payload: {
+    filename: string;
+    path: string;
+    mime?: string;
+    base64?: string;
+    downloadUrl?: string;
+}): void {
+    if (res.writableEnded) return;
+    res.write(`event: file_generated\ndata: ${JSON.stringify(payload)}\n\n`);
+}
+
 /**
  * A writer bound to one response, for code that should not know about Express.
  * This is the seam tools will move onto: same behaviour, no `res` in the signature.
@@ -88,7 +112,16 @@ export interface StreamWriter {
     status(subtype: string, message: string, data?: any, track?: any[]): void;
     progress(subtype: string, progress: number, message: string, data?: any): void;
     toolCall(toolName: string, args: any, status: string, result?: any): void;
+    codeExecution(code: string, language: string): void;
     codeOutput(type: string, content: string): void;
+    codeDone(exitCode: number | undefined, duration: number | undefined): void;
+    fileGenerated(payload: {
+        filename: string;
+        path: string;
+        mime?: string;
+        base64?: string;
+        downloadUrl?: string;
+    }): void;
     ended(): boolean;
 }
 
@@ -99,7 +132,10 @@ export function writerFor(res: any): StreamWriter {
         status: (subtype, message, data, track) => sendStatus(res, subtype, message, data, track),
         progress: (subtype, progress, message, data) => sendProgress(res, subtype, progress, message, data),
         toolCall: (toolName, args, status, result) => sendToolCall(res, toolName, args, status, result),
+        codeExecution: (code, language) => sendCodeExecution(res, code, language),
         codeOutput: (type, content) => sendCodeOutput(res, type, content),
+        codeDone: (exitCode, duration) => sendCodeDone(res, exitCode, duration),
+        fileGenerated: (payload) => sendFileGenerated(res, payload),
         ended: () => Boolean(res.writableEnded),
     };
 }
