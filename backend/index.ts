@@ -98,6 +98,7 @@ import { createImageTools } from './agents/tools/images';
 import { createWikiTools } from './agents/tools/wiki';
 import { createResearchTools } from './agents/tools/research';
 import { createSearchTools } from './agents/tools/search';
+import type { NewsItemType } from './services/news/feed';
 import { getDomain, getUrlTitle } from './http/util/url';
 import { tavilyClient } from './services/search/tavily';
 import { createFluxTools } from './agents/tools/factory';
@@ -107,6 +108,7 @@ import { createIntegrationsRouter } from './http/routes/integrations';
 import { createSandboxRouter } from './http/routes/sandbox';
 import { createWikiRouter } from './http/routes/wiki';
 import { createConversationsRouter } from './http/routes/conversations';
+import { createNewsRouter } from './http/routes/news';
 import type { RoutesContext } from './http/routes/context';
 import { availableModels } from './http/routes/catalog';
 import { extractDocxText, extractPdf } from './services/pdf/extract';
@@ -951,6 +953,7 @@ app.use(taskRouter);
 // ═══════════════════════════════════════════════════════════
 
 app.use(createConversationsRouter(routesContext));
+app.use(createNewsRouter());
 
 // ─── MEMORY MANAGEMENT ──────────────────────────────────────
 app.get("/memories", middleware, async (req, res) => {
@@ -991,16 +994,7 @@ app.delete("/memories/:id", middleware, async (req, res) => {
     }
 });
 
-// ─── NEWS ───────────────────────────────────────────────────
-app.get("/news", middleware, async (req, res) => {
-    try {
-        const hn = await fetchHackerNews(12);
-        const verge = await fetchRSSCached("https://www.theverge.com/rss/index.xml", "The Verge", 8);
-        const all = [...hn, ...verge].sort((a, b) => new Date(b.publishedDate).getTime() - new Date(a.publishedDate).getTime());
-        return res.json({ news: all });
-    } catch (e) { console.error(e); return res.status(500).json({ message: "Internal server error" }); }
-});
-
+app.use(createNewsRouter());
 async function generateContextualStatusMessages(
     query: string,
     thoughtText: string,
@@ -2678,217 +2672,7 @@ app.post("/api/tts/local", middleware, async (req, res) => {
 });
 
 // ════════════════════════════════════════════════════════════
-//   NEWS — HackerNews Firebase API + RSS
-// ════════════════════════════════════════════════════════════
-
-type NewsItemType = {
-    title: string; url: string; content: string;
-    publishedDate: string; source: string;
-};
-
-function withTimeout(ms: number): AbortSignal {
-    const ctrl = new AbortController();
-    setTimeout(() => ctrl.abort(), ms);
-    return ctrl.signal;
-}
-
-const rssCache = new Map<string, { articles: NewsItemType[]; ts: number }>();
-const RSS_CACHE_TTL = 2 * 60 * 1000;
-
-async function fetchRSSCached(url: string, sourceName: string, limit = 20): Promise<NewsItemType[]> {
-    const cached = rssCache.get(url);
-    if (cached && Date.now() - cached.ts < RSS_CACHE_TTL) {
-        return cached.articles.slice(0, limit);
-    }
-    const articles = await fetchRSS(url, sourceName, limit);
-    if (articles.length > 0) rssCache.set(url, { articles, ts: Date.now() });
-    return articles;
-}
-
-async function fetchHackerNews(limit = 18): Promise<NewsItemType[]> {
-    try {
-        const idsRes = await fetch(
-            "https://hacker-news.firebaseio.com/v0/topstories.json",
-            { signal: withTimeout(8000) }
-        );
-        if (!idsRes.ok) throw new Error(`HN list: ${idsRes.status}`);
-        const ids = (await idsRes.json()) as number[];
-        const items = await Promise.allSettled(
-            ids.slice(0, limit).map(id =>
-                fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`, { signal: withTimeout(5000) })
-                    .then(r => r.ok ? r.json() : null)
-                    .catch(() => null)
-            )
-        );
-        return items
-            .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled" && !!(r.value as any)?.url)
-            .map(({ value: v }) => ({
-                title: v.title,
-                url: v.url,
-                content: `${(v.score ?? 0).toLocaleString()} points · ${v.descendants ?? 0} comments on Hacker News`,
-                publishedDate: new Date((v.time ?? Date.now() / 1000) * 1000).toISOString(),
-                source: getDomain(v.url),
-            }));
-    } catch (e) {
-        console.warn("[NEWS] HackerNews fetch failed:", (e as Error).message);
-        return [];
-    }
-}
-
-function decodeHTMLEntities(str: string): string {
-    return str
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .replace(/&#(\d+);/g, (_: string, n: string) => String.fromCharCode(parseInt(n, 10)))
-        .replace(/&#x([0-9a-f]+);/gi, (_: string, h: string) => String.fromCharCode(parseInt(h, 16)));
-}
-
-function stripHTML(str: string): string {
-    return str.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-}
-
-function extractRSSField(xml: string, tag: string): string {
-    const cdataRe = new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>`, 'i');
-    const cm = xml.match(cdataRe);
-    if (cm) return cm[1]!.trim();
-    const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i');
-    const m = xml.match(re);
-    return m ? m[1]!.trim() : '';
-}
-
-function parseRSSFeed(xml: string, defaultSource: string): NewsItemType[] {
-    const results: NewsItemType[] = [];
-    const itemRe = /<item[^>]*>([\s\S]*?)<\/item>/gi;
-    let m: RegExpExecArray | null;
-    while ((m = itemRe.exec(xml)) !== null) {
-        const item = m[1]!;
-        const title = decodeHTMLEntities(stripHTML(extractRSSField(item, 'title'))).slice(0, 200);
-        const link = extractRSSField(item, 'link') || extractRSSField(item, 'guid');
-        const pubDate = extractRSSField(item, 'pubDate');
-        const desc = decodeHTMLEntities(stripHTML(extractRSSField(item, 'description'))).slice(0, 400);
-        const srcM = item.match(/<source[^>]+url="([^"]+)"/i);
-        const source = srcM?.[1] ? getDomain(srcM[1]) : defaultSource;
-        if (!title || !link) continue;
-        try {
-            results.push({
-                title,
-                url: link,
-                content: desc || `From ${defaultSource}`,
-                publishedDate: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
-                source,
-            });
-        } catch { /* skip malformed dates */ }
-    }
-    return results;
-}
-
-async function fetchRSS(url: string, sourceName: string, limit = 20): Promise<NewsItemType[]> {
-    try {
-        const res = await fetch(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (compatible; FluxNews/2.0; +https://flux.app)',
-                'Accept': 'application/rss+xml, application/xml, text/xml, */*',
-                'Cache-Control': 'no-cache',
-            },
-            signal: withTimeout(10000),
-        });
-        if (!res.ok) throw new Error(`${sourceName}: ${res.status}`);
-        const xml = await res.text();
-        const items = parseRSSFeed(xml, sourceName).slice(0, limit);
-        console.log(`[NEWS] RSS ${sourceName} → ${items.length} items`);
-        return items;
-    } catch (e) {
-        console.warn(`[NEWS] RSS ${sourceName} failed:`, (e as Error).message);
-        return [];
-    }
-}
-
-type NewsFetcher = () => Promise<NewsItemType[]>;
-
-const BBC = 'https://feeds.bbci.co.uk/news';
-const NPR = 'https://feeds.npr.org';
-
-const CATEGORY_FETCHERS: Record<string, NewsFetcher[]> = {
-    all: [
-        () => fetchRSSCached(`${BBC}/rss.xml`, 'BBC News', 15),
-        () => fetchHackerNews(12),
-        () => fetchRSSCached(`${NPR}/1001/rss.xml`, 'NPR', 10),
-        () => fetchRSSCached('https://feeds.reuters.com/reuters/topNews', 'Reuters', 10),
-        () => fetchRSSCached('https://rss.cnn.com/rss/edition.rss', 'CNN', 10),
-    ],
-    world: [
-        () => fetchRSSCached(`${BBC}/world/rss.xml`, 'BBC World', 15),
-        () => fetchRSSCached('https://www.aljazeera.com/xml/rss/all.xml', 'Al Jazeera', 12),
-        () => fetchRSSCached('https://feeds.reuters.com/Reuters/worldNews', 'Reuters World', 10),
-    ],
-    tech: [
-        () => fetchHackerNews(20),
-        () => fetchRSSCached(`${BBC}/technology/rss.xml`, 'BBC Tech', 10),
-        () => fetchRSSCached('https://feeds.arstechnica.com/arstechnica/index', 'Ars Technica', 10),
-        () => fetchRSSCached('https://www.wired.com/feed/rss', 'Wired', 8),
-    ],
-    business: [
-        () => fetchRSSCached(`${BBC}/business/rss.xml`, 'BBC Business', 15),
-        () => fetchRSSCached(`${NPR}/1006/rss.xml`, 'NPR Economy', 10),
-        () => fetchRSSCached('https://feeds.reuters.com/reuters/businessNews', 'Reuters Business', 10),
-    ],
-    science: [
-        () => fetchRSSCached(`${BBC}/science_and_environment/rss.xml`, 'BBC Science', 15),
-        () => fetchRSSCached('https://www.sciencedaily.com/rss/all.xml', 'ScienceDaily', 10),
-        () => fetchRSSCached('https://www.nasa.gov/rss/dyn/breaking_news.rss', 'NASA', 8),
-    ],
-    politics: [
-        () => fetchRSSCached(`${BBC}/politics/rss.xml`, 'BBC Politics', 15),
-        () => fetchRSSCached(`${NPR}/1014/rss.xml`, 'NPR Politics', 10),
-        () => fetchRSSCached('https://feeds.reuters.com/Reuters/PoliticsNews', 'Reuters Politics', 10),
-    ],
-};
-
-function detectCategoryKey(query: string): string {
-    const q = (query || "").toLowerCase();
-    if (!q || /latest.*breaking|breaking.*news|top.*news/.test(q)) return "all";
-    if (/tech|technology|ai|software|digital|cyber|hack/.test(q)) return "tech";
-    if (/business|economy|finance|market|trade|stock/.test(q)) return "business";
-    if (/science|research|discovery|space|climate|biology/.test(q)) return "science";
-    if (/politic|government|election|policy|parliament|senate/.test(q)) return "politics";
-    if (/world|international|global|foreign/.test(q)) return "world";
-    return "all";
-}
-
-app.get("/news", middleware, async (req, res) => {
-    try {
-        const categoryParam = (req.query.category as string) || "";
-        const key = detectCategoryKey(categoryParam);
-        const fetchers = CATEGORY_FETCHERS[key] || CATEGORY_FETCHERS["all"]!;
-
-        const batches = await Promise.all(fetchers.map(fn => fn().catch(() => [] as NewsItemType[])));
-
-        const seen = new Set<string>();
-        const merged: NewsItemType[] = [];
-        for (const batch of batches) {
-            for (const item of batch) {
-                if (item.title && item.url && !seen.has(item.url)) {
-                    seen.add(item.url);
-                    merged.push(item);
-                }
-            }
-        }
-
-        merged.sort((a, b) =>
-            new Date(b.publishedDate).getTime() - new Date(a.publishedDate).getTime()
-        );
-
-        console.log(`[NEWS] key="${key}" sources=${fetchers.length} results=${merged.length}`);
-        res.json({ news: merged.slice(0, 30) });
-    } catch (e) {
-        console.error("[NEWS] Endpoint error:", e);
-        res.status(500).json({ message: "Failed to fetch news" });
-    }
-});
-
+// ── NEWS SEARCH ───────────────────────────────────────────────
 app.get("/news/search", middleware, async (req: any, res: any) => {
     const q = ((req.query.q as string) || "").trim();
     if (!q || q.length < 2) {
@@ -2914,7 +2698,7 @@ app.get("/news/search", middleware, async (req: any, res: any) => {
             source: r.url ? getDomain(r.url) : "Unknown",
         })).filter((a: NewsItemType) => a.title && a.url);
 
-        console.log(`[NEWS SEARCH] "${q}" → ${articles.length} results`);
+        console.log(`[NEWS SEARCH] "${q}" -> ${articles.length} results`);
         res.json({ news: articles });
     } catch (e: any) {
         console.error("[NEWS SEARCH] Error:", e?.message ?? e);
