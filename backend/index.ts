@@ -93,6 +93,9 @@ import { createFileTools } from './agents/tools/files';
 import { createAppTools } from './agents/tools/apps';
 import { createExecTools } from './agents/tools/exec';
 import { createDocumentTools } from './agents/tools/documents';
+import { createWeatherTools } from './agents/tools/weather';
+import { createImageTools } from './agents/tools/images';
+import { sanitizeLocation, sanitizeTitle } from './http/util/sanitize';
 import type { ToolContext } from './agents/tools/context';
 import {
     generateDocumentWithSkill,
@@ -205,15 +208,7 @@ app.get('/api/tools', (req, res) => {
     res.json({ tools: toolRegistry.getToolList() });
 });
 
-// ── Sanitisation helpers ───────────────────────────────────
-function sanitizeLocation(input: string): string {
-    return input.replace(/[^a-zA-Z0-9\s,.'-]/g, '').slice(0, 100);
-}
-
-function sanitizeTitle(title: string): string {
-    return title.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().slice(0, 120);
-}
-
+// Sanitisation helpers live in http/util/sanitize.ts
 // Model catalog, selection and fallback live in agents/model-router.ts
 function slugify(input: string) {
     const slug = input
@@ -1328,126 +1323,8 @@ INSTRUCTION: Above are ALL search results accumulated across your searches. Use 
         }),
 
         ...createDocumentTools(ctx),
-        // ── get_weather ───────────────────────────────────────────────────
-        get_weather: (tool as any)({
-            description: 'Fetch real-time weather data for a specific city. ONLY call when the user explicitly asks about weather, temperature, or forecast for a location. NEVER call this when the user is asking about code, architecture, routing, classifiers, prototypes, or any technical/system topic — even if the word "weather" appears in their message as part of an example or quote. If in doubt, do NOT call this tool.',
-            inputSchema: z.object({
-                city: z.string().describe('The city name to get weather for'),
-            }),
-            execute: async ({ city }: any) => {
-                if (state.searchCount >= 2 && (state.searchContent?.length ?? 0) > 100) {
-                    return '__TOOL_BLOCKED__ ANSWER THE USER NOW using the search results already accumulated from 3 web searches. Do NOT call get_weather or any other tool.';
-                }
-                const safeCity = typeof city === 'string' ? city.trim() : '';
-                if (!safeCity) {
-                    console.warn('[TOOL] get_weather called with no city');
-                    return 'No city was provided for weather lookup.';
-                }
-                // Hallucination guard: only call weather if user actually asked about weather
-                if (typeof userQuery === 'string') {
-                    const hasWeatherIntent = /\b(weather|temperature|forecast|humidity|rain|sunny|cloudy|wind|rainfall|climate|degrees)\b/i.test(userQuery);
-                    const hasSystemWords = /\b(architecture|prototype|router|codebase|classify|tier|regex|embedding|classifier|pipeline|workflow|orchestrat|diagram|query.*router|route.*model)\b/i.test(userQuery);
-                    if (!hasWeatherIntent || hasSystemWords) {
-                        console.warn(`[TOOL] get_weather skipped — ${!hasWeatherIntent ? 'no weather intent' : 'query has system/architecture context'} (called with city: ${safeCity})`);
-                        return `__SEARCH_SKIPPED__ Answer naturally without searching. The user's request has nothing to do with weather.`;
-                    }
-                }
-                if (state.weatherDone) {
-                    return `Weather already fetched for this conversation turn. Answer the user using that data.`;
-                }
-                sendStatus(res, 'weather', `Fetching weather for ${safeCity}...`, undefined, state.thoughtProcess);
-                const result = await fetchWeatherFromAPI(sanitizeLocation(safeCity));
-                if (!result) {
-                    sendStatus(res, 'weather_error', `Weather unavailable for ${safeCity}.`, undefined, state.thoughtProcess);
-                    return `Could not fetch weather for ${safeCity}.`;
-                }
-                const tempC = Math.round(result.temperature);
-                const feelsC = Math.round(result.feelsLike);
-                const tempF = Math.round((result.temperature * 9 / 5) + 32);
-                const feelsFRound = Math.round((result.feelsLike * 9 / 5) + 32);
-                sendStatus(res, 'weather_success',
-                    `${result.resolvedCity}: ${tempC}°C (${tempF}°F), ` +
-                    `feels like ${feelsC}°C (${feelsFRound}°F) — ${result.description}`,
-                    {
-                        source: result.source,
-                        city: result.resolvedCity,
-                        temperature: tempC,
-                        feelsLike: feelsC,
-                        humidity: result.humidity,
-                        windSpeed: result.windSpeed,
-                        description: result.description,
-                        tempF,
-                        feelsF: feelsFRound,
-                    },
-                    state.thoughtProcess);
-                state.weatherDone = true;
-                return `${result.resolvedCity} is ${tempC}°C (feels like ${feelsC}°C) with ${result.description}. Humidity ${result.humidity}%, wind ${result.windSpeed} km/h.`;
-            },
-        }),
-
-        // ── generate_image ────────────────────────────────────────────────
-        generate_image: (tool as any)({
-            description:
-                'Generate an AI image, illustration, photo, or artwork. ' +
-                'Use when user asks to create, draw, or generate an image. ' +
-                'Do NOT use this tool for charts, graphs, or diagrams (which should be rendered inline using CHART or MERMAID tags).',
-            inputSchema: z.object({
-                prompt: z.string().describe('Description of the image to generate'),
-            }),
-            execute: async ({ prompt }: any) => {
-                sendStatus(res, 'image_enhancing', 'Enhancing image prompt with AI...', undefined, state.thoughtProcess);
-                const enhanced = await enhanceImagePrompt(prompt, model);
-                sendStatus(res, 'image_enhancing_success', 'Image prompt enhanced', undefined, state.thoughtProcess);
-
-                const thoughtEvent = { type: 'thought', content: `Enhanced prompt: ${enhanced}` };
-                state.thoughtProcess.push(thoughtEvent);
-                res.write(
-                    `event: thought\ndata: ${JSON.stringify(thoughtEvent)}\n\n`
-                );
-                sendStatus(res, 'image_generating', 'Generating image with Bonsai...', undefined, state.thoughtProcess);
-                try {
-                    const health = await fetch(`${IMAGE_SERVICE_URL}/health`, {
-                        signal: AbortSignal.timeout(3000),
-                    }).catch(() => null);
-                    if (!health?.ok) {
-                        sendStatus(res, 'image_generating_error', 'Image service is offline.', undefined, state.thoughtProcess);
-                        return 'Image service is offline. Start it with: python image_service.py';
-                    }
-                    const imgRes = await fetch(`${IMAGE_SERVICE_URL}/generate`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: enhanced, width: 1024, height: 1024 }),
-                        signal: AbortSignal.timeout(180_000),
-                    });
-                    if (!imgRes.ok) {
-                        sendStatus(res, 'image_generating_error', `Image service error: HTTP ${imgRes.status}`, undefined, state.thoughtProcess);
-                        return `Image service error: HTTP ${imgRes.status}`;
-                    }
-                    const imgData = await imgRes.json() as any;
-                    const file = {
-                        base64: imgData.image_base64,
-                        thumbnail: imgData.thumbnail_base64,
-                        filename: `bonsai-${Date.now()}.png`,
-                        mime: 'image/png',
-                        width: imgData.width,
-                        height: imgData.height,
-                    };
-                    state.generatedFiles.push(file);
-                    if (!res.writableEnded) {
-                        res.write(`event: file\ndata: ${JSON.stringify(file)}\n\n`);
-                    }
-                    sendStatus(res, 'image_generating_success', 'Image generated successfully', undefined, state.thoughtProcess);
-                    return (
-                        `Image generated (${imgData.width}×${imgData.height}px). ` +
-                        `Tell the user the image is displayed below.`
-                    );
-                } catch (e: any) {
-                    sendStatus(res, 'image_generating_error', `Image generation failed: ${e.message}`, undefined, state.thoughtProcess);
-                    return `Image generation failed: ${e.message}`;
-                }
-            },
-        }),
-
+        ...createWeatherTools(ctx),
+        ...createImageTools(ctx),
         ...createExecTools(ctx),
         ...createFileTools(ctx),
         // ── wiki_search ───────────────────────────────────────────────────
@@ -1732,56 +1609,6 @@ async function extractDocxText(rawBuf: Buffer): Promise<string> {
         return text.slice(0, 80000) || 'No extractable text found in DOCX.';
     } catch (e: any) {
         return `Failed to parse DOCX: ${e.message}`;
-    }
-}
-
-// ═══════════════════════════════════════════════════════════
-//   IMAGE GENERATION — Bonsai Image 4B (local Python service)
-// ═══════════════════════════════════════════════════════════
-
-const IMAGE_SERVICE_URL = process.env.IMAGE_SERVICE_URL || "http://127.0.0.1:8001";
-
-function detectImageIntent(query: string): boolean {
-    const q = query.toLowerCase().trim();
-    const genVerb = /\b(generate|create|make|draw|paint|render|design|illustrate|produce|imagine|visualize|sketch|craft)\b/i;
-    const imgNoun = /\b(image|photo|photograph|picture|pic|illustration|artwork|art|painting|drawing|portrait|landscape|wallpaper|poster|logo|banner|thumbnail)\b/i;
-    if (genVerb.test(q) && imgNoun.test(q)) return true;
-    if (/^(draw|paint|sketch|illustrate)\s+(me\s+)?(a\s+|an\s+|the\s+)?\S/i.test(q)) return true;
-    return false;
-}
-
-async function enhanceImagePrompt(rawPrompt: string, model: any): Promise<string> {
-    try {
-        const { text } = await generateText({
-            model,
-            system: [
-                "You are a professional image-generation prompt engineer.",
-                "Expand the user's short request into a vivid, detailed prompt for a diffusion model.",
-                "Focus on: subject, composition, lighting, colour palette, mood, art style, and quality keywords.",
-                "Output ONLY the enhanced prompt — no preamble, no quotes, no explanations.",
-                "Target length: 60-150 words. End with: highly detailed, 8k, cinematic lighting.",
-            ].join(" "),
-            prompt: `Enhance this image prompt: "${rawPrompt}"`,
-            maxTokens: 250,
-        } as any);
-        return text.trim() || rawPrompt;
-    } catch {
-        return rawPrompt;
-    }
-}
-
-async function generateImageFollowUps(originalQuery: string, enhancedPrompt: string, model: any): Promise<string[]> {
-    try {
-        const { text } = await generateText({
-            model,
-            system: "You are a creative assistant. Generate exactly 3 short, engaging follow-up questions for a user who just generated an image. Focus on variations, edits, or related creative ideas. Output ONLY the questions wrapped in <question> tags.",
-            prompt: `User originally asked for: "${originalQuery}"\nAI enhanced it to: "${enhancedPrompt}"\nGenerate 3 follow-up questions.`,
-            maxTokens: 150,
-        } as any);
-        const matches = Array.from(text.matchAll(/<question>([\s\S]*?)<\/question>/g), m => m[1]!.trim()).filter(Boolean);
-        return matches.length >= 3 ? matches.slice(0, 3) : ["Can you generate another one with a different style?", "Make this wear a hat", "What model was used for this?"];
-    } catch {
-        return ["Can you generate another one with a different style?", "Make this wear a hat", "What model was used for this?"];
     }
 }
 

@@ -63,9 +63,24 @@ const ready = new Promise((resolve, reject) => {
     });
 });
 
+/**
+ * Shut the server down and exit.
+ *
+ * The child is killed and then waited for: on Windows, exiting while the
+ * process handle is still closing trips a libuv assertion inside Bun.
+ */
 function stop(code) {
-    try { child.kill(); } catch { /* already gone */ }
-    process.exit(code);
+    if (child.exitCode !== null || child.signalCode !== null) {
+        process.exit(code);
+    }
+    child.once('exit', () => process.exit(code));
+    try {
+        child.kill('SIGTERM');
+    } catch {
+        process.exit(code);
+    }
+    // Do not hang forever if the child ignores the signal.
+    setTimeout(() => process.exit(code), 3000).unref();
 }
 
 try {

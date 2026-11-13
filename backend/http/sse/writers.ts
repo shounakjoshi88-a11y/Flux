@@ -107,6 +107,12 @@ export function sendFile(res: any, payload: any): void {
     res.write(`event: file\ndata: ${JSON.stringify(payload)}\n\n`);
 }
 
+/** A thought the model wants the client to show, e.g. an enhanced prompt. */
+export function sendThought(res: any, content: string): void {
+    if (res.writableEnded) return;
+    res.write(`event: thought\ndata: ${JSON.stringify({ type: 'thought', content })}\n\n`);
+}
+
 /**
  * A writer bound to one response, for code that should not know about Express.
  * This is the seam tools will move onto: same behaviour, no `res` in the signature.
@@ -130,6 +136,8 @@ export interface StreamWriter {
     }): void;
     /** A generated document, pushed to the client so it can offer a download. */
     file(payload: any): void;
+    /** A thought the model wants the client to show. */
+    thought(content: string): void;
     ended(): boolean;
 }
 
@@ -145,6 +153,7 @@ export function writerFor(res: any): StreamWriter {
         codeDone: (exitCode, duration) => sendCodeDone(res, exitCode, duration),
         fileGenerated: (payload) => sendFileGenerated(res, payload),
         file: (payload) => sendFile(res, payload),
+        thought: (content) => sendThought(res, content),
         ended: () => Boolean(res.writableEnded),
     };
 }
