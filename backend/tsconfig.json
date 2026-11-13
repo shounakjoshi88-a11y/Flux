@@ -25,12 +25,8 @@
     // Some stricter flags (disabled by default)
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noPropertyAccessFromIndexSignature": false,
-
-    "paths": {
-      "@common/*": ["../shared/flux-common/*"],
-      "@host/*": ["./flux-host/*"]
-    }
+    "noPropertyAccessFromIndexSignature": false
   },
   "exclude": ["Bonsai-Image-Demo"]
 }
+
