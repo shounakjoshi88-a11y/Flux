@@ -69,15 +69,26 @@ export function sendToolCall(res: any, toolName: string, args: any, status: stri
 }
 
 /**
+ * Raw stdout/stderr lines from a sandbox command, streamed to the client as
+ * they arrive.
+ */
+export function sendCodeOutput(res: any, type: string, content: string): void {
+    if (res.writableEnded) return;
+    res.write(`event: code_output\ndata: ${JSON.stringify({ type, content })}\n\n`);
+}
+
+/**
  * A writer bound to one response, for code that should not know about Express.
  * This is the seam tools will move onto: same behaviour, no `res` in the signature.
  */
 export interface StreamWriter {
     text(content: string): void;
     replaceText(): void;
-    status(subtype: string, message: string, data?: any): void;
+    /** `track` mirrors the original signature: the event is also pushed to it. */
+    status(subtype: string, message: string, data?: any, track?: any[]): void;
     progress(subtype: string, progress: number, message: string, data?: any): void;
     toolCall(toolName: string, args: any, status: string, result?: any): void;
+    codeOutput(type: string, content: string): void;
     ended(): boolean;
 }
 
@@ -85,9 +96,10 @@ export function writerFor(res: any): StreamWriter {
     return {
         text: (content) => writeSafeSSE(res, content),
         replaceText: () => writeReplaceText(res),
-        status: (subtype, message, data) => sendStatus(res, subtype, message, data),
+        status: (subtype, message, data, track) => sendStatus(res, subtype, message, data, track),
         progress: (subtype, progress, message, data) => sendProgress(res, subtype, progress, message, data),
         toolCall: (toolName, args, status, result) => sendToolCall(res, toolName, args, status, result),
+        codeOutput: (type, content) => sendCodeOutput(res, type, content),
         ended: () => Boolean(res.writableEnded),
     };
 }
