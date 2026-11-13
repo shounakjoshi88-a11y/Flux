@@ -39,7 +39,8 @@ const schema = z.object({
 
     // Tools
     TAVILY_API_KEY: optional,
-    E2B_API_KEY: optional,
+    // Sandbox (agent-infra/sandbox). Defaults to http://localhost:8080.
+    SANDBOX_BASE_URL: optional,
     HF_API_KEY: optional,
     OPENWEATHER_API_KEY: optional,
     IMAGE_SERVICE_URL: optional,
@@ -66,7 +67,7 @@ const REQUIRED_IN_PRODUCTION: (keyof Env)[] = [
 ];
 
 /** Variables strongly recommended outside production; missing means the feature is off. */
-const RECOMMENDED: (keyof Env)[] = ['E2B_API_KEY', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'];
+const RECOMMENDED: (keyof Env)[] = ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'];
 
 function parse(source: NodeJS.ProcessEnv): Env {
     const result = schema.safeParse(source);

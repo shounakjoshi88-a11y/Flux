@@ -1,76 +1,172 @@
-import { Sandbox } from '@e2b/code-interpreter';
+/**
+ * Sandbox manager backed by agent-infra/sandbox (AIO Sandbox).
+ *
+ * Unlike the previous E2B backend, this is a single shared container: every
+ * conversation gets its own working directory under /home/user/<id>, and all
+ * file and shell operations are scoped to that directory.
+ *
+ * The container is expected to be running at SANDBOX_BASE_URL (default
+ * http://localhost:8080). Start it with:
+ *   docker run -p 127.0.0.1:8080:8080 ghcr.io/agent-infra/sandbox:latest
+ */
+import { SandboxClient } from '@agent-infra/sandbox';
+import { env } from '../config/env';
+
+export interface SandboxHandle {
+  /** Conversation-scoped working directory. */
+  workdir: string;
+  /** Run a shell command and stream output. */
+  commands: {
+    run: (command: string, options?: any) => Promise<{ stdout: string; stderr: string; exitCode: number }>;
+  };
+  /** File operations. */
+  files: {
+    read: (path: string) => Promise<string>;
+    write: (path: string, content: string | Buffer) => Promise<void>;
+    list: (path: string) => Promise<{ path: string }[]>;
+  };
+  /** Run Python code via Jupyter and return logs. */
+  runCode: (code: string, options?: any) => Promise<{ logs: { stdout: string[]; stderr: string[] }; error?: { value?: string } }>;
+  /** Identifier used for preview URLs. */
+  sandboxId: string;
+  sandboxDomain: string;
+}
 
 export class SandboxManager {
-  private sandboxes = new Map<string, { sandbox: Sandbox; lastUsed: number }>();
+  private client: SandboxClient;
+  private base: string;
+  private sandboxes = new Map<string, { handle: SandboxHandle; lastUsed: number }>();
   private cleanupInterval: ReturnType<typeof setInterval>;
 
   constructor() {
+    this.base = env.SANDBOX_BASE_URL || 'http://localhost:8080';
+    this.client = new SandboxClient({ baseUrl: this.base, environment: this.base });
     this.cleanupInterval = setInterval(() => this.cleanup(), 2 * 60 * 1000);
   }
 
-  async getOrCreate(conversationId: string): Promise<Sandbox> {
+  async getOrCreate(conversationId: string): Promise<SandboxHandle> {
     const existing = this.sandboxes.get(conversationId);
-
     if (existing) {
-      // Always extend the sandbox timeout on access to prevent mid-operation expiry
-      try { await (existing.sandbox as any).setTimeout?.(1_800_000); } catch {}
-      // Only health-check if it's been > 3 minutes since last use
-      if (Date.now() - existing.lastUsed < 3 * 60 * 1000) {
-        existing.lastUsed = Date.now();
-        return existing.sandbox; // skip the echo ping — trust it's alive
-      }
-      try {
-        await existing.sandbox.commands.run('echo alive', { timeoutMs: 3000 });
-        existing.lastUsed = Date.now();
-        return existing.sandbox;
-      } catch {
-        this.sandboxes.delete(conversationId);
-      }
+      existing.lastUsed = Date.now();
+      return existing.handle;
     }
 
-    const sandbox = await Sandbox.create({
-      apiKey: process.env.E2B_API_KEY!,
-      timeoutMs: 1_800_000,
-    });
+    const workdir = `/home/user/${conversationId}`;
+    // Ensure the working directory exists.
+    try {
+      await this.client.shell.execCommand({ command: `mkdir -p ${workdir}` });
+    } catch {
+      /* ignore */
+    }
 
-    // Extend sandbox timeout immediately after creation
-    try { await (sandbox as any).setTimeout?.(1_800_000); } catch {}
+    const handle: SandboxHandle = {
+      workdir,
+      sandboxId: conversationId,
+      sandboxDomain: new URL(this.base).host,
+      commands: {
+        run: async (command: string, options?: any) => {
+          const timeout = options?.timeoutMs ?? 120_000;
+          const res = await this.client.shell.execCommand({
+            command,
+            exec_dir: options?.cwd ?? workdir,
+            timeout: Math.round(timeout / 1000),
+          });
+          const data = (res as any)?.data ?? res;
+          // Stream output to callbacks if provided.
+          if (options?.onStdout && data?.output) {
+            for (const line of String(data.output).split('\n')) {
+              if (line) options.onStdout(line);
+            }
+          }
+          if (options?.onStderr && data?.stderr) {
+            for (const line of String(data.stderr).split('\n')) {
+              if (line) options.onStderr(line);
+            }
+          }
+          // Background processes: fire and forget.
+          if (options?.background) {
+            return { stdout: data?.output ?? '', stderr: data?.stderr ?? '', exitCode: data?.exit_code ?? 0 };
+          }
+          return {
+            stdout: data?.output ?? '',
+            stderr: data?.stderr ?? '',
+            exitCode: data?.exit_code ?? 0,
+          };
+        },
+      },
+      files: {
+        read: async (filePath: string) => {
+          const res = await this.client.file.readFile({ file: filePath });
+          const data = (res as any)?.data ?? res;
+          return data?.content ?? '';
+        },
+        write: async (filePath: string, content: string | Buffer) => {
+          await this.client.file.writeFile({ file: filePath, content: String(content) });
+        },
+        list: async (dirPath: string) => {
+          const res = await this.client.file.listPath({ path: dirPath });
+          const data = (res as any)?.data ?? res;
+          const files = data?.files ?? [];
+          return files.map((f: any) => ({ path: f.name ?? f.path ?? '' }));
+        },
+      },
+      runCode: async (code: string, options?: any) => {
+        const startTime = Date.now();
+        // Use jupyter for Python execution.
+        try {
+          const res = await this.client.jupyter.executeCode({ code });
+          const data = (res as any)?.data ?? res;
+          const stdout: string[] = [];
+          const stderr: string[] = [];
+          if (data?.outputs) {
+            for (const o of data.outputs) {
+              if (o.text) stdout.push(o.text);
+              if (o.stderr) stderr.push(o.stderr);
+            }
+          }
+          if (options?.onStdout) {
+            for (const line of stdout) options.onStdout({ line });
+          }
+          if (options?.onStderr) {
+            for (const line of stderr) options.onStderr({ line });
+          }
+          return { logs: { stdout, stderr }, error: data?.error ? { value: data.error } : undefined };
+        } catch (e: any) {
+          if (options?.onStderr) options.onStderr({ line: e.message });
+          return { logs: { stdout: [], stderr: [e.message] }, error: { value: e.message } };
+        }
+      },
+    };
 
-    await sandbox.commands.run(
-      'pip install pandas numpy matplotlib seaborn plotly scipy scikit-learn pillow requests -q',
-      { timeoutMs: 60_000 }
-    );
-
-    this.sandboxes.set(conversationId, { sandbox, lastUsed: Date.now() });
-    return sandbox;
+    this.sandboxes.set(conversationId, { handle, lastUsed: Date.now() });
+    return handle;
   }
 
   async uploadFile(conversationId: string, filename: string, content: Buffer | string): Promise<string> {
     const sandbox = await this.getOrCreate(conversationId);
-    const remotePath = `/home/user/${filename}`;
-    await sandbox.files.write(remotePath, content as any);
+    const remotePath = `${sandbox.workdir}/${filename}`;
+    await sandbox.files.write(remotePath, content);
     return remotePath;
   }
 
   async downloadFile(conversationId: string, remotePath: string): Promise<Buffer> {
     const sandbox = await this.getOrCreate(conversationId);
-    return Buffer.from(await sandbox.files.read(remotePath));
+    const content = await sandbox.files.read(remotePath);
+    return Buffer.from(content);
   }
 
   async listFiles(conversationId: string, dir = '/home/user'): Promise<string[]> {
     const sandbox = await this.getOrCreate(conversationId);
     try {
-      return (await sandbox.files.list(dir)).map((f: any) => f.path);
+      return (await sandbox.files.list(dir)).map((f) => f.path);
     } catch {
-      const result = await sandbox.commands.run(`find ${dir} -type f`, { timeoutMs: 10_000 });
-      return result.stdout.trim().split('\n').filter(Boolean);
+      return [];
     }
   }
 
   async kill(conversationId: string): Promise<void> {
     const existing = this.sandboxes.get(conversationId);
     if (existing) {
-      try { await existing.sandbox.kill(); } catch {}
       this.sandboxes.delete(conversationId);
     }
   }
@@ -78,9 +174,8 @@ export class SandboxManager {
   private async cleanup(): Promise<void> {
     const now = Date.now();
     const idleTimeout = 12 * 60 * 1000;
-    for (const [convId, { sandbox, lastUsed }] of this.sandboxes.entries()) {
+    for (const [convId, { lastUsed }] of this.sandboxes.entries()) {
       if (now - lastUsed > idleTimeout) {
-        try { await sandbox.kill(); } catch {}
         this.sandboxes.delete(convId);
       }
     }

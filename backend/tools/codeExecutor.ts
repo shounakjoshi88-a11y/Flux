@@ -42,8 +42,14 @@ export class CodeExecutor {
     try {
       const filesBefore = await this._listFiles(sandbox, '/home/user');
       const result = await sandbox.runCode(code, {
-        onStdout: (output: any) => onOutput?.('stdout', output.line),
-        onStderr: (output: any) => onOutput?.('stderr', output.line),
+        onStdout: (output: any) => {
+          const line = typeof output === 'string' ? output : (output?.line ?? output?.text ?? '');
+          if (line) onOutput?.('stdout', line);
+        },
+        onStderr: (output: any) => {
+          const line = typeof output === 'string' ? output : (output?.line ?? output?.stderr ?? '');
+          if (line) onOutput?.('stderr', line);
+        },
         timeoutMs: 120_000,
         signal,
       } as any);
@@ -73,16 +79,24 @@ export class CodeExecutor {
     try {
       const filesBefore = await this._listFiles(sandbox, '/home/user');
       const result = await sandbox.commands.run(command, {
-        onStdout: (data) => onOutput?.('stdout', data),
-        onStderr: (data) => onOutput?.('stderr', data),
+        onStdout: (data: any) => {
+          const line = typeof data === 'string' ? data : (data ?? '');
+          if (line) onOutput?.('stdout', line);
+        },
+        onStderr: (data: any) => {
+          const line = typeof data === 'string' ? data : (data ?? '');
+          if (line) onOutput?.('stderr', line);
+        },
         timeoutMs: 120_000,
         signal,
       });
       const filesAfter = await this._listFiles(sandbox, '/home/user');
       const newFiles = filesAfter.filter(f => !filesBefore.includes(f));
       return {
-        stdout: [result.stdout], stderr: [result.stderr],
-        exitCode: result.exitCode, duration: Date.now() - startTime,
+        stdout: [result.stdout],
+        stderr: [result.stderr],
+        exitCode: result.exitCode,
+        duration: Date.now() - startTime,
         generatedFiles: newFiles,
       };
     } catch (e: any) {
@@ -98,11 +112,13 @@ export class CodeExecutor {
     port?: number,
   ): Promise<AppProcess> {
     const sandbox = await sandboxManager.getOrCreate(conversationId);
-    const handle = await sandbox.commands.run(command, {
-      background: true,
-      cwd,
-      envs: { ...(port ? { PORT: String(port) } : {}) },
-    });
+    const envPrefix = port ? `PORT=${port} ` : '';
+    const logPath = `/tmp/app_${Date.now()}.log`;
+    const result = await sandbox.commands.run(
+      `cd ${cwd} && nohup ${envPrefix}${command} > ${logPath} 2>&1 & echo $!`,
+      { timeoutMs: 10_000 },
+    );
+    const pid = parseInt((result.stdout || '').trim(), 10);
     const app: AppProcess = {
       id: `app_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       name,
@@ -110,7 +126,7 @@ export class CodeExecutor {
       cwd,
       startedAt: Date.now(),
       port,
-      handle,
+      handle: { pid, logPath } as any,
     };
     if (!this.apps.has(conversationId)) this.apps.set(conversationId, new Map());
     this.apps.get(conversationId)!.set(app.id, app);
@@ -122,7 +138,13 @@ export class CodeExecutor {
     if (!apps) return false;
     const app = apps.get(appId);
     if (!app) return false;
-    try { await app.handle.kill(); } catch {}
+    const pid = (app.handle as any)?.pid;
+    if (pid) {
+      try {
+        const sandbox = await sandboxManager.getOrCreate(conversationId);
+        await sandbox.commands.run(`kill ${pid} 2>/dev/null; true`, { timeoutMs: 5_000 });
+      } catch {}
+    }
     apps.delete(appId);
     if (apps.size === 0) this.apps.delete(conversationId);
     return true;
@@ -141,12 +163,12 @@ export class CodeExecutor {
   async getAppLogs(conversationId: string, appId: string): Promise<{ stdout: string; stderr: string }> {
     const app = this.apps.get(conversationId)?.get(appId);
     if (!app) return { stdout: '', stderr: '' };
+    const logPath = (app.handle as any)?.logPath;
+    if (!logPath) return { stdout: '', stderr: '' };
     try {
-      const result = await app.handle.wait({ timeoutMs: 500 });
-      return {
-        stdout: result.stdout || '',
-        stderr: result.stderr || '',
-      };
+      const sandbox = await sandboxManager.getOrCreate(conversationId);
+      const result = await sandbox.commands.run(`cat ${logPath} 2>/dev/null || true`, { timeoutMs: 5_000 });
+      return { stdout: result.stdout || '', stderr: '' };
     } catch {
       return { stdout: '', stderr: '' };
     }
@@ -157,12 +179,12 @@ export class CodeExecutor {
     if (!app || !app.port) return null;
     try {
       const sandbox = await sandboxManager.getOrCreate(conversationId);
-      const url = await sandbox.commands.run(
+      const result = await sandbox.commands.run(
         `curl -s http://localhost:${app.port} -o /dev/null -w "%{http_code}"`,
         { timeoutMs: 3_000 },
       );
-      if (url.stdout && parseInt(url.stdout) > 0) {
-        return `https://${sandbox.sandboxId}-${app.port}.${sandbox.sandboxDomain}`;
+      if (result.stdout && parseInt(result.stdout) > 0) {
+        return `http://localhost:${app.port}`;
       }
       return null;
     } catch {

@@ -5,6 +5,7 @@
     "": {
       "name": "flux",
       "dependencies": {
+        "@agent-infra/sandbox": "^1.0.17",
         "@ai-sdk/google": "^3.0.65",
         "@ai-sdk/openai-compatible": "^2.0.41",
         "@e2b/code-interpreter": "^2.6.1",
@@ -48,6 +49,8 @@
     },
   },
   "packages": {
+    "@agent-infra/sandbox": ["@agent-infra/sandbox@1.0.17", "", {}, "sha512-QFluIcyink6Bsi3SNk8HsCE6WowMB5YMv39ivxug/wZvtokUj6WOf9kkYhdkapYLLpf5RB9218YCdQe3/+PfFw=="],
+
     "@ai-sdk/gateway": ["@ai-sdk/gateway@3.0.105", "", { "dependencies": { "@ai-sdk/provider": "3.0.9", "@ai-sdk/provider-utils": "4.0.24", "@vercel/oidc": "3.2.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-XpERadvLMHkYGJO4hz1Sw7Y9J705Iex48TmdZLdZdaPiFFtVgiA9qhXugLUWGAxdlXU/2N6ipoPSOwfnULZbXw=="],
 
     "@ai-sdk/google": ["@ai-sdk/google@3.0.65", "", { "dependencies": { "@ai-sdk/provider": "3.0.9", "@ai-sdk/provider-utils": "4.0.24" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-SwdaJ6IqguyiVuDRgiRM4sHj7uUO4AETlQFFLF3jcEvu/3yrgIHfw2aM6bBNKSdalw0j25Pedx6qyHc2DWJwrg=="],
