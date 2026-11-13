@@ -109,6 +109,7 @@ import { createSandboxRouter } from './http/routes/sandbox';
 import { createWikiRouter } from './http/routes/wiki';
 import { createConversationsRouter } from './http/routes/conversations';
 import { createNewsRouter } from './http/routes/news';
+import { createMemoriesRouter } from './http/routes/memories';
 import type { RoutesContext } from './http/routes/context';
 import { availableModels } from './http/routes/catalog';
 import { extractDocxText, extractPdf } from './services/pdf/extract';
@@ -956,45 +957,7 @@ app.use(createConversationsRouter(routesContext));
 app.use(createNewsRouter());
 
 // ─── MEMORY MANAGEMENT ──────────────────────────────────────
-app.get("/memories", middleware, async (req, res) => {
-    try {
-        const uid = req.appUserId!;
-        console.log(`[MEMORIES] Fetching memories for appUserId: ${uid}`);
-        const memories = await prisma.memory.findMany({
-            where: { userId: uid },
-            orderBy: { createdAt: 'desc' },
-            select: {
-                id: true, category: true, fact: true,
-                importance: true, accessCount: true,
-                createdAt: true, sourceConversationId: true,
-            },
-        });
-        console.log(`[MEMORIES] Found ${memories.length} memories for UID: ${uid}`);
-        return res.json({ memories, debugUid: uid });
-    } catch (e) {
-        console.error("[MEMORIES] Fetch error:", e);
-        return res.status(500).json({ message: "Internal server error" });
-    }
-});
-
-app.delete("/memories/:id", middleware, async (req, res) => {
-    try {
-        const uid = req.appUserId!;
-        const id = req.params.id as string;
-        const memory = await prisma.memory.findFirst({
-            where: { id, userId: uid },
-            select: { id: true },
-        });
-        if (!memory) return res.status(404).json({ message: "Memory not found" });
-        await prisma.memory.delete({ where: { id } });
-        return res.json({ success: true });
-    } catch (e) {
-        console.error("[MEMORIES] Delete error:", e);
-        return res.status(500).json({ message: "Internal server error" });
-    }
-});
-
-app.use(createNewsRouter());
+app.use(createMemoriesRouter(routesContext));
 async function generateContextualStatusMessages(
     query: string,
     thoughtText: string,
