@@ -7,7 +7,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from "react";
 import { ChevronDown } from "lucide-react";
-import type { CodeOutputLine } from "../types";
+import type { CodeOutputLine } from "../../types";
 import { FileDownloadButton } from "./FileDownloadButton";
 
 interface CodeOutputBlockProps {

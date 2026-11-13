@@ -8,7 +8,9 @@ import { motion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import { MessageRenderer } from "./MessageRenderer";
 import { calculateReputationScore } from "../../utils/ReputationScore";
-import { SearchIcon, GlobeIcon, BookIcon, LinkIcon, WarnIcon, DoneIcon, ExtractIcon, TerminalIcon, FileIcon, ClockIcon, WikiIcon, PackageIcon, WeatherIcon, WandIcon, ImageIcon, ChartIcon } from "./icons";
+import { SearchIcon, GlobeIcon, BookIcon, LinkIcon, WarnIcon, DoneIcon, ExtractIcon, TerminalIcon, FileIcon, ClockIcon, WikiIcon, PackageIcon, WeatherIcon, WandIcon, ImageIcon, ChartIcon, LANG_COLORS } from "./icons";
+
+type IProps = { cls?: string };
 
 // ── Icons — 20×20 viewport, size-4, 1.6px stroke ───────────────────────────
 const getLangStyle = (lang: string) =>

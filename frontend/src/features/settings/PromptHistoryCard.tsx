@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import type { Message } from "../types";
+import type { Message } from "../../types";
 
 interface PromptHistoryCardProps {
   messages: Message[];

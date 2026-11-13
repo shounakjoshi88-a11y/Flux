@@ -58,7 +58,7 @@ import {
 import { FileDownloadButton } from "../content/FileDownloadButton";
 import { CodeOutputBlock } from "../content/CodeOutputBlock";
 import { getDomain, rewriteSandboxUrls, fixMalformedTags } from "../../lib/chat-utils";
-import type { Message, MessagePart, Source } from "../types";
+import type { Message, MessagePart, Source } from "../../types";
 
 type MessageItemProps = {
   message: Message & {

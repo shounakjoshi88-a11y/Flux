@@ -6,7 +6,7 @@ import { MessageItem } from "./MessageItem";
 import { SourceCard } from "../content/SourceCard";
 import { getDomain } from "../../lib/chat-utils";
 import { calculateReputationScore } from "../../utils/ReputationScore";
-import type { Message, Source } from "../types";
+import type { Message, Source } from "../../types";
 
 // ─── Props ──────────────────────────────────────────────────
 type MessageListProps = {
