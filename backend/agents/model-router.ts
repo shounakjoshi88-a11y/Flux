@@ -151,7 +151,7 @@ export function routeModel(preferredModel: string | undefined, query: string, pr
     wasRouted: boolean;
 } {
     try {
-        const { routeModel: rm } = require('./query-router');
+        const { routeModel: rm } = require('../query-router');
         return rm(preferredModel, query, previousQuery);
     } catch {
         return { modelId: preferredModel || "deepseek-v4-pro", tier: "power", score: 0.5, wasRouted: false };
