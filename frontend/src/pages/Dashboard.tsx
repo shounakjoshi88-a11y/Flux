@@ -45,6 +45,7 @@ import { useTheme } from "../hooks/useTheme";
 import { slugifyFriendly } from "../utils/slugify";
 import { getGreeting } from "../utils/greeting";
 import { readAttachedFiles } from "../utils/fileHandling";
+import { fetchImagesForQuery as fetchImagesForQueryUtil } from "../utils/imageSearch";
 import { useSessionRevocationListener } from "../hooks/useSessionRevocationListener";
 import { useSync } from "../hooks/useSync";
 import type {
@@ -733,16 +734,8 @@ export default function Dashboard() {
 
 
   const fetchImagesForQuery = useCallback(async (q: string) => {
-    if (!q.trim()) return;
-    try {
-      const res = await fetch(
-        `https://api.unsplash.com/search/photos?query=${encodeURIComponent(q)}&per_page=6&client_id=${UNSPLASH_ACCESS_KEY}`
-      );
-      const data = await res.json();
-      setActiveImages((data.results ?? []).map((img: any) => img.urls.small));
-    } catch {
-      setActiveImages([]);
-    }
+    const urls = await fetchImagesForQueryUtil(q);
+    setActiveImages(urls);
   }, []);
 
   // ── HTML preview handler ────────────────────────────────
