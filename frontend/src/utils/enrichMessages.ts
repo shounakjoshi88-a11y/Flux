@@ -1,0 +1,152 @@
+import { extractLiveContent, parseAssistantContent } from "../lib/chat-utils";
+import type { Message, MessagePart, Source } from "../types";
+
+export type ConvCacheEntry = { enriched: Message[]; ts: number };
+
+export function enrichConversationMessages(rawMessages: any[]): ConvCacheEntry {
+      const enriched = (rawMessages || []).map((msg) => {
+        if (!msg) return msg;
+        if (msg.role === "Assistant") {
+          const storedSources = (msg as any).sources as Source[] | undefined;
+          const storedFollowUps = (msg as any).followUps as string[] | undefined;
+          const storedThoughtProcess = (msg as any).thoughtProcess as any[] | undefined;
+          if (typeof msg.content !== "string") msg.content = "";
+          const { answer, followUps: parsedFollowUps } = extractLiveContent(msg.content);
+          const finalFollowUps =
+            storedFollowUps && storedFollowUps.length > 0 ? storedFollowUps : parsedFollowUps;
+
+          // Check localStorage for persisted parts first
+          const storedParts = msg.id ? (() => { try { const p = localStorage.getItem(`flux-parts-${msg.id}`); return p ? JSON.parse(p) : null; } catch { return null; } })() : null;
+          if (storedParts && Array.isArray(storedParts) && storedParts.length > 0) {
+            (msg as any).parts = storedParts;
+          } else if (!(msg as any).parts && Array.isArray(storedThoughtProcess) && storedThoughtProcess.length) {
+            const parts: MessagePart[] = [];
+            let lastTodosIdx = -1;
+            for (let tpi = 0; tpi < storedThoughtProcess.length; tpi++) {
+              const tp = storedThoughtProcess[tpi];
+              if (!tp) continue;
+              if (tp.type === "status") {
+                const sub = tp.subtype as string;
+                const isTerminal = sub.endsWith('_success') || sub.endsWith('_error') || sub.endsWith('_complete');
+                
+                // Map/merge sandbox status events into code_execution blocks
+                if (sub.startsWith('sandbox_')) {
+                  const isStart = sub === 'sandbox_start';
+                  const lastCodeExec = [...parts].reverse().find(p => p.type === 'code_execution') as any;
+                  
+                  if (isStart) {
+                    parts.push({
+                      type: "code_execution",
+                      block: {
+                        code: tp.data?.command ?? tp.data?.code ?? "",
+                        language: tp.data?.tool === "run_python" ? "python" : "bash",
+                        outputLines: [],
+                        isRunning: true,
+                        generatedFiles: []
+                      }
+                    } as any);
+                  } else {
+                    if (lastCodeExec && lastCodeExec.block) {
+                      lastCodeExec.block.isRunning = false;
+                      lastCodeExec.block.exitCode = tp.data?.exitCode ?? (sub === 'sandbox_error' ? 1 : 0);
+                      lastCodeExec.block.duration = tp.data?.duration;
+                      if (tp.data?.stdout || tp.data?.stderr) {
+                        lastCodeExec.block.outputLines = [
+                          ...(tp.data.stdout ? tp.data.stdout.split('\n').map((line: string) => ({ type: 'stdout', content: line })) : []),
+                          ...(tp.data.stderr ? tp.data.stderr.split('\n').map((line: string) => ({ type: 'stderr', content: line })) : [])
+                        ];
+                      }
+                    } else {
+                      parts.push({
+                        type: "code_execution",
+                        block: {
+                          code: tp.data?.command ?? tp.data?.code ?? "",
+                          language: tp.data?.tool === "run_python" ? "python" : "bash",
+                          outputLines: [
+                            ...(tp.data?.stdout ? tp.data.stdout.split('\n').map((line: string) => ({ type: 'stdout', content: line })) : []),
+                            ...(tp.data?.stderr ? tp.data.stderr.split('\n').map((line: string) => ({ type: 'stderr', content: line })) : [])
+                          ],
+                          isRunning: false,
+                          exitCode: tp.data?.exitCode,
+                          duration: tp.data?.duration,
+                          generatedFiles: []
+                        }
+                      } as any);
+                    }
+                  }
+                  continue;
+                }
+
+                if (isTerminal) {
+                  const baseSub = sub.replace(/_(?:success|error|complete)$/, '');
+                  let idx = parts.findIndex(
+                    p => p.type === 'tool_call' && p.name === baseSub
+                  );
+                  if (idx < 0) {
+                    idx = parts.findIndex(
+                      p => p.type === 'tool_call' && p.name === `${baseSub}_start`
+                    );
+                  }
+                  if (idx >= 0) {
+                    const existing = parts[idx] as any;
+                    existing.status = sub.endsWith('_error') ? 'error' : 'completed';
+                    existing.output = tp.message;
+                    if (tp.data) {
+                      existing.input = { ...existing.input, ...tp.data };
+                    }
+                  } else {
+                    parts.push({
+                      type: "tool_call",
+                      name: baseSub,
+                      input: tp.data || {},
+                      output: tp.message || "",
+                      status: sub.endsWith('_error') ? 'error' : 'completed',
+                    });
+                  }
+                } else {
+                  parts.push({
+                    type: "tool_call",
+                    name: sub,
+                    input: tp.data || {},
+                    output: tp.message || "",
+                    status: "running",
+                  });
+                }
+              } else if (tp.type === "thought" && tp.content?.trim()) {
+                parts.push({ type: "thought", content: tp.content });
+              } else if (tp.type === "todos" && tp.items?.length) {
+                lastTodosIdx = parts.length;
+                parts.push({ type: "todos", items: tp.items });
+              }
+            }
+            // Only keep the last todos entry (replaces in-place like SSE does)
+            if (lastTodosIdx >= 0) {
+              const lastEntry = parts.splice(lastTodosIdx, 1)[0] as any;
+              // Remove any earlier todos entries
+              for (let pi = parts.length - 1; pi >= 0; pi--) {
+                if (parts[pi]?.type === "todos") parts.splice(pi, 1);
+              }
+              parts.push(lastEntry);
+            }
+            if (answer.trim()) {
+              parts.push({ type: "text", text: answer });
+            }
+            (msg as any).parts = parts;
+          }
+
+          const msgGenerated = (msg as any).generatedFiles ?? [];
+          const msgFileAtt = (msg as any).fileAttachment ?? [];
+          if (storedSources && storedSources.length > 0) {
+            return { ...msg, content: answer, sources: storedSources, followUps: finalFollowUps, generatedFiles: msgGenerated, fileAttachment: msgFileAtt } as Message;
+          }
+          const { sources: parsedSources } = parseAssistantContent(msg.content);
+          return { ...msg, content: answer, sources: parsedSources.length > 0 ? parsedSources : (msg.sources ?? []), followUps: finalFollowUps, generatedFiles: msgGenerated, fileAttachment: msgFileAtt } as Message;
+        }
+        if (msg.role === "User") {
+          const fileAttachment = (msg as any).fileAttachment as { name: string; content?: string }[] | undefined;
+          return { ...msg, fileAttachment: fileAttachment || [] };
+        }
+        return msg;
+      }) as Message[];
+      return { enriched, ts: Date.now() };
+}
