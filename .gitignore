@@ -49,3 +49,9 @@ certs/
 dist-electron/
 release/
 *.exe
+
+# Prisma generated client (regenerate with bunx prisma generate)
+backend/prisma/generated/
+
+# Root npm lockfile (project uses bun)
+package-lock.json

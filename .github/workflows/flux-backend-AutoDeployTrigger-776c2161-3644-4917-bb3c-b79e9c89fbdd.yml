@@ -36,7 +36,7 @@ jobs:
         with:
           registry: fluxacr987.azurecr.io
           username: fluxacr987
-          password: 6HN0wk0ytZNujn2HwTfIHHOpJyQgd0tB6lXoQfM9hlvx7DSCVPibJQQJ99CFACGhslBEqg7NAAACAZCRGrfO
+          password: ${{ secrets.FLUXBACKEND_ACR_PASSWORD }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -56,7 +56,8 @@ jobs:
           imageToDeploy: fluxacr987.azurecr.io/flux-backend:${{ github.sha }}
           registryUrl: fluxacr987.azurecr.io
           registryUsername: fluxacr987
-          registryPassword: 6HN0wk0ytZNujn2HwTfIHHOpJyQgd0tB6lXoQfM9hlvx7DSCVPibJQQJ99CFACGhslBEqg7NAAACAZCRGrfO
+          registryPassword: ${{ secrets.FLUXBACKEND_ACR_PASSWORD }}
+
 
 
 
