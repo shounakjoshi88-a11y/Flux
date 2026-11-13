@@ -33,7 +33,6 @@ import { isModelHealthy, recordFailure, recordSuccess, getShortTimeout } from '.
 import { taskRouter, recoverInterruptedTasks } from './task-routes';
 import { classifyTaskIntent } from './task-detector';
 import { planTask, runTaskLoop } from './task-loop';
-import { createSupabaseClient } from "./client";
 import { syncManager } from './sync';
 import type { SyncEvent } from './sync';
 import { initGoogleAuth, handleGoogleCallback, getGoogleStatus, disconnectGoogle } from './google-auth';
@@ -45,8 +44,19 @@ import { toOpenAIChunk, fromOpenAITools, mapModelId, sseLine, BUILD_PROJECT_TOOL
 import { openAICompatAuth } from './openai-auth';
 import { runMultiAgentBuild } from './orchestrator-multiagent';
 import { env, assertEnv, isSmoke } from './config/env';
-import { BODY_LIMIT, MAX_SSE_PER_USER, RATE_LIMITS, SSE_REVALIDATE_MS } from './config/constants';
+import { BODY_LIMIT, RATE_LIMITS } from './config/constants';
 import { corsOptions } from './config/cors';
+import {
+    writeSafeSSE,
+    writeReplaceText,
+    sendStatus,
+    sendProgress,
+    sendAgentStatus,
+    sendPermissionRequest,
+    sendToolGroup,
+    sendToolCall,
+} from './http/sse/writers';
+import { trackSseConnection } from './http/sse/connections';
 
 assertEnv();
 
@@ -75,32 +85,7 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: BODY_LIMIT }));
 
 // ── SSE connection tracking & token re-validation ─────────
-const supabaseAdmin = createSupabaseClient();
-const sseConnections = new Map<string, Set<any>>();
-
-function trackSseConnection(uid: string, req: any, res: any) {
-  if (!sseConnections.has(uid)) sseConnections.set(uid, new Set());
-  const conns = sseConnections.get(uid)!;
-  if (conns.size >= MAX_SSE_PER_USER) {
-    conns.forEach(c => { try { c.end(); } catch {} });
-    conns.clear();
-  }
-  conns.add(res);
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  const revalidateTimer = setInterval(async () => {
-    if (res.writableEnded) { clearInterval(revalidateTimer); return; }
-    if (!token) { res.end(); return; }
-    try {
-      const { data: { user } } = await supabaseAdmin.auth.getUser(token);
-      if (!user) { res.end(); }
-    } catch { res.end(); }
-  }, SSE_REVALIDATE_MS);
-  req.on('close', () => {
-    clearInterval(revalidateTimer);
-    conns.delete(res);
-    if (conns.size === 0) sseConnections.delete(uid);
-  });
-}
+// SSE connection tracking lives in http/sse/connections.ts
 
 // ── Magic byte detection ──────────────────────────────────
 const MAGIC_BYTES: [RegExp, string][] = [
@@ -533,61 +518,9 @@ function getUrlTitle(url: string): string {
     } catch { return url; }
 }
 
-// ── SSE helper ──────────────────────────────────────────────
-function writeSafeSSE(res: any, content: string) {
-    if (res.writableEnded) return;
-    let deglitched = content;
-    const cjkGlitchRe = /([a-zA-Z\u2019\s,.'!?;:()\-–])([\u4e00-\u9fff\u3040-\u30ff\u30a0-\u30ff\uff00-\uffef]{1,8})([a-zA-Z\s,.'!?;:()\-–])/g;
-    let prev = '';
-    while (prev !== deglitched) {
-        prev = deglitched;
-        deglitched = deglitched.replace(cjkGlitchRe, '$1$3');
-    }
-    const normalized = deglitched.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-    const escaped = normalized.replace(/\n/g, '\ndata: ');
-    res.write(`data: ${escaped}\n\n`);
-}
+// SSE writers live in http/sse/writers.ts
 
-function writeReplaceText(res: any) {
-    if (res.writableEnded) return;
-    res.write(`event: replace_text\ndata: {}\n\n`);
-}
-
-function sendStatus(res: any, subtype: string, message: string, data?: any, track?: any[]) {
-    if (res.writableEnded) return;
-    const event = { type: "status", subtype, message, data: data || null };
-    res.write(`event: status\ndata: ${JSON.stringify(event)}\n\n`);
-    if (track) track.push(event);
-}
-
-function sendProgress(res: any, subtype: string, progress: number, message: string, data?: any) {
-    if (res.writableEnded) return;
-    res.write(`event: status\ndata: ${JSON.stringify({ type: "status", subtype, message, data: data || null, progress })}\n\n`);
-}
-
-// ── Enhanced SSE events (Flux-style) ─────────────────────
-
-function sendAgentStatus(res: any, status: string, message: string, data?: any) {
-    if (res.writableEnded) return;
-    res.write(`event: agent_status\ndata: ${JSON.stringify({ type: "agent_status", status, message, data: data || null })}\n\n`);
-}
-
-function sendPermissionRequest(res: any, id: string, toolName: string, args: any, description: string) {
-    if (res.writableEnded) return;
-    res.write(`event: permission\ndata: ${JSON.stringify({ type: "permission", id, toolName, args, description })}\n\n`);
-}
-
-function sendToolGroup(res: any, tools: any[]) {
-    if (res.writableEnded) return;
-    res.write(`event: tool_group\ndata: ${JSON.stringify({ type: "tool_group", tools })}\n\n`);
-}
-
-function sendToolCall(res: any, toolName: string, args: any, status: string, result?: any) {
-    if (res.writableEnded) return;
-    res.write(`event: tool_call\ndata: ${JSON.stringify({ type: "tool_call", toolName, args, status, result })}\n\n`);
-}
-
-// ── File analysis helpers (used by synthesis path) ──────────────────────────
+// File analysis helpers (used by synthesis path)
 
 type FileCategory = 'code' | 'document' | 'data' | 'config';
 
