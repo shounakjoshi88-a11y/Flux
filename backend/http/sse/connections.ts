@@ -5,7 +5,7 @@
  * token on every open stream so a revoked session stops receiving output.
  */
 import type { Request, Response } from 'express';
-import { createSupabaseClient } from '../../client';
+import { createSupabaseClient } from '../../db/supabase';
 import { MAX_SSE_PER_USER, SSE_REVALIDATE_MS } from '../../config/constants';
 
 const supabaseAdmin = createSupabaseClient();

@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { prisma } from './db';
-import { middleware } from './middleware';
+import { prisma } from './db/prisma';
+import { middleware } from './http/middleware/auth';
 import { planTask, runTaskLoop, recoverInterruptedTasks } from './task-loop';
 
 const taskRouter = Router();
