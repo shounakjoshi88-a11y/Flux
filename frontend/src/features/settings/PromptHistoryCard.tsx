@@ -1,17 +1,23 @@
 /**
- * Prompt history rail.
+ * Prompt history card — a 1:1 replica of chat.deepseek.com's right-side
+ * conversation navigator, measured live (Nov 2026):
  *
- * A fixed 34px rail pinned to the right edge of the viewport, vertically
- * centred, with a blurred dark pill behind it. Hovering expands a 240px card
- * that lists every prompt sent in this conversation so you can jump back to
- * one. Each row carries a small dash on the right, which is the delete
- * affordance, and the prompt nearest the viewport is highlighted.
+ * A 34×292 pill (br16, rgba(21,21,23,.6) + 5px backdrop blur) is pinned
+ * 16px from the right edge, vertically centred. The card itself — 242×152,
+ * br16 — is ALWAYS mounted, right-aligned to the pill's right edge and
+ * vertically centred on it, exactly like DeepSeek's DOM: collapsed, its
+ * surface is transparent and the row labels are faded out, so only the
+ * position ticks show over the pill. Hovering fades the surface to opaque
+ * #232324 and the labels to full opacity; no positional animation.
  *
- * Modelled on chat.deepseek.com: rail at right:16px, 300px tall, card 240px
- * wide with 16px corners, rows at 13px in #adb2b8, active row in #5686fe.
+ * Rows are 210×30: a 13px #adb2b8 truncated label and, on the right, the
+ * position tick (8×2 white/20; active 12×3 #679efe, both br4, centred in a
+ * 16×20 box, 12px gap after the label). The prompt nearest the viewport
+ * carries the active tick. Clicking a row (or its collapsed tick) jumps to
+ * that prompt. The list scrolls when there are more prompts than fit; the
+ * card height is fixed at 152px like DeepSeek's.
  */
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import type { Message } from "../../types";
 
 interface PromptHistoryCardProps {
@@ -20,10 +26,15 @@ interface PromptHistoryCardProps {
   visibleRange: { startIndex: number; endIndex: number };
 }
 
-const RAIL_WIDTH = 34;
-const CARD_WIDTH = 240;
-const CARD_HEIGHT = 150;
+/** Geometry measured from chat.deepseek.com. */
+const CARD_WIDTH = 242;
+const CARD_HEIGHT = 152;
+const ROW_WIDTH = 210;
 const ROW_HEIGHT = 30;
+const CARD_PAD_Y = 15; // 15px top/bottom inside the card
+const CARD_PAD_X = 24; // 24px left inset before the rows
+const PILL_WIDTH = 34;
+const PILL_HEIGHT = 292;
 
 export function PromptHistoryCard({ messages, onJumpToPrompt, visibleRange }: PromptHistoryCardProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -90,108 +101,103 @@ export function PromptHistoryCard({ messages, onJumpToPrompt, visibleRange }: Pr
 
   return (
     <div
-      className="fixed z-50 flex items-center"
+      className="phc-root fixed z-40 hidden md:block"
       style={{ right: 16, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
     >
-      {/* Expanded card - slides out to the left of the rail */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, x: 12, scale: 0.97 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 12, scale: 0.97 }}
-            transition={{ duration: 0.16, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="overflow-hidden"
-            style={{
-              pointerEvents: "auto",
-              width: CARD_WIDTH,
-              height: CARD_HEIGHT,
-              borderRadius: 16,
-              background: "var(--prompt-history-scrim)",
-              backdropFilter: "blur(5px)",
-              WebkitBackdropFilter: "blur(5px)",
-              boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.06)",
-              marginRight: -1,
-            }}
-          >
-            <div
-              ref={listRef}
-              className="overflow-y-auto h-full"
-              style={{ scrollbarWidth: "none" }}
-            >
-              <style>{`.phc-list::-webkit-scrollbar{display:none}`}</style>
-              <div className="phc-list" style={{ padding: "12px 0 0 12px" }}>
-                {userPrompts.map((msg, i) => {
-                  const isActive = i === activeIndex;
-                  return (
-                    <button
-                      key={msg.id}
-                      data-item
-                      onClick={() => handleClick(msg)}
-                      className="flex w-full items-center gap-2 text-left transition-colors hover:bg-[rgba(255,255,255,0.04)]"
-                      style={{
-                        height: ROW_HEIGHT,
-                        padding: "0 10px 0 0",
-                        color: isActive ? "var(--prompt-history-active)" : "var(--prompt-history-row)",
-                      }}
-                    >
-                      <span
-                        className="min-w-0 flex-1 truncate text-[13px] leading-5"
-                        style={{ color: isActive ? "var(--prompt-history-active)" : "var(--prompt-history-row)" }}
-                      >
-                        {msg.content}
-                      </span>
-                      {/* Dash affordance, same as DeepSeek's per-row delete control */}
-                      <span
-                        aria-hidden
-                        className="shrink-0 text-[9px] font-medium leading-[14px]"
-                        style={{ color: isActive ? "var(--prompt-history-active)" : "var(--prompt-history-row)" }}
-                      >
-                        -
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <style>{`.phc-list::-webkit-scrollbar{display:none}`}</style>
 
-      {/* The rail itself: a blurred pill with one tick per prompt */}
+      {/* The collapsed pill: blurred scrim strip, 34×292, br16. Rendered
+          first so the card (same right edge) covers it when open. */}
       <div
-        className="relative flex flex-col items-center justify-center gap-1"
         style={{
           pointerEvents: "auto",
-          width: RAIL_WIDTH,
-          height: 292,
+          width: PILL_WIDTH,
+          height: PILL_HEIGHT,
           borderRadius: 16,
           background: "var(--prompt-history-scrim)",
           backdropFilter: "blur(5px)",
           WebkitBackdropFilter: "blur(5px)",
-          boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.04)",
           cursor: "pointer",
-          padding: "8px 0",
+        }}
+      />
+
+      {/* The card — always mounted like DeepSeek's; surface + labels fade
+          with hover. pointer-events stay off while collapsed except for the
+          tick strips, so invisible rows never block chat clicks. */}
+      <div
+        style={{
+          position: "absolute",
+          right: 0,
+          top: "50%",
+          transform: "translateY(-50%)",
+          width: CARD_WIDTH,
+          height: CARD_HEIGHT,
+          borderRadius: 16,
+          background: isOpen ? "var(--prompt-history-card)" : "transparent",
+          transition: "background-color 160ms ease",
+          pointerEvents: isOpen ? "auto" : "none",
+          overflow: "hidden",
         }}
       >
-        {userPrompts.map((msg, i) => {
-          const isActive = i === activeIndex;
-          return (
-            <div
-              key={msg.id}
-              onClick={() => handleClick(msg)}
-              className="w-full mx-auto rounded-full transition-all duration-200"
-              style={{
-                width: isActive ? 18 : 10,
-                height: 3,
-                background: isActive ? "var(--prompt-history-active)" : "rgba(255,255,255,0.22)",
-                boxShadow: isActive ? "0 0 6px rgba(86,134,254,0.45)" : "none",
-              }}
-            />
-          );
-        })}
+        <div
+          ref={listRef}
+          className="phc-list overflow-y-auto"
+          style={{
+            height: "100%",
+            padding: `${CARD_PAD_Y}px 0 ${CARD_PAD_Y}px ${CARD_PAD_X}px`,
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
+          }}
+        >
+          {userPrompts.map((msg, i) => {
+            const isActive = i === activeIndex;
+            return (
+              <button
+                key={msg.id}
+                data-item
+                onClick={() => handleClick(msg)}
+                className="flex items-center text-left transition-colors hover:bg-[rgba(255,255,255,0.04)]"
+                style={{
+                  width: ROW_WIDTH,
+                  height: ROW_HEIGHT,
+                  gap: 12,
+                  flexShrink: 0,
+                  pointerEvents: isOpen ? "auto" : "none",
+                }}
+              >
+                <span
+                  className="min-w-0 flex-1 truncate transition-opacity duration-150"
+                  style={{
+                    fontSize: 13,
+                    lineHeight: "20px",
+                    opacity: isOpen ? 1 : 0,
+                    color: isActive ? "var(--prompt-history-active)" : "var(--prompt-history-row)",
+                  }}
+                >
+                  {msg.content}
+                </span>
+                {/* Position tick — 8×2 normally, 12×3 blue when active.
+                    Always interactive so the collapsed pill is clickable. */}
+                <span
+                  className="flex h-5 w-4 shrink-0 items-center justify-center"
+                  style={{ pointerEvents: "auto" }}
+                >
+                  <span
+                    className="transition-all duration-200"
+                    style={{
+                      width: isActive ? 12 : 8,
+                      height: isActive ? 3 : 2,
+                      borderRadius: 4,
+                      background: isActive ? "var(--prompt-history-active)" : "var(--prompt-history-tick)",
+                    }}
+                  />
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

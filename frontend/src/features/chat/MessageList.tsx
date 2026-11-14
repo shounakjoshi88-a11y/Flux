@@ -1,5 +1,5 @@
 // src/components/MessageList.tsx
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, forwardRef, useImperativeHandle } from "react";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { motion } from "framer-motion";
 import { MessageItem } from "./MessageItem";
@@ -41,7 +41,16 @@ type MessageListProps = {
 
 
 // ─── Main component ────────────────────────────────────────
-export function MessageList({
+/**
+ * Imperative handle so the dashboard can jump the virtualized list to a
+ * message (the prompt-history card's click-to-scroll) even when the target
+ * item is not rendered by Virtuoso yet.
+ */
+export type MessageListHandle = {
+  jumpToMessage: (messageId: string | number) => void;
+};
+
+export const MessageList = forwardRef<MessageListHandle, MessageListProps>(function MessageList({
   messages,
   activeTab,
   activeSources,
@@ -63,12 +72,30 @@ export function MessageList({
   onHtmlPreview,
   conversationId,
   onVisibleRangeChange,
-}: MessageListProps) {
+}: MessageListProps,
+  ref,
+) {
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const atBottomRef = useRef(true);
   const prevLenRef = useRef(messages.length);
   const scrollThrottleRef = useRef(0);
   const messagesRef = useRef(messages);
+
+  // Click-to-scroll for the prompt-history card: rendered items scroll
+  // natively; virtualized-out items go through Virtuoso's scrollToIndex.
+  useImperativeHandle(ref, () => ({
+    jumpToMessage: (messageId: string | number) => {
+      const el = document.querySelector(`[data-message-id="${messageId}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+      const idx = messages.findIndex((m) => String(m.id) === String(messageId));
+      if (idx >= 0) {
+        virtuosoRef.current?.scrollToIndex({ index: idx, align: "center", behavior: "smooth" });
+      }
+    },
+  }));
 
   useEffect(() => {
     (window as any).__flux_messages = messages;
@@ -230,4 +257,4 @@ export function MessageList({
       />
     </div>
   );
-}
+});

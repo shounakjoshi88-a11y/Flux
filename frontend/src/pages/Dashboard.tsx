@@ -27,7 +27,7 @@ import { ChatHeader } from "../features/dashboard/ChatHeader";
 import { EmptyState } from "../features/dashboard/EmptyState";
 import { SlideOverPanel } from "../features/dashboard/SlideOverPanel";
 import { DeleteToast } from "../features/dashboard/DeleteToast";
-import { MessageList } from "../features/chat/MessageList";
+import { MessageList, type MessageListHandle } from "../features/chat/MessageList";
 import { SuggestedActions } from "../features/chat/SuggestedActions";
 import { Settings } from "../features/settings/Settings";
 import { PromptHistoryCard } from "../features/settings/PromptHistoryCard";
@@ -216,6 +216,8 @@ export default function Dashboard() {
   const [isCustomAgentsOpen, setIsCustomAgentsOpen] = useState(false);
   const [activeTransport, setActiveTransport] = useState<"sse" | "ws">("sse");
   const [visibleRange, setVisibleRange] = useState({ startIndex: 0, endIndex: 0 });
+  /** Imperative handle into MessageList for the prompt-history card's jump. */
+  const messageListRef = useRef<MessageListHandle>(null);
 
 // ── Auto-detect transport: try WS, fall back to SSE ──
   const wsAvailableRef = useRef(false);
@@ -827,10 +829,7 @@ export default function Dashboard() {
 
   // ── Jump to prompt ──
   const handleJumpToPrompt = useCallback((messageId: string | number) => {
-    const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
-    if (messageElement) {
-      messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
+    messageListRef.current?.jumpToMessage(messageId);
   }, []);
 
   // ── Delete conversation ──
@@ -1101,6 +1100,7 @@ export default function Dashboard() {
                   />
                 )}
                 <MessageList
+                  ref={messageListRef}
                   messages={messages}
                   activeTab={activeTab}
                   activeSources={activeSources}
