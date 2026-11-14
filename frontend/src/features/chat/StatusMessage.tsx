@@ -300,34 +300,32 @@ function StatusMessage({
         message={status.message} isFirst={isFirst} isLast={isLast} pulse={isActive}
       >
         {titles.length > 0 && (
-          <div className="rounded-lg border border-[var(--surface-border)] overflow-hidden" style={{ background: '#0f0f0e' }}>
-            <div className="overflow-y-auto custom-scrollbar" style={{ maxHeight: '156px' }}>
-              {titles.map((title, idx) => (
-                <button
-                  key={`${urls[idx] ?? idx}`}
-                  onClick={() => urls[idx] && onSourceClick?.(urls[idx])}
-                  aria-label={`View source: ${title}`}
-                  className="group w-full flex items-center gap-2.5 px-3 py-[7px] text-left transition-colors hover:bg-white/[0.025] border-b border-white/[0.05] last:border-b-0"
-                >
-                  {urls[idx] && (
-                    <img
-                      src={`https://www.google.com/s2/favicons?domain=${(() => { try { return new URL(urls[idx]).hostname.replace(/^www\./, ""); } catch { return ""; } })()}&sz=16`}
-                      alt=""
-                      className="size-4 rounded-sm shrink-0 opacity-75"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                    />
-                  )}
-                  <span className="flex-1 text-[12px] text-[var(--text-secondary)]/80 truncate min-w-0 group-hover:text-[var(--text-secondary)] transition-colors">
-                    {title}
+          <div className="mt-1 flex flex-col">
+            {titles.map((title, idx) => (
+              <button
+                key={`${urls[idx] ?? idx}`}
+                onClick={() => urls[idx] && onSourceClick?.(urls[idx])}
+                aria-label={`View source: ${title}`}
+                className="group -mx-1.5 flex w-[calc(100%+12px)] items-center gap-3 rounded-lg px-1.5 py-1.5 text-left transition-colors hover:bg-[rgba(255,255,255,0.04)]"
+              >
+                {urls[idx] && (
+                  <img
+                    src={`https://www.google.com/s2/favicons?domain=${(() => { try { return new URL(urls[idx]).hostname.replace(/^www\./, ""); } catch { return ""; } })()}&sz=16`}
+                    alt=""
+                    className="size-4 rounded-sm shrink-0 opacity-75"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                )}
+                <span className="min-w-0 flex-1 truncate text-[16px] leading-6 text-[var(--text-primary)]">
+                  {title}
+                </span>
+                {urls[idx] && (
+                  <span className="shrink-0 truncate text-[14px] leading-5 text-[var(--text-secondary)]/60 max-w-[45%]">
+                    {(() => { try { return new URL(urls[idx]).hostname.replace(/^www\./, ""); } catch { return ""; } })()}
                   </span>
-                  {urls[idx] && (
-                    <span className="text-[11px] font-mono text-[var(--text-muted)]/60 shrink-0 ml-2">
-                      {(() => { try { return new URL(urls[idx]).hostname.replace(/^www\./, ""); } catch { return ""; } })()}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
+                )}
+              </button>
+            ))}
           </div>
         )}
       </StepRow>

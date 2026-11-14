@@ -69,7 +69,7 @@ export function formatInlineText(text: string, onCitationClick: any, sources: So
     const val = part.value;
     if (val.startsWith("\\begin{") || val.startsWith("$$") || (val.startsWith("\\[") && val.length > 10)) return <DisplayMath key={key} formula={val} />;
     if (val.startsWith("`")) return <code key={key} className="inline-code">{val.slice(1, -1)}</code>;
-    if (val.startsWith("**") || val.startsWith("__")) return <strong key={key} className="font-bold text-[var(--text-primary)]">{formatInlineText(val.slice(2, -2), onCitationClick, sources, key)}</strong>;
+    if (val.startsWith("**") || val.startsWith("__")) return <strong key={key} className="font-bold text-[15px] leading-[21px] text-[var(--text-primary)]">{formatInlineText(val.slice(2, -2), onCitationClick, sources, key)}</strong>;
     if (val.startsWith("*") || val.startsWith("_")) return <em key={key} className="italic">{formatInlineText(val.slice(1, -1), onCitationClick, sources, key)}</em>;
     if (val.startsWith("$") || val.startsWith("\\(")) {
       const inner = val.replace(/^(\$|\\\()/, "").replace(/(\$|\\\))$/, "");
@@ -230,7 +230,7 @@ export function renderPlainBlocks(text: string, onCitationClick: any, sources: S
       elements.push(<hr key={`hr-${parentIdx}-${i}`} className="my-8 border-white/10" />);
       i++; continue;
     }
-    elements.push(<p key={`p-${parentIdx}-${i}`} className="leading-relaxed mb-4 last:mb-0 text-[15px] text-foreground/90">{formatInlineText(line, onCitationClick, sources, `p-${parentIdx}-${i}`)}</p>);
+    elements.push(<p key={`p-${parentIdx}-${i}`} className="leading-[21px] mb-3 last:mb-0 text-[15px] text-[var(--text-primary)] break-words [overflow-wrap:anywhere]">{formatInlineText(line, onCitationClick, sources, `p-${parentIdx}-${i}`)}</p>);
     i++;
   }
   return elements;

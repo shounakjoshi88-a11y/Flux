@@ -1,3 +1,15 @@
+/**
+ * Prompt history rail.
+ *
+ * A fixed 34px rail pinned to the right edge of the viewport, vertically
+ * centred, with a blurred dark pill behind it. Hovering expands a 240px card
+ * that lists every prompt sent in this conversation so you can jump back to
+ * one. Each row carries a small dash on the right, which is the delete
+ * affordance, and the prompt nearest the viewport is highlighted.
+ *
+ * Modelled on chat.deepseek.com: rail at right:16px, 300px tall, card 240px
+ * wide with 16px corners, rows at 13px in #adb2b8, active row in #5686fe.
+ */
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Message } from "../../types";
@@ -8,11 +20,10 @@ interface PromptHistoryCardProps {
   visibleRange: { startIndex: number; endIndex: number };
 }
 
-const MINIMAP_H = 280;
-const DOT_MIN = 3;
-const DOT_MAX = 8;
-const GAP_MIN = 2;
-const GAP_MAX = 6;
+const RAIL_WIDTH = 34;
+const CARD_WIDTH = 240;
+const CARD_HEIGHT = 150;
+const ROW_HEIGHT = 30;
 
 export function PromptHistoryCard({ messages, onJumpToPrompt, visibleRange }: PromptHistoryCardProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -21,15 +32,14 @@ export function PromptHistoryCard({ messages, onJumpToPrompt, visibleRange }: Pr
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const userPrompts = useMemo(() => messages.filter((m) => m.role === "User"), [messages]);
-
   const total = userPrompts.length;
-  const itemSlot = total > 0 ? MINIMAP_H / total : MINIMAP_H;
-  const dotH = Math.max(DOT_MIN, Math.min(DOT_MAX, itemSlot * 0.5));
-  const gap = Math.max(GAP_MIN, Math.min(GAP_MAX, itemSlot * 0.5));
 
-  // ── Active index from Virtuoso's visible range ─────────────
+  // The prompt nearest the viewport is the active one.
   useEffect(() => {
-    if (total === 0) { setActiveIndex(-1); return; }
+    if (total === 0) {
+      setActiveIndex(-1);
+      return;
+    }
     let bestIdx = -1;
     let bestOverlap = 0;
     for (let i = 0; i < messages.length; i++) {
@@ -47,28 +57,20 @@ export function PromptHistoryCard({ messages, onJumpToPrompt, visibleRange }: Pr
     setActiveIndex(bestIdx);
   }, [visibleRange, messages, userPrompts, total]);
 
-  // ── Track centering math ───────────────────────────────────
-  const totalContentH = total * dotH + (total - 1) * gap;
-  const centeringOffset = Math.max(0, (MINIMAP_H - totalContentH) / 2);
-  const activeDotCenter = activeIndex >= 0
-    ? centeringOffset + activeIndex * (dotH + gap) + dotH / 2
-    : 0;
-
-  // ── Auto-scroll popup list to active item ──────────────────
+  // Keep the active row in view when the card is open.
   useEffect(() => {
     if (!isOpen || activeIndex < 0 || !listRef.current) return;
-    const btns = listRef.current.querySelectorAll<HTMLElement>("[data-item]");
-    const btn = btns[activeIndex];
+    const btn = listRef.current.querySelectorAll<HTMLElement>("[data-item]")[activeIndex];
     if (!btn) return;
-    const t = setTimeout(() =>
-      btn.scrollIntoView({ block: "nearest", behavior: "smooth" }), 50
-    );
+    const t = setTimeout(() => btn.scrollIntoView({ block: "nearest", behavior: "smooth" }), 50);
     return () => clearTimeout(t);
   }, [activeIndex, isOpen]);
 
-  // ── Hover show / hide ──────────────────────────────────────
   const handleEnter = useCallback(() => {
-    if (closeTimerRef.current) { clearTimeout(closeTimerRef.current); closeTimerRef.current = null; }
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
     setIsOpen(true);
   }, []);
 
@@ -76,19 +78,24 @@ export function PromptHistoryCard({ messages, onJumpToPrompt, visibleRange }: Pr
     closeTimerRef.current = setTimeout(() => setIsOpen(false), 350);
   }, []);
 
-  const handleClick = useCallback((msg: Message) => {
-    onJumpToPrompt(msg.id);
-    setIsOpen(false);
-  }, [onJumpToPrompt]);
+  const handleClick = useCallback(
+    (msg: Message) => {
+      onJumpToPrompt(msg.id);
+      setIsOpen(false);
+    },
+    [onJumpToPrompt],
+  );
 
   if (total === 0) return null;
 
   return (
     <div
-      className="fixed top-1/2 -translate-y-1/2 z-50 flex items-center"
-      style={{ pointerEvents: "none", right: 100 }}
+      className="fixed z-50 flex items-center"
+      style={{ right: 16, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
     >
-      {/* ── Popup card ── */}
+      {/* Expanded card - slides out to the left of the rail */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -96,195 +103,95 @@ export function PromptHistoryCard({ messages, onJumpToPrompt, visibleRange }: Pr
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: 12, scale: 0.97 }}
             transition={{ duration: 0.16, ease: [0.25, 0.46, 0.45, 0.94] }}
-            style={{ pointerEvents: "auto", marginRight: "10px" }}
-            onMouseEnter={handleEnter}
-            onMouseLeave={handleLeave}
+            className="overflow-hidden"
+            style={{
+              pointerEvents: "auto",
+              width: CARD_WIDTH,
+              height: CARD_HEIGHT,
+              borderRadius: 16,
+              background: "var(--prompt-history-scrim)",
+              backdropFilter: "blur(5px)",
+              WebkitBackdropFilter: "blur(5px)",
+              boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.06)",
+              marginRight: -1,
+            }}
           >
             <div
-              className="relative rounded-2xl overflow-hidden"
-              style={{
-                width: 248,
-                background: "rgba(18,17,15,0.92)",
-                backdropFilter: "blur(20px)",
-                WebkitBackdropFilter: "blur(20px)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                boxShadow: "0 24px 48px rgba(0,0,0,0.55), 0 0 0 0.5px rgba(255,255,255,0.04)",
-              }}
+              ref={listRef}
+              className="overflow-y-auto h-full"
+              style={{ scrollbarWidth: "none" }}
             >
-              {/* Header */}
-              <div
-                className="px-4 pt-3 pb-2 flex items-center gap-2"
-                style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}
-              >
-                <span style={{ color: "#cc785c", fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                  Prompts
-                </span>
-                <span
-                  style={{
-                    background: "rgba(204,120,92,0.15)",
-                    color: "#cc785c",
-                    fontSize: 10,
-                    fontWeight: 600,
-                    padding: "1px 6px",
-                    borderRadius: 20,
-                    marginLeft: "auto",
-                  }}
-                >
-                  {total}
-                </span>
-              </div>
-
-              {/* Top fade */}
-              <div
-                className="absolute left-0 right-0 pointer-events-none z-10"
-                style={{
-                  top: 44,
-                  height: 20,
-                  background: "linear-gradient(to bottom, rgba(18,17,15,0.95) 0%, transparent 100%)",
-                }}
-              />
-
-              {/* Scrollable list */}
-              <div
-                ref={listRef}
-                className="overflow-y-auto"
-                style={{ maxHeight: 260, scrollbarWidth: "none" }}
-              >
-                <style>{`.phc-list::-webkit-scrollbar{display:none}`}</style>
-                <div className="py-2">
-                  {userPrompts.map((msg, i) => {
-                    const isActive = i === activeIndex;
-                    return (
-                      <button
-                        key={msg.id}
-                        data-item
-                        onClick={() => handleClick(msg)}
-                        className="w-full text-left px-4 py-2 flex items-center gap-2.5 group transition-all duration-150"
-                        style={{
-                          background: isActive ? "rgba(204,120,92,0.08)" : "transparent",
-                        }}
+              <style>{`.phc-list::-webkit-scrollbar{display:none}`}</style>
+              <div className="phc-list" style={{ padding: "12px 0 0 12px" }}>
+                {userPrompts.map((msg, i) => {
+                  const isActive = i === activeIndex;
+                  return (
+                    <button
+                      key={msg.id}
+                      data-item
+                      onClick={() => handleClick(msg)}
+                      className="flex w-full items-center gap-2 text-left transition-colors hover:bg-[rgba(255,255,255,0.04)]"
+                      style={{
+                        height: ROW_HEIGHT,
+                        padding: "0 10px 0 0",
+                        color: isActive ? "var(--prompt-history-active)" : "var(--prompt-history-row)",
+                      }}
+                    >
+                      <span
+                        className="min-w-0 flex-1 truncate text-[13px] leading-5"
+                        style={{ color: isActive ? "var(--prompt-history-active)" : "var(--prompt-history-row)" }}
                       >
-                        <span
-                          className="shrink-0 rounded-full transition-all duration-200"
-                          style={{
-                            width: isActive ? 7 : 5,
-                            height: isActive ? 7 : 5,
-                            background: isActive ? "#cc785c" : "rgba(255,255,255,0.2)",
-                            boxShadow: isActive ? "0 0 8px rgba(204,120,92,0.6)" : "none",
-                            flexShrink: 0,
-                          }}
-                        />
-                        <span
-                          className="text-xs leading-snug truncate"
-                          style={{
-                            color: isActive ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.45)",
-                            fontWeight: isActive ? 500 : 400,
-                            maxWidth: 180,
-                            transition: "color 0.15s",
-                          }}
-                        >
-                          {msg.content}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                        {msg.content}
+                      </span>
+                      {/* Dash affordance, same as DeepSeek's per-row delete control */}
+                      <span
+                        aria-hidden
+                        className="shrink-0 text-[9px] font-medium leading-[14px]"
+                        style={{ color: isActive ? "var(--prompt-history-active)" : "var(--prompt-history-row)" }}
+                      >
+                        -
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
-
-              {/* Bottom fade */}
-              <div
-                className="absolute bottom-0 left-0 right-0 pointer-events-none"
-                style={{
-                  height: 20,
-                  background: "linear-gradient(to top, rgba(18,17,15,0.95) 0%, transparent 100%)",
-                }}
-              />
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ── Minimap track ── */}
+      {/* The rail itself: a blurred pill with one tick per prompt */}
       <div
-        onMouseEnter={handleEnter}
-        onMouseLeave={handleLeave}
+        className="relative flex flex-col items-center justify-center gap-1"
         style={{
           pointerEvents: "auto",
-          width: 24,
-          height: MINIMAP_H,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
+          width: RAIL_WIDTH,
+          height: 292,
+          borderRadius: 16,
+          background: "var(--prompt-history-scrim)",
+          backdropFilter: "blur(5px)",
+          WebkitBackdropFilter: "blur(5px)",
+          boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.04)",
           cursor: "pointer",
-          position: "relative",
+          padding: "8px 0",
         }}
       >
-        {/* Track line bg */}
-        <div
-          style={{
-            width: 2,
-            height: MINIMAP_H,
-            background: "rgba(255,255,255,0.06)",
-            borderRadius: 4,
-            position: "absolute",
-          }}
-        />
-        {/* Track line active highlight */}
-        {activeIndex >= 0 && (
-          <div
-            style={{
-              width: 2,
-              height: dotH + 2,
-              background: "#cc785c",
-              borderRadius: 4,
-              position: "absolute",
-              top: centeringOffset + activeIndex * (dotH + gap) - 1,
-              boxShadow: "0 0 6px rgba(204,120,92,0.5)",
-              transition: "top 0.3s ease",
-            }}
-          />
-        )}
-        {/* Dots */}
-        <div
-          style={{
-            position: "relative",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            height: MINIMAP_H,
-            width: "100%",
-            overflow: "hidden",
-            justifyContent: "center",
-          }}
-        >
-          {userPrompts.map((msg, i) => {
-            const isActive = i === activeIndex;
-            return (
-              <div
-                key={msg.id}
-                onClick={() => handleClick(msg)}
-                style={{
-                  width: isActive ? 12 : 6,
-                  height: dotH,
-                  minHeight: dotH,
-                  maxHeight: dotH,
-                  borderRadius: 9999,
-                  background: isActive
-                    ? "#cc785c"
-                    : "rgba(255,255,255,0.15)",
-                  boxShadow: isActive
-                    ? "0 0 8px rgba(204,120,92,0.7), 0 0 16px rgba(204,120,92,0.3)"
-                    : "none",
-                  margin: `${gap / 2}px auto`,
-                  transition: "width 0.25s ease, background 0.25s ease, box-shadow 0.25s ease",
-                  flexShrink: 0,
-                  cursor: "pointer",
-                }}
-              />
-            );
-          })}
-        </div>
+        {userPrompts.map((msg, i) => {
+          const isActive = i === activeIndex;
+          return (
+            <div
+              key={msg.id}
+              onClick={() => handleClick(msg)}
+              className="w-full mx-auto rounded-full transition-all duration-200"
+              style={{
+                width: isActive ? 18 : 10,
+                height: 3,
+                background: isActive ? "var(--prompt-history-active)" : "rgba(255,255,255,0.22)",
+                boxShadow: isActive ? "0 0 6px rgba(86,134,254,0.45)" : "none",
+              }}
+            />
+          );
+        })}
       </div>
     </div>
   );

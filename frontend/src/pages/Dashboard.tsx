@@ -25,7 +25,6 @@ import { PeekPanel } from "../features/layout/PeekPanel";
 import { ChatInput } from "../features/chat/ChatInput";
 import { MessageList } from "../features/chat/MessageList";
 import { SuggestedActions } from "../features/chat/SuggestedActions";
-import { InputSeparator } from "../features/settings/InputSeparator";
 import { Settings } from "../features/settings/Settings";
 import { PromptHistoryCard } from "../features/settings/PromptHistoryCard";
 import { ArtifactsModal, prefetchArtifacts } from "../features/content/ArtifactsModal";
@@ -1132,7 +1131,7 @@ export default function Dashboard() {
 
           {!hasStarted ? (
             <div className="flex-1 overflow-y-auto px-6 flex flex-col justify-start items-center pt-[30vh] pb-12 custom-scrollbar" style={{ minHeight: 0 }}>
-              <div className={`w-full ${isMobile ? '' : 'max-w-2xl'} mx-auto flex flex-col items-center`}>
+              <div className={`w-full ${isMobile ? '' : 'max-w-[656px]'} mx-auto flex flex-col items-center`}>
                 {/* Claude-style warm greeting */}
                 <div className="flex items-center justify-center gap-4 mb-8 select-none">
                   {/* Flux logo: mountain with rising sun/moon */}
@@ -1186,32 +1185,31 @@ export default function Dashboard() {
                       />
                     </svg>
                   </button>
-<h1 className="serif-display text-3xl sm:text-4xl md:text-5xl text-[var(--accent)] leading-tight">
+<h1 className="serif-display text-[38px] leading-[47.5px] font-[300] text-[var(--text-primary)]">
                       {getGreeting(user)}
                   </h1>
                 </div>
 
                 <div className="w-full">
-                  <div className={`border border-[var(--surface-border)] ${isMobile ? 'rounded-none border-x-0' : 'rounded-2xl'} shadow-xl backdrop-blur-sm`}>
-                    <ChatInput
-                      query={query}
-                      setQuery={setQuery}
-                      onSend={handleSend}
-                      isLoading={isLoading}
-                      placeholderText={placeholderText}
-                      attachedFiles={attachedFiles}
-                      setAttachedFiles={setAttachedFiles}
-                      selectedModel={selectedModel}
-                      setSelectedModel={setSelectedModel}
-                      models={modelCategories}
-                      currentModelLabel={currentModelLabel}
-                      modelDropdownOpen={modelDropdownOpen}
-                      setModelDropdownOpen={setModelDropdownOpen}
-                      handleAttachFiles={handleAttachFiles}
-                      onStop={handleStop}
-                      compact={isMobile}
-                    />
-                  </div>
+                  <ChatInput
+                    query={query}
+                    setQuery={setQuery}
+                    onSend={handleSend}
+                    isLoading={isLoading}
+                    placeholderText={placeholderText}
+                    attachedFiles={attachedFiles}
+                    setAttachedFiles={setAttachedFiles}
+                    selectedModel={selectedModel}
+                    setSelectedModel={setSelectedModel}
+                    models={modelCategories}
+                    currentModelLabel={currentModelLabel}
+                    modelDropdownOpen={modelDropdownOpen}
+                    setModelDropdownOpen={setModelDropdownOpen}
+                    handleAttachFiles={handleAttachFiles}
+                    onStop={handleStop}
+                    compact={isMobile}
+                    hero
+                  />
                 </div>
                 <div className="mt-6 w-full">
                   <SuggestedActions onAction={handleSend} />
@@ -1273,7 +1271,7 @@ export default function Dashboard() {
               right: isMobile ? "0" : isSidebarOpen ? "48px" : "48px",
             }}
           >
-            <div className={`mx-auto pointer-events-auto ${isMobile ? 'w-full' : 'w-full max-w-[700px]'}`}>
+            <div className={`mx-auto pointer-events-auto ${isMobile ? 'w-full' : 'w-full max-w-[768px]'}`}>
               <ChatInput
                 query={query}
                 setQuery={setQuery}
@@ -1293,7 +1291,6 @@ export default function Dashboard() {
                 compact={isMobile}
               />
             </div>
-            <InputSeparator />
           </motion.div>
         )}
 

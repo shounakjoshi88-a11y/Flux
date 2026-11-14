@@ -1,13 +1,14 @@
 // src/components/ChatInput.tsx
 import { AnimatePresence, motion } from "framer-motion";
+import { HardDrive, X } from "lucide-react";
 import {
-  ChevronDown,
-  Globe,
-  HardDrive,
-  SendHorizontal,
-  X,
-  Plus,
-} from "lucide-react";
+  IconArrowUp,
+  IconChevronDown,
+  IconGlobe,
+  IconMic,
+  IconPlus,
+  IconStop,
+} from "../layout/anthropicIcons";
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import type { AttachedFile } from "@/types";
 import { marked } from "marked";
@@ -46,6 +47,8 @@ export interface ChatInputProps {
   searchEnabled?: boolean;
   setSearchEnabled?: React.Dispatch<React.SetStateAction<boolean>>;
   compact?: boolean;
+  /** New-chat composer: editor row on top, controls underneath. */
+  hero?: boolean;
   toolsSlot?: React.ReactNode;
 }
 
@@ -182,6 +185,7 @@ export function ChatInput({
   searchEnabled = true,
   setSearchEnabled,
   compact = false,
+  hero = false,
 }: ChatInputProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
@@ -312,6 +316,221 @@ export function ChatInput({
 
   const hasText = query.trim().length > 0;
 
+
+  /* Claude builds its composer from three groups and composes them
+     differently for the hero (new chat) and inline (in-conversation) states. */
+  const editorControl = (
+    <div
+      ref={editorRef}
+      contentEditable
+      suppressContentEditableWarning
+      role="textbox"
+      aria-multiline="true"
+      onInput={handleInput}
+      onKeyDown={handleKeyDown}
+      onPaste={handlePaste}
+      onCompositionStart={handleCompositionStart}
+      onCompositionEnd={handleCompositionEnd}
+      data-placeholder={placeholderText}
+      className="w-full min-h-[21px] max-h-[160px] overflow-y-auto custom-scrollbar text-[15px] leading-[21px] text-[var(--text-primary)] font-sans outline-none [&:empty:before]:content-[attr(data-placeholder)] [&:empty:before]:text-[#a09d96] [&:empty:before]:pointer-events-none [&_p]:my-0 [&_pre]:my-1 [&_pre]:bg-[var(--code-bg)] [&_pre]:rounded-lg [&_pre]:p-2 [&_code]:text-[var(--inline-code-text)] [&_code]:bg-[var(--inline-code-bg)]"
+    />
+  );
+
+  const attachControl = (
+    <div className="relative">
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setAttachMenuOpen(!attachMenuOpen)}
+          className="flex items-center justify-center rounded-full text-white/90 hover:text-white hover:bg-[var(--surface-bg)] transition p-1"
+          title="Attach files"
+        >
+          <IconPlus className="size-5" />
+        </button>
+
+      </div>
+      {isPerfLow ? (
+        attachMenuOpen && (
+          <div className="absolute bottom-full left-0 mb-2 w-48 rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-xl z-50 overflow-hidden">
+            <button
+              onClick={() => {
+                fileInputRef.current?.click();
+                setAttachMenuOpen(false);
+              }}
+              className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--surface-bg)] transition"
+            >
+              <HardDrive className="size-4" />
+              Upload from computer
+            </button>
+          </div>
+        )
+      ) : (
+        <AnimatePresence>
+          {attachMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 4 }}
+              className="absolute bottom-full left-0 mb-2 w-48 rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-xl z-50 overflow-hidden"
+            >
+              <button
+                onClick={() => {
+                  fileInputRef.current?.click();
+                  setAttachMenuOpen(false);
+                }}
+                className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--surface-bg)] transition"
+              >
+                <HardDrive className="size-4" />
+                Upload from computer
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        multiple
+        accept="image/*,video/*,.txt,.md,.docx,.doc,.pdf,.pptx,.ppt,.xlsx,.xls,.csv,.tsv,.c,.h,.cpp,.hpp,.cc,.cxx,.rs,.go,.java,.kt,.swift,.js,.jsx,.ts,.tsx,.py,.rb,.php,.css,.scss,.less,.html,.htm,.xml,.json,.yaml,.yml,.toml,.ini,.cfg,.conf,.sh,.bash,.zsh,.ps1,.bat,.cmd,.sql,.svg,.webp"
+        onChange={(e) => handleLocalFiles(e.target.files)}
+      />
+    </div>
+  );
+
+
+  /* Claude shows the model picker inside the hero composer and in the
+     meta row under the box once a conversation is running. */
+  const modelControl = (dense = false) => {
+    if (hideModelSelector) return null;
+    return (
+      <div className="relative model-selector">
+        <button
+          onClick={() => setModelDropdownOpen((prev) => !prev)}
+          className={dense
+            ? "flex items-center gap-1 text-[12px] leading-[16px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition"
+            : "flex h-7 items-center gap-1 rounded-full px-2 text-[14px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-bg)] transition"}
+        >
+          <span className="max-w-[125px] truncate">{currentModelLabel.replace(/\s*\([^)]*\)/g, "")}</span>
+          {!dense && <IconChevronDown className="size-3.5 opacity-50" />}
+        </button>
+        {isPerfLow ? (
+          modelDropdownOpen && (
+            <div className="absolute bottom-full right-0 mb-2 w-64 max-h-80 overflow-y-auto rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-xl z-[70] p-1.5 custom-scrollbar">
+              {models.map((group) => (group.models.length > 0 && (
+                <div key={group.category} className="mb-1 last:mb-0">
+                  <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] select-none">
+                    {group.category}
+                  </div>
+                  {group.models.map((model) => (
+                    <button
+                      key={model.id}
+                      onClick={() => {
+                        setSelectedModel(model.id);
+                        setModelDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-xs rounded-lg transition flex items-center justify-between ${selectedModel === model.id
+                        ? "text-[var(--accent)] bg-[var(--accent)]/8"
+                        : "text-[var(--text-primary)]/70 hover:bg-[var(--surface-bg)]"
+                        }`}
+                    >
+                      <span>{model.label.replace(/\s*\([^)]*\)/g, "")}</span>
+                      {selectedModel === model.id && <span className="text-[var(--accent)]">●</span>}
+                    </button>
+                  ))}
+                </div>
+              )))}
+            </div>
+          )
+        ) : (
+          <AnimatePresence>
+            {modelDropdownOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                className="absolute bottom-full right-0 mb-2 w-64 max-h-80 overflow-y-auto rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-xl z-[70] p-1.5 custom-scrollbar"
+              >
+                {models.map((group) => (group.models.length > 0 && (
+                  <div key={group.category} className="mb-1 last:mb-0">
+                    <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] select-none">
+                      {group.category}
+                    </div>
+                    {group.models.map((model) => (
+                      <button
+                        key={model.id}
+                        onClick={() => {
+                          setSelectedModel(model.id);
+                          setModelDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-xs rounded-lg transition flex items-center justify-between ${selectedModel === model.id
+                          ? "text-[var(--accent)] bg-[var(--accent)]/8"
+                          : "text-[var(--text-primary)]/70 hover:bg-[var(--surface-bg)]"
+                          }`}
+                      >
+                        <span>{model.label.replace(/\s*\([^)]*\)/g, "")}</span>
+                        {selectedModel === model.id && <span className="text-[var(--accent)]">●</span>}
+                      </button>
+                    ))}
+                  </div>
+                )))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
+      </div>
+    );
+  };
+
+  const rightControls = (
+    <div className="flex items-center gap-1.5">
+      {setSearchEnabled && (
+        <button
+          onClick={() => setSearchEnabled((prev) => !prev)}
+          className={`flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[14px] font-medium transition ${
+            searchEnabled
+              ? "bg-[var(--accent)]/12 border border-[var(--accent)]/25 text-[var(--accent)]"
+              : "text-[var(--text-secondary)]/60 hover:text-[var(--text-primary)] hover:bg-[var(--surface-bg)] border border-transparent"
+          }`}
+        >
+          <IconGlobe className="size-4" />
+          Web
+        </button>
+      )}
+
+      {isLoading ? (
+        <button
+          onClick={onStop}
+          className="h-7 w-7 rounded-full bg-[var(--text-primary)] text-[var(--bg-primary)] hover:opacity-90 flex items-center justify-center transition-colors"
+          aria-label="Stop generating"
+        >
+          <IconStop className="size-3.5" />
+        </button>
+      ) : (
+        <button
+          onClick={handleButtonClick}
+          disabled={isLoading}
+          className={`h-7 w-7 rounded-full flex items-center justify-center transition-all ${
+            hasText
+              ? "bg-[var(--text-primary)] text-[var(--bg-primary)] hover:opacity-90"
+              : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          }`}
+        >
+          {hasText ? (
+            <IconArrowUp className="size-4" />
+          ) : isRecording ? (
+            <div className="flex items-center justify-center h-3 w-3">
+              <AnimatedAudioLines isActive={isRecording} />
+            </div>
+          ) : (
+            /* Idle slot is Claude's dictation button. */
+            <IconMic className="size-4" />
+          )}
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <>
       {previewImage && (
@@ -332,14 +551,14 @@ export function ChatInput({
       )}
       <div
         className={`
-          w-full rounded-2xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-sm relative transition-colors z-10
-          ${compact ? "rounded-none border-x-0" : "max-w-[740px]"}
+          w-full p-2 bg-[var(--user-msg-bg)] relative transition-colors z-10
+          ${compact ? "rounded-none" : "rounded-[14px] max-w-[768px] shadow-[0_2px_12px_rgba(0,0,0,0.18)]"}
         `}
       >
       {/* ─── FILE CARDS ─── */}
       {isPerfLow ? (
         attachedFiles.length > 0 && (
-          <div className="flex flex-wrap gap-4 px-4 pt-3 pb-1 border-b border-[var(--surface-border)]">
+          <div className="flex flex-wrap gap-3 px-1 pb-2">
             {attachedFiles.map((file, idx) => {
               const ext = file.name.split('.').pop()?.toUpperCase() || 'FILE';
               const isImage = file.type?.startsWith('image/');
@@ -382,7 +601,7 @@ export function ChatInput({
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 8 }}
-              className="flex flex-wrap gap-4 px-4 pt-3 pb-1 border-b border-[var(--surface-border)]"
+              className="flex flex-wrap gap-3 px-1 pb-2"
             >
               {attachedFiles.map((file, idx) => {
                 const ext = file.name.split('.').pop()?.toUpperCase() || 'FILE';
@@ -431,206 +650,38 @@ export function ChatInput({
       )}
 
       {/* ─── CONTENTEDITABLE EDITOR (markdown renders inline) ─── */}
-      <div className="px-4 pt-[14px] pb-1">
-        <div
-          ref={editorRef}
-          contentEditable
-          suppressContentEditableWarning
-          role="textbox"
-          aria-multiline="true"
-          onInput={handleInput}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          onCompositionStart={handleCompositionStart}
-          onCompositionEnd={handleCompositionEnd}
-          data-placeholder={placeholderText}
-          className="w-full min-h-[36px] max-h-[160px] overflow-y-auto custom-scrollbar text-[14px] text-[var(--text-primary)] leading-relaxed font-sans outline-none [&:empty:before]:content-[attr(data-placeholder)] [&:empty:before]:text-[#a09d96] [&:empty:before]:pointer-events-none [&_p]:my-0 [&_pre]:my-1 [&_pre]:bg-[var(--code-bg)] [&_pre]:rounded-lg [&_pre]:p-2 [&_code]:text-[var(--inline-code-text)] [&_code]:bg-[var(--inline-code-bg)]"
-        />
-      </div>
-
-      {/* ─── BOTTOM CONTROLS ─── */}
-      <div className="flex items-center justify-between px-3 pb-2">
-        <div className="relative">
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setAttachMenuOpen(!attachMenuOpen)}
-              className="flex items-center justify-center rounded-full text-white/90 hover:text-white hover:bg-[var(--surface-bg)] transition p-1"
-              title="Attach files"
-            >
-              <Plus className="size-4" />
-            </button>
-
-          </div>
-          {isPerfLow ? (
-            attachMenuOpen && (
-              <div className="absolute bottom-full left-0 mb-2 w-48 rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-xl z-50 overflow-hidden">
-                <button
-                  onClick={() => {
-                    fileInputRef.current?.click();
-                    setAttachMenuOpen(false);
-                  }}
-                  className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--surface-bg)] transition"
-                >
-                  <HardDrive className="size-4" />
-                  Upload from computer
-                </button>
-              </div>
-            )
-          ) : (
-            <AnimatePresence>
-              {attachMenuOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 4 }}
-                  className="absolute bottom-full left-0 mb-2 w-48 rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-xl z-50 overflow-hidden"
-                >
-                  <button
-                    onClick={() => {
-                      fileInputRef.current?.click();
-                      setAttachMenuOpen(false);
-                    }}
-                    className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--surface-bg)] transition"
-                  >
-                    <HardDrive className="size-4" />
-                    Upload from computer
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          )}
-          <input
-            type="file"
-            ref={fileInputRef}
-            className="hidden"
-            multiple
-            accept="image/*,video/*,.txt,.md,.docx,.doc,.pdf,.pptx,.ppt,.xlsx,.xls,.csv,.tsv,.c,.h,.cpp,.hpp,.cc,.cxx,.rs,.go,.java,.kt,.swift,.js,.jsx,.ts,.tsx,.py,.rb,.php,.css,.scss,.less,.html,.htm,.xml,.json,.yaml,.yml,.toml,.ini,.cfg,.conf,.sh,.bash,.zsh,.ps1,.bat,.cmd,.sql,.svg,.webp"
-            onChange={(e) => handleLocalFiles(e.target.files)}
-          />
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          {!hideModelSelector && (
-            <div className="relative model-selector">
-              <button
-                onClick={() => setModelDropdownOpen((prev) => !prev)}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-white/85 hover:text-white hover:bg-[var(--surface-bg)] transition"
-              >
-                <span className="max-w-[125px] truncate">{currentModelLabel.replace(/\s*\([^)]*\)/g, "")}</span>
-                <ChevronDown className="size-3 opacity-40" />
-              </button>
-              {isPerfLow ? (
-                modelDropdownOpen && (
-                  <div className="absolute bottom-full right-0 mb-2 w-64 max-h-80 overflow-y-auto rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-xl z-[70] p-1.5 custom-scrollbar">
-                    {models.map((group) => (group.models.length > 0 && (
-                      <div key={group.category} className="mb-1 last:mb-0">
-                        <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] select-none">
-                          {group.category}
-                        </div>
-                        {group.models.map((model) => (
-                          <button
-                            key={model.id}
-                            onClick={() => {
-                              setSelectedModel(model.id);
-                              setModelDropdownOpen(false);
-                            }}
-                            className={`w-full text-left px-3 py-2 text-xs rounded-lg transition flex items-center justify-between ${selectedModel === model.id
-                              ? "text-[var(--accent)] bg-[var(--accent)]/8"
-                              : "text-[var(--text-primary)]/70 hover:bg-[var(--surface-bg)]"
-                              }`}
-                          >
-                            <span>{model.label.replace(/\s*\([^)]*\)/g, "")}</span>
-                            {selectedModel === model.id && <span className="text-[var(--accent)]">●</span>}
-                          </button>
-                        ))}
-                      </div>
-                    )))}
-                  </div>
-                )
-              ) : (
-                <AnimatePresence>
-                  {modelDropdownOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                      className="absolute bottom-full right-0 mb-2 w-64 max-h-80 overflow-y-auto rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-xl z-[70] p-1.5 custom-scrollbar"
-                    >
-                      {models.map((group) => (group.models.length > 0 && (
-                        <div key={group.category} className="mb-1 last:mb-0">
-                          <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] select-none">
-                            {group.category}
-                          </div>
-                          {group.models.map((model) => (
-                            <button
-                              key={model.id}
-                              onClick={() => {
-                                setSelectedModel(model.id);
-                                setModelDropdownOpen(false);
-                              }}
-                              className={`w-full text-left px-3 py-2 text-xs rounded-lg transition flex items-center justify-between ${selectedModel === model.id
-                                ? "text-[var(--accent)] bg-[var(--accent)]/8"
-                                : "text-[var(--text-primary)]/70 hover:bg-[var(--surface-bg)]"
-                                }`}
-                            >
-                              <span>{model.label.replace(/\s*\([^)]*\)/g, "")}</span>
-                              {selectedModel === model.id && <span className="text-[var(--accent)]">●</span>}
-                            </button>
-                          ))}
-                        </div>
-                      )))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              )}
+      {hero ? (
+        <>
+          {/* New chat: editor row on top, controls underneath - claude.ai/new.
+              Claude reserves 32px under the first line so a second line of
+              text appears before the controls row has to move. */}
+          <div className="px-2 pt-[3.5px] pb-[32.5px]">{editorControl}</div>
+          <div className="mt-0.5 flex items-center justify-between gap-2 px-0.5">
+            {attachControl}
+            <div className="flex items-center gap-1.5">
+              {modelControl()}
+              {rightControls}
             </div>
-          )}
-
-          {setSearchEnabled && (
-            <button
-              onClick={() => setSearchEnabled((prev) => !prev)}
-              className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium transition ${
-                searchEnabled
-                  ? "bg-[var(--accent)]/12 border border-[var(--accent)]/25 text-[var(--accent)]"
-                  : "text-[var(--text-secondary)]/60 hover:text-[var(--text-primary)] hover:bg-[var(--surface-bg)] border border-transparent"
-              }`}
-            >
-              <Globe className="size-3.5" />
-              Web
-            </button>
-          )}
-
-          {isLoading ? (
-            <button
-              onClick={onStop}
-              className="h-6 w-6 rounded-full bg-[var(--accent)] hover:bg-[var(--accent)]/90 flex items-center justify-center shadow transition-colors"
-              aria-label="Stop generating"
-            >
-              <div className="w-2 h-2 rounded-sm bg-white" />
-            </button>
-          ) : (
-            <button
-              onClick={handleButtonClick}
-              disabled={isLoading}
-              className={`h-6 w-6 rounded-full flex items-center justify-center transition-all ${
-                hasText
-                  ? "bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 shadow-sm"
-                  : "bg-transparent text-[var(--text-secondary)]/50 hover:text-[var(--text-primary)] hover:bg-[var(--surface-bg)]"
-              }`}
-            >
-              {hasText ? (
-                <SendHorizontal className="size-3" />
-              ) : (
-                <div className="flex items-center justify-center h-3 w-3">
-                  <AnimatedAudioLines isActive={isRecording} />
-                </div>
-              )}
-            </button>
-          )}
+          </div>
+        </>
+      ) : (
+        /* Mid-conversation: one 44px row - plus, text, controls. */
+        <div className="flex items-end gap-1">
+          <div className="shrink-0">{attachControl}</div>
+          <div className="min-w-0 flex-1 py-[3.5px]">{editorControl}</div>
+          <div className="flex shrink-0 items-center gap-1">{rightControls}</div>
         </div>
-      </div>
+      )}
     </div>
+
+    {/* Meta row: Claude keeps this below the composer box, not inside it.
+        In conversation the model picker lives here instead of in the box. */}
+    {!hero && (
+      <div className="mx-auto mt-2 flex w-full max-w-[768px] items-center justify-between px-1 text-[12px] leading-[16px] text-[var(--text-muted)]">
+        <span className="truncate">Flux can make mistakes. Please double-check responses.</span>
+        {modelControl(true)}
+      </div>
+    )}
     </>
   );
 }

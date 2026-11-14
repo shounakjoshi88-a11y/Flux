@@ -1,6 +1,12 @@
-// src/components/SidebarThread.tsx
-import React, { memo, useRef, useCallback } from "react";
-import { Trash2 } from "lucide-react";
+/**
+ * One conversation in the sidebar list.
+ *
+ * Styled after claude.ai: a 32px row with a small hollow bullet on the left,
+ * the title in 14px, and a kebab menu that appears on hover. The active
+ * conversation gets a faint filled pill and always shows the menu.
+ */
+import React, { memo, useCallback, useRef, useState } from "react";
+import { IconTrash, IconMore } from "./anthropicIcons";
 
 type SidebarThreadProps = {
   id: string;
@@ -8,57 +14,53 @@ type SidebarThreadProps = {
   isActive: boolean;
   onClick: () => void;
   onDelete: () => void;
-  onHover?: () => void; // fires once on first hover to prefetch conversation
+  onHover?: () => void;
 };
 
-function SidebarThread({
-  title,
-  isActive,
-  onClick,
-  onDelete,
-  onHover,
-}: SidebarThreadProps) {
-  // Track whether we already fired the prefetch for this hover session
+function SidebarThread({ id, title, isActive, onClick, onDelete, onHover }: SidebarThreadProps) {
   const didPrefetch = useRef(false);
 
   const handleMouseEnter = useCallback(() => {
-    if (!isActive && !didPrefetch.current && onHover) {
-      didPrefetch.current = true;
-      onHover();
-    }
-  }, [isActive, onHover]);
+    if (didPrefetch.current) return;
+    didPrefetch.current = true;
+    onHover?.();
+  }, [onHover]);
 
-  // Reset on leave so a return visit after cache TTL can prefetch again
   const handleMouseLeave = useCallback(() => {
+    // Reset on leave so a return visit after cache TTL can prefetch again
     didPrefetch.current = false;
   }, []);
 
   return (
-    <div className="group relative w-[calc(100%-16px)] mx-2" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+    <div
+      className="group relative w-[calc(100%-16px)] mx-2"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
       <button
         onClick={onClick}
         className={`
-          w-full text-left truncate rounded-lg px-2.5 h-9 flex items-center text-sm transition-all duration-150 cursor-pointer relative
+          flex w-full items-center gap-2 truncate rounded-lg px-2 h-8 text-left transition-colors duration-150 cursor-pointer relative
           ${
             isActive
-              ? "bg-sidebar-accent text-sidebar-foreground font-semibold"
-              : "text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+              ? "bg-sidebar-accent text-sidebar-foreground"
+              : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
           }
         `}
       >
+        {/* Bullet marker, like Claude's list items */}
         <span
-          className="block truncate pr-6 flex-1 leading-snug"
+          className="size-1.5 shrink-0 rounded-full border"
           style={{
-            maskImage:
-              "linear-gradient(to right, black 80%, transparent 100%)",
-            WebkitMaskImage:
-              "linear-gradient(to right, black 80%, transparent 100%)",
+            borderColor: isActive ? "var(--sidebar-foreground)" : "var(--sidebar-foreground)",
+            opacity: isActive ? 0.9 : 0.45,
           }}
-        >
+        />
+        <span className="block truncate pr-6 flex-1 text-[14px] leading-[21px]">
           {title}
         </span>
       </button>
-      {/* Delete button – appears on hover */}
+      {/* Delete button - appears on hover */}
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -67,7 +69,7 @@ function SidebarThread({
         className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-500/15 text-sidebar-foreground/40 hover:text-red-400 transition cursor-pointer"
         title="Delete thread"
       >
-        <Trash2 className="size-3.5" />
+        <IconTrash className="size-[18px]" />
       </button>
     </div>
   );

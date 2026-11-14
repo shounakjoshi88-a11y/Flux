@@ -3,25 +3,28 @@ import { AnimatePresence, motion } from "framer-motion";
 import { BACKEND_URL } from "../../lib/config";
 import { usePerformance } from "../../lib/performance-context";
 import {
-  ChevronDown,
   LogOut,
   Settings as SettingsIcon,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Search,
-  Component,
   CircleX,
   Loader2,
   MessageSquare,
   History,
   X,
-  Newspaper,
-  Plus,
-  ChevronsUpDown,
-  Bot,
-  Users,
-  Network,
+  ChevronDown,
 } from "lucide-react";
+import {
+  IconPlus,
+  IconSearch,
+  IconArtifacts,
+  IconGraph,
+  IconGlobe,
+  IconTerminal,
+  IconPeople,
+  IconGear,
+  IconPanel,
+  IconPanelOpen,
+  IconGroupSort,
+} from "./anthropicIcons";
 import type { User } from "@supabase/supabase-js";
 import { SidebarThread } from "./SidebarThread";
 import { useState, useRef, useEffect, memo, useCallback, useMemo } from "react";
@@ -489,7 +492,7 @@ export const Sidebar = memo(function Sidebar({
           border-r border-sidebar-border
           overflow-hidden
         `}
-        animate={{ width: isOpen ? 260 : 64 }}
+        animate={{ width: isOpen ? 288 : 64 }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
         style={{ willChange: "width" }}
       >
@@ -518,7 +521,7 @@ export const Sidebar = memo(function Sidebar({
                 className="p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/45 hover:text-sidebar-foreground/80 transition-colors cursor-pointer"
                 title="Search chats"
               >
-                <Search className="size-4" />
+                <IconSearch className="size-[18px]" />
               </button>
               <button
                 type="button"
@@ -526,7 +529,7 @@ export const Sidebar = memo(function Sidebar({
                 className="p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/45 hover:text-sidebar-foreground/80 transition-colors cursor-pointer"
                 aria-label="Close sidebar"
               >
-                <PanelLeftClose className="size-4" />
+                <IconPanel className="size-5" />
               </button>
             </div>
             {!isOpen && (
@@ -536,24 +539,37 @@ export const Sidebar = memo(function Sidebar({
                 className="absolute right-0 top-3 p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/45 hover:text-sidebar-foreground/80 transition-colors cursor-pointer w-[64px] flex justify-center"
                 aria-label="Open sidebar"
               >
-                <PanelLeftOpen className="size-4" />
+                <IconPanelOpen className="size-5" />
               </button>
             )}
           </div>
 
           {/* Nav Section */}
-          <div className="flex flex-col gap-0.5 mb-5">
+          <div className="flex flex-col gap-px mb-4">
             {/* New Chat */}
             <button
               type="button"
               onClick={onCreateThread}
-              className={`flex items-center h-9 rounded-xl transition-all cursor-pointer gap-2.5
-                border border-sidebar-border hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground
-                ${isOpen ? "w-full px-3 justify-start" : "w-10 mx-auto justify-center"}`}
+              className={`flex items-center h-8 rounded-lg transition-colors cursor-pointer gap-1 px-0.5
+                hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground
+                ${isOpen ? "w-full justify-start" : "w-8 mx-auto justify-center"}`}
               title="New chat"
             >
-              <Plus className="size-4 shrink-0 text-sidebar-foreground/50" />
-              {isOpen && <span className="text-[13px] font-medium whitespace-nowrap">New chat</span>}
+              <span className="flex size-7 shrink-0 items-center justify-center"><IconPlus className="size-5 shrink-0" /></span>
+              {isOpen && <span className="text-[14px] leading-[21px] font-[435] whitespace-nowrap">New</span>}
+            </button>
+
+            {/* Search */}
+            <button
+              type="button"
+              onClick={openSearchModal}
+              className={`flex items-center h-8 rounded-lg transition-colors cursor-pointer gap-1 px-0.5
+                hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground
+                ${isOpen ? "w-full justify-start" : "w-8 mx-auto justify-center"}`}
+              title="Search chats"
+            >
+              <span className="flex size-7 shrink-0 items-center justify-center"><IconSearch className="size-5 shrink-0" /></span>
+              {isOpen && <span className="text-[14px] leading-[21px] font-[435] whitespace-nowrap">Search</span>}
             </button>
 
             {/* Artifacts */}
@@ -561,64 +577,77 @@ export const Sidebar = memo(function Sidebar({
               type="button"
               onClick={onArtifactsOpen}
               onMouseEnter={onArtifactsPrefetch}
-              className={`flex items-center h-9 rounded-xl hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-all gap-2.5 cursor-pointer
-                ${isOpen ? "w-full px-3 justify-start" : "w-10 mx-auto justify-center"}`}
+              className={`flex items-center h-8 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/75 hover:text-sidebar-foreground transition-colors gap-1 px-0.5 cursor-pointer
+                ${isOpen ? "w-full justify-start" : "w-8 mx-auto justify-center"}`}
               title="Artifacts"
             >
-              <Component className="size-4 shrink-0" />
-              {isOpen && <span className="text-[13px] font-medium whitespace-nowrap">Artifacts</span>}
+              <span className="flex size-7 shrink-0 items-center justify-center"><IconArtifacts className="size-5 shrink-0" /></span>
+              {isOpen && <span className="text-[14px] leading-[21px] font-[435] whitespace-nowrap">Artifacts</span>}
             </button>
 
             {/* Knowledge Graph */}
             <button
               type="button"
               onClick={onWikiOpen}
-              className={`flex items-center h-9 rounded-xl hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-all gap-2.5 cursor-pointer
-                ${isOpen ? "w-full px-3 justify-start" : "w-10 mx-auto justify-center"}`}
+              className={`flex items-center h-8 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/75 hover:text-sidebar-foreground transition-colors gap-1 px-0.5 cursor-pointer
+                ${isOpen ? "w-full justify-start" : "w-8 mx-auto justify-center"}`}
               title="Knowledge Graph"
             >
-              <Network className="size-4 shrink-0" />
-              {isOpen && <span className="text-[13px] font-medium whitespace-nowrap">Knowledge Graph</span>}
+              <span className="flex size-7 shrink-0 items-center justify-center"><IconGraph className="size-5 shrink-0" /></span>
+              {isOpen && <span className="text-[14px] leading-[21px] font-[435] whitespace-nowrap">Knowledge Graph</span>}
             </button>
 
             {/* Live News */}
             <button
               type="button"
               onClick={onNewsOpen}
-              className={`flex items-center h-9 rounded-xl hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-all gap-2.5 cursor-pointer
-                ${isOpen ? "w-full px-3 justify-start" : "w-10 mx-auto justify-center"}`}
+              className={`flex items-center h-8 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/75 hover:text-sidebar-foreground transition-colors gap-1 px-0.5 cursor-pointer
+                ${isOpen ? "w-full justify-start" : "w-8 mx-auto justify-center"}`}
               title="Live News"
             >
-              <Newspaper className="size-4 shrink-0" />
-              {isOpen && <span className="text-[13px] font-medium whitespace-nowrap">Live News</span>}
+              <span className="flex size-7 shrink-0 items-center justify-center"><IconGlobe className="size-5 shrink-0" /></span>
+              {isOpen && <span className="text-[14px] leading-[21px] font-[435] whitespace-nowrap">Live News</span>}
             </button>
 
             {/* Agents */}
             <button
               type="button"
               onClick={onCustomAgentsOpen}
-              className={`flex items-center h-9 rounded-xl hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-all gap-2.5 cursor-pointer
-                ${isOpen ? "w-full px-3 justify-start" : "w-10 mx-auto justify-center"}`}
+              className={`flex items-center h-8 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/75 hover:text-sidebar-foreground transition-colors gap-1 px-0.5 cursor-pointer
+                ${isOpen ? "w-full justify-start" : "w-8 mx-auto justify-center"}`}
               title="Custom Agents"
             >
-              <Bot className="size-4 shrink-0" />
-              {isOpen && <span className="text-[13px] font-medium whitespace-nowrap">Agents</span>}
+              <span className="flex size-7 shrink-0 items-center justify-center"><IconTerminal className="size-5 shrink-0" /></span>
+              {isOpen && <span className="text-[14px] leading-[21px] font-[435] whitespace-nowrap">Agents</span>}
             </button>
 
             {/* Team */}
             <button
               type="button"
               onClick={onTeamOpen}
-              className={`flex items-center h-9 rounded-xl hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-all gap-2.5 cursor-pointer
-                ${isOpen ? "w-full px-3 justify-start" : "w-10 mx-auto justify-center"}`}
+              className={`flex items-center h-8 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/75 hover:text-sidebar-foreground transition-colors gap-1 px-0.5 cursor-pointer
+                ${isOpen ? "w-full justify-start" : "w-8 mx-auto justify-center"}`}
               title="Team Mode"
             >
-              <Users className="size-4 shrink-0" />
-              {isOpen && <span className="text-[13px] font-medium whitespace-nowrap">Team</span>}
+              <span className="flex size-7 shrink-0 items-center justify-center"><IconPeople className="size-5 shrink-0" /></span>
+              {isOpen && <span className="text-[14px] leading-[21px] font-[435] whitespace-nowrap">Team</span>}
             </button>
           </div>
 
           {/* Conversations List */}
+        {isOpen && (
+          <div className="flex h-11 items-center justify-between px-2">
+            <span className="text-[14px] leading-[21px] font-[435] text-sidebar-foreground/75">Chats and tasks</span>
+            <button
+              type="button"
+              onClick={openSearchModal}
+              className="rounded-md p-1 text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground/80 transition cursor-pointer"
+              title="Search chats"
+            >
+              <IconGroupSort className="size-4" />
+            </button>
+          </div>
+        )}
           {isPerfLow ? (
             isOpen && (
               <div className="flex-1 relative mt-4 flex flex-col" style={{ minHeight: 0 }}>
@@ -640,7 +669,7 @@ export const Sidebar = memo(function Sidebar({
                       item.type === "header" ? (
                         <div
                           key={`header-${item.label}-${index}`}
-                          className="text-[10px] font-bold text-sidebar-foreground/35 uppercase tracking-widest pl-4 pt-5 pb-1 select-none font-sans"
+                          className="text-[12px] font-medium text-sidebar-foreground/40 pl-3 pt-5 pb-1.5 select-none"
                         >
                           {item.label}
                         </div>
@@ -691,7 +720,7 @@ export const Sidebar = memo(function Sidebar({
                         item.type === "header" ? (
                           <div
                             key={`header-${item.label}-${index}`}
-                            className="text-[10px] font-bold text-sidebar-foreground/35 uppercase tracking-widest pl-4 pt-5 pb-1 select-none font-sans"
+                            className="text-[12px] font-medium text-sidebar-foreground/40 pl-3 pt-5 pb-1.5 select-none"
                           >
                             {item.label}
                           </div>
@@ -804,7 +833,7 @@ export const Sidebar = memo(function Sidebar({
                         {user?.email?.split("@")[0]}
                       </p>
                     </div>
-                    <ChevronsUpDown
+                    <IconGroupSort
                       className={`size-3 text-sidebar-foreground/40 transition-transform duration-200 ${
                         userMenuOpen ? "rotate-180" : ""
                       }`}
@@ -826,7 +855,7 @@ export const Sidebar = memo(function Sidebar({
                           {user?.email?.split("@")[0]}
                         </p>
                       </div>
-                      <ChevronsUpDown
+                      <IconGroupSort
                         className={`size-3 text-sidebar-foreground/40 transition-transform duration-200 ${
                           userMenuOpen ? "rotate-180" : ""
                         }`}
@@ -847,7 +876,7 @@ export const Sidebar = memo(function Sidebar({
             <div className="absolute inset-0 bg-black/50" />
             <div className="relative w-full max-w-[720px] bg-[var(--bg-primary)]/95 border border-[var(--surface-border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center gap-3 px-4 py-4 border-b border-[var(--surface-border)]">
-                <Search className="size-4 text-[var(--text-muted)] shrink-0" />
+                <IconSearch className="size-4 text-[var(--text-muted)] shrink-0" />
                 <input
                   ref={searchInputRef}
                   type="text"
@@ -972,7 +1001,7 @@ export const Sidebar = memo(function Sidebar({
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex items-center gap-3 px-4 py-4 border-b border-[var(--surface-border)]">
-                  <Search className="size-4 text-[var(--text-muted)] shrink-0" />
+                  <IconSearch className="size-4 text-[var(--text-muted)] shrink-0" />
                   <input
                     ref={searchInputRef}
                     type="text"
