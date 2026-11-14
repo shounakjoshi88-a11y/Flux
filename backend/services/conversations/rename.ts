@@ -10,7 +10,7 @@ import { nim } from '../../services/models/nim-client';
 import { prisma } from '../../db/prisma';
 import { sanitizeTitle } from '../../http/util/sanitize';
 import { slugify } from '../../http/util/slug';
-export const TITLE_MODEL = nim.chatModel('meta/llama-4-maverick-17b-128e-instruct');
+export const TITLE_MODEL = nim.chatModel('nvidia/nemotron-3-ultra-550b-a55b');
 
 export function extractTitle(query: string): string {
     let q = query.trim();

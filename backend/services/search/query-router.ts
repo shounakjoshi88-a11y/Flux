@@ -1,14 +1,9 @@
 // query-router.ts — Classifies queries and routes to appropriate model
 
-const CHEAP_MODEL_ID = "step-3.7-flash";
+const CHEAP_MODEL_ID = "nemotron-3-nano-omni-30b-a3b-reasoning";
 const EXPENSIVE_MODELS = new Set([
-  "mistral-large-675b",
-  "glm-5.2",
   "nemotron-3-ultra-550b",
-  "mistral-medium-3.5-128b",
-  "qwen3.5-397b-a17b",
-  "deepseek-v4-pro",
-  "minimax-m3",
+  "laguna-xs-2.1",
 ]);
 
 type Complexity = "simple" | "complex";
@@ -63,7 +58,7 @@ export function routeModel(preferredModel: string | undefined, query: string): {
   complexity: Complexity;
   wasRouted: boolean;
 } {
-  const modelId = preferredModel || "deepseek-v4-pro";
+  const modelId = preferredModel || "nemotron-3-ultra-550b";
   const complexity = classifyQuery(query);
 
   if (complexity === "simple" && isExpensiveModel(modelId)) {

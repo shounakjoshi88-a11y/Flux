@@ -9,7 +9,7 @@ const MAX_SUBAGENTS = 3;
 const MAX_ITERATIONS = 2;
 const MAX_CONCURRENT_SANDBOXES = 3;
 
-const PLANNER_MODEL = process.env.PLANNER_MODEL || 'moonshotai/kimi-k2.6';
+const PLANNER_MODEL = process.env.PLANNER_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b';
 
 export interface BuildRequest {
   buildId: string;

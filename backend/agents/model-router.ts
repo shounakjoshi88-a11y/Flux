@@ -9,37 +9,20 @@
 import { nim } from '../services/models/nim-client';
 import { isModelHealthy, recordFailure, recordSuccess, getShortTimeout } from './model-health';
 
+// Only models verified live on NVIDIA NIM (2026-11-14). Retired entries
+// (see RETIRED_MODELS in model-health.ts) were removed; re-add after
+// verifying with a fresh call.
 export const NIM_MODELS: Record<string, string> = {
-    "llama-4-maverick": "meta/llama-4-maverick-17b-128e-instruct",
-    "mistral-large-675b": "mistralai/mistral-large-3-675b-instruct-2512",
-    "glm-5.2": "z-ai/glm-5.2",
-    "kimi-k2.6": "moonshotai/kimi-k2.6",
     "nemotron-3-ultra-550b": "nvidia/nemotron-3-ultra-550b-a55b",
     "nemotron-3-nano-omni-30b-a3b-reasoning": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-    "mistral-medium-3.5-128b": "mistralai/mistral-medium-3.5-128b",
-    "nemotron-3-super-120b-a12b": "nvidia/nemotron-3-super-120b-a12b",
-    "deepseek-v4-flash": "deepseek-ai/deepseek-v4-flash",
-    "step-3.7-flash": "stepfun-ai/step-3.7-flash",
-    "qwen3.5-397b-a17b": "qwen/qwen3.5-397b-a17b",
-    "step-3.5-flash": "stepfun-ai/step-3.5-flash",
-    "minimax-m2.7": "minimaxai/minimax-m2.7",
-    "minimax-m3": "minimaxai/minimax-m3",
-    "deepseek-v4-pro": "deepseek-ai/deepseek-v4-pro",
-    "sarvam-m": "sarvamai/sarvam-m",
-    "stockmark-2-100b-instruct": "stockmark/stockmark-2-100b-instruct",
-    "nemotron-nano-12b-v2-vl": "nvidia/nemotron-nano-12b-v2-vl",
-    "inkling": "thinkingmachines/inkling",
     "laguna-xs-2.1": "poolside/laguna-xs-2.1",
 };
 
 // ── Vision-capable models ──────────────────────────────────
-export const VISION_MODELS = new Set([
-    "nemotron-nano-12b-v2-vl",
-    "kimi-k2.6",
-    "minimax-m3",
-    "deepseek-v4-pro",
-    "inkling",
-]);
+// No live vision-capable model in the verified NIM catalog right now —
+// every previously-listed VL model is retired. Kept as an (empty) set so
+// vision routing simply never triggers until a VL model returns.
+export const VISION_MODELS = new Set<string>([]);
 
 // ── selectModel returns a proper AI SDK model instance ──
 export function createFallbackModel(primaryModel: any, preferredModelId: string | undefined, modelsMap: Record<string, string>): any {
@@ -137,8 +120,8 @@ export function selectModel(preferredModel: string | undefined): any {
         primaryModel = nim.chatModel(NIM_MODELS[preferredModel]);
         actualPref = preferredModel;
     } else {
-        primaryModel = nim.chatModel('deepseek-ai/deepseek-v4-pro');
-        actualPref = 'deepseek-v4-pro';
+        primaryModel = nim.chatModel('nvidia/nemotron-3-ultra-550b-a55b');
+        actualPref = 'nemotron-3-ultra-550b';
     }
     return createFallbackModel(primaryModel, actualPref, NIM_MODELS);
 }
@@ -154,46 +137,30 @@ export function routeModel(preferredModel: string | undefined, query: string, pr
         const { routeModel: rm } = require('../services/search/query-router');
         return rm(preferredModel, query, previousQuery);
     } catch {
-        return { modelId: preferredModel || "deepseek-v4-pro", tier: "power", score: 0.5, wasRouted: false };
+        return { modelId: preferredModel || "nemotron-3-ultra-550b", tier: "power", score: 0.5, wasRouted: false };
     }
 }
 
 // ── getProviderOptions – used only for thinking stream ──
-export function getProviderOptions(modelId: string | undefined) {
-    if (modelId === "deepseek-r1" || modelId === "deepseek-v4-flash") {
-        return { nim: { enable_thinking: true } };
-    }
+export function getProviderOptions(_modelId: string | undefined) {
     return {};
 }
 
 
+// The selectable catalog shown by the frontend. Only models verified live
+// on NVIDIA NIM on 2026-11-14 are listed; the retired ones (see
+// RETIRED_MODELS in model-health.ts) were removed instead of being listed
+// and failing on every pick. Re-add after verifying with a fresh call.
 export const AVAILABLE_MODELS = [
     {
         category: "General Purpose", models: [
-            { id: "mistral-large-675b", label: "Mistral Large 3 675B (Mistral AI)" },
-            { id: "glm-5.2", label: "GLM 5.2 (Z‑AI)" },
-            { id: "kimi-k2.6", label: "Kimi K2.6 (Moonshot AI)" },
             { id: "nemotron-3-ultra-550b", label: "Nemotron 3 Ultra 550B (NVIDIA)" },
-            { id: "mistral-medium-3.5-128b", label: "Mistral Medium 3.5 128B (Mistral AI)" },
-            { id: "nemotron-3-super-120b-a12b", label: "Nemotron 3 Super 120B (NVIDIA)" },
-            { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash Free (DeepSeek)" },
-            { id: "qwen3.5-397b-a17b", label: "Qwen 3.5 397B (Qwen)" },
-            { id: "minimax-m2.7", label: "MiniMax M2.7 (MiniMax)" },
-            { id: "minimax-m3", label: "MiniMax M3 (MiniMax)" },
-            { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro (DeepSeek)" },
-            { id: "sarvam-m", label: "Sarvam-M (Sarvam AI)" },
-            { id: "stockmark-2-100b-instruct", label: "Stockmark 2 100B (Stockmark)" },
-            { id: "nemotron-nano-12b-v2-vl", label: "Nemotron Nano 12B v2 VL (NVIDIA)" },
             { id: "laguna-xs-2.1", label: "Laguna XS 2.1 (Poolside)" },
-            { id: "sarvamai", label: "Sarvamai (Sarvamai)" },
         ]
     },
     {
         category: "Reasoning & Agents", models: [
-            { id: "step-3.7-flash", label: "Step 3.7 Flash (StepFun)" },
-            { id: "step-3.5-flash", label: "Step 3.5 Flash (StepFun)" },
             { id: "nemotron-3-nano-omni-30b-a3b-reasoning", label: "Nemotron 3 Nano Omni 30B Reasoning (NVIDIA)" },
-            { id: "inkling", label: "Inkling (Thinking Machines)" },
         ]
     },
 ];

@@ -46,7 +46,7 @@ export async function planTask(taskId: string): Promise<void> {
 
   let steps: { title: string; description: string }[];
   try {
-    const model = nim.chatModel('moonshotai/kimi-k2.6');
+    const model = nim.chatModel('nvidia/nemotron-3-ultra-550b-a55b');
     const res = await generateText({
       model,
       system: TASK_PLANNER_SYSTEM,
@@ -133,7 +133,7 @@ async function executeStep(
   });
   const contextSummary = previousSteps.map(s => `Step ${s.index + 1} (${s.title}): ${s.result || 'completed'}`).join('\n');
 
-  const model = nim.chatModel('moonshotai/kimi-k2.6');
+  const model = nim.chatModel('nvidia/nemotron-3-ultra-550b-a55b');
 
   const sandboxTools = {
     run_bash: (tool as any)({

@@ -2,27 +2,17 @@
 import { nim } from '../../services/models/nim-client';
 import { isModelHealthy, recordFailure, recordSuccess, getShortTimeout } from '../model-health';
 
+// Only models verified live on NVIDIA NIM (2026-11-14). Keys the fallback
+// walk can reach; the retired catalog entries were removed so every user
+// message does not pay a 410 round-trip for 14 dead models first.
+// See agents/model-health.ts RETIRED_MODELS for the full retired list.
 const NIM_MODELS: Record<string, string> = {
-  "llama-4-maverick": "meta/llama-4-maverick-17b-128e-instruct",
-  "mistral-large-675b": "mistralai/mistral-large-3-675b-instruct-2512",
-  "glm-5.2": "z-ai/glm-5.2",
-  "kimi-k2.6": "moonshotai/kimi-k2.6",
   "nemotron-3-ultra-550b": "nvidia/nemotron-3-ultra-550b-a55b",
   "nemotron-3-nano-omni-30b-a3b-reasoning": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-  "mistral-medium-3.5-128b": "mistralai/mistral-medium-3.5-128b",
-  "nemotron-3-super-120b-a12b": "nvidia/nemotron-3-super-120b-a12b",
-  "deepseek-v4-flash": "deepseek-ai/deepseek-v4-flash",
-  "step-3.7-flash": "stepfun-ai/step-3.7-flash",
-  "qwen3.5-397b-a17b": "qwen/qwen3.5-397b-a17b",
-  "step-3.5-flash": "stepfun-ai/step-3.5-flash",
-  "minimax-m2.7": "minimaxai/minimax-m2.7",
-  "stockmark-2-100b-instruct": "stockmark/stockmark-2-100b-instruct",
-  "nemotron-nano-12b-v2-vl": "nvidia/nemotron-nano-12b-v2-vl",
-  "inkling": "thinkingmachines/inkling",
   "laguna-xs-2.1": "poolside/laguna-xs-2.1",
 };
 
-const VISION_MODELS = new Set(["nemotron-nano-12b-v2-vl", "kimi-k2.6", "inkling"]);
+const VISION_MODELS = new Set();
 
 function createFallbackModel(primaryModel: any, preferredModelId: string | undefined, modelsMap: Record<string, string>): any {
   const getFallbackSequence = (prefId?: string) => {
@@ -118,8 +108,8 @@ export function selectModel(preferredModel?: string): any {
     primaryModel = nim.chatModel(NIM_MODELS[preferredModel]);
     actualPref = preferredModel;
   } else {
-    primaryModel = nim.chatModel('moonshotai/kimi-k2.6');
-    actualPref = 'kimi-k2.6';
+    primaryModel = nim.chatModel('nvidia/nemotron-3-ultra-550b-a55b');
+    actualPref = 'nemotron-3-ultra-550b';
   }
   return createFallbackModel(primaryModel, actualPref, NIM_MODELS);
 }

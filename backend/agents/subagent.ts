@@ -18,7 +18,7 @@ export interface SubagentResult {
   error?: string;
 }
 
-const DEFAULT_SUBAGENT_MODEL = process.env.SUBAGENT_MODEL || 'deepseek-ai/deepseek-v4-pro';
+const DEFAULT_SUBAGENT_MODEL = process.env.SUBAGENT_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b';
 
 export async function runSubagent(
   task: SubagentTask,

@@ -2,7 +2,7 @@ import { generateText } from 'ai';
 import { nim } from '../models/nim-client';
 import { prisma } from '../../db/prisma';
 
-const EXTRACT_MODEL = nim.chatModel('meta/llama-4-maverick-17b-128e-instruct');
+const EXTRACT_MODEL = nim.chatModel('nvidia/nemotron-3-ultra-550b-a55b');
 const CHUNK_SIZE = 3;
 
 export type WikiNodeInfo = {

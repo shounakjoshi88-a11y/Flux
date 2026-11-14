@@ -159,7 +159,7 @@ async function handleSessionStart(ws: AuthenticatedSocket, payload: any) {
   const config: AgentSessionConfig = {
     userId: ws.userId,
     conversationId: conversationId || "",
-    model: model || "kimi-k2.6",
+    model: model || "nemotron-3-ultra-550b",
     mode: (mode as AgentMode) || "default",
   };
 
@@ -176,8 +176,8 @@ async function handleSessionStart(ws: AuthenticatedSocket, payload: any) {
     maxTools: 25,
     maxSteps: 30,
     supportsStreaming: true,
-    supportsVision: ["kimi-k2.6", "nemotron-nano-12b-v2-vl"].includes(config.model),
-    supportsThinking: ["deepseek-v4-flash", "step-3.7-flash"].includes(config.model),
+    supportsVision: ["nemotron-3-ultra-550b", "nemotron-nano-12b-v2-vl"].includes(config.model),
+    supportsThinking: false,
     supportedModes: ["default", "plan", "yolo"],
     availableTools: ["web_search", "read_skill", "generate_document", "get_weather", "generate_image", "shell_execute", "file_list", "file_read", "file_write"],
     maxContextLength: 128000,
