@@ -11,9 +11,7 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { tavilyClient, searchDepthFor } from '../../services/search/tavily';
 import {
-    isFollowUpQuery,
     isGenericQuery,
-    isQueryRelevant,
     smartRewriteQuery,
     STOPWORDS,
 } from '../../services/search/query';
@@ -135,17 +133,11 @@ in the history (the PDF they attached, your legitimacy analysis, the docs or pos
 THAT — or answer directly from the history without calling web_search again.`;
                     }
                 }
+                // Model queries are trusted (relevance is no longer checked
+                // lexically — a zero-signal user message like "go ahead" can
+                // follow any topic). The verbatim-affirmation refusal above, the
+                // 2-search cap and the generic-filler refusal are the gates.
                 for (const mq of modelQueries) {
-                    if (userQuery && mq.toLowerCase() === userQuery?.toLowerCase()) {
-                        if (state.searchCount === 0) queriesToRun.push(mq);
-                        continue;
-                    }
-                    if (userQuery && !isFollowUpQuery(userQuery) && !isQueryRelevant(userQuery, mq)) {
-                        console.warn(
-                            `[TOOL] web_search dropped hallucinated query - model query "${mq}" has no relation to user query "${userQuery}"`,
-                        );
-                        continue;
-                    }
                     queriesToRun.push(mq);
                 }
 

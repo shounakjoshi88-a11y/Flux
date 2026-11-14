@@ -37,40 +37,9 @@ export function extractProperNouns(text: string): string[] {
     return [...new Set(out)];
 }
 
-export function isQueryRelevant(userQuery: string, modelQuery: string): boolean {
-    const uTokens = extractTokens(userQuery);
-    const mTokens = extractTokens(modelQuery);
-
-    if (mTokens.length === 0) return false;
-    if (uTokens.length === 0) return true;
-
-    const mLower = modelQuery.toLowerCase();
-
-    // Hard gate: user query has ≥2 proper nouns but model query has ZERO of them
-    // This is the instruction-echo signature — reject it
-    const uProperNouns = extractProperNouns(userQuery);
-    if (uProperNouns.length >= 2) {
-        const hits = uProperNouns.filter(pn => mLower.includes(pn));
-        if (hits.length === 0) return false;
-    }
-
-    // Require stricter overlap for long user queries (more entities = higher bar)
-    const overlapping = mTokens.filter((t: string) => uTokens.includes(t));
-    const minRequired = uTokens.length > 5 ? 2 : 1;
-    if (overlapping.length >= minRequired) return true;
-
-    // Bigram phrase check
-    for (let i = 0; i < uTokens.length - 1; i++) {
-        const bigram = `${uTokens[i]} ${uTokens[i + 1]}`;
-        if (mLower.includes(bigram)) return true;
-    }
-
-    return false;
-}
-
 // ── Smart query rewriting ────────────────────────────────────────────────────
 
-export const INSTRUCTION_ECHO_RE = /^(search\s+(for|up|about|the|on|regarding)?\s*|look\s+up\s+|find\s+(out\s+)?(about\s+)?|tell\s+me\s+(about\s+|the\s+)?|show\s+me\s+|get\s+(me\s+)?|what\s+(is|are|does|were)\s+|can\s+you\s+(find|search|tell|show)\s+|please\s+(search|find|look\s+up)?\s+|i\s+(want|need)\s+to\s+(find|know|search)(\s+about)?\s+)/gi;
+export const INSTRUCTION_ECHO_RE = /^(search\s+(for|up|about|the|on|regarding)?\s*|look\s+up\s*|find\s+(out\s+)?(about\s+)?|tell\s+me\s+(about\s+|the\s+)?|show\s+me\s+|get\s+(me\s+)?|what\s+(is|are|does|were)\s+|can\s+you\s+(find|search|tell|show)\s+|please\s+(search|find|look\s+up)?\s+|i\s+(want|need)\s+to\s+(find|know|search)(\s+about)?\s+)/gi;
 export const TRAVEL_FILLER_RE = /^(tours?\s+and\s+travels?\s+(for\s+(visiting|going\s+to)?\s*|to\s+)?|travel\s+(to|for)\s+|visit(?:ing)?\s+(to\s+)?)/i;
 export const TRAILING_NOISE_RE = /\s*(,\s*)?(and\s+)?(please|for\s+me|right\s+now|asap|as\s+well|also|too|with\s+details?|in\s+detail)\.?$/gi;
 export const PRICE_SUFFIX_RE = /\s+(and\s+)?(prices?|costs?|pricing|fees?|charges?|rates?)\s+too\.?$/i;
@@ -252,33 +221,3 @@ export function isGenericQuery(q: string): boolean {
     ];
     return genericPatterns.some(pat => pat.test(clean));
 }
-
-/** Returns true if the user's message is a generic follow-up that
- *  doesn't contain the topic itself. In this case we trust the model's
- *  own generated query rather than requiring token overlap. */
-export function isFollowUpQuery(q: string): boolean {
-    const clean = q.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
-    return [
-        /^can you tell( (me|us))? in detail/i,
-        /^can you tell( (me|us))? more/i,
-        /^can you (explain|elaborate|expand)( (further|more))?/i,
-        /^(tell|explain|elaborate|expand) (me|us)? (more|further|in detail)/i,
-        /^what about (it|this|that|the)/i,
-        /^tell (me|us) (more|about)/i,
-        /^i'd like to know (more|further)/i,
-    ].some(p => p.test(clean));
-}
-
-// ── Query relevance guard ──────────────────────────────────────────
-// Prevents the model from searching for topics completely unrelated
-// to what the user actually asked (hallucination guard).
-// Query relevance and rewriting live in services/search/query.ts
-
-export function deriveSearchQuery(query: string): string {
-    return query
-        .replace(/^(?:what(?:'s| is| are| was| were)|how (?:do|does|did|can|to|about)|why (?:is|does|are|did)|when (?:is|was|did|will)|where (?:is|are|can|do)|who (?:is|are|was|were)|can you|please|tell me(?: about)?|explain|i want to know|i need to know|i'm looking for|give me|show me|find me|do you know)\s+/i, '')
-        .replace(/\?+$/, '')
-        .trim()
-        .slice(0, 200) || query.slice(0, 200);
-}
-
