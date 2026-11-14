@@ -246,10 +246,13 @@ export function createFluxAskRouter(): Router {
         }
 
         // ── Save user message (fire-and-forget — don't block streaming) ──
-        const userMsgFileText = safeFile || (safeAtt.filter(f => f.content && !f.type?.startsWith('image/') && !f.type?.startsWith('video/')).map(f => `[${f.name}]\n${f.content}`).join('\n\n'));
+        // Only file NAMES go into the visible text — never base64/raw content.
+        // The attachment itself rides in fileAttachment (lazy-loaded by the UI).
+        const attachedNames = safeAtt.filter(f => f.content || f.name).map(f => `[attached: ${f.name}]`);
+        const userMsgFileText = attachedNames.length > 0 ? attachedNames.join('\n') : (safeFile ? '[attached file]' : '');
         prisma.message.create({
             data: {
-                content: userMsgFileText ? `${userMsgFileText}\n--\n${nq}` : nq,
+                content: userMsgFileText ? `${nq}\n\n${userMsgFileText}` : nq,
                 role: 'User',
                 conversationId: activeConversationId,
                 fileAttachment: safeAtt.length > 0 ? safeAtt : undefined,
@@ -1341,6 +1344,30 @@ CROSS-FILE RULES (when multiple files provided):
             }
 
             if (!charsSent && !res.writableEnded) {
+                // Last resort: the model produced nothing through tools (e.g. search
+                // skipped/blocked) — ask it to answer from knowledge rather than
+                // printing a useless generic line.
+                try {
+                    const fallback = await generateText({
+                        model,
+                        messages: [
+                            ...(historyMessages ?? []),
+                            { role: 'user' as const, content: userText },
+                        ],
+                        maxOutputTokens: 1200,
+                    } as any);
+                    const text = (fallback as any)?.text?.trim();
+                    if (text) {
+                        console.log(`[ASK] direct-answer fallback produced ${text.length} chars`);
+                        writeSafeSSE(res, text);
+                        charsSent += text.length;
+                        fullText += text;
+                    }
+                } catch (e: any) {
+                    console.warn('[ASK] direct-answer fallback failed:', e?.message?.slice(0, 200));
+                }
+            }
+            if (!charsSent && !res.writableEnded) {
                 const nonSearchResults = collectedToolResults.filter(r => r.name !== 'web_search');
                 if (nonSearchResults.length > 0) {
                     const toolResultsText = nonSearchResults.map(r => {
@@ -1367,7 +1394,7 @@ CROSS-FILE RULES (when multiple files provided):
                         fullText += toolResultsText;
                     }
                 } else {
-                    const msg = 'Received results. Please try rephrasing your question for a more detailed answer.';
+                    const msg = "I can't find what I need to answer that properly. Try rephrasing, or attach the source directly.";
                     console.log('[ASK] last-resort safety net fired');
                     writeSafeSSE(res, msg);
                     fullText += msg;

@@ -82,22 +82,19 @@ export function createSearchTools(ctx: ToolContext) {
                     );
                 }
 
-                // Skip search if the query does not ask for factual information.
+                // Skip search only for genuine no-ops: greetings, chitchat and
+                // self-referential meta — nothing where a search could help.
+                // (Previously any short query with no question-word was blocked,
+                //  which trapped "yeah pull them"-style instructions behind a wall.)
                 if (typeof userQuery === 'string') {
                     const uq = userQuery.trim().toLowerCase();
                     const words = uq.split(/\s+/).filter(Boolean);
-                    const isShort = words.length < 5;
-                    const hasQuestionWord = /\b(what|who|why|how|when|where)\b/.test(uq);
-                    const hasSearchWord =
-                        /\b(find|search|look\s*up|tell me about|latest|news|explain|define|compare|vs\b|versus|tutorial|guide|review|price|cost|specs|status|how to|verify|check|confirm|validate|prove|disprove|debunk|fact.?check|legitimate|authentic|true|false|claim|rumor)\b/.test(uq);
-                    const isMetaChat = /\b(who are you|what can you|are you .{0,20}?|do you .{0,20}?)\b/.test(uq);
-                    const isPersonal = /\b(i|my|me|we)\b/.test(uq) && !hasQuestionWord && !hasSearchWord;
+                    const isExactGreeting = /^(hi|hello|hey|yo|sup|hiya|heya|gm|gn|good (morning|afternoon|evening|night)|thanks|thank you|ty|cheers|lol|lmao|haha|hehe|bye|goodbye|ok|okay|cool|nice|great|awesome|perfect|got it|sure|alright|no problem|np)$/.test(uq);
+                    const isMetaChat = /\b(who are you|what can you|are you .{0,20}?|do you .{0,20}?)\b/.test(uq) && words.length <= 6;
                     const isSystemQuery =
                         /\b(architecture|design|codebase|how.*(work|built|implement|structur)|your (code|design|architecture|system)|this (system|code|function|class|file|router))\b/i.test(uq);
-                    const hasEntity =
-                        /\b(university|college|institute|school|company|course|syllabus|program|department|faculty|professor|exam|admission|fee|placement)\b/i.test(uq);
 
-                    if (isSystemQuery || (!hasQuestionWord && !hasSearchWord && !hasEntity && (isShort || isMetaChat || isPersonal))) {
+                    if (isSystemQuery || isMetaChat || isExactGreeting) {
                         console.log(`[TOOL] web_search skipped - not a factual query`);
                         return `__SEARCH_SKIPPED__ Answer naturally without searching.`;
                     }
