@@ -134,8 +134,8 @@ function highlightBash(cmd: string): React.ReactNode {
     if (isPipe) color = '#bb9af7';
     else if (isQuoted) color = '#9ece6a';
     else if (isFlag) color = '#7dcfff';
-    else if (isPath) color = '#7aa2f7';
-    else if (isFirst) color = '#e0af68';
+    else if (isPath) color = '#e0af68';
+    else if (isFirst) color = '#7aa2f7';
     return (
       <span key={i}>
         {i > 0 && ' '}
@@ -207,10 +207,7 @@ export function CodeOutputBlock({
   }, [visibleOutputLines.length, displayedLength]);
 
   const langLabel = language || 'python';
-  const prompt = langLabel === 'python' ? '>>>' : '$';
-  const promptColor = langLabel === 'python' ? '#7dcfff' : '#9ece6a';
 
-  const isSuccess = exitCode === 0;
   const isFailure = exitCode !== undefined && exitCode !== 0;
 
   // Split output into stdout and stderr
@@ -219,35 +216,15 @@ export function CodeOutputBlock({
   const hasStdout = stdoutLines.length > 0;
   const hasStderr = stderrLines.length > 0;
 
-  const borderClass = isRunning
-    ? 'border-[var(--accent)]/30'
-    : isFailure
-      ? 'border-red-500/25'
-      : isSuccess
-        ? 'border-emerald-500/15'
-        : 'border-[var(--surface-border)]';
-
   return (
-    <div
-      className={`mt-2 rounded-lg overflow-hidden border transition-all duration-300 ${borderClass}`}
-      style={{ background: '#0b0b0a', animation: 'stepFadeIn 0.35s ease-out both' }}
-    >
-      {/* ── Header bar */}
-      <div
-        className="flex items-center gap-2 px-3 py-[7px] border-b border-white/[0.05]"
-        style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.025), rgba(0,0,0,0.18))' }}
-      >
-        {/* Traffic dots */}
-        <div className="flex gap-1.5 shrink-0">
-          <span className="size-[8px] rounded-full" style={{ background: '#ff5f57', opacity: 0.65 }} />
-          <span className="size-[8px] rounded-full" style={{ background: '#febc2e', opacity: 0.65 }} />
-          <span className="size-[8px] rounded-full" style={{ background: '#28c840', opacity: 0.65 }} />
-        </div>
-
-        {/* Language label */}
-        <span className="text-[11px] text-[var(--text-muted)] font-mono tracking-wide ml-1">
-          {langLabel}
-        </span>
+    // Panel anatomy only — ToolPanel renders the outer card (border, surface,
+    // radius). No nested border/bg here, or the disclosure row feels like two cards.
+    <div className="min-w-0" style={{ animation: 'stepFadeIn 0.35s ease-out both' }}>
+      {/* ── Header bar: Claude's anatomy — muted mono language label on the
+          left, live timer / failure-only badge on the right. No window
+          chrome, no success badge (success is the default and shows nothing). */}
+      <div className="flex h-8 items-center justify-between gap-2 px-3">
+        <p className="font-mono text-[11px] leading-none text-[var(--text-secondary)]">{langLabel}</p>
 
         <div className="ml-auto flex items-center gap-2 shrink-0">
           {/* Running indicator with live timer */}
@@ -257,28 +234,12 @@ export function CodeOutputBlock({
                 <span className="absolute inset-0 rounded-full bg-[var(--accent)]/60 animate-ping" />
                 <span className="relative size-[6px] rounded-full bg-[var(--accent)]" />
               </span>
-              running · {formatElapsed(liveElapsed)}
+              Running… {formatElapsed(liveElapsed)}
             </span>
           )}
-          {/* Exit code badge */}
-          {!isRunning && exitCode !== undefined && (
-            <span
-              className={`text-[10px] font-mono rounded px-1.5 py-0.5 border flex items-center gap-1 ${
-                isSuccess
-                  ? 'bg-emerald-500/8 text-emerald-400/85 border-emerald-500/20'
-                  : 'bg-red-500/8 text-red-400/85 border-red-500/20'
-              }`}
-            >
-              {isSuccess ? (
-                <svg viewBox="0 0 10 10" className="size-2.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="1.5,5.5 4,8 8.5,2.5" />
-                </svg>
-              ) : (
-                <svg viewBox="0 0 10 10" className="size-2.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                  <line x1="2.5" y1="2.5" x2="7.5" y2="7.5" />
-                  <line x1="7.5" y1="2.5" x2="2.5" y2="7.5" />
-                </svg>
-              )}
+          {/* Failures only — success renders no badge */}
+          {!isRunning && isFailure && (
+            <span className="text-[10px] font-mono rounded px-1.5 py-0.5 border bg-red-500/8 text-red-400/85 border-red-500/20 flex items-center gap-1">
               exit {exitCode}
               {duration ? ` · ${(duration / 1000).toFixed(1)}s` : ''}
             </span>
@@ -286,7 +247,7 @@ export function CodeOutputBlock({
         </div>
       </div>
 
-      {/* ── Command area with prompt + syntax highlighting */}
+      {/* ── Command area: raw syntax-highlighted command, no prompt prefix */}
       {displayedCode && (
         <div className="relative">
           {isRunning && (
@@ -296,10 +257,9 @@ export function CodeOutputBlock({
             />
           )}
           <pre
-            className="text-[12.5px] leading-[1.65] font-mono px-4 py-3 overflow-x-auto whitespace-pre-wrap break-words"
+            className="text-[12.5px] leading-[1.65] font-mono px-3 py-2.5 overflow-x-auto whitespace-pre-wrap break-words"
             style={{ color: '#c0caf5' }}
           >
-            <span style={{ color: promptColor, marginRight: '6px' }}>{prompt}</span>
             {langLabel === 'python' ? highlightPython(displayedCode) : highlightBash(displayedCode)}
             {isRunning && (
               <span
@@ -316,19 +276,9 @@ export function CodeOutputBlock({
         <>
           <button
             onClick={() => setShowOutput(v => !v)}
-            className="w-full flex items-center gap-2 px-3 py-[6px] border-t border-white/[0.05] hover:bg-white/[0.015] transition-colors text-left"
-            style={{ background: 'rgba(0,0,0,0.18)' }}
+            className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-white/[0.015] transition-colors text-left"
           >
-            <span
-              className={`size-[5px] rounded-full shrink-0 ${
-                hasStderr && !hasStdout ? 'bg-[#f7768e]' : 'bg-[#9ece6a]'
-              }`}
-              style={{ opacity: 0.7 }}
-            />
-            <span className="text-[11px] text-[var(--text-muted)] font-mono tracking-wide">Output</span>
-            <span className="text-[10px] text-[var(--text-muted)]/60 font-mono">
-              {outputLines.length} {outputLines.length === 1 ? 'line' : 'lines'}
-            </span>
+            <span className="text-[11px] text-[var(--text-secondary)] font-mono">Output</span>
             <span className="ml-auto flex items-center gap-0.5 text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
               <IconChevronDown className={`size-3 transition-transform duration-200 ${showOutput ? 'rotate-180' : ''}`} />
               {showOutput ? 'hide' : 'show'}
@@ -337,8 +287,8 @@ export function CodeOutputBlock({
           {showOutput && (
             <pre
               ref={outputRef}
-              className="text-[11.5px] leading-[1.6] font-mono px-4 py-2.5 overflow-x-auto max-h-[320px] overflow-y-auto whitespace-pre-wrap break-words border-t border-white/[0.03]"
-              style={{ color: '#b5b2aa' }}
+              className="text-[12px] leading-[1.65] font-mono px-3 pb-2.5 pt-0 overflow-x-auto max-h-[320px] overflow-y-auto whitespace-pre-wrap break-words"
+              style={{ color: '#d6d3cb' }}
             >
               {visibleOutputLines.length === 0 && isRunning && (
                 <span style={{ color: '#565f89', fontStyle: 'italic' }}>▶ Executing…</span>
@@ -347,8 +297,7 @@ export function CodeOutputBlock({
                 <div
                   key={i}
                   style={{
-                    color: line.type === 'stderr' ? '#f7768e' : '#9ece6a',
-                    opacity: line.type === 'stderr' ? 0.85 : 0.9,
+                    color: line.type === 'stderr' ? '#f7768e' : '#d6d3cb',
                     animation: 'outputLineIn 0.2s ease-out both',
                   }}
                 >

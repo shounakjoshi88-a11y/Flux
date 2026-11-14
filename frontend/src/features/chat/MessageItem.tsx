@@ -47,7 +47,7 @@ import { InlineImageDisplay, ImageGenerationSkeleton, InlineGenerationIndicator 
 import { UserFileAttachment, ContentWithFileCards, deepCleanAnswer, RenderFollowUpText } from "./FileCards";
 import { SearchStepsGroup, ScrollableSourceCascade, PartsRenderer } from "./SearchSteps";
 import { OrbitalSVG, ThinkingIndicator } from "./ThinkingIndicator";
-import { CodeOutputBlock } from "../content/CodeOutputBlock";
+
 import { getDomain, rewriteSandboxUrls, fixMalformedTags } from "../../lib/chat-utils";
 import type { Message, MessagePart, Source } from "../../types";
 

@@ -4,7 +4,7 @@ import { motion, useReducedMotion } from "framer-motion";
 
 import { StatusMessage } from "./StatusMessage";
 import { CommandGroup } from "./CommandGroup";
-import { TimelineNode } from "./ThoughtBlock";
+
 import { ThoughtBlock } from "./ThoughtBlock";
 import { ContentWithFileCards } from "./FileCards";
 import { InlineImageDisplay } from "./ImageDisplay";
@@ -14,7 +14,7 @@ import PermissionDialog from "./PermissionDialog";
 import { CodeOutputBlock } from "../content/CodeOutputBlock";
 import { WebSearchSection } from "./status/WebSearchStatus";
 import { FetchStatus } from "./status/FetchStatus";
-import { ToolRow, ToolPanel } from "./ToolActivity";
+import { ToolRow, ToolPanel, useToolDisclosure } from "./ToolActivity";
 import { getDomain } from "../../lib/chat-utils";
 import type { MessagePart, Source } from "../../types";
 
@@ -109,6 +109,28 @@ export function SearchStepsGroup({
             onSourceClick={onSourceClick}
           />
         ))}
+      </ToolPanel>
+    </div>
+  );
+}
+
+/** One code/sandbox execution: Claude's "Ran a command" disclosure + flat panel. */
+function CodeExecutionRow({ block }: { block: any }) {
+  const { open, toggle } = useToolDisclosure(true);
+  const failed = typeof block?.exitCode === "number" && block.exitCode !== 0;
+  return (
+    <div className="min-w-0">
+      <ToolRow
+        label="Ran a command"
+        open={open}
+        onToggle={toggle}
+        isActive={!!block?.isRunning}
+        rightSlot={failed ? (
+          <span className="font-mono text-[10px] uppercase tracking-wide text-red-400/80">exit {block.exitCode}</span>
+        ) : undefined}
+      />
+      <ToolPanel open={open}>
+        <CodeOutputBlock {...block} />
       </ToolPanel>
     </div>
   );
@@ -367,23 +389,11 @@ export function PartsRenderer({
         break;
       }
       case "code_execution": {
-        const termIconEl = (
-          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"
-            strokeLinecap="round" strokeLinejoin="round"
-            className="size-4 shrink-0 text-[var(--text-secondary)]/40">
-            <rect x="2" y="3.5" width="16" height="13" rx="2" />
-            <polyline points="5.5,8 8,10.5 5.5,13" strokeWidth="1.5" />
-            <line x1="9.5" y1="13" x2="14.5" y2="13" strokeWidth="1.3" />
-          </svg>
-        );
-        const actualIsFirst = i === 0 || parts[i - 1]?.type !== "tool_call";
-        const actualIsLast = i === parts.length - 1 || parts[i + 1]?.type !== "tool_call";
+        // Claude's anatomy: "Ran a command" disclosure row + flat dark panel —
+        // no timeline rail (Flux dropped rails).
         renderedParts.push(
-          <div key={`code-${i}`} className="flex gap-2.5">
-            <TimelineNode icon={termIconEl} isFirst={actualIsFirst} isLast={actualIsLast} />
-            <div className="py-2 min-w-0 flex-1">
-              <CodeOutputBlock {...part.block} />
-            </div>
+          <div key={`code-${i}`} className="mb-0.5">
+            <CodeExecutionRow block={part.block} />
           </div>
         );
         break;
