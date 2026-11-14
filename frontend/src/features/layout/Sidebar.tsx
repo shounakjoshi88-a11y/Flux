@@ -18,6 +18,7 @@ import {
   IconPanelOpen,
   IconGroupSort,
   IconChevronDown,
+  IconCheck,
   IconExternal,
 } from "./anthropicIcons";
 import type { User } from "@supabase/supabase-js";
@@ -96,6 +97,38 @@ export const Sidebar = memo(function Sidebar({
   const isDay = new Date().getHours() >= 6 && new Date().getHours() < 18;
   const [gearSpinning, setGearSpinning] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  // ─── Collapsible "Chats and tasks" section + sort/group menu ───
+  const [chatsCollapsed, setChatsCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem("flux-chats-collapsed") === "1"; } catch { return false; }
+  });
+  const [sortMode, setSortMode] = useState<"recent" | "alpha">(() => {
+    try { return localStorage.getItem("flux-sidebar-sort") === "alpha" ? "alpha" : "recent"; } catch { return "recent"; }
+  });
+  const [groupByTime, setGroupByTime] = useState<boolean>(() => {
+    try { return localStorage.getItem("flux-sidebar-group") !== "0"; } catch { return true; }
+  });
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try { localStorage.setItem("flux-chats-collapsed", chatsCollapsed ? "1" : "0"); } catch {}
+  }, [chatsCollapsed]);
+  useEffect(() => {
+    try { localStorage.setItem("flux-sidebar-sort", sortMode); } catch {}
+  }, [sortMode]);
+  useEffect(() => {
+    try { localStorage.setItem("flux-sidebar-group", groupByTime ? "1" : "0"); } catch {}
+  }, [groupByTime]);
+  useEffect(() => {
+    if (!sortMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (sortMenuRef.current && !sortMenuRef.current.contains(e.target as Node)) {
+        setSortMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [sortMenuOpen]);
 
   // Auto-scroll (thread list and search modal share one hook) --------------
   const threadsScroll = useEdgeAutoScroll(isOpen);
@@ -166,10 +199,17 @@ export const Sidebar = memo(function Sidebar({
     const source = Array.isArray(conversations) ? conversations : [];
 
     const sorted = [...source].sort((a, b) => {
+      if (sortMode === "alpha") {
+        return (a.title ?? "").localeCompare(b.title ?? "");
+      }
       const timeA = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
       const timeB = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
       return timeB - timeA;
     });
+
+    if (!groupByTime) {
+      return sorted.map((conversation) => ({ type: "thread" as const, conversation }));
+    }
 
     const items: ListItem[] = [];
     let lastGroup = "";
@@ -187,7 +227,7 @@ export const Sidebar = memo(function Sidebar({
     }
 
     return items;
-  }, [conversations]);
+  }, [conversations, sortMode, groupByTime]);
 
   // ─── Modal results ────────────────────────────────────────
   const modalResults = useMemo(() => {
@@ -282,7 +322,7 @@ export const Sidebar = memo(function Sidebar({
         style={{ willChange: "width" }}
       >
         <div className="flex flex-col h-full pb-2">
-          {/* Titlebar — Claude geometry: h-11, 20px logo at x16, 28px toggle right */}
+          {/* Titlebar — claude.ai: h-11, 20px logo at x16, only the hide/show toggle at the right (no search up here — search lives in the nav row) */}
           <div className="flex h-11 shrink-0 items-center justify-between px-2">
             {isOpen ? (
               <div className="ms-2 flex min-w-0 items-center gap-1.5 select-none">
@@ -296,24 +336,14 @@ export const Sidebar = memo(function Sidebar({
               <span className="w-0" />
             )}
             {isOpen ? (
-              <div className="flex items-center gap-0.5">
-                <button
-                  type="button"
-                  onClick={openSearchModal}
-                  className="flex size-7 items-center justify-center rounded-[8px] text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground/90 transition-colors cursor-pointer"
-                  title="Search chats"
-                >
-                  <IconSearch className="size-[18px]" />
-                </button>
-                <button
-                  type="button"
-                  onClick={onToggle}
-                  className="flex size-7 items-center justify-center rounded-[8px] text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground/90 transition-colors cursor-pointer"
-                  aria-label="Close sidebar"
-                >
-                  <IconPanel className="size-[18px]" />
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={onToggle}
+                className="flex size-7 items-center justify-center rounded-[8px] text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground/90 transition-colors cursor-pointer"
+                aria-label="Hide sidebar"
+              >
+                <IconPanel className="size-[18px]" />
+              </button>
             ) : (
               <button
                 type="button"
@@ -407,23 +437,67 @@ export const Sidebar = memo(function Sidebar({
             </button>
           </div>
 
-          {/* Conversations List */}
+          {/* Conversations List — "Chats and tasks" toggles the thread list;
+              the organize button opens the sort/group menu (claude.ai parity) */}
         {isOpen && (
-          <div className="flex h-11 shrink-0 items-center gap-1 px-2">
-            <IconChevronDown className="size-3.5 shrink-0 text-sidebar-foreground/55" />
-            <span className="text-[14px] leading-[21px] font-[435] text-sidebar-foreground/90">Chats and tasks</span>
+          <div className="relative flex h-11 shrink-0 items-center gap-1 px-2" ref={sortMenuRef}>
             <button
               type="button"
-              onClick={openSearchModal}
-              className="ml-auto flex size-7 items-center justify-center rounded-[8px] text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground/90 transition-colors cursor-pointer"
-              title="Organize chats"
+              onClick={() => setChatsCollapsed((v) => !v)}
+              aria-expanded={!chatsCollapsed}
+              className="flex min-w-0 flex-1 items-center gap-1 rounded-[8px] py-1 pr-1 text-left transition-colors hover:bg-sidebar-accent cursor-pointer"
+              title={chatsCollapsed ? "Show chats" : "Hide chats"}
+            >
+              <IconChevronDown
+                className={`size-3.5 shrink-0 text-sidebar-foreground/55 transition-transform duration-200 ${chatsCollapsed ? "-rotate-90" : ""}`}
+              />
+              <span className="truncate text-[14px] leading-[21px] font-[435] text-sidebar-foreground/90">Chats and tasks</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSortMenuOpen((v) => !v)}
+              aria-expanded={sortMenuOpen}
+              className="ml-auto flex size-7 shrink-0 items-center justify-center rounded-[8px] text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground/90 transition-colors cursor-pointer"
+              title="Group and sort"
             >
               <IconGroupSort className="size-4" />
             </button>
+            {sortMenuOpen && (
+              <div className="absolute right-2 top-full z-40 mt-1 w-48 rounded-[10px] border border-sidebar-border bg-sidebar p-1 shadow-xl">
+                <div className="px-2.5 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/40 select-none">
+                  Sort
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setSortMode("recent"); setSortMenuOpen(false); }}
+                  className="flex w-full items-center justify-between whitespace-nowrap rounded-[6px] px-2.5 py-1.5 text-[13px] font-[435] text-sidebar-foreground/90 hover:bg-sidebar-accent cursor-pointer"
+                >
+                  Recent activity
+                  {sortMode === "recent" && <IconCheck className="size-4 opacity-80" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setSortMode("alpha"); setSortMenuOpen(false); }}
+                  className="flex w-full items-center justify-between whitespace-nowrap rounded-[6px] px-2.5 py-1.5 text-[13px] font-[435] text-sidebar-foreground/90 hover:bg-sidebar-accent cursor-pointer"
+                >
+                  Title A–Z
+                  {sortMode === "alpha" && <IconCheck className="size-4 opacity-80" />}
+                </button>
+                <div className="h-px bg-sidebar-border mx-2 my-0.5" />
+                <button
+                  type="button"
+                  onClick={() => setGroupByTime((v) => !v)}
+                  className="flex w-full items-center justify-between whitespace-nowrap rounded-[6px] px-2.5 py-1.5 text-[13px] font-[435] text-sidebar-foreground/90 hover:bg-sidebar-accent cursor-pointer"
+                >
+                  Group by time
+                  {groupByTime && <IconCheck className="size-4 opacity-80" />}
+                </button>
+              </div>
+            )}
           </div>
         )}
           {isPerfLow ? (
-            isOpen && (
+            isOpen && !chatsCollapsed && (
               <div className="flex-1 relative mt-1 flex flex-col" style={{ minHeight: 0 }}>
                 <div className="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-sidebar to-transparent pointer-events-none z-10" />
                 <div
@@ -431,7 +505,7 @@ export const Sidebar = memo(function Sidebar({
                   onMouseMove={threadsScroll.handleMouseMove}
                   onMouseLeave={threadsScroll.handleMouseLeave}
                   className="flex-1 overflow-y-auto space-y-0.5 sidebar-scroll pb-10"
-                  style={{ minHeight: 0, scrollbarWidth: "none", msOverflowStyle: "none" }}
+                  style={{ minHeight: 0 }}
                 >
                   {groupedItems.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 opacity-35">
@@ -470,7 +544,7 @@ export const Sidebar = memo(function Sidebar({
             )
           ) : (
             <AnimatePresence>
-              {isOpen && (
+              {isOpen && !chatsCollapsed && (
                 <motion.div 
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -483,7 +557,7 @@ export const Sidebar = memo(function Sidebar({
                     onMouseMove={threadsScroll.handleMouseMove}
                     onMouseLeave={threadsScroll.handleMouseLeave}
                     className="flex-1 overflow-y-auto space-y-0.5 sidebar-scroll pb-10"
-                    style={{ minHeight: 0, scrollbarWidth: "none", msOverflowStyle: "none" }}
+                    style={{ minHeight: 0 }}
                   >
                     {groupedItems.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-12 opacity-35">
