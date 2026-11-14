@@ -116,6 +116,25 @@ export function createSearchTools(ctx: ToolContext) {
                     modelQueries.push(query.trim());
                 }
 
+                // Refuse affirmation-matching queries: if the model query is the
+                // user's short affirmation verbatim, do not search the internet for
+                // it — the model is guessing at the referent, not resolving it.
+                // Steer it to answer from history instead (which has the PDF + analysis).
+                const AFFIRM_ONLY = /^(yes|yeah|yep|yup|sure|ok|okay|alright|fine|do it|go ahead|go for it|fetch it|get it|pull it|pull them|pull that|pull everything|just fetch|just do it|yes please|please do|sure thing)\s*[.!?]?$/i;
+                const isShortAffirmation = typeof userQuery === 'string'
+                    && AFFIRM_ONLY.test(userQuery.trim());
+                if (isShortAffirmation && userQuery) {
+                    const mqLower = (typeof query === 'string' ? query : (Array.isArray(queriesArr) && queriesArr[0]))?.toLowerCase() ?? '';
+                    const matches = queriesArr?.some((q: any) => String(q).toLowerCase() === userQuery.toLowerCase()) || mqLower === userQuery.toLowerCase();
+                    if (matches) {
+                        console.warn('[TOOL] web_search refused 1:1 affirmation query — model must use conversation context');
+                        writer.status('searching', `Skipping search: query matches the affirmation verbatim`, undefined, state.thoughtProcess);
+                        return `__SEARCH_SKIPPED__ Your search query is identical to the user's affirmation ("${userQuery}"), not a topic. 
+The user told you to pull up something you already offered or discussed in this conversation. FIND that referent
+in the history (the PDF they attached, your legitimacy analysis, the docs or posts you mentioned) and search for
+THAT — or answer directly from the history without calling web_search again.`;
+                    }
+                }
                 for (const mq of modelQueries) {
                     if (userQuery && mq.toLowerCase() === userQuery?.toLowerCase()) {
                         if (state.searchCount === 0) queriesToRun.push(mq);
@@ -130,9 +149,11 @@ export function createSearchTools(ctx: ToolContext) {
                     queriesToRun.push(mq);
                 }
 
-                // Fallback: only add the user's raw query if the model generated nothing.
+                // Fallback: only add the user's raw query if the model generated nothing and
+                // it's not a bare affirmation (an affirmation would produce zero-signal junk).
+                const AFFIRM_FALLBACK = /^(yes|yeah|yep|yup|sure|ok|okay|alright|fine|do it|go ahead|go for it|fetch it|get it|pull it|pull them|pull that|pull everything|just fetch|just do it|yes please|please do|sure thing)\s*[.!?]?$/i;
                 if (queriesToRun.length === 0 && state.searchCount === 0 && typeof userQuery === 'string' && userQuery.trim()) {
-                    queriesToRun.push(userQuery.trim());
+                    if (!AFFIRM_FALLBACK.test(userQuery.trim())) queriesToRun.push(userQuery.trim());
                 }
 
                 // Rewrite each query: strip instruction echo, extract key entities,
