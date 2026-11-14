@@ -94,15 +94,32 @@ toolRegistry.register('web_search', {
 
 toolRegistry.register('read_skill', {
   name: 'read_skill',
-  description: 'Load the generation rules/skill file for a document type.',
+  description: 'Load a skill from the catalog by name (e.g. "frontend-design"), or a legacy doc_type ("pdf", "file", …).',
   parameters: z.object({
-    doc_type: z.enum(['pdf', 'pptx', 'docx', 'xlsx', 'csv', 'tsv', 'md', 'json', 'sql', 'html', 'tech', 'finance', 'coder', 'creative', 'legal', 'design', 'file', 'live-viz']),
+    skill: z.string().optional(),
+    doc_type: z.string().optional(),
   }),
   execute: async () => 'Implemented in index.ts',
   category: 'data',
   requiresApproval: false,
   maxRetries: 1,
   timeout: 10000,
+});
+
+toolRegistry.register('manage_skill', {
+  name: 'manage_skill',
+  description: 'Create, list, update or delete the user\'s agent skills.',
+  parameters: z.object({
+    action: z.enum(['list', 'create', 'update', 'delete']),
+    name: z.string().optional(),
+    description: z.string().optional(),
+    content: z.string().optional(),
+  }),
+  execute: async () => 'Implemented in index.ts',
+  category: 'utility',
+  requiresApproval: false,
+  maxRetries: 1,
+  timeout: 15000,
 });
 
 toolRegistry.register('generate_document', {

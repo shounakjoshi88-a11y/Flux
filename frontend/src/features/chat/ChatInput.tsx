@@ -1,8 +1,10 @@
 // src/components/ChatInput.tsx
 import { AnimatePresence, motion } from "framer-motion";
-import { HardDrive } from "lucide-react";
-import { IconArrowUp, IconChevronDown, IconGlobe, IconMic, IconPlus, IconStop, IconClose } from "../layout/anthropicIcons";
+import { IconArrowUp, IconChevronDown, IconMic, IconPlus, IconStop, IconClose, IconFolder, IconArtifacts, IconAttachment, IconCamera, IconSkill, IconLink, IconHistory, IconGlobe, IconSearch, IconGear, IconCheck, IconChevronRight } from "../layout/anthropicIcons";
 import React, { useRef, useState, useEffect, useCallback } from "react";
+import { fetchSkills, toggleSkill, type SkillMeta } from "../../lib/skills";
+import { getMemoryEnabled, setMemoryEnabled as persistMemoryEnabled } from "../../lib/preferences";
+import { AddCustomConnectorDialog } from "../connectors/AddCustomConnectorDialog";
 import type { AttachedFile } from "@/types";
 import { marked } from "marked";
 import { usePerformance } from "../../lib/performance-context";
@@ -43,6 +45,8 @@ export interface ChatInputProps {
   /** New-chat composer: editor row on top, controls underneath. */
   hero?: boolean;
   toolsSlot?: React.ReactNode;
+  /** Open Settings on a given tab, e.g. ("Customize", "Plugins") — used by the composer menu links. */
+  onRequestSettingsTab?: (tab: string, sub?: string) => void;
 }
 
 // Fixed SpeechRecognition types
@@ -179,15 +183,89 @@ export function ChatInput({
   setSearchEnabled,
   compact = false,
   hero = false,
+  onRequestSettingsTab,
 }: ChatInputProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [skillsFlyoutOpen, setSkillsFlyoutOpen] = useState(false);
+  const [connectorFlyoutOpen, setConnectorFlyoutOpen] = useState(false);
+  const [pluginFlyoutOpen, setPluginFlyoutOpen] = useState(false);
+  const [addConnectorOpen, setAddConnectorOpen] = useState(false);
+  const [menuSkills, setMenuSkills] = useState<SkillMeta[] | null>(null);
+  const [memoryEnabled, setMemoryEnabled] = useState(true);
+  const [menuHint, setMenuHint] = useState<string | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const isComposing = useRef(false);
   const { isLow: isPerfLow } = usePerformance();
+
+  // Memory preference (shared with Settings → Capabilities).
+  useEffect(() => { let cancelled = false; getMemoryEnabled().then((v) => { if (!cancelled) setMemoryEnabled(v); }); return () => { cancelled = true; }; }, []);
+
+  // Lazy-load the skills catalog the first time the menu opens.
+  useEffect(() => {
+    if (!attachMenuOpen || menuSkills !== null) return;
+    let cancelled = false;
+    fetchSkills().then((s) => { if (!cancelled) setMenuSkills(s); });
+    return () => { cancelled = true; };
+  }, [attachMenuOpen, menuSkills]);
+
+  useEffect(() => {
+    if (!attachMenuOpen) { setSkillsFlyoutOpen(false); setConnectorFlyoutOpen(false); setPluginFlyoutOpen(false); }
+  }, [attachMenuOpen]);
+
+  useEffect(() => {
+    if (!menuHint) return;
+    const t = setTimeout(() => setMenuHint(null), 3500);
+    return () => clearTimeout(t);
+  }, [menuHint]);
+
+  const handleScreenshot = useCallback(async () => {
+    setAttachMenuOpen(false);
+    if (!navigator.clipboard?.read) {
+      setMenuHint("Clipboard read isn't supported here — press Ctrl+V in the composer instead.");
+      return;
+    }
+    try {
+      const items = await navigator.clipboard.read();
+      const item = items.find((i) => i.types.some((t) => t.startsWith("image/")));
+      const type = item?.types.find((t) => t.startsWith("image/"));
+      if (!item || !type) {
+        setMenuHint("No image in the clipboard — copy a screenshot first, or press Ctrl+V in the composer.");
+        return;
+      }
+      const blob = await item.getType(type);
+      const ext = type.split("/")[1] || "png";
+      const file = new File([blob], `screenshot-${Date.now()}.${ext}`, { type });
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      await handleAttachFiles(dt.files);
+    } catch {
+      setMenuHint("Clipboard access was blocked — allow it, or press Ctrl+V in the composer.");
+    }
+  }, [handleAttachFiles]);
+
+  const toggleSkillInMenu = useCallback(async (skill: SkillMeta) => {
+    // Optimistic toggle; the source of truth flips on with the user's write.
+    setMenuSkills((prev) => prev?.map((s) => (s.name === skill.name ? { ...s, enabled: !s.enabled } : s)) ?? prev);
+    const ok = await toggleSkill(skill, !skill.enabled);
+    if (!ok) {
+      setMenuSkills((prev) => prev?.map((s) => (s.name === skill.name ? { ...s, enabled: skill.enabled } : s)) ?? prev);
+      setMenuHint("Couldn't update the skill — try again.");
+    }
+  }, []);
+
+  const toggleMemoryInMenu = useCallback(async () => {
+    const next = !memoryEnabled;
+    setMemoryEnabled(next);
+    const ok = await persistMemoryEnabled(next);
+    if (!ok) {
+      setMemoryEnabled(!next);
+      setMenuHint("Couldn't update the memory setting.");
+    }
+  }, [memoryEnabled]);
 
   // ─── Render markdown to HTML ───
   const renderMarkdown = useCallback(async (text: string): Promise<string> => {
@@ -226,6 +304,12 @@ export function ChatInput({
   }, [setQuery, renderMarkdown]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // Ctrl/Cmd+U — Claude's "Upload or add files" shortcut.
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "u") {
+      e.preventDefault();
+      fileInputRef.current?.click();
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey && !isComposing.current) {
       e.preventDefault();
       const text = editorRef.current?.innerText || "";
@@ -329,6 +413,139 @@ export function ChatInput({
     />
   );
 
+  const menuItemClass =
+    "flex items-center gap-2.5 w-full px-2.5 py-[7px] rounded-lg text-[13px] leading-5 text-[var(--text-primary)]/95 hover:bg-[var(--surface-bg)] transition-colors select-none";
+  const menuKbdClass = "ml-auto pl-6 text-[11px] text-[var(--text-muted)] font-mono";
+  const checkClass = "ml-auto pl-6 text-[var(--accent)] size-4";
+
+  const attachMenuContent = (
+    <>
+      <button onClick={() => { fileInputRef.current?.click(); setAttachMenuOpen(false); }} className={menuItemClass}>
+        <IconAttachment className="size-[18px] text-[var(--text-secondary)]" />
+        Upload or add files
+        <span className={menuKbdClass}>Ctrl+U</span>
+      </button>
+      <button onClick={() => { void handleScreenshot(); }} className={menuItemClass}>
+        <IconCamera className="size-[18px] text-[var(--text-secondary)]" />
+        Take a screenshot
+      </button>
+
+      <div className="my-1 h-px bg-white/[0.06] mx-1.5" />
+
+      {/* Skills — submenu listing the user's merged catalog, toggle to enable/disable */}
+      <div className="relative">
+        <button onClick={() => { setSkillsFlyoutOpen((v) => !v); setConnectorFlyoutOpen(false); }} className={menuItemClass}>
+          <IconSkill className="size-4 text-[var(--text-secondary)]" />
+          Skills
+          <IconChevronRight className="ml-auto size-4 text-[var(--text-muted)]" />
+        </button>
+        {skillsFlyoutOpen && (
+          <div className="absolute left-full bottom-0 ml-2 w-80 max-h-80 overflow-y-auto custom-scrollbar rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-2xl z-[70] p-1.5">
+            {menuSkills === null ? (
+              <div className="px-3 py-3 text-[12px] text-[var(--text-muted)]">Loading skills…</div>
+            ) : menuSkills.length === 0 ? (
+              <div className="px-3 py-2.5 text-[12px] text-[var(--text-muted)]">No skills yet — ask the model to “save this as a skill”, or create one here.</div>
+            ) : (
+              menuSkills.map((skill) => (
+                <button
+                  key={skill.name}
+                  onClick={() => toggleSkillInMenu(skill)}
+                  className="flex w-full items-start gap-2.5 rounded-lg px-2 py-2 text-left hover:bg-[var(--surface-bg)] transition-colors"
+                  title={skill.enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}
+                >
+                  {skill.source === "custom"
+                    ? <IconArtifacts className="mt-0.5 size-4 shrink-0 text-[var(--accent)]/80" />
+                    : <IconFolder className="mt-0.5 size-4 shrink-0 text-[var(--text-secondary)]" />}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[12px] leading-4 font-medium text-[var(--text-primary)]">{skill.name}</span>
+                    <span className="mt-0.5 block text-[11px] leading-4 text-[var(--text-muted)] line-clamp-2">{skill.description}</span>
+                  </span>
+                  {skill.enabled && <IconCheck className="mt-1 size-4 shrink-0 text-[var(--accent)]" />}
+                </button>
+              ))
+            )}
+            <div className="my-1 h-px bg-white/[0.06] mx-1" />
+            <button onClick={() => { setAttachMenuOpen(false); onRequestSettingsTab?.("Customize", "Skills"); }} className={menuItemClass}>
+              <IconGear className="size-4 text-[var(--text-secondary)]" />
+              Manage skills
+            </button>
+            <button onClick={() => { setAttachMenuOpen(false); onRequestSettingsTab?.("Customize", "Skills"); }} className={menuItemClass}>
+              <IconPlus className="size-4 text-[var(--text-secondary)]" />
+              Browse skills
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Add connector — browse the catalog or add a custom MCP server */}
+      <div className="relative">
+        <button onClick={() => { setConnectorFlyoutOpen((v) => !v); setSkillsFlyoutOpen(false); setPluginFlyoutOpen(false); }} className={menuItemClass}>
+          <IconLink className="size-4 text-[var(--text-secondary)]" />
+          Add connector
+          <IconChevronRight className="ml-auto size-4 text-[var(--text-muted)]" />
+        </button>
+        {connectorFlyoutOpen && (
+          <div className="absolute left-full bottom-0 ml-2 w-64 rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-2xl z-[70] p-1.5">
+            <button
+              onClick={() => { setAttachMenuOpen(false); onRequestSettingsTab?.("Customize", "Connectors"); }}
+              className={menuItemClass}
+            >
+              <IconGlobe className="size-4 text-[var(--text-secondary)]" />
+              Browse connectors
+            </button>
+            <button
+              onClick={() => { setAttachMenuOpen(false); setAddConnectorOpen(true); }}
+              className={menuItemClass}
+            >
+              <IconPlus className="size-4 text-[var(--text-secondary)]" />
+              Add custom connector
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Plugins — browse bundles of skills */}
+      <div className="relative">
+        <button onClick={() => { setPluginFlyoutOpen((v) => !v); setSkillsFlyoutOpen(false); setConnectorFlyoutOpen(false); }} className={menuItemClass}>
+          <IconArtifacts className="size-4 text-[var(--text-secondary)]" />
+          Plugins
+          <IconChevronRight className="ml-auto size-4 text-[var(--text-muted)]" />
+        </button>
+        {pluginFlyoutOpen && (
+          <div className="absolute left-full bottom-0 ml-2 w-72 rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-2xl z-[70] p-1.5">
+            <button
+              onClick={() => { setAttachMenuOpen(false); onRequestSettingsTab?.("Customize", "Plugins"); }}
+              className={menuItemClass}
+            >
+              <IconGear className="size-4 text-[var(--text-secondary)]" />
+              Manage plugins
+            </button>
+            <button
+              onClick={() => { setAttachMenuOpen(false); onRequestSettingsTab?.("Customize", "Plugins"); }}
+              className={menuItemClass}
+            >
+              <IconPlus className="size-4 text-[var(--text-secondary)]" />
+              Browse plugins
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="my-1 h-px bg-white/[0.06] mx-1.5" />
+
+      <button onClick={() => setSearchEnabled?.((prev) => !prev)} className={menuItemClass}>
+        <IconGlobe className="size-4 text-[var(--text-secondary)]" />
+        Web search
+        {searchEnabled && <IconCheck className={checkClass} />}
+      </button>
+      <button onClick={() => { void toggleMemoryInMenu(); }} className={menuItemClass}>
+        <IconHistory className="size-4 text-[var(--text-secondary)]" />
+        Memory
+        {memoryEnabled && <IconCheck className={checkClass} />}
+      </button>
+    </>
+  );
+
   const attachControl = (
     <div className="relative">
       <div className="flex items-center gap-1">
@@ -336,25 +553,21 @@ export function ChatInput({
           type="button"
           onClick={() => setAttachMenuOpen(!attachMenuOpen)}
           className="flex items-center justify-center rounded-full text-white/90 hover:text-white hover:bg-[var(--surface-bg)] transition p-1"
-          title="Attach files"
+          title="Add files, skills, connectors…"
         >
           <IconPlus className="size-5" />
         </button>
 
+        {menuHint && (
+          <div className="absolute bottom-full left-0 mb-2 z-[80] w-72 rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-2xl px-3 py-2 text-[12px] leading-4 text-[var(--text-secondary)]">
+            {menuHint}
+          </div>
+        )}
       </div>
       {isPerfLow ? (
         attachMenuOpen && (
-          <div className="absolute bottom-full left-0 mb-2 w-48 rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-xl z-50 overflow-hidden">
-            <button
-              onClick={() => {
-                fileInputRef.current?.click();
-                setAttachMenuOpen(false);
-              }}
-              className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--surface-bg)] transition"
-            >
-              <HardDrive className="size-4" />
-              Upload from computer
-            </button>
+          <div className="absolute bottom-full left-0 mb-2 w-72 rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-2xl z-50 overflow-hidden p-1.5">
+            {attachMenuContent}
           </div>
         )
       ) : (
@@ -364,18 +577,10 @@ export function ChatInput({
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 4 }}
-              className="absolute bottom-full left-0 mb-2 w-48 rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-xl z-50 overflow-hidden"
+              transition={{ duration: 0.16, ease: "easeOut" }}
+              className="absolute bottom-full left-0 mb-2 w-72 rounded-xl border border-[var(--surface-border)] bg-[var(--user-msg-bg)] shadow-2xl z-50 p-1.5"
             >
-              <button
-                onClick={() => {
-                  fileInputRef.current?.click();
-                  setAttachMenuOpen(false);
-                }}
-                className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--surface-bg)] transition"
-              >
-                <HardDrive className="size-4" />
-                Upload from computer
-              </button>
+              {attachMenuContent}
             </motion.div>
           )}
         </AnimatePresence>
@@ -490,20 +695,6 @@ export function ChatInput({
 
   const rightControls = (
     <div className="flex items-center gap-1.5">
-      {setSearchEnabled && (
-        <button
-          onClick={() => setSearchEnabled((prev) => !prev)}
-          className={`flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[14px] font-medium transition ${
-            searchEnabled
-              ? "bg-[var(--accent)]/12 border border-[var(--accent)]/25 text-[var(--accent)]"
-              : "text-[var(--text-secondary)]/60 hover:text-[var(--text-primary)] hover:bg-[var(--surface-bg)] border border-transparent"
-          }`}
-        >
-          <IconGlobe className="size-4" />
-          Web
-        </button>
-      )}
-
       {isLoading ? (
         <button
           onClick={onStop}
@@ -539,6 +730,11 @@ export function ChatInput({
 
   return (
     <>
+      <AddCustomConnectorDialog
+        isOpen={addConnectorOpen}
+        onClose={() => setAddConnectorOpen(false)}
+        onAdded={() => { setMenuSkills(null); /* connector list refreshes on next open */ }}
+      />
       {previewImage && (
         <div
           className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center p-4"

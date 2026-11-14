@@ -34,6 +34,9 @@ import { createArticlesRouter } from './http/routes/articles';
 import { createOpenAICompatRouter } from './http/routes/openai-compat';
 import { createMultiAgentRouter } from './http/routes/multiagent';
 import { createAgentsRouter } from './http/routes/agents';
+import { createSkillsRouter } from './http/routes/skills';
+import { createConnectorsRouter } from './http/routes/connectors';
+import { createPluginsRouter } from './http/routes/plugins';
 
 /** Build and configure the Express app. Idempotent. */
 export function createApp(): express.Application {
@@ -73,6 +76,9 @@ export function createApp(): express.Application {
     app.use(createOpenAICompatRouter());
     app.use(createMultiAgentRouter());
     app.use(createAgentsRouter());
+    app.use(createSkillsRouter());
+    app.use(createConnectorsRouter());
+    app.use(createPluginsRouter());
 
     // Last-resort error handler so a thrown handler becomes a 500, not a hang.
     app.use((err: any, _req: any, res: any, _next: any) => {

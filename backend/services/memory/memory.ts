@@ -23,11 +23,12 @@ export async function retrieveMemories(
   try {
     queryEmbedding = await getEmbeddingVector(query);
   } catch (e) {
-    console.warn('[MEMORY] Embedding model unavailable, falling back to recent memories:', (e as any)?.message ?? e);
+    console.warn('[MEMORY] Embedding model unavailable, falling back to a few recent memories:', (e as any)?.message ?? e);
+    // Embedding service is down — return only a small handful, never the whole bank.
     const fallback = await prisma.memory.findMany({
       where: { userId },
       orderBy: [{ importance: 'desc' }, { lastAccessedAt: 'desc' }],
-      take: limit,
+      take: Math.min(3, limit),
       select: { id: true, category: true, fact: true, importance: true, accessCount: true },
     });
     const result = fallback.map(m => ({ ...m, similarity: 0 }));
@@ -58,26 +59,11 @@ export async function retrieveMemories(
     limit,
   );
 
-  // Fallback: if semantic search found nothing relevant, return recent/important memories
+  // Fallback: when semantic search finds nothing relevant, inject NOTHING —
+  // previously this dumped the top-importance memories into every conversation,
+  // which is why the model parroted the same lines unprompted.
   if (memories.length === 0) {
-    const fallback = await prisma.memory.findMany({
-      where: { userId },
-      orderBy: [{ importance: 'desc' }, { lastAccessedAt: 'desc' }],
-      take: limit,
-      select: { id: true, category: true, fact: true, importance: true, accessCount: true },
-    });
-    const result = fallback.map(m => ({ ...m, similarity: 0 }));
-    if (result.length > 0) {
-      const ids = result.map((m: any) => m.id);
-      await prisma.memory.updateMany({
-        where: { id: { in: ids } },
-        data: {
-          accessCount: { increment: 1 },
-          lastAccessedAt: new Date(),
-        },
-      });
-    }
-    return result;
+    return [];
   }
 
   const ids = memories.map((m: any) => m.id);
@@ -251,7 +237,7 @@ KNOWN USER MEMORIES (from previous conversations)
 ════════════════════════════════════════
 ${memories.map(m => `• [${m.category.toUpperCase()}] ${m.fact}`).join('\n')}
 
-IMPORTANT: The above facts are known about this user from prior interactions. You MUST reference these when relevant. This is NOT a first conversation — you already know things about them. Do NOT say "I don't know anything about you" or "this appears to be our first chat". Instead, acknowledge what you know and build on it.
+IMPORTANT: These facts describe the user from prior conversations. Weave them in ONLY when they are genuinely relevant to the current request. NEVER recite, list or reference them unprompted; do not compliment the user's work by repeating these facts back. This is NOT a first conversation, but do not mention that either unless it serves the reply.
 ════════════════════════════════════════`;
 }
 /**

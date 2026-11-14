@@ -46,6 +46,8 @@ interface UseAgentSessionCallbacks {
   onMessageId?: (id: string) => void;
   onPermissionRequest?: (request: any) => void;
   onPlan?: (plan: any) => void;
+  /** Composer web-search toggle — forwarded to the backend with each message. */
+  webSearch?: boolean;
 }
 
 let nextId = 1;
@@ -584,6 +586,7 @@ export function useAgentSession(user: any) {
         payload: {
           text,
           attachments: attachments?.map((a) => ({ name: a.name, content: a.content, type: a.type })) || [],
+          webSearch: callbacks?.webSearch,
         },
       }));
 

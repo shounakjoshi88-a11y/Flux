@@ -53,6 +53,11 @@ export interface EmptyStateProps {
   setModelDropdownOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
   handleAttachFiles: (files: FileList | null) => Promise<void>;
   onStop: () => void;
+  /** Composer web-search toggle — forwarded to ChatInput. */
+  searchEnabled?: boolean;
+  setSearchEnabled?: (value: boolean | ((prev: boolean) => boolean)) => void;
+  /** Open Settings on a given tab, e.g. ("Customize", "Plugins"). */
+  onRequestSettingsTab?: (tab: string, sub?: string) => void;
 }
 
 export function EmptyState({
@@ -75,6 +80,9 @@ export function EmptyState({
   setModelDropdownOpen,
   handleAttachFiles,
   onStop,
+  searchEnabled,
+  setSearchEnabled,
+  onRequestSettingsTab,
 }: EmptyStateProps) {
   return (
     <div className="flex-1 overflow-y-auto px-6 flex flex-col justify-start items-center pt-[30vh] pb-12 custom-scrollbar" style={{ minHeight: 0 }}>
@@ -150,6 +158,9 @@ export function EmptyState({
             handleAttachFiles={handleAttachFiles}
             onStop={onStop}
             compact={isMobile}
+            searchEnabled={searchEnabled}
+            setSearchEnabled={setSearchEnabled}
+            onRequestSettingsTab={onRequestSettingsTab}
             hero
           />
         </div>

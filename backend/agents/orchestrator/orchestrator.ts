@@ -8,6 +8,7 @@ import type {
   StreamWriter,
   WorkflowKind,
 } from "./types";
+import { skillBodyForDocType } from '../../services/skills/registry';
 
 interface OrchestratorInput {
   query: string;
@@ -19,8 +20,6 @@ interface OrchestratorInput {
   };
   stream: StreamWriter;
   model: any;
-  skillRegistry: Record<string, { fileName: string; label: string }>;
-  fetchSkillFile: (fileName: string) => Promise<string | null>;
   generateDocumentWithSkill: (
     docType: string,
     query: string,
@@ -65,7 +64,7 @@ export class OrchestratorEngine {
     input: OrchestratorInput,
     workflow: WorkflowKind
   ): Promise<OrchestratorOutput> {
-    const { query, tools, agentState, stream, model, fetchSkillFile, generateDocumentWithSkill } = input;
+    const { query, tools, agentState, stream, model, generateDocumentWithSkill } = input;
 
     const phaseResults = new Map<string, PhaseResult>();
 
@@ -127,7 +126,7 @@ export class OrchestratorEngine {
     previousResults: Map<string, PhaseResult>,
     retryIndex: number
   ): Promise<PhaseResult> {
-    const { query, tools, agentState, stream, model, skillRegistry, fetchSkillFile, generateDocumentWithSkill, requestToolApproval } = input;
+    const { query, tools, agentState, stream, model, generateDocumentWithSkill, requestToolApproval } = input;
 
     if (phase.type === "research") {
       const searchTool = tools["web_search"];
@@ -165,23 +164,16 @@ export class OrchestratorEngine {
         };
       }
 
-      const fileName = skillRegistry[docType]?.fileName;
-      if (!fileName) {
-        return {
-          phaseId: phase.id, type: "load_skill", success: false,
-          text: "", sources: [], files: [], skillContent: "", errors: [`No skill file for ${docType}`],
-        };
-      }
-
-      const content = await fetchSkillFile(fileName);
-      const success = content !== null && content.length > 100;
+      // No read_skill tool in this context — load the built-in skill body directly.
+      const content = skillBodyForDocType(docType) ?? "";
+      const success = content.length > 100;
       if (success) {
-        stream.writeStatus("reading_skill", `Reading the ${(skillRegistry[docType]?.label || docType).toUpperCase()} skill`, { docType });
+        stream.writeStatus("reading_skill", `Reading the ${docType.toUpperCase()} skill`, { docType });
       }
 
       return {
         phaseId: phase.id, type: "load_skill", success,
-        text: "", sources: [], files: [], skillContent: content ?? "", errors: success ? [] : [`Failed to load skill ${fileName}`],
+        text: "", sources: [], files: [], skillContent: content, errors: success ? [] : [`No skill for ${docType}`],
       };
     }
 

@@ -29,6 +29,8 @@ type UseChatCallbacks = {
   fileContent?: string;
   attachedFiles?: { name: string; content?: string }[];
   replaceLastAssistant?: boolean;
+  /** Composer web-search toggle — forwarded to the backend with each message. */
+  webSearch?: boolean;
   /** When set, truncate all messages after the message with this ID,
    *  replace its content with the incoming prompt, and append a new
    *  optimistic assistant.  Used for "edit + resend". */
@@ -318,6 +320,7 @@ export function useChat(user: any) {
           ? attachedFiles.map((f) => ({ name: f.name, content: f.content, type: f.type }))
           : undefined,
         conversationId: activeConversationId ?? undefined,
+        webSearch: callbacks?.webSearch,
       };
 
       const endpoint = `${BACKEND_URL}/flux_ask`;

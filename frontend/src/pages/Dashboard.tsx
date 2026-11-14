@@ -139,8 +139,22 @@ export default function Dashboard() {
 
   // ─── Settings state ─────────────────────────────────────
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<string>("General");
+  const [customizeInitialSub, setCustomizeInitialSub] = useState<"Connectors" | "Skills" | "Plugins">("Connectors");
+  // Web search toggle (persisted) — threaded to the composer and every send.
+  const [webSearch, setWebSearch] = useState<boolean>(() => {
+    try { return localStorage.getItem("flux-web-search") !== "0"; } catch { return true; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("flux-web-search", webSearch ? "1" : "0"); } catch {}
+  }, [webSearch]);
   const [logoRisen, setLogoRisen] = useState(false);
   const handleSettingsOpen = useCallback(() => setIsSettingsOpen(true), []);
+  const handleSettingsWithTab = useCallback((tab: string, sub?: string) => {
+    setSettingsInitialTab(tab);
+    if (sub === "Connectors" || sub === "Skills" || sub === "Plugins") setCustomizeInitialSub(sub);
+    setIsSettingsOpen(true);
+  }, []);
   const handleSettingsClose = useCallback(() => setIsSettingsOpen(false), []);
 
   // ─── Force logout listener ────────────────────────────────
@@ -420,6 +434,7 @@ export default function Dashboard() {
       // Auto-detect transport: use WS if available, fall back to SSE
       if (wsAvailableRef.current) {
         ws.sendMessage(prompt, activeConversationId, selectedModel, filesToSend, {
+          webSearch,
           onNewConversationId: (id, slug) => {
             setActiveConversationId(id);
             activeConversationIdRef.current = id;
@@ -452,6 +467,7 @@ export default function Dashboard() {
                 navigate(`/c/${slug}`, { replace: true });
               }
             },
+            webSearch,
             onStreamUpdate: (parsed) => setActiveSources(parsed.sources),
             onPermissionRequest: (request) => {
               console.log('[PERMISSION] Tool permission requested:', request);
@@ -607,7 +623,7 @@ export default function Dashboard() {
 
   // ── Derived flags ──
   const hasStarted = messages.length > 0 || activeConversationId !== null;
-  const placeholderText = hasStarted ? "Ask follow-up..." : "Ask anything ...";
+  const placeholderText = hasStarted ? "Write a message..." : "How can I help you today?";
   const showFixedInput = hasStarted && activeTab === "answer" && !isSearchModalOpen;
 
   // ── Loading state ──
@@ -762,6 +778,9 @@ export default function Dashboard() {
               setModelDropdownOpen={setModelDropdownOpen}
               handleAttachFiles={handleAttachFiles}
               onStop={handleStop}
+              searchEnabled={webSearch}
+              setSearchEnabled={setWebSearch}
+              onRequestSettingsTab={handleSettingsWithTab}
             />
           ) : (
             <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
@@ -837,6 +856,9 @@ export default function Dashboard() {
                 handleAttachFiles={handleAttachFiles}
                 onStop={handleStop}
                 compact={isMobile}
+                searchEnabled={webSearch}
+                setSearchEnabled={setWebSearch}
+                onRequestSettingsTab={handleSettingsWithTab}
               />
             </div>
           </motion.div>
@@ -979,6 +1001,8 @@ export default function Dashboard() {
         onUserUpdate={setUser}
         isDarkMode={isDark}
         toggleTheme={toggleTheme}
+        initialTab={settingsInitialTab}
+        initialSub={customizeInitialSub}
       />
     </div>
   );

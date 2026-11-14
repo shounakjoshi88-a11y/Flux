@@ -239,6 +239,57 @@ export const IconHome = icon(
   "IconHome",
 );
 
+/**
+ * Stroke-based glyph variant for icons the Anthropicon font does not carry.
+ * Same 1000x1000 grid, currentColor, round caps/joins — matches the filled
+ * glyphs' visual weight.
+ */
+function strokeIcon(d: string, displayName: string, strokeWidth = 72) {
+  function Glyph({ size = 20, className, ...rest }: IconProps) {
+    return (
+      <svg
+        viewBox="0 0 1000 1000"
+        width={size}
+        height={size}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        focusable="false"
+        className={className}
+        {...rest}
+      >
+        <path d={d} />
+      </svg>
+    );
+  }
+  Glyph.displayName = displayName;
+  return Glyph;
+}
+
+/** Paperclip — upload or add files. Matches the font's diagonal-clip glyph. */
+export const IconAttachment = strokeIcon(
+  "M626 262 L371 517 a120 120 0 0 0 170 170 l255-255 a180 180 0 0 0 -255-255 L279 439 a60 60 0 0 0 85 85 l226-226",
+  "IconAttachment",
+  84,
+);
+
+/** Camera — take a screenshot. */
+export const IconCamera = strokeIcon(
+  "M140 340 a64 64 0 0 1 64-64 h88 l46-82 a48 48 0 0 1 44-26 h140 a48 48 0 0 1 44 26 l46 82 h88 a64 64 0 0 1 64 64 v360 a64 64 0 0 1-64 64 H204 a64 64 0 0 1-64-64 Z M500 400 a118 118 0 1 0 0 236 a118 118 0 0 0 0-236 Z",
+  "IconCamera",
+  68,
+);
+
+/** Skill sheet — a document with rule lines. */
+export const IconSkill = strokeIcon(
+  "M280 128 h280 l170 170 v560 a44 44 0 0 1-44 44 H280 a44 44 0 0 1-44-44 V172 a44 44 0 0 1 44-44 Z M560 128 v170 h170 M330 420 h340 M330 536 h340 M330 652 h236",
+  "IconSkill",
+  64,
+);
+
 /** Codepoints, for reference and for tests. */
 export const ICON_CODEPOINTS = {
   plus: 0xE001,

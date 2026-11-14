@@ -5,10 +5,10 @@ import { GeneralTab } from "./tabs/GeneralTab";
 import { AccountTab } from "./tabs/AccountTab";
 import { CapabilitiesTab } from "./tabs/CapabilitiesTab";
 import { IntegrationsTab } from "./tabs/IntegrationsTab";
+import { CustomizeTab, type CustomizeSubTab } from "./tabs/CustomizeTab";
 import type { MemoryItem } from "./settingsMemory";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { User, Shield, Brain, Plug } from "lucide-react";
-import { IconCheck, IconClose } from "../layout/anthropicIcons.tsx";
+import { IconCheck, IconClose, IconGear, IconPeople, IconCustomize, IconArtifacts, IconLink, IconSearch } from "../layout/anthropicIcons.tsx";
 import { createClient } from "../../lib/client";
 import { BACKEND_URL } from "../../lib/config";
 import { usePerformance } from "../../lib/performance-context";
@@ -20,6 +20,10 @@ interface SettingsProps {
   onUserUpdate?: (user: any) => void;
   isDarkMode: boolean;
   toggleTheme: () => void;
+  /** Which tab to open on; defaults to "General". The composer menu uses "Customize". */
+  initialTab?: string;
+  /** Which sub-tab of Customize to open on; defaults to "Connectors". */
+  initialSub?: CustomizeSubTab;
 }
 
 export function Settings({
@@ -29,9 +33,21 @@ export function Settings({
   onUserUpdate,
   isDarkMode,
   toggleTheme,
+  initialTab = "General",
+  initialSub = "Connectors",
 }: SettingsProps) {
   const { tier, setTier } = usePerformance();
-  const [activeTab, setActiveTab] = useState("General");
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [navFilter, setNavFilter] = useState("");
+  const [customizeSub, setCustomizeSub] = useState<CustomizeSubTab>(initialSub);
+
+  // Reset to the requested tab every time the dialog opens.
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab);
+      setCustomizeSub(initialSub);
+    }
+  }, [isOpen, initialTab, initialSub]);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -469,11 +485,19 @@ export function Settings({
   };
 
   const tabs = useMemo(() => [
-    { id: "General", icon: <User className="size-4" />, label: "General" },
-    { id: "Account", icon: <Shield className="size-4" />, label: "Account" },
-    { id: "Capabilities", icon: <Brain className="size-4" />, label: "Capabilities" },
-    { id: "Integrations", icon: <Plug className="size-4" />, label: "Integrations" },
+    { id: "General", icon: <IconGear className="size-4" />, label: "General" },
+    { id: "Account", icon: <IconPeople className="size-4" />, label: "Account" },
+    { id: "Capabilities", icon: <IconCustomize className="size-4" />, label: "Capabilities" },
   ], []);
+  const tabsAfterDivider = useMemo(() => [
+    { id: "Customize", icon: <IconArtifacts className="size-4" />, label: "Customize" },
+    { id: "Integrations", icon: <IconLink className="size-4" />, label: "Integrations" },
+  ], []);
+  const visibleTabs = useMemo(() => {
+    const q = navFilter.trim().toLowerCase();
+    if (!q) return [...tabs, ...tabsAfterDivider];
+    return [...tabs, ...tabsAfterDivider].filter((t) => t.label.toLowerCase().includes(q));
+  }, [tabs, tabsAfterDivider, navFilter]);
 
   // ── Voice list for current provider ────────────────────────
   // For browser: populated by useEffect listening to voiceschanged
@@ -516,22 +540,41 @@ export function Settings({
             initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
             onClick={(e) => e.stopPropagation()}
-            className={`${isMobile ? "fixed inset-0 w-full h-full rounded-none border-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]" : "h-[80vh] max-h-[800px] w-full max-w-4xl"} flex flex-col sm:flex-row bg-[var(--bg-primary)] backdrop-blur-xl border-[var(--surface-border)] rounded-lg shadow-2xl overflow-hidden`}
+            className={`${isMobile ? "fixed inset-0 w-full h-full rounded-none border-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]" : "h-[80vh] max-h-[800px] w-full max-w-5xl"} flex flex-col sm:flex-row bg-[var(--bg-primary)] border-white/[0.06] rounded-2xl border shadow-2xl overflow-hidden`}
           >
-            {/* Left Sidebar */}
-            <div className={`${isMobile ? "w-full border-b border-[var(--surface-border)] bg-[var(--bg-secondary)]/80 px-3 py-2.5 gap-1.5 overflow-x-auto no-scrollbar sticky top-0 z-10 flex items-center" : "w-56 flex-shrink-0 border-r border-white/10 dark:border-white/5 bg-white/60 dark:bg-[var(--bg-secondary)] backdrop-blur-xl p-2 flex flex-col h-full"}`}>
-              <div className="flex items-center justify-between px-3 py-4">
-                <h2 className="text-lg font-semibold text-[var(--text-primary)]">Settings</h2>
-                <button onClick={onClose} className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition-all duration-200 text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]"><IconClose className="size-5" /></button>
+            {/* Left Sidebar — Claude.ai's rail: search on top, hairline divider before Customize */}
+            <div className={`${isMobile ? "w-full border-b border-[var(--surface-border)] bg-[var(--bg-secondary)]/80 px-3 py-2.5 gap-1.5 overflow-x-auto no-scrollbar sticky top-0 z-10 flex items-center" : "w-60 flex-shrink-0 border-r border-white/[0.06] bg-[var(--bg-secondary)] p-2 flex flex-col h-full"}`}>
+              <div className="flex items-center justify-between px-2 pt-2 pb-2">
+                <h2 className="text-[13px] font-semibold tracking-wide text-[var(--text-primary)]">Settings</h2>
+                <button onClick={onClose} className="p-1.5 rounded-lg text-[var(--text-primary)]/45 hover:text-[var(--text-primary)] hover:bg-white/[0.06] transition-colors" aria-label="Close"><IconClose className="size-4" /></button>
               </div>
-              <div className="space-y-1 flex-1 overflow-y-auto custom-scrollbar">
-                {tabs.map(tab => (
-                  <button key={tab.id} onClick={() => { setActiveTab(tab.id); setShowMemoryManager(false); }}
-                      className={`${isMobile ? "whitespace-nowrap px-3.5 py-2 text-xs font-medium rounded-lg" : "w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm"} transition-all duration-200 ${activeTab === tab.id ? "bg-[var(--accent)]/10 text-[var(--accent)] font-semibold shadow-sm" : "text-[var(--text-primary)]/50 hover:bg-[var(--surface-border)]/30 hover:text-[var(--text-primary)]"}`}>
-                    {tab.icon}{tab.label}
-                  </button>
+              {!isMobile && (
+                <div className="relative px-1 pb-2">
+                  <IconSearch className="absolute left-3.5 top-1/2 -translate-y-[calc(50%+4px)] size-4 text-[var(--text-muted)]" />
+                  <input
+                    value={navFilter}
+                    onChange={(e) => setNavFilter(e.target.value)}
+                    placeholder="Search"
+                    spellCheck={false}
+                    autoCapitalize="off"
+                    className="h-9 w-full rounded-lg border border-white/[0.06] bg-white/[0.04] pl-9 pr-3 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:border-white/[0.12]"
+                  />
+                </div>
+              )}
+              <nav className="space-y-0.5 flex-1 overflow-y-auto custom-scrollbar">
+                {visibleTabs.map(tab => (
+                  <div key={tab.id}>
+                    {tab.id === "Customize" && <div className="my-1.5 h-px bg-white/[0.06] mx-2" />}
+                    <button onClick={() => { setActiveTab(tab.id); setShowMemoryManager(false); }}
+                      className={`${isMobile ? "whitespace-nowrap px-3.5 py-2 text-xs font-medium rounded-lg" : "w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-[13px]"} transition-colors duration-150 ${activeTab === tab.id ? "bg-[#37372f] text-[var(--text-primary)] font-medium" : "text-[var(--text-primary)]/55 hover:bg-white/[0.04] hover:text-[var(--text-primary)]"}`}>
+                      <span className="text-[var(--text-secondary)]">{tab.icon}</span>{tab.label}
+                    </button>
+                  </div>
                 ))}
-              </div>
+                {visibleTabs.length === 0 && (
+                  <p className="px-3 py-4 text-[12px] text-[var(--text-muted)]">No settings match “{navFilter}”.</p>
+                )}
+              </nav>
               <div className="pt-4 border-t border-white/10 dark:border-white/5">
                 <AnimatePresence>
                   {savedMessage && (
@@ -598,6 +641,10 @@ export function Settings({
                   handleRevokeSession={handleRevokeSession}
                   revokingSessionId={revokingSessionId}
                 />
+              )}
+              {/* Customize tab */}
+              {activeTab === "Customize" && (
+                <CustomizeTab initialSub={customizeSub} />
               )}
               {/* Capabilities Tab */}
               {activeTab === "Capabilities" && (

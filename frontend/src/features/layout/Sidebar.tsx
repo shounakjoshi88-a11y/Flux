@@ -342,7 +342,7 @@ export const Sidebar = memo(function Sidebar({
                 className="flex size-7 items-center justify-center rounded-[8px] text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground/90 transition-colors cursor-pointer"
                 aria-label="Hide sidebar"
               >
-                <IconPanel className="size-[18px]" />
+                <IconPanel className="size-5" />
               </button>
             ) : (
               <button
@@ -351,7 +351,7 @@ export const Sidebar = memo(function Sidebar({
                 className="mx-auto flex size-7 items-center justify-center rounded-[8px] text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground/90 transition-colors cursor-pointer"
                 aria-label="Open sidebar"
               >
-                <IconPanelOpen className="size-[18px]" />
+                <IconPanelOpen className="size-5" />
               </button>
             )}
           </div>
@@ -365,7 +365,7 @@ export const Sidebar = memo(function Sidebar({
               className={`flex h-8 w-full items-center gap-1 rounded-[8px] px-1 text-sidebar-foreground/90 transition-colors cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-foreground justify-start`}
               title="New chat"
             >
-              <span className="flex size-7 shrink-0 items-center justify-center"><IconPlus className="size-[18px] shrink-0" /></span>
+              <span className="flex size-7 shrink-0 items-center justify-center"><IconPlus className="size-5 shrink-0" /></span>
               {isOpen && <span className="text-[14px] leading-[21px] font-[435] whitespace-nowrap">New</span>}
             </button>
 
@@ -376,7 +376,7 @@ export const Sidebar = memo(function Sidebar({
               className="flex h-8 w-full items-center gap-1 rounded-[8px] px-1 text-sidebar-foreground/90 transition-colors cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-foreground justify-start"
               title="Search chats"
             >
-              <span className="flex size-7 shrink-0 items-center justify-center"><IconSearch className="size-[18px] shrink-0" /></span>
+              <span className="flex size-7 shrink-0 items-center justify-center"><IconSearch className="size-5 shrink-0" /></span>
               {isOpen && <span className="text-[14px] leading-[21px] font-[435] whitespace-nowrap">Search</span>}
             </button>
 
@@ -388,7 +388,7 @@ export const Sidebar = memo(function Sidebar({
               className="flex h-8 w-full items-center gap-1 rounded-[8px] px-1 text-sidebar-foreground/90 transition-colors cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-foreground justify-start"
               title="Artifacts"
             >
-              <span className="flex size-7 shrink-0 items-center justify-center"><IconArtifacts className="size-[18px] shrink-0" /></span>
+              <span className="flex size-7 shrink-0 items-center justify-center"><IconArtifacts className="size-5 shrink-0" /></span>
               {isOpen && <span className="text-[14px] leading-[21px] font-[435] whitespace-nowrap">Artifacts</span>}
             </button>
 
@@ -399,7 +399,7 @@ export const Sidebar = memo(function Sidebar({
               className="flex h-8 w-full items-center gap-1 rounded-[8px] px-1 text-sidebar-foreground/90 transition-colors cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-foreground justify-start"
               title="Knowledge Graph"
             >
-              <span className="flex size-7 shrink-0 items-center justify-center"><IconGraph className="size-[18px] shrink-0" /></span>
+              <span className="flex size-7 shrink-0 items-center justify-center"><IconGraph className="size-5 shrink-0" /></span>
               {isOpen && <span className="text-[14px] leading-[21px] font-[435] whitespace-nowrap">Knowledge Graph</span>}
             </button>
 
@@ -410,7 +410,7 @@ export const Sidebar = memo(function Sidebar({
               className="flex h-8 w-full items-center gap-1 rounded-[8px] px-1 text-sidebar-foreground/90 transition-colors cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-foreground justify-start"
               title="Live News"
             >
-              <span className="flex size-7 shrink-0 items-center justify-center"><IconGlobe className="size-[18px] shrink-0" /></span>
+              <span className="flex size-7 shrink-0 items-center justify-center"><IconGlobe className="size-5 shrink-0" /></span>
               {isOpen && <span className="text-[14px] leading-[21px] font-[435] whitespace-nowrap">Live News</span>}
             </button>
 
@@ -421,7 +421,7 @@ export const Sidebar = memo(function Sidebar({
               className="flex h-8 w-full items-center gap-1 rounded-[8px] px-1 text-sidebar-foreground/90 transition-colors cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-foreground justify-start"
               title="Custom Agents"
             >
-              <span className="flex size-7 shrink-0 items-center justify-center"><IconTerminal className="size-[18px] shrink-0" /></span>
+              <span className="flex size-7 shrink-0 items-center justify-center"><IconTerminal className="size-5 shrink-0" /></span>
               {isOpen && <span className="text-[14px] leading-[21px] font-[435] whitespace-nowrap">Agents</span>}
             </button>
 
@@ -432,7 +432,7 @@ export const Sidebar = memo(function Sidebar({
               className="flex h-8 w-full items-center gap-1 rounded-[8px] px-1 text-sidebar-foreground/90 transition-colors cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-foreground justify-start"
               title="Team Mode"
             >
-              <span className="flex size-7 shrink-0 items-center justify-center"><IconPeople className="size-[18px] shrink-0" /></span>
+              <span className="flex size-7 shrink-0 items-center justify-center"><IconPeople className="size-5 shrink-0" /></span>
               {isOpen && <span className="text-[14px] leading-[21px] font-[435] whitespace-nowrap">Team</span>}
             </button>
           </div>
@@ -609,7 +609,7 @@ export const Sidebar = memo(function Sidebar({
                     onClick={handleSettingsClick}
                     className="flex items-center gap-2.5 w-full rounded-[6px] px-2.5 py-1.5 text-[13px] font-[435] hover:bg-sidebar-accent transition-all text-sidebar-foreground/90 hover:text-sidebar-foreground cursor-pointer"
                   >
-                    <IconGear className="size-[18px]" />
+                    <IconGear className="size-5" />
                     Settings
                   </button>
                   <button
@@ -620,7 +620,7 @@ export const Sidebar = memo(function Sidebar({
                     }}
                     className="flex items-center gap-2.5 w-full rounded-[6px] px-2.5 py-1.5 text-[13px] font-[435] hover:bg-red-500/10 transition-all text-red-400/80 hover:text-red-400 mt-0.5 cursor-pointer"
                   >
-                    <IconExternal className="size-[18px]" /> Log out
+                    <IconExternal className="size-5" /> Log out
                   </button>
                 </div>
               )
@@ -645,7 +645,7 @@ export const Sidebar = memo(function Sidebar({
                         animate={{ rotate: gearSpinning ? 360 : 0 }}
                         transition={{ duration: 0.6, ease: "easeOut" }}
                       >
-                        <IconGear className="size-[18px]" />
+                        <IconGear className="size-5" />
                       </motion.div>
                       Settings
                     </button>
@@ -657,7 +657,7 @@ export const Sidebar = memo(function Sidebar({
                       }}
                       className="flex items-center gap-2.5 w-full rounded-[6px] px-2.5 py-1.5 text-[13px] font-[435] hover:bg-red-500/10 transition-all text-red-400/80 hover:text-red-400 mt-0.5 cursor-pointer"
                     >
-                      <IconExternal className="size-[18px]" /> Log out
+                      <IconExternal className="size-5" /> Log out
                     </button>
                   </motion.div>
                 )}

@@ -15,6 +15,8 @@ import { createExecTools } from './exec';
 import { createFileTools } from './files';
 import { createWikiTools } from './wiki';
 import { createResearchTools } from './research';
+import { createSkillsTools } from './skills';
+import { createMcpTools } from './mcp';
 
 /**
  * Build the tools for one request.
@@ -22,7 +24,7 @@ import { createResearchTools } from './research';
  * Every tool is scoped to the request: it can write to that request's stream,
  * read that request's state, and knows which conversation's sandbox to use.
  */
-export function createFluxTools(
+export async function createFluxTools(
     res: any,
     model: any,
     state: AgentState,
@@ -30,6 +32,7 @@ export function createFluxTools(
     activeConversationId?: string,
     uid?: string,
     abortSignal?: AbortSignal,
+    disabledBuiltinSkills?: string[] | null,
 ) {
     const ctx: ToolContext = {
         res,
@@ -39,6 +42,7 @@ export function createFluxTools(
         userQuery,
         activeConversationId,
         uid,
+        disabledBuiltinSkills,
         abortSignal,
     };
 
@@ -51,5 +55,7 @@ export function createFluxTools(
         ...createFileTools(ctx),
         ...createWikiTools(ctx),
         ...createResearchTools(ctx),
+        ...createSkillsTools(ctx),
+        ...(await createMcpTools(ctx)),
     };
 }

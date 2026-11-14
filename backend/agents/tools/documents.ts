@@ -7,7 +7,9 @@
  */
 import { tool } from 'ai';
 import { z } from 'zod';
-import { fetchSkillFile, generateDocumentWithSkill, SKILL_REGISTRY } from '../../services/documents/generate';
+import { resolveSkill, skillNameForDocType } from '../../services/skills/registry';
+import { generateDocumentWithSkill } from '../../services/documents/generate';
+import { codeExecutor } from '../../sandbox/executor';
 import { shouldBlockFurtherTools } from './context';
 import type { ToolContext } from './context';
 
@@ -20,55 +22,61 @@ export function createDocumentTools(ctx: ToolContext) {
     return {
         read_skill: (tool as any)({
             description:
-                'Load rules for handling files or generating documents. ' +
-                'Use doc_type="file" when a user uploads a file - this is the FIRST thing you should call. ' +
-                'Use doc_type="design" for UI/styling rules on uploaded HTML/CSS files. ' +
-                'Use other doc types (pdf, docx, pptx, xlsx, etc.) before generate_document to get generation rules.',
+                'Load a skill the catalog told you exists. Pass its `skill` name (e.g. "frontend-design", "pdf-skill", "file-reading", or a custom skill the user created). ' +
+                'Use doc_type instead ("file", "design", "pdf", "pptx", "docx", "xlsx", …) for backwards-compatible document-generation calls. ' +
+                'Returns the skill\'s full rules; follow them for the rest of the task.',
             inputSchema: z.object({
+                skill: z
+                    .string()
+                    .optional()
+                    .describe('Skill name from the <skills> catalog, e.g. "frontend-design" or "my-custom-skill".'),
                 doc_type: z
-                    .enum([
-                        'pdf',
-                        'pptx',
-                        'docx',
-                        'xlsx',
-                        'csv',
-                        'tsv',
-                        'md',
-                        'json',
-                        'sql',
-                        'html',
-                        'tech',
-                        'finance',
-                        'coder',
-                        'creative',
-                        'legal',
-                        'design',
-                        'file',
-                        'live-viz',
-                    ])
-                    .describe('The skill type to load rules for'),
+                    .string()
+                    .optional()
+                    .describe('Legacy: the document type (pdf, docx, file, …). Mapped to its skill automatically.'),
             }),
-            execute: async ({ doc_type }: any) => {
+            execute: async ({ skill, doc_type }: any) => {
                 if (shouldBlockFurtherTools(ctx)) {
                     return '__TOOL_BLOCKED__ ANSWER THE USER NOW using the search results already accumulated from 3 web searches. Do NOT call read_skill or any other tool.';
                 }
-                const entry = SKILL_REGISTRY[doc_type];
-                if (!entry) {
-                    return `No skill file registered for "${doc_type}" yet. Proceed with defaults.`;
+                const requested = (typeof skill === 'string' && skill.trim())
+                    ? skill.trim().toLowerCase()
+                    : (typeof doc_type === 'string' ? doc_type.trim().toLowerCase() : '');
+                if (!requested) {
+                    return 'read_skill requires a `skill` name from the catalog (or a legacy `doc_type`).';
                 }
-                writer.status('reading_skill', `Reading ${entry.label} rules...`, { docType: doc_type }, state.thoughtProcess);
-                const content = await fetchSkillFile(entry.fileName);
-                if (!content) {
-                    writer.status(
-                        'reading_skill_error',
-                        `Skill file for "${doc_type}" not found on disk.`,
-                        { docType: doc_type },
-                        state.thoughtProcess,
-                    );
-                    return `Skill file for "${doc_type}" not found on disk. Proceed with defaults.`;
+                // Legacy doc_type → skill name mapping (pdf → pdf-skill, …).
+                const name = skillNameForDocType(requested) ?? requested;
+                const resolved = await resolveSkill(name, ctx.uid);
+                if (!resolved) {
+                    return `No skill named "${name}" exists. Available skills are listed in the <skills> catalog.`;
                 }
-                writer.status('reading_skill_success', `${entry.label} rules loaded`, { docType: doc_type }, state.thoughtProcess);
-                return content;
+                writer.status('reading_skill', `Reading ${resolved.source === 'custom' ? 'your' : ''} "${resolved.name}" skill…`, { docType: resolved.name }, state.thoughtProcess);
+
+                // Materialise bundled files into the sandbox so skill scripts can run.
+                let materialisedNote = '';
+                const files = resolved.files ?? {};
+                const filePaths = Object.keys(files);
+                if (filePaths.length > 0 && ctx.activeConversationId) {
+                    const base = `/home/user/.skills/${resolved.name}`;
+                    try {
+                        await codeExecutor.runBash(ctx.activeConversationId, `mkdir -p "${base}"`);
+                        for (const relPath of filePaths) {
+                            const safe = relPath.replace(/[^\w./-]/g, '_').replace(/\.\./g, '__');
+                            const dir = safe.includes('/') ? `"${base}/${safe.split('/').slice(0, -1).join('/')}"` : `"${base}"`;
+                            if (safe.includes('/')) {
+                                await codeExecutor.runBash(ctx.activeConversationId, `mkdir -p ${dir}`);
+                            }
+                            const fileContent = files[relPath] ?? '';
+                            await codeExecutor.writeFile(ctx.activeConversationId, `${base}/${safe}`, fileContent);
+                        }
+                        materialisedNote = `\n\nThe skill bundles ${filePaths.length} supporting file(s), available at ${base}/ (${filePaths.join(', ')}). Reference them with those absolute paths — e.g. python3 ${base}/scripts/foo.py.`;
+                    } catch (e: any) {
+                        console.warn('[SKILLS] Could not materialise skill files:', e?.message);
+                    }
+                }
+                writer.status('reading_skill_success', `Skill "${resolved.name}" loaded`, { docType: resolved.name }, state.thoughtProcess);
+                return resolved.body + materialisedNote;
             },
         }),
 

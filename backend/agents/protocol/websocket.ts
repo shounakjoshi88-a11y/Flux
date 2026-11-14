@@ -227,6 +227,7 @@ async function handleUserMessage(ws: AuthenticatedSocket, payload: any) {
       attachedFiles: attachments || [],
       isComputerMode,
       mode: session.config.mode,
+      webSearch: payload?.webSearch === false ? false : undefined,
     });
 
     const sseRes = await fetch(sseUrl, {

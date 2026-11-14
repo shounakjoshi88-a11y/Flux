@@ -40,7 +40,7 @@ export function createChatSdkRouter(): Router {
             on: () => { },
         };
         const agentState: AgentState = { sources: [], generatedFiles: [], thoughtProcess: [], searchCount: 0, wikiSearchCount: 0 };
-        const tools = createFluxTools(noopRes, model, agentState, nq, '');
+        const tools = await createFluxTools(noopRes, model, agentState, nq, '');
         withToolTimeout(tools, {
             web_search: 30_000,
             generate_document: 60_000,

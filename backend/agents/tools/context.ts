@@ -25,6 +25,8 @@ export interface ToolContext {
     activeConversationId?: string;
     /** Local user id. */
     uid?: string;
+    /** Built-in skills the user turned off (user_metadata.disabledBuiltinSkills). */
+    disabledBuiltinSkills?: string[] | null;
     /** Aborted when the client disconnects. */
     abortSignal?: AbortSignal;
 }

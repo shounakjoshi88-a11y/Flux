@@ -6,9 +6,8 @@
  * the actual file. Every failure path falls back to synthesised data so a
  * document request never returns nothing.
  */
-import * as fs from 'fs';
-import * as path from 'path';
 import { generateText } from 'ai';
+import { skillBodyForDocType } from '../skills/registry';
 import { buildPPTX, buildDOCX, buildPDF, buildXLSX, buildCSV, buildTSV, buildMD, buildJSON, buildSQL, buildHTML } from '../../agents/tools/builders';
 import type { GeneratedFileResult } from '../../agents/tools/builders';
 import { sendStatus } from '../../http/sse/writers';
@@ -16,46 +15,9 @@ import { robustParseJSON } from './json';
 import { extractTopicFromQuery } from './intent';
 import type { DocType } from './intent';
 import type { ContextualStatusMessages } from './types';
-// ── SKILL REGISTRY ─────────────────────────────────────────────────────────
-// Add entries here as you add skill files to the skills/ folder.
-export const SKILL_REGISTRY: Record<string, { fileName: string; label: string }> = {
-    pdf: { fileName: 'pdf-skill', label: 'PDF generation' },
-    pptx: { fileName: 'pptx-skill', label: 'PowerPoint generation' },
-    docx: { fileName: 'docx-skill', label: 'Word document generation' },
-    xlsx: { fileName: 'xlsx-skill', label: 'Excel spreadsheet generation' },
-    csv: { fileName: 'csv-skill', label: 'CSV export generation' },
-    tsv: { fileName: 'tsv-skill', label: 'TSV export generation' },
-    md: { fileName: 'md-skill', label: 'Markdown document generation' },
-    json: { fileName: 'json-skill', label: 'JSON data generation' },
-    sql: { fileName: 'sql-skill', label: 'SQL script generation' },
-    html: { fileName: 'html-skill', label: 'HTML mockup generation' },
-    tech: { fileName: 'tech-writer-skill', label: 'Technical documentation' },
-    finance: { fileName: 'finance-skill', label: 'Financial analysis' },
-    coder: { fileName: 'coder-skill', label: 'Software engineering' },
-    creative: { fileName: 'creative-skill', label: 'Creative copywriting' },
-    legal: { fileName: 'legal-skill', label: 'Legal drafting' },
-    design: { fileName: 'frontend-design', label: 'Frontend design & styling' },
-    'live-viz': { fileName: 'live-viz', label: 'Live interactive visualization' },
-    file: { fileName: 'file-reading', label: 'File reading & analysis per type' },
-};
-
-export async function fetchSkillFile(skillName: string): Promise<string> {
-    try {
-        const safeName = (skillName || '').replace(/[^a-z0-9-]/g, '').slice(0, 80);
-        if (!safeName) return '';
-        const p = path.join(__dirname, '..', '..', 'skills', `${safeName}.md`);
-        if (!fs.existsSync(p)) {
-            console.warn(`[SKILL] File not found: ${p}`);
-            return '';
-        }
-        const text = fs.readFileSync(p, 'utf-8');
-        console.log(`[SKILL] "${skillName}" loaded — ${text.length} chars`);
-        return text;
-    } catch (e) {
-        console.warn(`[SKILL] Could not load "${skillName}":`, e);
-        return '';
-    }
-}
+// Skills live in services/skills/registry.ts — DOC_TYPE_TO_SKILL is derived from
+// the built-in catalog; bodies are read from the merged (built-in + custom)
+// registry via skillBodyForDocType.
 
 /** Exact JSON schema shown to the model for each doc type */
 const DOC_SCHEMA: Record<Exclude<DocType, null>, string> = {
@@ -300,16 +262,16 @@ export async function generateDocument(
 
     const schema = DOC_SCHEMA[docType];
 
-    // Fetch the skill file for this doc type if one exists in the registry.
+    // Fetch the skill for this doc type if one exists in the registry.
     // This gives the LLM full format awareness (templates, layout rules, content rules).
     let skillContext = "";
-    if (docType && docType in SKILL_REGISTRY) {
-        if (res && statusMsgs?.readingSkill) {
-            sendStatus(res, "reading_skill", statusMsgs.readingSkill);
-        }
-        const skillMd = await fetchSkillFile(SKILL_REGISTRY[docType]!.fileName);
+    if (docType) {
+        const skillMd = skillBodyForDocType(docType);
         if (skillMd) {
-            skillContext = `\n\n=== ${docType.toUpperCase()} GENERATION SKILL FILE ===\n${skillMd}\n=== END SKILL FILE ===\n\nRead the skill file above carefully. Follow all instructions, templates, and content rules exactly.\n\n`;
+            if (res && statusMsgs?.readingSkill) {
+                sendStatus(res, "reading_skill", statusMsgs.readingSkill);
+            }
+            skillContext = `\n\n=== ${docType.toUpperCase()} GENERATION SKILL ===\n${skillMd}\n=== END SKILL ===\n\nRead the skill above carefully. Follow all instructions, templates, and content rules exactly.\n\n`;
         }
     }
 

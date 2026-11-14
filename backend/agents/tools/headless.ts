@@ -4,6 +4,8 @@ import { codeExecutor } from '../../sandbox/executor';
 import { wikiManager } from '../../services/wiki/manager';
 import { sandboxManager } from '../../sandbox/sandboxManager';
 import { createGoogleTools } from '../../services/google/tools';
+import { resolveSkill, skillNameForDocType, skillBodyForDocType } from '../../services/skills/registry';
+import { generateDocumentWithSkill } from '../../services/documents/generate';
 
 type StatusCallback = (event: string, data: any) => void;
 
@@ -41,10 +43,6 @@ async function extractDocxText(buf: Buffer): Promise<string> { return ''; }
 async function extractPdf(buf: Buffer): Promise<any> { return { markdown: '', text: '', pages: [], token_count: 0, metadata: { pages: 0, ocr_pages: 0, is_scanned: false, has_images: false } }; }
 async function processLargeDocument(_result: any, _uid: string, _source: string, _tool: string, _query: string): Promise<void> {}
 const IMAGE_SERVICE_URL = process.env.IMAGE_SERVICE_URL || 'http://localhost:8001';
-
-const SKILL_REGISTRY: Record<string, { fileName: string; label: string }> = {};
-async function fetchSkillFile(_name: string): Promise<string> { return ''; }
-async function generateDocumentWithSkill(_type: string, _query: string, _model: any, _skill: string, _search: string): Promise<any> { return null; }
 const STOPWORDS = new Set(['the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'can', 'could', 'shall', 'should', 'may', 'might', 'must', 'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between', 'out', 'off', 'over', 'under', 'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'each', 'every', 'both', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'just', 'because', 'but', 'and', 'or', 'if', 'while', 'about', 'up', 'down', 'this', 'that', 'these', 'those', 'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your', 'yours', 'yourself', 'yourselves', 'he', 'him', 'his', 'himself', 'she', 'her', 'hers', 'herself', 'it', 'its', 'itself', 'they', 'them', 'their', 'theirs', 'themselves', 'what', 'which', 'who', 'whom']);
 
 export function createHeadlessFluxTools(
@@ -82,16 +80,18 @@ export function createHeadlessFluxTools(
     }),
 
     read_skill: (tool as any)({
-      description: 'Load rules for handling files or generating documents.',
+      description: 'Load a skill from the catalog by name (e.g. "pdf-skill"), or a doc_type ("file", "design", "pdf"…) for document generation.',
       inputSchema: z.object({
-        doc_type: z.enum(['pdf', 'pptx', 'docx', 'xlsx', 'csv', 'tsv', 'md', 'json', 'sql', 'html', 'tech', 'finance', 'coder', 'creative', 'legal', 'design', 'file', 'live-viz']),
+        skill: z.string().optional(),
+        doc_type: z.string().optional(),
       }),
-      execute: async ({ doc_type }: any) => {
-        onStatus('reading_skill', { docType: doc_type });
-        const entry = SKILL_REGISTRY[doc_type];
-        if (!entry) return `No skill file registered for "${doc_type}".`;
-        const content = await fetchSkillFile(entry.fileName);
-        return content || `Skill file for "${doc_type}" not found.`;
+      execute: async ({ skill, doc_type }: any) => {
+        const requested = (typeof skill === 'string' && skill.trim()) ? skill.trim().toLowerCase() : (typeof doc_type === 'string' ? doc_type : '');
+        const name = skillNameForDocType(requested) ?? requested;
+        onStatus('reading_skill', { skill: name });
+        const resolved = await resolveSkill(name, uid);
+        if (!resolved) return `No skill named "${name}" exists. Available skills are in the catalog.`;
+        return resolved.body;
       },
     }),
 

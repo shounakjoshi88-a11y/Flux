@@ -8,7 +8,8 @@ import { sanitizeLocation } from '../../http/util/sanitize';
 import { stripEmDashes } from '../../prompts/sanitize';
 import { AGENT_SYSTEM_EXTENSION, VISUAL_INSTRUCTIONS } from '../../prompts/agent-extension';
 import { extractTopicFromQuery } from '../../services/documents/intent';
-import { generateDocumentWithSkill, fetchSkillFile, SKILL_REGISTRY } from '../../services/documents/generate';
+import { generateDocumentWithSkill } from '../../services/documents/generate';
+import { resolveSkill, skillBodyForDocType, listSkillsForUser, skillsCatalogText } from '../../services/skills/registry';
 import { checkSsrFree } from '../../services/net/ssrf';
 import { detectMimeFromBase64 } from '../../services/files/mime';
 import { retrieveDocChunks } from '../../lib/hybrid-retrieval';
@@ -359,7 +360,13 @@ IMPORTANT: After step 3, ALL subsequent operations use /home/user/edits/. Never 
           isSearchQuery = false;
         }
 
-        const searchGuard = isSearchQuery
+        const webSearchDisabledNow = (req as any).body?.webSearch === false;
+        if (webSearchDisabledNow) {
+            isSearchQuery = false;
+        }
+        const searchGuard = webSearchDisabledNow
+            ? `\n🌐 WEB SEARCH DISABLED: The user turned web search off for this conversation. Do NOT call web_search. Answer from your own knowledge; if you need current facts, say that search is off and answer from what you know.\n`
+            : isSearchQuery
             ? `\n🔍 RESEARCH MODE: The user is asking a factual/research question. Your ONLY allowed tools are web_search and read_url. Do NOT call run_bash, run_python, write_file, edit_file, install_package, create_project, start_app, stop_app, or any sandbox/execution tools. Use web_search first to find sources, then read_url to fetch full content from important URLs (especially PDFs).\n`
             : '';
 
@@ -369,13 +376,24 @@ IMPORTANT: After step 3, ALL subsequent operations use /home/user/edits/. Never 
             isSystemQuery = false;
             isSearchQuery = false;
             try {
-                const designContent = await fetchSkillFile('frontend-design');
-                if (designContent) {
-                    designSkillGuard = `\n🎨 DESIGN SKILL LOADED — follow these rules when modifying the uploaded file:\n${designContent.slice(0, 7000)}\n\n`;
+                const designSkill = await resolveSkill('frontend-design', uid);
+                if (designSkill?.body) {
+                    designSkillGuard = `\n🎨 DESIGN SKILL LOADED — follow these rules when modifying the uploaded file:\n${designSkill.body.slice(0, 7000)}\n\n`;
                 }
             } catch (e: any) {
-                console.warn('[DESIGN_SKILL] Could not fetch:', e.message);
+                console.warn('[DESIGN_SKILL] Could not load:', e.message);
             }
+        }
+
+        // ── Skills catalog (built-in + user-created) for the system prompt ──
+        const disabledBuiltinSkills = Array.isArray((req as any).authUser?.user_metadata?.disabledBuiltinSkills)
+            ? (req as any).authUser.user_metadata.disabledBuiltinSkills.filter((x: any) => typeof x === 'string')
+            : null;
+        let skillsSection = '';
+        try {
+            skillsSection = skillsCatalogText(await listSkillsForUser(uid!, disabledBuiltinSkills));
+        } catch (e: any) {
+            console.warn('[SKILLS] catalog build failed:', e?.message);
         }
 
         const dynSys = [
@@ -387,6 +405,7 @@ IMPORTANT: After step 3, ALL subsequent operations use /home/user/edits/. Never 
             designSkillGuard,
             systemGuard,
             searchGuard,
+            skillsSection,
             VISUAL_INSTRUCTIONS,
             isSystemQuery ? '' : AGENT_SYSTEM_EXTENSION,
         ].join('\n\n');
@@ -401,7 +420,12 @@ IMPORTANT: After step 3, ALL subsequent operations use /home/user/edits/. Never 
 
         // ── Per-request agent state ──────────────────────────────────────
         const agentState: AgentState = { sources: [], generatedFiles: [], thoughtProcess: [], searchCount: 0, wikiSearchCount: 0 };
-        const tools = createFluxTools(res, model, agentState, nq, activeConversationId, uid, abortController.signal);
+        const webSearchDisabled = (req as any).body?.webSearch === false;
+        const tools = await createFluxTools(res, model, agentState, nq, activeConversationId, uid, abortController.signal, disabledBuiltinSkills);
+        if (webSearchDisabled) {
+            // User toggled web search off in the composer — do not offer the tool at all.
+            delete (tools as any)['web_search'];
+        }
         if (isSystemQuery) {
             const destructiveTools = ['create_project', 'write_file', 'edit_file', 'run_bash', 'run_python', 'install_package', 'start_app', 'stop_app', 'list_apps', 'get_app_logs', 'get_app_url', 'web_search', 'get_weather', 'wiki_search'];
             for (const name of destructiveTools) {
@@ -448,8 +472,6 @@ IMPORTANT: After step 3, ALL subsequent operations use /home/user/edits/. Never 
             agentState,
             stream: orchStream,
             model,
-            skillRegistry: SKILL_REGISTRY,
-            fetchSkillFile,
             generateDocumentWithSkill: generateDocumentWithSkill as any,
             fileContent: hasAnyFile ? 'attached' : undefined,
             isComputerMode,
@@ -1458,8 +1480,7 @@ CROSS-FILE RULES (when multiple files provided):
                             const bgSearchUrls = agentState.sources.map((s: any) => s.url).join('\n');
                             (async () => {
                                 try {
-                                    const skillFile = SKILL_REGISTRY[bgDocIntent]?.fileName;
-                                    const skillContent = skillFile ? await fetchSkillFile(skillFile) : '';
+                                    const skillContent = skillBodyForDocType(bgDocIntent) ?? '';
                                     if (!skillContent || res.writableEnded) return;
 
                                     const searchContent = agentState.searchContent || `Search results for reference:\n${bgSearchUrls}`;
