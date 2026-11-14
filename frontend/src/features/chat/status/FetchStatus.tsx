@@ -108,8 +108,7 @@ export function FetchStatus({
             rel="noreferrer noopener"
             className="group/cardrow -mx-1.5 flex items-center gap-3 rounded-md px-1.5 py-1.5 transition-colors hover:bg-white/[0.03]"
           >
-            <Favicon url={url} size={20} />
-            <span className="min-w-0 flex-1 truncate text-[12.5px] leading-[18px] text-[#eba188] underline-offset-2 group-hover/cardrow:underline">
+            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold leading-[18px] text-[var(--text-primary)] underline-offset-2 transition-colors group-hover/cardrow:underline">
               {clean}
             </span>
             <LinkIcon cls="size-3.5 shrink-0 text-[var(--text-secondary)] opacity-70 transition-opacity group-hover/cardrow:opacity-100" />
