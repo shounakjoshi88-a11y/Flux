@@ -20,7 +20,7 @@ import { LinkIcon, WarnIcon } from "../icons";
 import { ToolPanel, ToolSection } from "../ToolActivity";
 import { Favicon } from "../Favicon";
 import { cleanUrl } from "../../../utils/linkify";
-import { getDomain } from "../../../lib/chat-utils";
+
 import type { StatusBlockProps } from "./types";
 
 export function FetchStatus({
@@ -43,9 +43,8 @@ export function FetchStatus({
   const isFetching = !isDone && !isError;
 
   const clean = cleanUrl(url);
-  const domain = url ? getDomain(url) : "";
-  // Only a real page title (or PDF filename) makes a distinct heading —
-  // without one, show "Fetched: <host>" and keep the card to a single line.
+  // Row label: titled pages read "Fetched: <title>" (Claude's anatomy);
+  // untitled pages just read "Fetched" — the card below carries the URL.
   const hasTitle = typeof title === "string" && title.trim().length > 0;
   const label = isFetching
     ? (typeof status.message === "string" && status.message.startsWith("Parsing")
@@ -53,7 +52,9 @@ export function FetchStatus({
         : `Fetching ${clean || "content"}`)
     : isError
       ? `Couldn't fetch ${clean || "page"}`
-      : `Fetched: ${hasTitle ? title : clean}`;
+      : hasTitle
+        ? `Fetched: ${title}`
+        : "Fetched";
 
   if (isError) {
     return (
@@ -81,7 +82,7 @@ export function FetchStatus({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="group/fetchrow flex w-stretch items-center gap-2 rounded-[8px] py-[3px] pl-1 pr-1 text-left outline-none transition-colors hover:bg-white/[0.04] focus-visible:bg-white/[0.05] select-none"
+        className="group/fetchrow flex w-full min-w-0 items-center gap-2 rounded-[8px] py-[3px] pl-1 pr-1 text-left outline-none transition-colors hover:bg-white/[0.04] focus-visible:bg-white/[0.05] select-none"
       >
         <Favicon url={url} className="transition-opacity group-hover/fetchrow:opacity-90" />
         <span className="min-w-0 flex-1 truncate whitespace-nowrap text-[13px] leading-[18px] text-[var(--text-secondary)] transition-colors group-hover/fetchrow:text-[var(--text-primary)]">
@@ -108,24 +109,10 @@ export function FetchStatus({
             className="group/cardrow -mx-1.5 flex items-center gap-3 rounded-md px-1.5 py-1.5 transition-colors hover:bg-white/[0.03]"
           >
             <Favicon url={url} size={20} />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-medium leading-[18px] text-[var(--text-primary)]">
-                {hasTitle ? title : clean}
-              </span>
-              {hasTitle && (
-                <span className="block truncate text-[12px] leading-[16px] text-[#eba188] underline-offset-2 group-hover/cardrow:underline">
-                  {clean}
-                </span>
-              )}
+            <span className="min-w-0 flex-1 truncate text-[12.5px] leading-[18px] text-[#eba188] underline-offset-2 group-hover/cardrow:underline">
+              {clean}
             </span>
-            {hasTitle ? (
-              <span className="flex shrink-0 items-center gap-1.5 font-mono text-[11px] text-[var(--text-secondary)]">
-                <span className="hidden sm:inline">{domain}</span>
-                <LinkIcon cls="size-3.5 opacity-70 transition-opacity group-hover/cardrow:opacity-100" />
-              </span>
-            ) : (
-              <LinkIcon cls="size-3.5 shrink-0 text-[var(--text-secondary)] opacity-70 transition-opacity group-hover/cardrow:opacity-100" />
-            )}
+            <LinkIcon cls="size-3.5 shrink-0 text-[var(--text-secondary)] opacity-70 transition-opacity group-hover/cardrow:opacity-100" />
           </a>
         </ToolSection>
       </ToolPanel>
