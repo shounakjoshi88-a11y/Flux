@@ -22,7 +22,6 @@ import type { ToolContext } from './context';
 
 const MAX_RESULTS = 7;
 const MAX_SOURCES = 10;
-const MAX_TITLES = 7;
 const MAX_QUERY_CHARS = 400;
 const MAX_EXTRACT_CHARS = 3000;
 
@@ -196,19 +195,13 @@ export function createSearchTools(ctx: ToolContext) {
                     const idxOffset = state.sources.length;
                     const withIndex = cached.sources.map((s: any, i: number) => ({ url: s.url, index: idxOffset + i + 1 }));
                     state.sources.push(...withIndex);
-                    // Emit found_sources and reading status so the frontend shows each search cycle's steps.
+                    // Emit found_sources so the frontend shows each search cycle's steps.
                     const cachedUrls = cached.sources.map((s: any) => s.url);
                     const cachedTitles = cached.sources.map((s: any) => s.title || getUrlTitle(s.url));
                     writer.status(
                         'found_sources',
                         `Found ${cached.sources.length} source${cached.sources.length > 1 ? 's' : ''}`,
                         { sources: cachedUrls, titles: cachedTitles, query: safeQueries[0] || userQuery || '' },
-                        state.thoughtProcess,
-                    );
-                    writer.status(
-                        'reading',
-                        `Reading ${Math.min(cachedTitles.length, MAX_TITLES)} sources...`,
-                        { titles: cachedTitles.slice(0, MAX_TITLES), urls: cachedUrls.slice(0, MAX_TITLES) },
                         state.thoughtProcess,
                     );
                     if (cached.content) {
@@ -275,10 +268,6 @@ export function createSearchTools(ctx: ToolContext) {
                         state.thoughtProcess,
                     );
 
-                    const titles = uniqueResults.slice(0, MAX_TITLES).map((r: any) => r.title || getUrlTitle(r.url));
-                    const urls = uniqueResults.slice(0, MAX_TITLES).map((r: any) => r.url);
-                    writer.status('reading', `Reading ${titles.length} sources...`, { titles, urls }, state.thoughtProcess);
-
                     const resultsText = uniqueResults
                         .map((r: any, i: number) => {
                             let c = (r.content || r.snippet || '')
@@ -289,27 +278,9 @@ export function createSearchTools(ctx: ToolContext) {
                             return `[${i + 1}] ${r.url}\n${r.title ? r.title + '\n' : ''}${c}`;
                         })
                         .join('\n\n');
-                    let extraContent = '';
-                    try {
-                        const topUrls = uniqueResults.slice(0, 3).map((r: any) => r.url).filter(Boolean);
-                        if (topUrls.length > 0) {
-                            writer.status('extracting', 'Extracting full content from top sources...', {}, state.thoughtProcess);
-                            const extractResult = await tavilyClient.extract(topUrls);
-                            const extracted = extractResult?.results?.filter((r: any) => r.rawContent) ?? [];
-                            if (extracted.length > 0) {
-                                extraContent =
-                                    '\n\n--- Full page content from top sources ---\n' +
-                                    extracted
-                                        .map((r: any, i: number) => {
-                                            const txt = r.rawContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-                                            return `[SOURCE ${i + 1}] ${r.url || topUrls[i]}\n${txt.slice(0, MAX_EXTRACT_CHARS)}`;
-                                        })
-                                        .join('\n\n');
-                            }
-                        }
-                    } catch (e: any) {
-                        console.warn('[TOOL] web_search extract failed (non-fatal):', e?.message ?? e);
-                    }
+                    // Full-page extraction is intentionally not attempted: it
+                    // produced no verifiable user-visible result, so it was removed.
+                    const extraContent = '';
 
                     const safeQueryStr = safeQueries.join('; ');
                     const fullSearchRes = `[Search Results for "${safeQueryStr}"]\n\n${resultsText}${extraContent}`;

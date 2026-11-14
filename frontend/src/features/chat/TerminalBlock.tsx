@@ -106,11 +106,6 @@ export function TerminalBlock({
   const isSuccess = exitCode === 0;
   const isFailure = exitCode !== undefined && exitCode !== 0;
   const langLabel = language || 'bash';
-  const langStyle = getLangStyle(langLabel);
-
-  // Prompt symbol per language
-  const prompt = langLabel === 'python' ? '>>>' : langLabel === 'sh' || langLabel === 'bash' ? '$' : '$';
-  const promptColor = langLabel === 'python' ? '#7dcfff' : '#9ece6a';
 
   // Tokenize command for bash syntax coloring
   const renderCommand = (cmd: string) => {
@@ -183,27 +178,19 @@ export function TerminalBlock({
       ? 'border-red-500/25'
       : isSuccess
         ? 'border-emerald-500/15'
-        : 'border-[var(--surface-border)]';
+        : 'border-white/[0.05]';
 
   return (
-    <div className={`mt-2 rounded-lg overflow-hidden border transition-all duration-200 ${borderClass}`}
-      style={{ background: '#0b0b0a' }}>
+    // claude.ai's bash card: flat surface, language label (11px mono,
+    // secondary) on the left, live timer / exit badge on the right, no
+    // window chrome dots. Body is the raw highlighted command at 12.5px
+    // with a 200px max height and an inner scrollbar.
+    <div className={`mt-1.5 overflow-hidden rounded-md border transition-all duration-200 ${borderClass}`}
+      style={{ background: 'var(--bg-primary)' }}>
 
       {/* ── Block header bar */}
-      <div className="flex items-center gap-2 px-3 py-[7px] border-b border-white/[0.05]"
-        style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.025), rgba(0,0,0,0.18))' }}>
-        {/* Traffic dots */}
-        <div className="flex gap-1.5 shrink-0">
-          <span className="size-[8px] rounded-full" style={{ background: '#ff5f57', opacity: 0.65 }} />
-          <span className="size-[8px] rounded-full" style={{ background: '#febc2e', opacity: 0.65 }} />
-          <span className="size-[8px] rounded-full" style={{ background: '#28c840', opacity: 0.65 }} />
-        </div>
-
-        {/* Language label with colored dot */}
-        <span className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)] font-mono tracking-wide ml-1">
-          <span className={`size-[5px] rounded-full ${langStyle.dot}`} />
-          {langLabel}
-        </span>
+      <div className="flex h-7 items-center justify-between gap-2 border-b border-white/[0.04] px-3">
+        <p className="font-mono text-[11px] leading-none text-[var(--text-secondary)]">{langLabel}</p>
 
         <div className="ml-auto flex items-center gap-2 shrink-0">
           {/* Running indicator with live timer */}
@@ -251,9 +238,8 @@ export function TerminalBlock({
           <div className="absolute top-0 left-0 right-0 h-px pointer-events-none"
             style={{ background: 'linear-gradient(90deg, transparent, var(--accent), transparent)', opacity: 0.5 }} />
         )}
-        <pre className="text-[12.5px] leading-[1.65] font-mono px-4 py-3 overflow-x-auto whitespace-pre-wrap break-words"
-          style={{ color: '#c0caf5' }}>
-          <span style={{ color: promptColor, marginRight: '6px' }}>{prompt}</span>
+        <pre className="custom-scrollbar px-3 py-2.5 font-mono whitespace-pre-wrap break-words overflow-y-auto text-[12.5px] leading-[1.65]"
+          style={{ color: '#c0caf5', maxHeight: 200 }}>
           {renderCommand(displayedCommand)}
           {isRunning && (
             <span

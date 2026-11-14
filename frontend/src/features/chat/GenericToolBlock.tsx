@@ -1,10 +1,8 @@
-import { IconChevronDown } from "../layout/anthropicIcons.tsx";
+import { IconChevronDown } from "../layout/anthropicIcons";
 import React, { useState } from "react";
 
-import { TerminalIcon, FileIcon, WikiIcon, SearchIcon, PackageIcon } from "./icons";
-import { SpinnerIcon } from "./ThoughtBlock";
 import { TerminalBlock, FileCodeBlock } from "./TerminalBlock";
-import { TimelineNode } from "./ThoughtBlock";
+import { ToolRow, ToolPanel, ToolSection, useToolDisclosure } from "./ToolActivity";
 
 export function GenericToolBlock({
   toolName,
@@ -32,33 +30,13 @@ export function GenericToolBlock({
   // Decide icon based on tool name
   const isExecution = /bash|python|sandbox|terminal|package|run|exec/i.test(toolName);
   const isFileTool = /file|write|edit|read|generat/i.test(toolName);
-  const isWiki = /wiki/i.test(toolName);
-  const isSearch = /search|query/i.test(toolName);
   const isInstall = /package|install|pip|npm/i.test(toolName);
+  void isInstall; // reserved for install-specific rendering
 
-  const iconColor = isRunning
-    ? "text-[var(--accent)]"
-    : isErr
-      ? "text-red-400/70"
-      : isDone
-        ? "text-emerald-400/70"
-        : "text-[var(--text-secondary)]/40";
-
-  const toolIconEl = isExecution
-    ? <TerminalIcon cls={iconColor} />
-    : isFileTool
-      ? <FileIcon cls={iconColor} />
-      : isWiki
-        ? <WikiIcon cls={iconColor} />
-        : isSearch
-          ? <SearchIcon cls={iconColor} />
-          : isInstall
-            ? <PackageIcon cls={iconColor} />
-            : isRunning
-              ? <SpinnerIcon />
-              : <span className="size-4 flex items-center justify-center">
-                <span className={`size-1.5 rounded-full ${isDone ? 'bg-emerald-400/70' : isErr ? 'bg-red-400/70' : 'bg-[var(--text-muted)]'}`} />
-              </span>;
+  // Claude's disclosure rows are collapsed by default while streaming and
+  // open after completion; keep them open so nothing is hidden while
+  // output arrives, and the user collapses manually.
+  const { open, toggle } = useToolDisclosure(true);
 
   // Extract command/code for terminal rendering
   const terminalCmd = args?.command ?? args?.code ?? args?.script ?? "";
@@ -79,77 +57,67 @@ export function GenericToolBlock({
   // Pretty-print args as key-value pairs (not raw JSON)
   const argEntries = args && typeof args === 'object' ? Object.entries(args).filter(([, v]) => v != null && v !== '') : [];
 
-  return (
-    <div className="flex gap-2.5">
-      <TimelineNode icon={toolIconEl} isFirst={isFirst} isLast={isLast} />
-      <div className="py-2 min-w-0 flex-1">
-        {/* Header: message + tool name badge + status pill */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[13px] text-[var(--text-secondary)] leading-snug font-medium">
-            {message || toolName}
-          </span>
-          <span className="text-[10px] text-[var(--text-muted)]/80 font-mono bg-[var(--surface-bg)] border border-[var(--surface-border)] rounded px-1.5 py-0.5">
-            {toolName}
-          </span>
-          {/* Status pill */}
-          {isRunning && (
-            <span className="flex items-center gap-1 text-[10px] text-[var(--accent)]/80 font-mono">
-              <span className="size-[5px] rounded-full bg-[var(--accent)]/80 animate-pulse" />
-              running
-            </span>
-          )}
-          {isDone && !isRunning && (
-            <span className="flex items-center gap-1 text-[10px] text-emerald-400/70 font-mono">
-              <svg viewBox="0 0 10 10" className="size-2.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="1.5,5.5 4,8 8.5,2.5" />
-              </svg>
-              done
-            </span>
-          )}
-          {isErr && (
-            <span className="flex items-center gap-1 text-[10px] text-red-400/70 font-mono">
-              <svg viewBox="0 0 10 10" className="size-2.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                <line x1="2.5" y1="2.5" x2="7.5" y2="7.5" />
-                <line x1="7.5" y1="2.5" x2="2.5" y2="7.5" />
-              </svg>
-              error
-            </span>
-          )}
-          {rightSlot && <span className="inline-flex shrink-0 align-middle">{rightSlot}</span>}
-        </div>
+  // Claude's row label: execution tools read "Ran a command", file tools
+  // "Read a file"/"Wrote a file"/"Edited a file", everything else falls
+  // back to the tool's own message/name.
+  const isRead = /read|get|cat|open/i.test(toolName);
+  const isWrite = /write|create|edit|delete/i.test(toolName);
+  const rowLabel = message
+    || (isExecution ? (isRunning ? "Running a command" : "Ran a command")
+      : isFileTool ? (isRead ? "Read a file" : isWrite ? "Wrote a file" : "Updated a file")
+      : toolName);
 
+  // Error-only trailing badge (Claude's rows stay clean otherwise)
+  const errBadge = isErr
+    ? <span className="font-mono text-[10px] uppercase tracking-wide text-red-400/80">error</span>
+    : undefined;
+
+  return (
+    <div className="min-w-0">
+      {/* claude.ai: 20px disclosure row that expands into a card with the
+          highlighted command / args / output. */}
+      <ToolRow label={rowLabel} open={open} onToggle={toggle} isActive={isRunning} rightSlot={errBadge} />
+      <ToolPanel open={open}>
         {/* Terminal block for execution tools */}
         {isExecution && terminalCmd ? (
-          <TerminalBlock
-            command={terminalCmd}
-            language={terminalLang}
-            isRunning={isRunning}
-            stdout={result || undefined}
-          />
+          <ToolSection>
+            <TerminalBlock
+              command={terminalCmd}
+              language={terminalLang}
+              isRunning={isRunning}
+              exitCode={status === "done" ? 0 : status === "error" ? 1 : undefined}
+              stdout={result || undefined}
+            />
+          </ToolSection>
         ) : isFileTool && filename ? (
-          <FileCodeBlock
-            filename={filename}
-            content={fileContent || undefined}
-            language={fileLang}
-            isRunning={isRunning}
-            isSuccess={isDone}
-            isError={isErr}
-          />
+          <ToolSection>
+            <FileCodeBlock
+              filename={filename}
+              content={fileContent || undefined}
+              language={fileLang}
+              isRunning={isRunning}
+              isSuccess={isDone}
+              isError={isErr}
+            />
+          </ToolSection>
         ) : argEntries.length > 0 ? (
-          <PrettyArgsBlock entries={argEntries} result={result} isResultJson={isResultJson} />
+          <ToolSection>
+            <PrettyArgsBlock entries={argEntries} result={result} isResultJson={isResultJson} />
+          </ToolSection>
         ) : result ? (
-          <div className="mt-2 rounded-lg border border-[var(--surface-border)] overflow-hidden" style={{ background: '#0b0b0a' }}>
-            <div className="px-3 py-1.5 border-b border-white/[0.05] text-[10px] text-[var(--text-muted)] font-mono uppercase tracking-wider"
-              style={{ background: 'rgba(0,0,0,0.2)' }}>
-              Output
+          <ToolSection>
+            <div className="overflow-hidden rounded-md border border-white/[0.05]" style={{ background: 'var(--bg-primary)' }}>
+              <div className="flex items-center justify-between border-b border-white/[0.04] px-3 h-7">
+                <p className="font-mono text-[11px] text-[var(--text-secondary)]">output</p>
+              </div>
+              <pre className="custom-scrollbar max-h-[200px] overflow-y-auto px-3 py-2.5 text-[12px] leading-[1.6] font-mono whitespace-pre-wrap break-words"
+                style={{ color: '#9a978f' }}>
+                {result}
+              </pre>
             </div>
-            <pre className="text-[11.5px] leading-relaxed font-mono px-4 py-2.5 overflow-x-auto max-h-[200px] overflow-y-auto whitespace-pre-wrap"
-              style={{ color: '#9a978f' }}>
-              {result}
-            </pre>
-          </div>
+          </ToolSection>
         ) : null}
-      </div>
+      </ToolPanel>
     </div>
   );
 }

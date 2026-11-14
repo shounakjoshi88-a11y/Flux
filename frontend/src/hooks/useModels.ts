@@ -82,31 +82,21 @@ export function useModels(): ModelDiscoveryResult {
   return { categories, all, isLoading, error, refresh };
 }
 
+// Last-resort catalog shown when /api/models is unreachable. Mirrors the
+// backend: only models verified live on NVIDIA NIM (2026-11-14) are listed.
 function getFallbackModels(): ModelCategory[] {
   return [
     {
       category: "General Purpose",
       models: [
-        { id: "mistral-large-675b", label: "Mistral Large 3 675B (Mistral AI)" },
-        { id: "glm-5.2", label: "GLM 5.2 (Z‑AI)" },
-        { id: "kimi-k2.6", label: "Kimi K2.6 (Moonshot AI)" },
         { id: "nemotron-3-ultra-550b", label: "Nemotron 3 Ultra 550B (NVIDIA)" },
-        { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash (DeepSeek)" },
-        { id: "qwen3.5-397b-a17b", label: "Qwen 3.5 397B (Qwen)" },
-        { id: "minimax-m2.7", label: "MiniMax M2.7 (MiniMax)" },
-        { id: "minimax-m3", label: "MiniMax M3 (MiniMax)" },
-        { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro (DeepSeek)" },
-        { id: "sarvam-m", label: "Sarvam-M (Sarvam AI)" },
-        { id: "nemotron-nano-12b-v2-vl", label: "Nemotron Nano 12B v2 VL (NVIDIA)" },
         { id: "laguna-xs-2.1", label: "Laguna XS 2.1 (Poolside)" },
       ],
     },
     {
       category: "Reasoning & Agents",
       models: [
-        { id: "step-3.7-flash", label: "Step 3.7 Flash (StepFun)" },
-        { id: "step-3.5-flash", label: "Step 3.5 Flash (StepFun)" },
-        { id: "inkling", label: "Inkling (Thinking Machines)" },
+        { id: "nemotron-3-nano-omni-30b-a3b-reasoning", label: "Nemotron 3 Nano Omni 30B Reasoning (NVIDIA)" },
       ],
     },
   ];

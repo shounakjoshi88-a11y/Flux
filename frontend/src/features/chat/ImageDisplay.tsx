@@ -410,5 +410,5 @@ export function InlineGenerationIndicator({
   );
 }
 
-/* ─── Search steps group (searching → found_sources → reading) ────── */
+/* ─── Search steps (searching → found_sources) ────── */
 

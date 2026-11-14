@@ -2,6 +2,7 @@ import { IconChevronDown } from "../layout/anthropicIcons.tsx";
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 
 import { StatusMessage } from "./StatusMessage";
+import { CommandGroup } from "./CommandGroup";
 import { TimelineNode } from "./ThoughtBlock";
 import { ThoughtBlock } from "./ThoughtBlock";
 import { ContentWithFileCards } from "./FileCards";
@@ -10,10 +11,12 @@ import { FileDownloadButton } from "../content/FileDownloadButton";
 import TodoList from "./TodoList";
 import PermissionDialog from "./PermissionDialog";
 import { CodeOutputBlock } from "../content/CodeOutputBlock";
+import { WebSearchSection } from "./status/WebSearchStatus";
+import { ToolRow, ToolPanel } from "./ToolActivity";
 import { getDomain } from "../../lib/chat-utils";
 import type { MessagePart, Source } from "../../types";
 
-const SEARCH_SUBTYPES = new Set(['searching', 'found_sources', 'reading', 'extracting', 'no_results', 'error', 'web_search', 'done']);
+const SEARCH_SUBTYPES = new Set(['searching', 'found_sources', 'no_results', 'error', 'web_search', 'done']);
 
 function isSearchStep(part: MessagePart | undefined): boolean {
   return !!part && part.type === 'tool_call' && SEARCH_SUBTYPES.has(part.name);
@@ -39,62 +42,37 @@ export function SearchStepsGroup({
   const typedParts = groupParts as (MessagePart & { type: 'tool_call' })[];
   const firstPart = typedParts[0];
 
-  const actualIsFirst = groupStartIndex === 0 || allParts[groupStartIndex - 1]?.type !== 'tool_call';
-
   if (!firstPart) return null;
 
   const searchQuery = firstPart.input?.query ?? '';
-
-  const innerParts = typedParts.slice(1);
-
-  const lastVisibleIdx = useMemo(() => {
-    for (let k = innerParts.length - 1; k >= 0; k--) {
-      const p = innerParts[k];
-      if (p && p.name !== 'done') return k;
-    }
-    return -1;
-  }, [innerParts]);
-
-  const chevron = (
-    <IconChevronDown className={`size-3 text-[var(--text-muted)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
-  );
+  const streamingActive = isStreaming && typedParts.some((p) => p.status === 'running');
 
   return (
-    <div className="mb-0.5">
-      <div className="cursor-pointer" onClick={() => setOpen(v => !v)}>
-        <StatusMessage
-          status={{
-            type: firstPart.name,
-            subtype: firstPart.name,
-            message: firstPart.output || '',
-            data: firstPart.input,
-          }}
-          isFirst={actualIsFirst}
-          isLast={false}
-          isActive={isStreaming && firstPart.status === 'running'}
-          showRail={true}
-          onSourceClick={onSourceClick}
-          rightSlot={chevron}
-        />
-      </div>
-
-      {open && innerParts.map((part, idx) => (
-        <StatusMessage
-          key={idx}
-          status={{
-            type: part.name,
-            subtype: part.name,
-            message: part.output || '',
-            data: part.input,
-          }}
-          searchQuery={part.name === 'found_sources' ? searchQuery : undefined}
-          isFirst={idx === 0}
-          isLast={lastVisibleIdx >= 0 && idx === lastVisibleIdx}
-          isActive={isStreaming && part.status === 'running'}
-          showRail={true}
-          onSourceClick={onSourceClick}
-        />
-      ))}
+    <div className="min-w-0">
+      {/* claude.ai: one 20px disclosure row ("Searched the web") expanding into
+          a hairline-divided card with the query, source list and read lines. */}
+      <ToolRow
+        label="Searched the web"
+        open={open}
+        onToggle={() => setOpen((v) => !v)}
+        isActive={streamingActive}
+      />
+      <ToolPanel open={open}>
+        {typedParts.map((part, idx) => (
+          <WebSearchSection
+            key={idx}
+            status={{
+              type: part.name,
+              subtype: part.name,
+              message: part.output || '',
+              data: part.input,
+            }}
+            searchQuery={part.name === 'found_sources' ? searchQuery : undefined}
+            isPartActive={isStreaming && part.status === 'running'}
+            onSourceClick={onSourceClick}
+          />
+        ))}
+      </ToolPanel>
     </div>
   );
 }
@@ -206,38 +184,15 @@ export function PartsRenderer({
         }
         i = j - 1;
 
-        toolParts.forEach((tpPart, idx) => {
-          const tp = tpPart as MessagePart & { type: 'tool_call' };
-          const partIndex = i - (toolParts.length - 1) + idx;
-          const actualIsFirst = partIndex === 0 || parts[partIndex - 1]?.type !== "tool_call";
-          const actualIsLast = !activeGenerationStatus && (partIndex === parts.length - 1 || parts[partIndex + 1]?.type !== "tool_call");
-
-          renderedParts.push(
-            <div key={`tool-${partIndex}`} className="mb-0.5">
-              <StatusMessage
-                status={{
-                  type: "tool_call",
-                  subtype: tp.name,
-                  message: tp.output || "",
-                  data: {
-                    args: tp.input,
-                    result: tp.output,
-                    status: tp.status,
-                    path: tp.input?.path,
-                    filename: tp.input?.filename,
-                    content: tp.input?.content,
-                    language: tp.input?.language,
-                    ...(tp.input || {}),
-                  },
-                }}
-                isFirst={actualIsFirst}
-                isLast={actualIsLast}
-                isActive={isStreaming && tp.status === "running"}
-                showRail={true}
-              />
-            </div>
-          );
-        });
+        // Consecutive non-search tool calls aggregate into one Claude-style
+        // disclosure ("Ran 2 commands, read a file") with a nested row per call.
+        renderedParts.push(
+          <CommandGroup
+            key={`cmd-group-${i - (toolParts.length - 1)}`}
+            parts={toolParts}
+            isStreaming={isStreaming}
+          />
+        );
         break;
       }
       case "thought": {

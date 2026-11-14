@@ -1,10 +1,8 @@
-import { IconChevronDown } from "../layout/anthropicIcons.tsx";
 import React, { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
 
 import { MessageRenderer } from "./MessageRenderer";
+import { ToolRow, ToolPanel, ToolSection } from "./ToolActivity";
 import { useElapsedSeconds } from "./TerminalBlock";
-import { ClockIcon } from "./icons";
 type IProps = { cls?: string };
 
 export function useWordByWord(fullText: string, isActive: boolean): string {
@@ -164,8 +162,8 @@ export function parseThoughtSteps(text: string): string[] {
 export function ThoughtBlock({
   content,
   message,
-  isFirst = false,
-  isLast = false,
+  isFirst,
+  isLast,
   isActive,
   elapsedSeconds,
 }: {
@@ -176,8 +174,11 @@ export function ThoughtBlock({
   isActive?: boolean;
   elapsedSeconds?: number;
 }) {
+  // claude.ai: a single 20px disclosure row ("Thought for 31s") that expands
+  // into a hairline-divided card with the step lines. No timeline rail, no
+  // per-line clock icons, no "Done" footer.
   const [open, setOpen] = useState(true);
-  const isThinking = isActive !== undefined ? isActive : isLast;
+  const isThinking = (isActive !== undefined ? isActive : isLast) ?? false;
   const rawText = cleanThoughtText(content || message || "");
   const allSteps = parseThoughtSteps(rawText);
   const liveElapsed = useElapsedSeconds(isThinking);
@@ -202,136 +203,35 @@ export function ThoughtBlock({
   if (!rawText) return null;
   const stepsToRender = allSteps.slice(0, shownCount);
 
-  // Build flat list of visual rows
-  type Row = 
-    | { kind: 'header' }
-    | { kind: 'blank' }
-    | { kind: 'step-line';     isFirstInStep: boolean; text: string; isAnimating: boolean }
-    | { kind: 'step-composite'; lines: { isFirstInStep: boolean; text: string }[] };
-
-  const rows: Row[] = [];
-  rows.push({ kind: 'header' });
-  rows.push({ kind: 'blank' });
-
-  stepsToRender.forEach((step, i) => {
-    const isLastStep = i === stepsToRender.length - 1;
-    const stepText = isThinking && isLastStep ? animatedActive : step;
-    const lines = stepText.split('\n').filter(l => l.trim());
-
-    if (isLastStep && isLast && !isThinking) {
-      // Last step — render as composite with Done footer
-      rows.push({
-        kind: 'step-composite',
-        lines: lines.map(text => ({ isFirstInStep: false, text })),
-      });
-    } else {
-      lines.forEach((line, li) => {
-        rows.push({
-          kind: 'step-line',
-          isFirstInStep: li === 0,
-          text: line,
-          isAnimating: isThinking && isLastStep && li === 0,
-        });
-      });
-      if (i < stepsToRender.length - 1) rows.push({ kind: 'blank' });
-    }
-  });
-
-  const lineCls = "w-px bg-[var(--text-muted)]/15";
-  const visibleRows = rows.filter(r => r.kind === 'header' || open);
-
-  const railIcon = (row: Row) => {
-    if (row.kind === 'step-line' && row.isFirstInStep)
-      return <ClockIcon className={`size-4 ${row.isAnimating ? "text-[var(--accent)]" : "text-[var(--text-secondary)]/60"}`} />;
-    return null;
-  };
+  const label = isThinking
+    ? "Thinking"
+    : displayElapsed != null
+      ? `Thought for ${displayElapsed}s`
+      : "Thought";
 
   return (
-    <div className="flex flex-col py-2">
-      {visibleRows.map((row, ri) => {
-        const hasNext = ri < visibleRows.length - 1;
-
-        if (row.kind === 'header') {
+    <div className="min-w-0">
+      <ToolRow label={label} open={open} onToggle={() => setOpen(v => !v)} isActive={isThinking} />
+      <ToolPanel open={open}>
+        {stepsToRender.map((step, i) => {
+          const isLastStep = i === stepsToRender.length - 1;
+          const text = isThinking && isLastStep ? animatedActive : step;
           return (
-            <div key={ri} className="flex items-start">
-              <div className="min-w-0 flex-1">
-                <button
-                  onClick={() => setOpen(v => !v)}
-                  aria-expanded={open}
-                  className="flex items-center gap-1.5 w-full text-left select-none"
-                >
-                  <span className="text-[14px] leading-[20px] font-normal text-[var(--text-primary)]">
-                    {isThinking ? 'Thinking' : `Thought${displayElapsed != null ? ` · ${displayElapsed}s` : ''}`}
-                  </span>
-                  <span className="shrink-0 flex items-center gap-1.5">
-                    {isThinking && (
-                      <span className="inline-flex gap-0.5">
-                        {[0, 1, 2].map(i => (
-                          <span key={i} className="size-1 rounded-full bg-[var(--accent)]/70"
-                            style={{ animation: `thoughtDot 1.2s ease-in-out ${i * 0.2}s infinite` }} />
-                        ))}
-                      </span>
-                    )}
-                    <IconChevronDown className={`size-3.5 text-[var(--text-secondary)]/70 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
-                  </span>
-                </button>
+            <ToolSection key={i}>
+              <div
+                className={`text-[14px] leading-[20px] whitespace-pre-wrap ${
+                  isThinking && isLastStep ? "text-[var(--text-primary)]" : "text-[var(--text-primary)]/80"
+                }`}
+              >
+                <MessageRenderer content={text} onCitationClick={() => { }} sources={[]} />
+                {isThinking && isLastStep && (
+                  <span className="inline-block w-px h-[13px] bg-[var(--text-secondary)] ml-0.5 align-middle" style={{ animation: "blink 1s step-end infinite" }} />
+                )}
               </div>
-            </div>
+            </ToolSection>
           );
-        }
-
-        if (row.kind === 'step-composite') {
-          return (
-            <div key={ri} className="flex gap-2.5 items-stretch">
-              {/* Rail: ClockIcon → flex-1 line → checkmark */}
-              <div className="w-4 shrink-0 flex flex-col items-center">
-                <ClockIcon className="size-4 text-[var(--text-secondary)]/60" />
-                <div className="w-px flex-1 bg-[var(--text-muted)]/15" />
-                <div className="flex items-center justify-center h-4 w-4 mb-2">
-                  <svg viewBox="0 0 16 16" className="size-4 text-[var(--text-secondary)]" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="8" cy="8" r="6" strokeWidth="1" />
-                    <polyline points="5.5,8 7.5,10 10.5,6" />
-                  </svg>
-                </div>
-              </div>
-              {/* Content: lines → mt-10 → Done */}
-              <div className="min-w-0 flex-1 flex flex-col">
-                {row.lines.map((line, li) => (
-                  <div key={li} className={`text-[14px] leading-[21px] ${li === row.lines.length - 1 ? "" : "pb-2.5"} text-[var(--text-secondary)]/70`}>
-                    <MessageRenderer content={line.text} onCitationClick={() => { }} sources={[]} />
-                  </div>
-                ))}
-                <div className="flex items-center h-4 mt-10 mb-2">
-                  <span className="text-[14px] leading-[20px] font-normal text-[var(--text-secondary)]">Done</span>
-                </div>
-              </div>
-            </div>
-          );
-        }
-
-        // blank or step-line
-        const icon = railIcon(row);
-        return (
-          <div key={ri} className="flex gap-2.5 items-start">
-            <div className="w-4 shrink-0 flex flex-col items-center self-stretch">
-              <div className="flex flex-col items-center flex-1">
-                {icon || <div className="w-px bg-[var(--text-muted)]/15" />}
-                {hasNext && <div className={`${lineCls} flex-1 min-h-[4px]`} />}
-              </div>
-            </div>
-            <div className="min-w-0 flex-1">
-              {row.kind === 'step-line' && (
-                <div className={`text-[14px] leading-[21px] ${row.isAnimating ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]/70"}`}>
-                  <MessageRenderer content={row.text} onCitationClick={() => { }} sources={[]} />
-                  {row.isAnimating && (
-                    <span className="inline-block w-px h-[13px] bg-[var(--text-secondary)] ml-0.5 align-middle" style={{ animation: "blink 1s step-end infinite" }} />
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })}
+        })}
+      </ToolPanel>
     </div>
   );
 }

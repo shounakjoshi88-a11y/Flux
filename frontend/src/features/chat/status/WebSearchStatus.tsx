@@ -1,62 +1,55 @@
 /**
- * WebSearchStatus — the web-search trail.
+ * WebSearchStatus — claude.ai's "Searched the web" disclosure.
  *
- * Extracted from `features/chat/StatusMessage.tsx`. Renders the four steps the
- * agent walks through when it searches the live web:
+ * Matches the TurnStatus row on claude.ai: a 20px line reading "Searched the
+ * web" with a caret at the trailing edge; expanding it opens a hairline-
+ * divided card with one section per real step (the query line and the
+ * favicon-ordered source list). Nothing cosmetic is rendered — every row
+ * corresponds to an actual search/Tavily call made server-side.
+ * the same data the Links tab and citation hover use — favicon via Google's
+ * s2 endpoint, truncated title, mono domain on the right.
  *
- *   searching      -> "Searched the web"
- *   found_sources  -> the query, the result count and the source list
- *   reading        -> a transient "Reading N sources..." line
- *   extracting     -> "Extracting full content from top sources..."
- *   no_results     -> a warning row
- *
- * The source list is rendered once, on the `found_sources` row - Claude does the
- * same, so the reading step stays a status line.
+ * Two consumers:
+ *   - `SearchStepsGroup` (grouping consecutive search parts) renders ONE
+ *     ToolRow + ToolPanel and `WebSearchSection` per part inside it.
+ *   - `StatusMessage` dispatches here for a standalone `web_search`-family
+ *     part, which renders its own ToolRow + ToolPanel via
+ *     `WebSearchDisclosure`.
  *
  * Returns `null` for any other subtype.
  */
-import { StepRow } from "../ThoughtBlock";
-import { ClockIcon, ExtractIcon, GlobeIcon, WarnIcon } from "../icons";
+import { useState } from "react";
+import { ToolRow, ToolPanel, ToolSection, ToolSectionLine } from "../ToolActivity";
+import { WarnIcon } from "../icons";
 import { getDomain } from "./helpers";
 import type { StatusBlockProps } from "./types";
 
-const WEB_SEARCH_SUBTYPES = new Set([
-  "searching",
-  "found_sources",
-  "reading",
-  "extracting",
-  "no_results",
-]);
-
-
-const SUBTYPES = new Set(["searching", "found_sources", "reading", "extracting", "no_results"]);
-
+const SUBTYPES = new Set(["searching", "found_sources", "no_results"]);
 
 /** True when this family renders the given status subtype. */
 export function handles(subtype: string): boolean {
   return SUBTYPES.has(subtype);
 }
 
-function WebSearchStatusComponent({
+/** One section per search part (query / source list / transient line). */
+export function WebSearchSection({
   status,
-  isFirst,
-  isLast,
-  isActive,
-  onSourceClick,
-  rightSlot,
   searchQuery,
-  expanded = true,
-}: StatusBlockProps) {
-  if (!WEB_SEARCH_SUBTYPES.has(status.subtype)) return null;
-
+  isPartActive,
+  onSourceClick,
+}: {
+  status: StatusBlockProps["status"];
+  searchQuery?: string;
+  /** True while this part is still streaming (drives "Searching…" text). */
+  isPartActive?: boolean;
+  onSourceClick?: (url: string | null) => void;
+}) {
   if (status.subtype === "searching") {
+    const query = (status.data?.query as string) || searchQuery || "";
     return (
-      <div className="py-2 min-w-0">
-        <div className="flex items-center gap-1.5 w-full text-left select-none">
-          <span className="text-[13px] font-medium text-[var(--text-secondary)]">Searched the web</span>
-          {rightSlot && <span className="ml-auto shrink-0">{rightSlot}</span>}
-        </div>
-      </div>
+      <ToolSectionLine>
+        {isPartActive ? `Searching “${query || "the web"}”…` : query ? `Searched for “${query}”` : "Searched the web"}
+      </ToolSectionLine>
     );
   }
 
@@ -67,94 +60,90 @@ function WebSearchStatusComponent({
     const count = sources.length;
     if (count === 0) return null;
     return (
-      <StepRow
-        rightSlot={
-          <div className="flex items-center gap-2">
-            {rightSlot}
-            <span className="text-[11px] font-mono text-[var(--text-secondary)] font-semibold shrink-0 tabular-nums">{count} results</span>
+      <ToolSection>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="min-w-0 truncate text-[13px] leading-5 text-[var(--text-secondary)]">
+            {query || status.message || "Results"}
           </div>
-        }
-        icon={<GlobeIcon cls="text-[var(--text-secondary)]" />}
-        message={query || status.message}
-        isFirst={isFirst}
-        isLast={isLast}
-        pulse={false}
-      >
-        {expanded && (
-          <div className="rounded-lg border border-[var(--surface-border)] overflow-hidden" style={{ background: "#0f0f0e" }}>
-            <div className="overflow-y-auto custom-scrollbar" style={{ maxHeight: "156px" }}>
-              {sources.map((url, idx) => {
-                const domain = getDomain(url);
-                const title = titles[idx] || domain;
-                return (
-                  <button
-                    key={`${url}-${idx}`}
-                    onClick={() => onSourceClick?.(url)}
-                    className="group w-full flex items-center gap-2.5 px-3 py-[7px] text-left transition-colors hover:bg-white/[0.025] border-b border-white/[0.05] last:border-b-0"
-                  >
-                    <img
-                      src={`https://www.google.com/s2/favicons?domain=${domain}&sz=16`}
-                      alt=""
-                      className="size-4 rounded-sm shrink-0 opacity-75"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                    />
-                    <span className="flex-1 text-[12px] text-[var(--text-secondary)]/80 truncate min-w-0 group-hover:text-[var(--text-secondary)] transition-colors">
-                      {title}
-                    </span>
-                    <span className="text-[11px] font-mono text-[var(--text-muted)]/60 shrink-0 ml-2">{domain}</span>
-                  </button>
-                );
-              })}
-            </div>
+          <span className="shrink-0 font-mono text-[11px] tabular-nums text-[var(--text-secondary)]">
+            {count} result{count === 1 ? "" : "s"}
+          </span>
+        </div>
+        <div className="overflow-hidden rounded-lg border border-white/[0.05]">
+          <div className="custom-scrollbar max-h-[156px] overflow-y-auto">
+            {sources.map((url, idx) => {
+              const domain = getDomain(url);
+              const title = titles[idx] || domain;
+              return (
+                <button
+                  key={`${url}-${idx}`}
+                  onClick={() => onSourceClick?.(url)}
+                  className="group flex w-full items-center gap-2.5 border-b border-white/[0.04] px-3 py-[7px] text-left transition-colors last:border-b-0 hover:bg-white/[0.025]"
+                >
+                  <img
+                    src={`https://www.google.com/s2/favicons?domain=${domain}&sz=16`}
+                    alt=""
+                    className="size-4 shrink-0 rounded-sm opacity-75"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-[12px] text-[var(--text-secondary)]/85 transition-colors group-hover:text-[var(--text-secondary)]">
+                    {title}
+                  </span>
+                  <span className="ml-2 shrink-0 font-mono text-[11px] text-[var(--text-muted)]/70">
+                    {domain}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-        )}
-      </StepRow>
+        </div>
+      </ToolSection>
     );
   }
 
-  if (status.subtype === "reading") {
-    // Claude shows the source list once, on the "Searched the web" row.
-    // This row is a transient status, so it carries the message only.
+  if (status.subtype === "no_results") {
     return (
-      <StepRow
-        rightSlot={rightSlot}
-        icon={<ClockIcon className={`size-4 ${isActive ? "text-[var(--accent)]" : "text-[var(--text-secondary)]"}`} />}
-        message={status.message}
-        isFirst={isFirst}
-        isLast={isLast}
-        pulse={isActive}
-      />
+      <ToolSectionLine>
+        <span className="flex items-center gap-1.5">
+          <WarnIcon cls="size-3.5 text-amber-400/80" />
+          {status.message || "No results found"}
+        </span>
+      </ToolSectionLine>
     );
   }
 
-  if (status.subtype === "extracting") {
-    return (
-      <StepRow
-        rightSlot={rightSlot}
-        icon={<ExtractIcon cls={isActive ? "text-[var(--accent)]" : "text-[var(--text-secondary)]/40"} />}
-        message={status.message}
-        isFirst={isFirst}
-        isLast={isLast}
-        pulse={isActive}
-      />
-    );
-  }
+  return null;
+}
 
-  // no_results
+/** Standalone (non-grouped) disclosure — same anatomy, one section. */
+export function WebSearchDisclosure({
+  status,
+  isActive,
+  onSourceClick,
+  searchQuery,
+}: StatusBlockProps) {
+  const [open, setOpen] = useState(true);
   return (
-    <StepRow
-      rightSlot={rightSlot}
-      icon={<WarnIcon cls="text-[var(--text-secondary)]/60" />}
-      message={status.message}
-      isFirst={isFirst}
-      isLast={isLast}
-      pulse={false}
-    />
+    <div className="min-w-0">
+      <ToolRow
+        label="Searched the web"
+        open={open}
+        onToggle={() => setOpen((v) => !v)}
+        isActive={isActive}
+      />
+      <ToolPanel open={open}>
+        <WebSearchSection status={status} searchQuery={searchQuery} isPartActive={isActive} onSourceClick={onSourceClick} />
+      </ToolPanel>
+    </div>
   );
 }
 
 /**
- * The family component plus its `handles` predicate, so a caller can ask
- * whether this family owns a subtype before building the element.
+ * Back-compat export — a component carrying a static `.handles()` method,
+ * which is what `StatusMessage` consumes (`WebSearchStatus.handles(subtype)`
+ * + `<WebSearchStatus .../>`).
  */
-export const WebSearchStatus = Object.assign(WebSearchStatusComponent, { handles });
+function WebSearchStatusImpl(props: StatusBlockProps) {
+  return <WebSearchDisclosure {...props} />;
+}
+export const WebSearchStatus = Object.assign(WebSearchStatusImpl, { handles });
