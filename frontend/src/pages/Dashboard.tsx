@@ -145,6 +145,8 @@ export default function Dashboard() {
   const [threadMenuOpen, setThreadMenuOpen] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
+  /** Which conversation the open rename input targets (header menu = active thread). */
+  const [renameTargetId, setRenameTargetId] = useState<string | null>(null);
   const threadMenuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
@@ -334,31 +336,35 @@ export default function Dashboard() {
   }, []);
 
   // ─── Rename handlers (after getAccessToken) ──────────────
-  const handleRenameOpen = useCallback(() => {
-    const conv = conversations.find(c => c.id === activeConversationId);
+  const handleRenameOpen = useCallback((id?: string) => {
+    const target = id ?? activeConversationId;
+    if (!target) return;
+    const conv = conversations.find(c => c.id === target);
     setRenameValue(conv?.title || '');
+    setRenameTargetId(target);
     setThreadMenuOpen(false);
     setIsRenaming(true);
   }, [conversations, activeConversationId]);
 
   const handleRenameSubmit = useCallback(async () => {
-    if (!activeConversationId || !renameValue.trim()) { setIsRenaming(false); return; }
+    const targetId = renameTargetId ?? activeConversationId;
+    if (!targetId || !renameValue.trim()) { setIsRenaming(false); return; }
     const token = await getAccessToken();
     if (!token) return;
     try {
-      const res = await fetch(`${BACKEND_URL}/conversations/${activeConversationId}`, {
+      const res = await fetch(`${BACKEND_URL}/conversations/${targetId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ title: renameValue.trim() }),
       });
       if (res.ok) {
         const { conversation: updated } = await res.json();
-        setConversations(prev => prev.map(c => c.id === activeConversationId ? { ...c, title: updated.title, slug: updated.slug } : c));
-        document.title = `${updated.title} - Flux`;
+        setConversations(prev => prev.map(c => c.id === targetId ? { ...c, title: updated.title, slug: updated.slug } : c));
+        if (targetId === activeConversationId) document.title = `${updated.title} - Flux`;
       }
     } catch (err) { console.error('Rename failed:', err); }
     setIsRenaming(false);
-  }, [activeConversationId, renameValue, getAccessToken]);
+  }, [renameTargetId, activeConversationId, renameValue, getAccessToken]);
 
   const createNewThread = useCallback(() => {
     resetMessages();
@@ -950,6 +956,7 @@ export default function Dashboard() {
     onCreateThread: createNewThread,
     onSelectThread: openConversation,
     onDeleteThread: deleteConversation,
+    onRenameThread: (id: string) => handleRenameOpen(id),
     onPrefetchThread: prefetchConversation,
     onArtifactsPrefetch: () => prefetchArtifacts(BACKEND_URL),
     isDarkMode: isDark,
@@ -1016,7 +1023,7 @@ export default function Dashboard() {
 
       <main
         className={`relative flex-1 flex flex-col min-w-0 transition-[margin] duration-300 ease-in-out ${
-          !isMobile && isSidebarOpen ? "md:ml-[260px]" : "md:ml-0"
+          !isMobile && isSidebarOpen ? "md:ml-[288px]" : "md:ml-0"
         } ${!isMobile && !isSidebarOpen ? 'px-[48px]' : ''} ${isMobile ? 'pb-16' : ''}`}
         style={{ minHeight: 0, height: '100%' }}
       >

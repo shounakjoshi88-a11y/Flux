@@ -6,16 +6,6 @@ import { useEdgeAutoScroll } from "./sidebar/useEdgeAutoScroll";
 import { BACKEND_URL } from "../../lib/config";
 import { usePerformance } from "../../lib/performance-context";
 import {
-  LogOut,
-  Settings as SettingsIcon,
-  CircleX,
-  Loader2,
-  MessageSquare,
-  History,
-  X,
-  ChevronDown,
-} from "lucide-react";
-import {
   IconPlus,
   IconSearch,
   IconArtifacts,
@@ -27,6 +17,8 @@ import {
   IconPanel,
   IconPanelOpen,
   IconGroupSort,
+  IconChevronDown,
+  IconExternal,
 } from "./anthropicIcons";
 import type { User } from "@supabase/supabase-js";
 import { SidebarThread } from "./SidebarThread";
@@ -42,6 +34,8 @@ type SidebarProps = {
   onCreateThread: () => void;
   onSelectThread: (id: string) => void;
   onDeleteThread: (id: string) => void;
+  /** Opens the dashboard rename flow for a thread (sidebar kebab menu). */
+  onRenameThread?: (id: string) => void;
   onPrefetchThread?: (id: string) => void; // NEW – hover prefetch
   isDarkMode: boolean;
   toggleTheme: () => void;
@@ -72,6 +66,7 @@ export const Sidebar = memo(function Sidebar({
   onCreateThread,
   onSelectThread,
   onDeleteThread,
+  onRenameThread,
   onPrefetchThread,
   isDarkMode,
   toggleTheme,
@@ -239,13 +234,13 @@ export const Sidebar = memo(function Sidebar({
         <img
           src={avatarUrl}
           alt="avatar"
-          className="size-8 rounded-full object-cover"
+          className="size-6 rounded-full object-cover"
           onError={() => setAvatarError(true)}
         />
       );
     }
     return (
-      <div className="size-8 rounded-full bg-black/10 dark:bg-white/20 flex items-center justify-center text-sm font-semibold uppercase text-foreground">
+      <div className="size-6 rounded-full bg-black/10 dark:bg-white/20 flex items-center justify-center text-[11px] font-semibold uppercase text-sidebar-foreground">
         {user?.email?.charAt(0) ?? "?"}
       </div>
     );
@@ -286,66 +281,61 @@ export const Sidebar = memo(function Sidebar({
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
         style={{ willChange: "width" }}
       >
-        <div className="flex flex-col h-full py-3 px-2">
-          {/* Top Header Area */}
-          <div className="flex items-center justify-between mb-5 px-1 h-9">
+        <div className="flex flex-col h-full pb-2">
+          {/* Titlebar — Claude geometry: h-11, 20px logo at x16, 28px toggle right */}
+          <div className="flex h-11 shrink-0 items-center justify-between px-2">
             {isOpen ? (
-              <div className="flex items-center gap-2 select-none">
-                <svg className="size-5" viewBox="0 0 24 24" style={{ overflow: 'visible' }}>
+              <div className="ms-2 flex min-w-0 items-center gap-1.5 select-none">
+                <svg className="size-5 shrink-0" viewBox="0 0 24 24" style={{ overflow: 'visible' }}>
                   <path d="M2 16C5 6 8 18 11 10S17 6 22 12 L22 24 L2 24 Z" fill="var(--sidebar)" />
                   <path d="M2 16C5 6 8 18 11 10S17 6 22 12" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 <span className="text-[15px] font-semibold tracking-tight text-sidebar-foreground">Flux</span>
               </div>
             ) : (
-              <div className="w-full flex justify-center">
-                <svg className="size-5" viewBox="0 0 24 24">
-                  <path d="M2 16C5 6 8 18 11 10S17 6 22 12" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
+              <span className="w-0" />
             )}
-            <div className={`flex items-center gap-0.5 ${!isOpen ? 'hidden' : ''}`}>
-              <button
-                type="button"
-                onClick={openSearchModal}
-                className="p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/45 hover:text-sidebar-foreground/80 transition-colors cursor-pointer"
-                title="Search chats"
-              >
-                <IconSearch className="size-[18px]" />
-              </button>
+            {isOpen ? (
+              <div className="flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={openSearchModal}
+                  className="flex size-7 items-center justify-center rounded-[8px] text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground/90 transition-colors cursor-pointer"
+                  title="Search chats"
+                >
+                  <IconSearch className="size-[18px]" />
+                </button>
+                <button
+                  type="button"
+                  onClick={onToggle}
+                  className="flex size-7 items-center justify-center rounded-[8px] text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground/90 transition-colors cursor-pointer"
+                  aria-label="Close sidebar"
+                >
+                  <IconPanel className="size-[18px]" />
+                </button>
+              </div>
+            ) : (
               <button
                 type="button"
                 onClick={onToggle}
-                className="p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/45 hover:text-sidebar-foreground/80 transition-colors cursor-pointer"
-                aria-label="Close sidebar"
-              >
-                <IconPanel className="size-5" />
-              </button>
-            </div>
-            {!isOpen && (
-              <button
-                type="button"
-                onClick={onToggle}
-                className="absolute right-0 top-3 p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/45 hover:text-sidebar-foreground/80 transition-colors cursor-pointer w-[64px] flex justify-center"
+                className="mx-auto flex size-7 items-center justify-center rounded-[8px] text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground/90 transition-colors cursor-pointer"
                 aria-label="Open sidebar"
               >
-                <IconPanelOpen className="size-5" />
+                <IconPanelOpen className="size-[18px]" />
               </button>
             )}
           </div>
 
-          {/* Nav Section */}
-          <div className="flex flex-col gap-px mb-4">
+          {/* Nav Section — Claude rows: 32px, br8, 28px leading slot, 18px icon, label at x44 */}
+          <div className="flex flex-col gap-px px-2 pt-1 mb-3">
             {/* New Chat */}
             <button
               type="button"
               onClick={onCreateThread}
-              className={`flex items-center h-8 rounded-lg transition-colors cursor-pointer gap-1 px-0.5
-                hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground
-                ${isOpen ? "w-full justify-start" : "w-8 mx-auto justify-center"}`}
+              className={`flex h-8 w-full items-center gap-1 rounded-[8px] px-1 text-sidebar-foreground/90 transition-colors cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-foreground justify-start`}
               title="New chat"
             >
-              <span className="flex size-7 shrink-0 items-center justify-center"><IconPlus className="size-5 shrink-0" /></span>
+              <span className="flex size-7 shrink-0 items-center justify-center"><IconPlus className="size-[18px] shrink-0" /></span>
               {isOpen && <span className="text-[14px] leading-[21px] font-[435] whitespace-nowrap">New</span>}
             </button>
 
@@ -353,12 +343,10 @@ export const Sidebar = memo(function Sidebar({
             <button
               type="button"
               onClick={openSearchModal}
-              className={`flex items-center h-8 rounded-lg transition-colors cursor-pointer gap-1 px-0.5
-                hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground
-                ${isOpen ? "w-full justify-start" : "w-8 mx-auto justify-center"}`}
+              className="flex h-8 w-full items-center gap-1 rounded-[8px] px-1 text-sidebar-foreground/90 transition-colors cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-foreground justify-start"
               title="Search chats"
             >
-              <span className="flex size-7 shrink-0 items-center justify-center"><IconSearch className="size-5 shrink-0" /></span>
+              <span className="flex size-7 shrink-0 items-center justify-center"><IconSearch className="size-[18px] shrink-0" /></span>
               {isOpen && <span className="text-[14px] leading-[21px] font-[435] whitespace-nowrap">Search</span>}
             </button>
 
@@ -367,11 +355,10 @@ export const Sidebar = memo(function Sidebar({
               type="button"
               onClick={onArtifactsOpen}
               onMouseEnter={onArtifactsPrefetch}
-              className={`flex items-center h-8 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/75 hover:text-sidebar-foreground transition-colors gap-1 px-0.5 cursor-pointer
-                ${isOpen ? "w-full justify-start" : "w-8 mx-auto justify-center"}`}
+              className="flex h-8 w-full items-center gap-1 rounded-[8px] px-1 text-sidebar-foreground/90 transition-colors cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-foreground justify-start"
               title="Artifacts"
             >
-              <span className="flex size-7 shrink-0 items-center justify-center"><IconArtifacts className="size-5 shrink-0" /></span>
+              <span className="flex size-7 shrink-0 items-center justify-center"><IconArtifacts className="size-[18px] shrink-0" /></span>
               {isOpen && <span className="text-[14px] leading-[21px] font-[435] whitespace-nowrap">Artifacts</span>}
             </button>
 
@@ -379,11 +366,10 @@ export const Sidebar = memo(function Sidebar({
             <button
               type="button"
               onClick={onWikiOpen}
-              className={`flex items-center h-8 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/75 hover:text-sidebar-foreground transition-colors gap-1 px-0.5 cursor-pointer
-                ${isOpen ? "w-full justify-start" : "w-8 mx-auto justify-center"}`}
+              className="flex h-8 w-full items-center gap-1 rounded-[8px] px-1 text-sidebar-foreground/90 transition-colors cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-foreground justify-start"
               title="Knowledge Graph"
             >
-              <span className="flex size-7 shrink-0 items-center justify-center"><IconGraph className="size-5 shrink-0" /></span>
+              <span className="flex size-7 shrink-0 items-center justify-center"><IconGraph className="size-[18px] shrink-0" /></span>
               {isOpen && <span className="text-[14px] leading-[21px] font-[435] whitespace-nowrap">Knowledge Graph</span>}
             </button>
 
@@ -391,11 +377,10 @@ export const Sidebar = memo(function Sidebar({
             <button
               type="button"
               onClick={onNewsOpen}
-              className={`flex items-center h-8 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/75 hover:text-sidebar-foreground transition-colors gap-1 px-0.5 cursor-pointer
-                ${isOpen ? "w-full justify-start" : "w-8 mx-auto justify-center"}`}
+              className="flex h-8 w-full items-center gap-1 rounded-[8px] px-1 text-sidebar-foreground/90 transition-colors cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-foreground justify-start"
               title="Live News"
             >
-              <span className="flex size-7 shrink-0 items-center justify-center"><IconGlobe className="size-5 shrink-0" /></span>
+              <span className="flex size-7 shrink-0 items-center justify-center"><IconGlobe className="size-[18px] shrink-0" /></span>
               {isOpen && <span className="text-[14px] leading-[21px] font-[435] whitespace-nowrap">Live News</span>}
             </button>
 
@@ -403,11 +388,10 @@ export const Sidebar = memo(function Sidebar({
             <button
               type="button"
               onClick={onCustomAgentsOpen}
-              className={`flex items-center h-8 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/75 hover:text-sidebar-foreground transition-colors gap-1 px-0.5 cursor-pointer
-                ${isOpen ? "w-full justify-start" : "w-8 mx-auto justify-center"}`}
+              className="flex h-8 w-full items-center gap-1 rounded-[8px] px-1 text-sidebar-foreground/90 transition-colors cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-foreground justify-start"
               title="Custom Agents"
             >
-              <span className="flex size-7 shrink-0 items-center justify-center"><IconTerminal className="size-5 shrink-0" /></span>
+              <span className="flex size-7 shrink-0 items-center justify-center"><IconTerminal className="size-[18px] shrink-0" /></span>
               {isOpen && <span className="text-[14px] leading-[21px] font-[435] whitespace-nowrap">Agents</span>}
             </button>
 
@@ -415,24 +399,24 @@ export const Sidebar = memo(function Sidebar({
             <button
               type="button"
               onClick={onTeamOpen}
-              className={`flex items-center h-8 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/75 hover:text-sidebar-foreground transition-colors gap-1 px-0.5 cursor-pointer
-                ${isOpen ? "w-full justify-start" : "w-8 mx-auto justify-center"}`}
+              className="flex h-8 w-full items-center gap-1 rounded-[8px] px-1 text-sidebar-foreground/90 transition-colors cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-foreground justify-start"
               title="Team Mode"
             >
-              <span className="flex size-7 shrink-0 items-center justify-center"><IconPeople className="size-5 shrink-0" /></span>
+              <span className="flex size-7 shrink-0 items-center justify-center"><IconPeople className="size-[18px] shrink-0" /></span>
               {isOpen && <span className="text-[14px] leading-[21px] font-[435] whitespace-nowrap">Team</span>}
             </button>
           </div>
 
           {/* Conversations List */}
         {isOpen && (
-          <div className="flex h-11 items-center justify-between px-2">
-            <span className="text-[14px] leading-[21px] font-[435] text-sidebar-foreground/75">Chats and tasks</span>
+          <div className="flex h-11 shrink-0 items-center gap-1 px-2">
+            <IconChevronDown className="size-3.5 shrink-0 text-sidebar-foreground/55" />
+            <span className="text-[14px] leading-[21px] font-[435] text-sidebar-foreground/90">Chats and tasks</span>
             <button
               type="button"
               onClick={openSearchModal}
-              className="rounded-md p-1 text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground/80 transition cursor-pointer"
-              title="Search chats"
+              className="ml-auto flex size-7 items-center justify-center rounded-[8px] text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground/90 transition-colors cursor-pointer"
+              title="Organize chats"
             >
               <IconGroupSort className="size-4" />
             </button>
@@ -440,7 +424,7 @@ export const Sidebar = memo(function Sidebar({
         )}
           {isPerfLow ? (
             isOpen && (
-              <div className="flex-1 relative mt-4 flex flex-col" style={{ minHeight: 0 }}>
+              <div className="flex-1 relative mt-1 flex flex-col" style={{ minHeight: 0 }}>
                 <div className="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-sidebar to-transparent pointer-events-none z-10" />
                 <div
                   ref={threadsScroll.scrollContainerRef}
@@ -451,7 +435,7 @@ export const Sidebar = memo(function Sidebar({
                 >
                   {groupedItems.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 opacity-35">
-                       <MessageSquare className="size-7 mb-2" />
+                       <IconPlus className="size-7 mb-2" />
                        <p className="text-[10px] font-bold uppercase tracking-wider">No chats yet</p>
                     </div>
                   ) : (
@@ -473,6 +457,7 @@ export const Sidebar = memo(function Sidebar({
                             isActive={activeConversationId === item.conversation.id}
                             onClick={() => handleSelectThread(item.conversation.id)}
                             onDelete={() => handleDeleteThread(item.conversation.id)}
+                            onRename={onRenameThread}
                             onHover={onPrefetchThread ? () => onPrefetchThread(item.conversation.id) : undefined}
                           />
                         </div>
@@ -490,7 +475,7 @@ export const Sidebar = memo(function Sidebar({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="flex-1 relative mt-4 flex flex-col" style={{ minHeight: 0 }}
+                  className="flex-1 relative mt-1 flex flex-col" style={{ minHeight: 0 }}
                 >
                   <div className="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-sidebar to-transparent pointer-events-none z-10" />
                   <div
@@ -502,7 +487,7 @@ export const Sidebar = memo(function Sidebar({
                   >
                     {groupedItems.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-12 opacity-35">
-                         <MessageSquare className="size-7 mb-2" />
+                         <IconPlus className="size-7 mb-2" />
                          <p className="text-[10px] font-bold uppercase tracking-wider">No chats yet</p>
                       </div>
                     ) : (
@@ -524,6 +509,7 @@ export const Sidebar = memo(function Sidebar({
                               isActive={activeConversationId === item.conversation.id}
                               onClick={() => handleSelectThread(item.conversation.id)}
                               onDelete={() => handleDeleteThread(item.conversation.id)}
+                            onRename={onRenameThread}
                               onHover={onPrefetchThread ? () => onPrefetchThread(item.conversation.id) : undefined}
                             />
                           </div>
@@ -537,19 +523,19 @@ export const Sidebar = memo(function Sidebar({
             </AnimatePresence>
           )}
 
-          {/* Footer: User Account — Claude-style minimal */}
-          <div className="relative mt-auto border-t border-sidebar-border pt-3" ref={userMenuRef}>
+          {/* Footer: user chip — Claude geometry: 28px chip, 24px avatar, "· Free" caption */}
+          <div className="relative mt-auto border-t border-sidebar-border px-2 pt-1.5 pb-0.5" ref={userMenuRef}>
             {isPerfLow ? (
               userMenuOpen && (
-                <div className={`absolute bottom-14 bg-sidebar border border-sidebar-border rounded-xl shadow-xl z-50 p-1 ${
+                <div className={`absolute bottom-10 bg-sidebar border border-sidebar-border rounded-[10px] shadow-xl z-50 p-1 ${
                   isOpen ? "left-2 right-2" : "left-12 w-44"
                 }`}>
                   <button
                     type="button"
                     onClick={handleSettingsClick}
-                    className="flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm font-medium hover:bg-sidebar-accent transition-all text-sidebar-foreground/70 hover:text-sidebar-foreground cursor-pointer"
+                    className="flex items-center gap-2.5 w-full rounded-[6px] px-2.5 py-1.5 text-[13px] font-[435] hover:bg-sidebar-accent transition-all text-sidebar-foreground/90 hover:text-sidebar-foreground cursor-pointer"
                   >
-                    <SettingsIcon className="size-4" />
+                    <IconGear className="size-[18px]" />
                     Settings
                   </button>
                   <button
@@ -558,9 +544,9 @@ export const Sidebar = memo(function Sidebar({
                       onLogout();
                       setUserMenuOpen(false);
                     }}
-                    className="flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm font-medium hover:bg-red-500/10 transition-all text-red-400/80 hover:text-red-400 mt-0.5 cursor-pointer"
+                    className="flex items-center gap-2.5 w-full rounded-[6px] px-2.5 py-1.5 text-[13px] font-[435] hover:bg-red-500/10 transition-all text-red-400/80 hover:text-red-400 mt-0.5 cursor-pointer"
                   >
-                    <LogOut className="size-4" /> Logout
+                    <IconExternal className="size-[18px]" /> Log out
                   </button>
                 </div>
               )
@@ -572,20 +558,20 @@ export const Sidebar = memo(function Sidebar({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 8 }}
                     transition={{ duration: 0.12 }}
-                    className={`absolute bottom-14 bg-sidebar border border-sidebar-border rounded-xl shadow-xl z-50 p-1 ${
+                    className={`absolute bottom-10 bg-sidebar border border-sidebar-border rounded-[10px] shadow-xl z-50 p-1 ${
                       isOpen ? "left-2 right-2" : "left-12 w-44"
                     }`}
                   >
                     <button
                       type="button"
                       onClick={handleSettingsClick}
-                      className="flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm font-medium hover:bg-sidebar-accent transition-all text-sidebar-foreground/70 hover:text-sidebar-foreground cursor-pointer"
+                      className="flex items-center gap-2.5 w-full rounded-[6px] px-2.5 py-1.5 text-[13px] font-[435] hover:bg-sidebar-accent transition-all text-sidebar-foreground/90 hover:text-sidebar-foreground cursor-pointer"
                     >
                       <motion.div
                         animate={{ rotate: gearSpinning ? 360 : 0 }}
                         transition={{ duration: 0.6, ease: "easeOut" }}
                       >
-                        <SettingsIcon className="size-4" />
+                        <IconGear className="size-[18px]" />
                       </motion.div>
                       Settings
                     </button>
@@ -595,9 +581,9 @@ export const Sidebar = memo(function Sidebar({
                         onLogout();
                         setUserMenuOpen(false);
                       }}
-                      className="flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm font-medium hover:bg-red-500/10 transition-all text-red-400/80 hover:text-red-400 mt-0.5 cursor-pointer"
+                      className="flex items-center gap-2.5 w-full rounded-[6px] px-2.5 py-1.5 text-[13px] font-[435] hover:bg-red-500/10 transition-all text-red-400/80 hover:text-red-400 mt-0.5 cursor-pointer"
                     >
-                      <LogOut className="size-4" /> Logout
+                      <IconExternal className="size-[18px]" /> Log out
                     </button>
                   </motion.div>
                 )}
@@ -608,8 +594,8 @@ export const Sidebar = memo(function Sidebar({
               type="button"
               onClick={() => setUserMenuOpen(!userMenuOpen)}
               aria-label="User menu"
-              className={`flex items-center rounded-lg hover:bg-sidebar-accent transition-all cursor-pointer ${
-                isOpen ? "w-[calc(100%-16px)] mx-2 px-2.5 justify-start gap-2.5 py-2" : "w-9 mx-1.5 px-0 justify-center py-1.5"
+              className={`flex h-7 items-center rounded-[8px] hover:bg-sidebar-accent transition-all cursor-pointer ${
+                isOpen ? "w-full pl-0.5 pr-2 justify-start gap-1.5" : "w-9 mx-auto justify-center"
               }`}
             >
               <span className="flex justify-center shrink-0">
@@ -617,14 +603,15 @@ export const Sidebar = memo(function Sidebar({
               </span>
               {isPerfLow ? (
                 isOpen && (
-                  <div className="truncate text-left flex-1 flex items-center justify-between pr-1">
-                    <div className="truncate">
-                      <p className="text-sm font-medium truncate text-sidebar-foreground leading-tight">
+                  <div className="truncate text-left flex-1 flex items-center justify-between pr-0.5">
+                    <div className="truncate flex items-baseline gap-1">
+                      <p className="text-[14px] leading-5 font-[435] truncate text-sidebar-foreground">
                         {user?.email?.split("@")[0]}
                       </p>
+                      <span className="text-[12px] leading-5 text-sidebar-foreground/55">· Free</span>
                     </div>
                     <IconGroupSort
-                      className={`size-3 text-sidebar-foreground/40 transition-transform duration-200 ${
+                      className={`size-3 shrink-0 text-sidebar-foreground/55 transition-transform duration-200 ${
                         userMenuOpen ? "rotate-180" : ""
                       }`}
                     />
@@ -638,15 +625,16 @@ export const Sidebar = memo(function Sidebar({
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.12 }}
-                      className="truncate text-left flex-1 flex items-center justify-between pr-1"
+                      className="truncate text-left flex-1 flex items-center justify-between pr-0.5"
                     >
-                      <div className="truncate">
-                        <p className="text-sm font-medium truncate text-sidebar-foreground leading-tight">
+                      <div className="truncate flex items-baseline gap-1">
+                        <p className="text-[14px] leading-5 font-[435] truncate text-sidebar-foreground">
                           {user?.email?.split("@")[0]}
                         </p>
+                        <span className="text-[12px] leading-5 text-sidebar-foreground/55">· Free</span>
                       </div>
                       <IconGroupSort
-                        className={`size-3 text-sidebar-foreground/40 transition-transform duration-200 ${
+                        className={`size-3 shrink-0 text-sidebar-foreground/55 transition-transform duration-200 ${
                           userMenuOpen ? "rotate-180" : ""
                         }`}
                       />

@@ -1,12 +1,16 @@
 /**
  * One conversation in the sidebar list.
  *
- * Styled after claude.ai: a 32px row with a small hollow bullet on the left,
- * the title in 14px, and a kebab menu that appears on hover. The active
- * conversation gets a faint filled pill and always shows the menu.
+ * Matched to claude.ai's measured thread row: 32px tall, 8px radius, a small
+ * hollow bullet on the left, a 14px/21px title, and a kebab control that
+ * appears on hover (always visible on the active row). The active row uses
+ * Claude's `--sidebar-active` fill (white at 15%).
+ *
+ * The kebab opens a small menu with Rename and Delete; rename is delegated to
+ * the dashboard's rename flow via `onRenameThread`.
  */
 import React, { memo, useCallback, useRef, useState } from "react";
-import { IconTrash, IconMore } from "./anthropicIcons";
+import { IconTrash, IconMore, IconCustomize } from "./anthropicIcons";
 
 type SidebarThreadProps = {
   id: string;
@@ -14,11 +18,15 @@ type SidebarThreadProps = {
   isActive: boolean;
   onClick: () => void;
   onDelete: () => void;
+  /** Opens the dashboard rename flow for this thread id. */
+  onRename?: (id: string) => void;
   onHover?: () => void;
 };
 
-function SidebarThread({ id, title, isActive, onClick, onDelete, onHover }: SidebarThreadProps) {
+function SidebarThread({ id, title, isActive, onClick, onDelete, onRename, onHover }: SidebarThreadProps) {
   const didPrefetch = useRef(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const handleMouseEnter = useCallback(() => {
     if (didPrefetch.current) return;
@@ -31,20 +39,33 @@ function SidebarThread({ id, title, isActive, onClick, onDelete, onHover }: Side
     didPrefetch.current = false;
   }, []);
 
+  // Close the kebab menu on any outside click.
+  React.useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
+
   return (
     <div
-      className="group relative w-[calc(100%-16px)] mx-2"
+      ref={menuRef}
+      className="group relative mx-2 w-[calc(100%-16px)]"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
       <button
         onClick={onClick}
         className={`
-          flex w-full items-center gap-2 truncate rounded-lg px-2 h-8 text-left transition-colors duration-150 cursor-pointer relative
+          flex h-8 w-full items-center gap-2 rounded-[8px] px-0.5 text-left transition-colors duration-150 cursor-pointer relative
           ${
             isActive
-              ? "bg-sidebar-accent text-sidebar-foreground"
-              : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+              ? "bg-sidebar-active text-sidebar-foreground"
+              : "text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-sidebar-foreground"
           }
         `}
       >
@@ -56,21 +77,52 @@ function SidebarThread({ id, title, isActive, onClick, onDelete, onHover }: Side
             opacity: isActive ? 0.9 : 0.45,
           }}
         />
-        <span className="block truncate pr-6 flex-1 text-[14px] leading-[21px]">
+        <span className="block truncate flex-1 text-[14px] leading-[21px] pr-6">
           {title}
         </span>
       </button>
-      {/* Delete button - appears on hover */}
+      {/* Kebab menu - appears on hover, always on the active row (Claude behaviour) */}
       <button
         onClick={(e) => {
           e.stopPropagation();
-          onDelete();
+          setMenuOpen((p) => !p);
         }}
-        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-500/15 text-sidebar-foreground/40 hover:text-red-400 transition cursor-pointer"
-        title="Delete thread"
+        className={`absolute right-1 top-1/2 -translate-y-1/2 flex size-7 items-center justify-center rounded-[6px] text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-opacity cursor-pointer ${
+          isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+        } ${menuOpen ? "opacity-100" : ""}`}
+        title="Thread options"
       >
-        <IconTrash className="size-[18px]" />
+        <IconMore className="size-4" />
       </button>
+      {menuOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="absolute right-0 top-full mt-1 w-40 bg-sidebar border border-sidebar-border rounded-[10px] shadow-xl z-50 p-1 overflow-hidden"
+        >
+          {onRename && (
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                onRename(id);
+              }}
+              className="flex w-full items-center gap-2.5 rounded-[6px] px-2.5 py-1.5 text-[13px] font-[435] text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors cursor-pointer"
+            >
+              <IconCustomize className="size-4 opacity-70" />
+              Rename
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setMenuOpen(false);
+              onDelete();
+            }}
+            className="flex w-full items-center gap-2.5 rounded-[6px] px-2.5 py-1.5 text-[13px] font-[435] text-red-400/90 hover:bg-red-500/10 hover:text-red-400 transition-colors cursor-pointer"
+          >
+            <IconTrash className="size-4 opacity-80" />
+            Delete
+          </button>
+        </div>
+      )}
     </div>
   );
 }
