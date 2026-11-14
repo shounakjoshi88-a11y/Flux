@@ -623,9 +623,11 @@ export const MessageItem = memo(function MessageItem({
           )}
         </div>
 
-        {/* 3-dot menu with Helpful / Unhelpful – hide during streaming */}
+        {/* 3-dot menu with Helpful / Unhelpful – hide during streaming.
+            The wrapper's z-index must stay below the app overlays (settings
+            modal is z-50), otherwise the menu bleeds through them. */}
         {!isStreaming && (
-          <div className="relative z-[100]">
+          <div className="relative z-20">
             <button
               onClick={() => setShowFeedbackMenu(p => !p)}
               className={`p-1.5 rounded-md transition-all duration-200 text-muted-foreground/60 hover:text-foreground ${liked ? 'text-accent' : ''}`}
@@ -635,8 +637,8 @@ export const MessageItem = memo(function MessageItem({
             </button>
             {showFeedbackMenu && (
               <>
-                <div className="fixed inset-0 z-[60]" onClick={() => setShowFeedbackMenu(false)} />
-                <div className="absolute right-0 bottom-full mb-1 z-[70] min-w-[140px] glass-panel rounded-xl shadow-xl overflow-hidden">
+                <div className="fixed inset-0 z-10" onClick={() => setShowFeedbackMenu(false)} />
+                <div className="absolute right-0 bottom-full mb-1 z-20 min-w-[140px] glass-panel rounded-xl shadow-xl overflow-hidden">
                   <button
                     onClick={() => { setLiked(liked === 'up' ? null : 'up'); setShowFeedbackMenu(false); }}
                     className={`flex items-center gap-2.5 w-full px-3.5 py-2.5 text-sm transition-colors hover:bg-black/5 dark:hover:bg-white/8 ${liked === 'up' ? 'text-emerald-500 font-medium' : 'text-muted-foreground/70 hover:text-foreground'}`}
