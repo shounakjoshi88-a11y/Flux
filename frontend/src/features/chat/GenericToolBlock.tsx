@@ -1,7 +1,13 @@
-import React, { useState } from "react";
+import React from "react";
 
 import { TerminalBlock, FileCodeBlock } from "./TerminalBlock";
 import { ToolRow, ToolPanel, ToolSection, useToolDisclosure } from "./ToolActivity";
+import { linkifyText } from "../../utils/linkify";
+import { getDomain } from "../../lib/chat-utils";
+
+/** URLs inside the dark mono output box: brighter clay, always underlined. */
+const MONO_LINK_CLS =
+  'text-[#eba188] hover:text-[#f4b8a3] underline underline-offset-2 decoration-[#eba188]/40 hover:decoration-[#f4b8a3] cursor-pointer break-all';
 
 export function GenericToolBlock({
   toolName,
@@ -46,13 +52,21 @@ export function GenericToolBlock({
   const fileContent = args?.content ?? args?.code ?? args?.new_str ?? "";
   const fileLang = args?.language ?? (filename ? (filename.split('.').pop() || 'text') : 'text');
 
-  // Claude's row label: execution tools read "Ran a command", file tools
-  // "Read a file"/"Wrote a file"/"Edited a file", everything else falls
+  // Row label — execution tools read "Ran a command", file tools
+  // "Read a file"/"Wrote a file"/"Edited a file", URL fetches read as
+  // "Read <domain>" (a web page is not a file), everything else falls
   // back to the tool's own message/name.
   const isRead = /read|get|cat|open/i.test(toolName);
   const isWrite = /write|create|edit|delete/i.test(toolName);
-  const rowLabel = message
-    || (isExecution ? (isRunning ? "Running a command" : "Ran a command")
+  const urlArg = typeof args?.url === 'string' ? args.url : undefined;
+  const isUrlFetch = /^https?:\/\//i.test(urlArg ?? '') || /url|fetch|http/i.test(toolName);
+  const urlDomain = urlArg ? getDomain(urlArg) : '';
+  // Tool-call parts pass the raw output as `message` — that's a page/stdout
+  // blob, not a title. Only short single-line messages qualify as the label.
+  const messageIsLabel = typeof message === 'string' && message.length <= 140 && !message.includes('\n');
+  const rowLabel = (messageIsLabel ? message : '')
+    || (isUrlFetch ? (urlDomain ? `Read ${urlDomain}` : 'Read a page')
+      : isExecution ? (isRunning ? "Running a command" : "Ran a command")
       : isFileTool ? (isRead ? "Read a file" : isWrite ? "Wrote a file" : "Updated a file")
       : toolName);
 
@@ -91,31 +105,18 @@ export function GenericToolBlock({
         ) : result ? (
           // Flat output box — Claude-style: one section, mono scrollable output,
           // no Input/Output expanders, no JSON pretty-printing.
+          // URLs in the output (e.g. fetched pages) are clickable and brighter.
           <ToolSection>
             <div className="overflow-hidden rounded-md border border-white/[0.04]" style={{ background: 'rgba(0,0,0,0.35)' }}>
               <div className="flex items-center justify-between border-b border-white/[0.04] px-3 h-6">
                 <p className="font-mono text-[10px] leading-none text-[var(--text-muted)]">output</p>
               </div>
-              <pre
+              <div
                 className="custom-scrollbar max-h-[260px] overflow-y-auto px-3 py-2 text-[11.5px] leading-[1.6] font-mono whitespace-pre-wrap break-words"
                 style={{ color: '#9a978f' }}
               >
-                {String(result)}
-              </pre>
-            </div>
-          </ToolSection>
-        ) : result ? (
-          <ToolSection>
-            <div className="overflow-hidden rounded-md border border-white/[0.04]" style={{ background: 'rgba(0,0,0,0.35)' }}>
-              <div className="flex items-center justify-between border-b border-white/[0.04] px-3 h-6">
-                <p className="font-mono text-[10px] leading-none text-[var(--text-muted)]">output</p>
+                {linkifyText(String(result), MONO_LINK_CLS)}
               </div>
-              <pre
-                className="custom-scrollbar max-h-[200px] overflow-y-auto px-3 py-2.5 text-[11.5px] leading-[1.6] font-mono whitespace-pre-wrap break-words"
-                style={{ color: '#9a978f' }}
-              >
-                {String(result)}
-              </pre>
             </div>
           </ToolSection>
         ) : null}

@@ -11,6 +11,7 @@ import { calculateReputationScore } from "../../utils/ReputationScore";
 import { SearchIcon, GlobeIcon, BookIcon, LinkIcon, WarnIcon, DoneIcon, ExtractIcon, TerminalIcon, FileIcon, ClockIcon, WikiIcon, PackageIcon, WeatherIcon, WandIcon, ImageIcon, ChartIcon, LANG_COLORS } from "./icons";
 import { TerminalBlock, TerminalOutputSection, FileCodeBlock, useElapsedSeconds } from "./TerminalBlock";
 import { GenericToolBlock } from "./GenericToolBlock";
+import { linkifyText } from "../../utils/linkify";
 import { weatherGradient, weatherGradientAnimate, weatherEmoji, conditionLabel } from "./weatherUtils";
 
 interface StatusMessageProps {
@@ -239,7 +240,7 @@ function StatusMessage({
             <span className="size-1.5 rounded-full bg-[var(--text-muted)]" />
           </span>
       }
-      message={status.message} isFirst={isFirst} isLast={isLast} pulse={isActive}
+      message={linkifyText(status.message || '')} isFirst={isFirst} isLast={isLast} pulse={isActive}
     />
   );
 }

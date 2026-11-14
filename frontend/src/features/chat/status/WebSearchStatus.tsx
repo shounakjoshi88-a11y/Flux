@@ -158,6 +158,12 @@ export function WebSearchDisclosure({
   searchQuery,
 }: StatusBlockProps) {
   const [open, setOpen] = useState(true);
+  // Found-but-empty `found_sources` (e.g. emitted after a URL read with no
+  // source list attached) would be an empty husk — render nothing.
+  if (status.subtype === 'found_sources' && !(status.data?.sources?.length)) {
+    return null;
+  }
+  if (status.subtype === 'error') return null;
   return (
     <div className="min-w-0">
       <ToolRow

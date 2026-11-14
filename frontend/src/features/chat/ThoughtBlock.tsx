@@ -90,7 +90,7 @@ export function StepRow({
   icon, message, children, isFirst = false, isLast = false, pulse = false, showRail = true, rightSlot,
 }: {
   icon: React.ReactNode;
-  message: string;
+  message: React.ReactNode;
   children?: React.ReactNode;
   isFirst?: boolean;
   isLast?: boolean;
@@ -101,9 +101,9 @@ export function StepRow({
   return (
     <div className="flex gap-2.5">
       <TimelineNode icon={icon} isFirst={isFirst} isLast={isLast} showRail={showRail} />
-      <div className={`min-w-0 flex-1 flex flex-col ${isLast ? 'pt-3 pb-0' : 'pt-3 pb-2'}`}>
+      <div className={`min-w-0 flex-1 flex flex-col ${isLast ? 'pt-1.5 pb-0' : 'pt-1.5 pb-1'}`}>
         <div className="flex items-start gap-1">
-          <span className="text-[13px] text-[var(--text-secondary)] leading-snug font-medium break-words min-w-0">{message}</span>
+          <span className="text-[13px] text-[var(--text-secondary)] leading-[18px] break-words min-w-0">{message}</span>
           {rightSlot && <span className="inline-flex shrink-0 align-middle ml-auto">{rightSlot}</span>}
         </div>
         {children && <div className="mt-1.5 text-[13px]">{children}</div>}

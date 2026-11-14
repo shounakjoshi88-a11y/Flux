@@ -18,9 +18,12 @@ import StatusMessage from "./StatusMessage";
 
 type ToolCallPart = MessagePart & { type: "tool_call" };
 
-type ToolFamily = "command" | "read" | "write" | "other";
+type ToolFamily = "command" | "fetch" | "read" | "write" | "other";
 
-function classify(name: string): ToolFamily {
+function classify(name: string, input?: any): ToolFamily {
+  // URL fetches are not file reads — a `read_url` call reads a web page / PDF
+  // over HTTP, never the local filesystem.
+  if (/^https?:\/\//i.test(String(input?.url ?? "")) || /url|fetch|http/i.test(name)) return "fetch";
   if (/bash|python|sandbox|terminal|run|exec|shell/i.test(name)) return "command";
   if (/write|create|edit|delete|append|generat/i.test(name)) return "write";
   if (/read|cat|get|open|file|list/i.test(name)) return "read";
@@ -29,10 +32,11 @@ function classify(name: string): ToolFamily {
 
 /** Claude's phrasing: "Ran 3 commands, read 2 files, and used 1 other tool". */
 function aggregateLabel(parts: ToolCallPart[]): string {
-  const counts: Record<ToolFamily, number> = { command: 0, read: 0, write: 0, other: 0 };
-  for (const p of parts) counts[classify(p.name ?? "")] += 1;
+  const counts: Record<ToolFamily, number> = { command: 0, fetch: 0, read: 0, write: 0, other: 0 };
+  for (const p of parts) counts[classify(p.name ?? "", p.input)] += 1;
   const segs: string[] = [];
   if (counts.command) segs.push(counts.command === 1 ? "Ran a command" : `Ran ${counts.command} commands`);
+  if (counts.fetch) segs.push(counts.fetch === 1 ? "read a page" : `read ${counts.fetch} pages`);
   if (counts.read) segs.push(counts.read === 1 ? "read a file" : `read ${counts.read} files`);
   if (counts.write) segs.push(counts.write === 1 ? "wrote a file" : `wrote ${counts.write} files`);
   if (counts.other) segs.push(`used ${counts.other} other tool${counts.other > 1 ? "s" : ""}`);

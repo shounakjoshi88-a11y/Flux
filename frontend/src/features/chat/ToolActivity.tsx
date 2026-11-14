@@ -38,9 +38,9 @@ function RowCaret({ open, isActive }: { open: boolean; isActive?: boolean }) {
     );
   }
   return (
-    <span className="inline-flex h-5 w-3 shrink-0 items-center justify-center" aria-hidden>
+    <span className="inline-flex h-4 w-3 shrink-0 items-center justify-center" aria-hidden>
       <IconChevronDown
-        className={`size-3 text-[var(--text-secondary)] transition-transform duration-200 ${open ? "rotate-0" : "-rotate-90"}`}
+        className={`size-2.5 text-[var(--text-secondary)] transition-transform duration-200 ${open ? "rotate-0" : "-rotate-90"}`}
       />
     </span>
   );
@@ -59,8 +59,8 @@ export interface ToolRowProps {
 }
 
 /**
- * One disclosure row — claude.ai's measured anatomy: 20px line, px-1.5, br8,
- * full-width stretched click overlay, 14px/20px label.
+ * One disclosure row — claude.ai's measured anatomy: 18px line, px-1.5, br8,
+ * full-width stretched click overlay, 13px/18px label.
  */
 export function ToolRow({ label, open, onToggle, isActive, rightSlot, className }: ToolRowProps) {
   return (
@@ -70,7 +70,7 @@ export function ToolRow({ label, open, onToggle, isActive, rightSlot, className 
       aria-expanded={open}
       className={`group/toolrow relative flex w-stretch items-center gap-1.5 rounded-[8px] py-0 pl-1.5 pr-1 text-left outline-none transition-colors hover:bg-white/[0.04] focus-visible:bg-white/[0.05] select-none ${className ?? ""}`}
     >
-      <span className="min-w-0 flex-1 truncate whitespace-nowrap py-[1px] text-[14px] leading-[20px] font-[400] text-[var(--text-secondary)] group-hover/toolrow:text-[var(--text-primary)] transition-colors">
+      <span className="min-w-0 flex-1 truncate whitespace-nowrap text-[13px] leading-[18px] font-normal text-[var(--text-secondary)] group-hover/toolrow:text-[var(--text-primary)] transition-colors">
         {label}
       </span>
       {rightSlot && <span className="shrink-0">{rightSlot}</span>}
@@ -108,13 +108,13 @@ export function ToolPanel({ open, children }: { open: boolean; children: React.R
 
 /** One divided section inside the panel (claude.ai: px-4 py-2 / py-3). */
 export function ToolSection({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={`px-4 py-3 ${className ?? ""}`}>{children}</div>;
+  return <div className={`px-4 py-2 ${className ?? ""}`}>{children}</div>;
 }
 
 /** Muted one-liner used for transient steps ("Reading 3 sources…"). */
 export function ToolSectionLine({ children }: { children: React.ReactNode }) {
   return (
-    <div className="px-4 py-2.5 text-[13px] leading-5 text-[var(--text-secondary)]">{children}</div>
+    <div className="px-4 py-2 text-[12.5px] leading-[18px] text-[var(--text-secondary)]">{children}</div>
   );
 }
 

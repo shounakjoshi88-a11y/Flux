@@ -107,12 +107,6 @@ export function createResearchTools(ctx: ToolContext) {
                         return `The URL "${trimmed}" returned content but no extractable text was found.`;
                     }
 
-                    writer.status(
-                        'found_sources',
-                        `Read ${trimmed} (${(extracted.length / 1024).toFixed(0)} KB of text)`,
-                        undefined,
-                        state.thoughtProcess,
-                    );
                     return `[CONTENT FROM ${trimmed}]\n${extracted}\n\n---\nUse this content to answer the user. It came directly from the URL, not from a search snippet.`;
                 } catch (e: any) {
                     if (e.name === 'AbortError') {

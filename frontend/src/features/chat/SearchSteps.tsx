@@ -48,6 +48,18 @@ export function SearchStepsGroup({
   const searchQuery = firstPart.input?.query ?? '';
   const streamingActive = isStreaming && typedParts.some((p) => p.status === 'running');
 
+  // A group with zero renderable sections (e.g. a `found_sources` status with no
+  // sources attached — emitted after URL reads) would be an empty disclosure
+  // husk that lies about a search having happened. Render nothing instead.
+  // `error` is excluded too: WebSearchSection has no renderer for it, so it
+  // would produce the same husk. (Search-skip chatter is noise by design.)
+  const hasRenderable = typedParts.some((p) => {
+    if (p.name === 'searching' || p.name === 'no_results') return true;
+    if (p.name === 'found_sources') return ((p.input as any)?.sources?.length ?? 0) > 0;
+    return false;
+  });
+  if (!hasRenderable) return null;
+
   return (
     <div className="min-w-0">
       {/* claude.ai: one 20px disclosure row ("Searched the web") expanding into
