@@ -94,7 +94,7 @@ export function ToolPanel({ open, children }: { open: boolean; children: React.R
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: "auto", opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
-          transition={{ duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
+          transition={{ type: "spring", stiffness: 260, damping: 26, mass: 0.8 }}
           className="overflow-hidden"
         >
           <div className="mt-1 overflow-hidden rounded-xl divide-y divide-white/[0.05] border border-white/[0.05] bg-[var(--bg-secondary)]/60">

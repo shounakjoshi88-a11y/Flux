@@ -1,5 +1,6 @@
 import { IconChevronDown } from "../layout/anthropicIcons.tsx";
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 
 import { StatusMessage } from "./StatusMessage";
 import { CommandGroup } from "./CommandGroup";
@@ -351,15 +352,21 @@ export function ScrollableSourceCascade({
   const targetSpeedRef = useRef(0);
   const animFrameRef = useRef<number>(0);
   const decelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reduceMotion = useReducedMotion();
 
   const step = useCallback(() => {
     const container = scrollRef.current;
     if (!container) return;
     const currentSpeed = speedRef.current;
     const target = targetSpeedRef.current;
-    const newSpeed = currentSpeed + (target - currentSpeed) * 0.15;
-    speedRef.current = newSpeed;
-    container.scrollLeft += newSpeed;
+    const newSpeed = currentSpeed + (target - currentSpeed) * 0.12;
+    // Snap to a dead stop instead of coasting on sub-pixel velocities forever.
+    if (Math.abs(newSpeed) < 0.02 && target === 0) {
+      speedRef.current = 0;
+    } else {
+      speedRef.current = newSpeed;
+      container.scrollLeft += newSpeed;
+    }
     animFrameRef.current = requestAnimationFrame(step);
   }, []);
 
@@ -420,10 +427,19 @@ export function ScrollableSourceCascade({
       onMouseLeave={handleMouseLeave}
     >
       {sources.map((source, idx) => (
-        <button
+        <motion.button
           key={source.url + idx}
+          initial={reduceMotion ? false : { opacity: 0, scale: 0.2, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={
+            reduceMotion
+              ? { duration: 0 }
+              : { type: "spring", stiffness: 480, damping: 24, delay: Math.min(idx * 0.055, 0.7) }
+          }
           onClick={(e) => { e.stopPropagation(); onSourceClick?.(source.url); }}
-          className="transition-all duration-150 hover:scale-125 hover:-translate-y-0.5 hover:shadow-lg focus:outline-none shrink-0 rounded-full"
+          className="transition-colors duration-150 hover:shadow-lg focus:outline-none shrink-0 rounded-full"
+          whileHover={reduceMotion ? undefined : { scale: 1.22, y: -2 }}
+          whileTap={{ scale: 1.15 }}
           title={getDomain(source.url)}
           style={{ zIndex: sources.length - idx }}
         >
@@ -432,7 +448,7 @@ export function ScrollableSourceCascade({
             alt={getDomain(source.url)}
             className="size-6 rounded-full border-2 border-background bg-white dark:bg-[#000] object-contain hover:border-[var(--accent)]/70 transition-colors"
           />
-        </button>
+        </motion.button>
       ))}
     </div>
   );

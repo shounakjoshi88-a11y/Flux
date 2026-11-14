@@ -19,6 +19,7 @@
  * Returns `null` for any other subtype.
  */
 import { useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { ToolRow, ToolPanel, ToolSection, ToolSectionLine } from "../ToolActivity";
 import { WarnIcon } from "../icons";
 import { getDomain } from "./helpers";
@@ -44,11 +45,27 @@ export function WebSearchSection({
   isPartActive?: boolean;
   onSourceClick?: (url: string | null) => void;
 }) {
+  const reduceMotion = useReducedMotion();
+
   if (status.subtype === "searching") {
     const query = (status.data?.query as string) || searchQuery || "";
     return (
       <ToolSectionLine>
-        {isPartActive ? `Searching “${query || "the web"}”…` : query ? `Searched for “${query}”` : "Searched the web"}
+        {isPartActive ? (
+          <span className="inline-flex items-center gap-1.5">
+            Searching “{query || "the web"}”
+            <span className="inline-flex items-end gap-[3px] pb-[1px]" aria-hidden>
+              {[0, 1, 2].map((i) => (
+                <motion.span
+                  key={i}
+                  className="size-[3px] rounded-full bg-[var(--text-secondary)]"
+                  animate={reduceMotion ? undefined : { y: [0, -3.5, 0], opacity: [0.4, 1, 0.4] }}
+                  transition={reduceMotion ? undefined : { duration: 0.9, repeat: Infinity, delay: i * 0.16, ease: "easeInOut" }}
+                />
+              ))}
+            </span>
+          </span>
+        ) : query ? `Searched for “${query}”` : "Searched the web"}
       </ToolSectionLine>
     );
   }
@@ -59,24 +76,42 @@ export function WebSearchSection({
     const query: string = status.data?.query ?? searchQuery ?? "";
     const count = sources.length;
     if (count === 0) return null;
+    // Rows stagger in when the results arrive — the "results just came in" beat.
+    const rowDelay = (idx: number) => (reduceMotion ? 0 : Math.min(idx * 0.05, 0.45));
     return (
       <ToolSection>
-        <div className="mb-2 flex items-center justify-between gap-2">
+        <motion.div
+          className="mb-2 flex items-center justify-between gap-2"
+          initial={reduceMotion ? false : { opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, ease: [0.22, 0.61, 0.36, 1] }}
+        >
           <div className="min-w-0 truncate text-[13px] leading-5 text-[var(--text-secondary)]">
             {query || status.message || "Results"}
           </div>
-          <span className="shrink-0 font-mono text-[11px] tabular-nums text-[var(--text-secondary)]">
+          <motion.span
+            className="shrink-0 font-mono text-[11px] tabular-nums text-[var(--text-secondary)]"
+            initial={reduceMotion ? false : { opacity: 0, scale: 0.6 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 500, damping: 22, delay: 0.12 }}
+          >
             {count} result{count === 1 ? "" : "s"}
-          </span>
-        </div>
-        <div className="overflow-hidden rounded-lg border border-white/[0.05]">
+          </motion.span>
+        </motion.div>
+        <div
+          className="overflow-hidden rounded-lg border border-white/[0.05]"
+          style={{ transition: "border-color 0.3s ease" }}
+        >
           <div className="custom-scrollbar max-h-[156px] overflow-y-auto">
             {sources.map((url, idx) => {
               const domain = getDomain(url);
               const title = titles[idx] || domain;
               return (
-                <button
+                <motion.button
                   key={`${url}-${idx}`}
+                  initial={reduceMotion ? false : { opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, ease: [0.22, 0.61, 0.36, 1], delay: rowDelay(idx) }}
                   onClick={() => onSourceClick?.(url)}
                   className="group flex w-full items-center gap-2.5 border-b border-white/[0.04] px-3 py-[7px] text-left transition-colors last:border-b-0 hover:bg-white/[0.025]"
                 >
@@ -92,7 +127,7 @@ export function WebSearchSection({
                   <span className="ml-2 shrink-0 font-mono text-[11px] text-[var(--text-muted)]/70">
                     {domain}
                   </span>
-                </button>
+                </motion.button>
               );
             })}
           </div>
