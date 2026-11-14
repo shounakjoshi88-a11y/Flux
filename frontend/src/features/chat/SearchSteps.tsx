@@ -474,10 +474,10 @@ export function ScrollableSourceCascade({
   return (
     <div
       ref={scrollRef}
-      className="flex items-center -space-x-2 overflow-x-auto scroll-smooth max-w-[120px] pr-2 py-1"
+      className="flex items-center -space-x-2 overflow-x-auto scroll-smooth max-w-[176px] pr-3 py-1"
       style={{
-        maskImage: "linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%)",
-        WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%)",
+        maskImage: "linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)",
+        WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)",
         scrollbarWidth: "none",
       }}
       onMouseMove={handleMouseMove}
@@ -503,7 +503,7 @@ export function ScrollableSourceCascade({
           <img
             src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(source.url)}&sz=64`}
             alt={getDomain(source.url)}
-            className="size-6 rounded-full border-2 border-background bg-white dark:bg-[#000] object-contain hover:border-[var(--accent)]/70 transition-colors"
+            className="size-6 rounded-full border-2 border-background bg-white object-contain hover:border-[var(--accent)]/70 transition-colors"
           />
         </motion.button>
       ))}
