@@ -1,5 +1,8 @@
 // src/components/Sidebar.tsx
 import { AnimatePresence, motion } from "framer-motion";
+import { SidebarSearchModal } from "./SidebarSearchModal";
+import { formatSearchDate, getTimeGroup } from "./sidebar/timeGroups";
+import { useEdgeAutoScroll } from "./sidebar/useEdgeAutoScroll";
 import { BACKEND_URL } from "../../lib/config";
 import { usePerformance } from "../../lib/performance-context";
 import {
@@ -56,35 +59,6 @@ type SidebarProps = {
   onTeamOpen: () => void;
 };
 
-// ─── Shared time grouping logic ──────────────────────────────
-function getTimeGroup(date: Date): string {
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterdayStart = new Date(todayStart);
-  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-
-  if (date >= todayStart) return "Today";
-  if (date >= yesterdayStart) return "Yesterday";
-
-  const diffTime = todayStart.getTime() - date.getTime();
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-  if (diffDays < 7) return "This Week";
-
-  const weeks = Math.floor(diffDays / 7);
-  if (weeks <= 4) return `${weeks} Week${weeks > 1 ? "s" : ""} Ago`;
-
-  const months = Math.floor(diffDays / 30);
-  if (months <= 11) return `${months} Month${months > 1 ? "s" : ""} Ago`;
-
-  return "Older";
-}
-
-function formatSearchDate(dateString: string | null): string {
-  if (!dateString) return "Older";
-  return getTimeGroup(new Date(dateString));
-}
-
 type ListItem =
   | { type: "header"; label: string }
   | { type: "thread"; conversation: ConversationListItem };
@@ -128,194 +102,10 @@ export const Sidebar = memo(function Sidebar({
   const [gearSpinning, setGearSpinning] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
 
-  // ─── Auto‑scroll refs & logic (SIDEBAR) ─────────────────
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const speedRef = useRef(0);
-  const targetSpeedRef = useRef(0);
-  const animFrameRef = useRef<number>(0);
-  const scrollHoverTimerRef = useRef<number | null>(null);
+  // Auto-scroll (thread list and search modal share one hook) --------------
+  const threadsScroll = useEdgeAutoScroll(isOpen);
+  const modalScroll = useEdgeAutoScroll(isSearchModalOpen);
 
-  const step = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const currentSpeed = speedRef.current;
-    const target = targetSpeedRef.current;
-    const newSpeed = currentSpeed + (target - currentSpeed) * 0.15;
-
-    if (Math.abs(newSpeed) < 0.05 && Math.abs(target) < 0.05) {
-      speedRef.current = 0;
-      targetSpeedRef.current = 0;
-      animFrameRef.current = 0;
-      return;
-    }
-
-    speedRef.current = newSpeed;
-    const maxScroll = container.scrollHeight - container.clientHeight;
-    container.scrollTop = Math.min(Math.max(container.scrollTop + newSpeed, 0), maxScroll);
-
-    animFrameRef.current = requestAnimationFrame(step);
-  }, []);
-
-  useEffect(() => {
-    if (isOpen) {
-      animFrameRef.current = requestAnimationFrame(step);
-    }
-    return () => {
-      if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
-        animFrameRef.current = 0;
-      }
-    };
-  }, [step, isOpen]);
-
-  const handleThreadsMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const rect = container.getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    const height = rect.height;
-
-    const edgeThreshold = 0.3;
-    const maxSpeed = 4.5;
-    let newTarget = 0;
-
-    if (y < height * edgeThreshold) {
-      const fraction = 1 - y / (height * edgeThreshold);
-      newTarget = -maxSpeed * fraction;
-    } else if (y > height * (1 - edgeThreshold)) {
-      const fraction = (y - height * (1 - edgeThreshold)) / (height * edgeThreshold);
-      newTarget = maxSpeed * fraction;
-    }
-
-    targetSpeedRef.current = newTarget;
-
-    if (animFrameRef.current === 0) {
-      animFrameRef.current = requestAnimationFrame(step);
-    }
-
-    if (scrollHoverTimerRef.current !== null) {
-      clearTimeout(scrollHoverTimerRef.current);
-      scrollHoverTimerRef.current = null;
-    }
-  }, [step]);
-
-  const handleThreadsMouseLeave = useCallback(() => {
-    const decelerate = () => {
-      const current = targetSpeedRef.current;
-      if (Math.abs(current) < 0.1) {
-        targetSpeedRef.current = 0;
-        return;
-      }
-      targetSpeedRef.current = current * 0.85;
-      scrollHoverTimerRef.current = window.setTimeout(decelerate, 16);
-    };
-    decelerate();
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (scrollHoverTimerRef.current !== null) {
-        clearTimeout(scrollHoverTimerRef.current);
-      }
-    };
-  }, []);
-
-  // ─── Auto‑scroll refs & logic (MODAL) ──────────────────
-  const modalScrollContainerRef = useRef<HTMLDivElement>(null);
-  const modalSpeedRef = useRef(0);
-  const modalTargetSpeedRef = useRef(0);
-  const modalAnimFrameRef = useRef<number>(0);
-  const modalScrollHoverTimerRef = useRef<number | null>(null);
-
-  const modalStep = useCallback(() => {
-    const container = modalScrollContainerRef.current;
-    if (!container) return;
-
-    const currentSpeed = modalSpeedRef.current;
-    const target = modalTargetSpeedRef.current;
-    const newSpeed = currentSpeed + (target - currentSpeed) * 0.15;
-
-    if (Math.abs(newSpeed) < 0.05 && Math.abs(target) < 0.05) {
-      modalSpeedRef.current = 0;
-      modalTargetSpeedRef.current = 0;
-      modalAnimFrameRef.current = 0;
-      return;
-    }
-
-    modalSpeedRef.current = newSpeed;
-    const maxScroll = container.scrollHeight - container.clientHeight;
-    container.scrollTop = Math.min(Math.max(container.scrollTop + newSpeed, 0), maxScroll);
-
-    modalAnimFrameRef.current = requestAnimationFrame(modalStep);
-  }, []);
-
-  useEffect(() => {
-    if (isSearchModalOpen) {
-      modalAnimFrameRef.current = requestAnimationFrame(modalStep);
-    }
-    return () => {
-      if (modalAnimFrameRef.current) {
-        cancelAnimationFrame(modalAnimFrameRef.current);
-        modalAnimFrameRef.current = 0;
-      }
-    };
-  }, [modalStep, isSearchModalOpen]);
-
-  const handleModalMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const container = modalScrollContainerRef.current;
-    if (!container) return;
-
-    const rect = container.getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    const height = rect.height;
-
-    const edgeThreshold = 0.3;
-    const maxSpeed = 4.5; let newTarget = 0;
-
-    if (y < height * edgeThreshold) {
-      const fraction = 1 - y / (height * edgeThreshold);
-      newTarget = -maxSpeed * fraction;
-    } else if (y > height * (1 - edgeThreshold)) {
-      const fraction = (y - height * (1 - edgeThreshold)) / (height * edgeThreshold);
-      newTarget = maxSpeed * fraction;
-    }
-
-    modalTargetSpeedRef.current = newTarget;
-
-    if (modalAnimFrameRef.current === 0) {
-      modalAnimFrameRef.current = requestAnimationFrame(modalStep);
-    }
-
-    if (modalScrollHoverTimerRef.current !== null) {
-      clearTimeout(modalScrollHoverTimerRef.current);
-      modalScrollHoverTimerRef.current = null;
-    }
-  }, [modalStep]);
-
-  const handleModalMouseLeave = useCallback(() => {
-    const decelerate = () => {
-      const current = modalTargetSpeedRef.current;
-      if (Math.abs(current) < 0.1) {
-        modalTargetSpeedRef.current = 0;
-        return;
-      }
-      modalTargetSpeedRef.current = current * 0.85;
-      modalScrollHoverTimerRef.current = window.setTimeout(decelerate, 16);
-    };
-    decelerate();
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (scrollHoverTimerRef.current !== null) {
-        clearTimeout(scrollHoverTimerRef.current);
-      }
-    };
-  }, []);
-
-  // ─── Other state and effects ──────────────────────────
   useEffect(() => {
     if (!userMenuOpen) return;
     const handler = (e: MouseEvent) => {
@@ -653,9 +443,9 @@ export const Sidebar = memo(function Sidebar({
               <div className="flex-1 relative mt-4 flex flex-col" style={{ minHeight: 0 }}>
                 <div className="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-sidebar to-transparent pointer-events-none z-10" />
                 <div
-                  ref={scrollContainerRef}
-                  onMouseMove={handleThreadsMouseMove}
-                  onMouseLeave={handleThreadsMouseLeave}
+                  ref={threadsScroll.scrollContainerRef}
+                  onMouseMove={threadsScroll.handleMouseMove}
+                  onMouseLeave={threadsScroll.handleMouseLeave}
                   className="flex-1 overflow-y-auto space-y-0.5 sidebar-scroll pb-10"
                   style={{ minHeight: 0, scrollbarWidth: "none", msOverflowStyle: "none" }}
                 >
@@ -704,9 +494,9 @@ export const Sidebar = memo(function Sidebar({
                 >
                   <div className="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-sidebar to-transparent pointer-events-none z-10" />
                   <div
-                    ref={scrollContainerRef}
-                    onMouseMove={handleThreadsMouseMove}
-                    onMouseLeave={handleThreadsMouseLeave}
+                    ref={threadsScroll.scrollContainerRef}
+                    onMouseMove={threadsScroll.handleMouseMove}
+                    onMouseLeave={threadsScroll.handleMouseLeave}
                     className="flex-1 overflow-y-auto space-y-0.5 sidebar-scroll pb-10"
                     style={{ minHeight: 0, scrollbarWidth: "none", msOverflowStyle: "none" }}
                   >
@@ -869,244 +659,22 @@ export const Sidebar = memo(function Sidebar({
         </div>
       </motion.aside>
 
-      {/* ─── SEARCH MODAL ─── */}
-      {isPerfLow ? (
-        isSearchModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] px-4" onClick={closeSearchModal}>
-            <div className="absolute inset-0 bg-black/50" />
-            <div className="relative w-full max-w-[720px] bg-[var(--bg-primary)]/95 border border-[var(--surface-border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center gap-3 px-4 py-4 border-b border-[var(--surface-border)]">
-                <IconSearch className="size-4 text-[var(--text-muted)] shrink-0" />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  placeholder="Search chats and projects"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') { closeSearchModal(); return; }
-                    if (e.key === 'ArrowDown') {
-                      e.preventDefault();
-                      setSelectedIndex(i => Math.min(i + 1, modalResults.length - 1));
-                    }
-                    if (e.key === 'ArrowUp') {
-                      e.preventDefault();
-                      setSelectedIndex(i => Math.max(i - 1, -1));
-                    }
-                    if (e.key === 'Enter' && selectedIndex >= 0 && modalResults[selectedIndex]) {
-                      const conv = modalResults[selectedIndex];
-                      onSelectThread(conv.id);
-                      closeSearchModal();
-                    }
-                  }}
-                  className="flex-1 bg-transparent outline-none text-base text-[var(--text-primary)]/90 placeholder:text-[var(--text-muted)]/40 min-w-0"
-                />
-                <div className="flex items-center gap-1 shrink-0">
-                  {searchLoading && (
-                    <Loader2 className="size-4 animate-spin text-[var(--text-muted)]" />
-                  )}
-                  {search && !searchLoading && (
-                    <button
-                      type="button"
-                      onClick={() => setSearch("")}
-                      className="p-1 rounded-md hover:bg-[var(--surface-bg)] transition-colors"
-                    >
-                      <CircleX className="size-4 text-[var(--text-muted)]/60" />
-                    </button>
-                  )}
-                  <div className="w-px h-4 bg-[var(--surface-border)] mx-1" />
-                  <button
-                    type="button"
-                    onClick={closeSearchModal}
-                    className="p-1.5 rounded-lg hover:bg-[var(--surface-bg)] transition-colors"
-                    aria-label="Close search"
-                  >
-                    <X className="size-4 text-[var(--text-muted)]/60" />
-                  </button>
-                </div>
-              </div>
-              <div
-                ref={modalScrollContainerRef}
-                onMouseMove={handleModalMouseMove}
-                onMouseLeave={handleModalMouseLeave}
-                className="overflow-y-auto max-h-[520px] py-1.5 scrollbar-none"
-                style={{ scrollbarWidth: "none" }}
-              >
-                {modalResults.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-48 gap-2">
-                    <History className="size-8 text-[var(--text-muted)]/20" />
-                    <p className="text-xs text-[var(--text-muted)]/40">
-                      {search.trim() ? "No results found" : "No conversations yet"}
-                    </p>
-                  </div>
-                ) : (
-                  modalResults.map((conv, index) => (
-                    <button
-                      key={conv.id}
-                      onClick={() => {
-                        onSelectThread(conv.id);
-                        if (conv.messageId) {
-                          setTimeout(() => {
-                            const el = document.getElementById(`message-${conv.messageId}`);
-                            el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                          }, 400);
-                        }
-                        closeSearchModal();
-                      }}
-                      className={`w-full flex items-center gap-3 px-4 py-3.5 transition-colors text-left group
-                        ${index === selectedIndex
-                          ? 'bg-[var(--surface-bg)]'
-                          : 'hover:bg-[var(--surface-bg)]/60'
-                        }`}
-                    >
-                      <MessageSquare className="size-4 text-[var(--text-muted)]/40 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-[var(--text-secondary)]/80 group-hover:text-[var(--text-primary)] truncate transition-colors">
-                          {conv.title ?? "Untitled"}
-                        </p>
-                        {conv.snippet && (
-                          <p className="text-xs text-[var(--text-muted)]/50 truncate mt-0.5 group-hover:text-[var(--text-secondary)]/70 transition-colors">
-                            {conv.snippet}
-                          </p>
-                        )}
-                      </div>
-                      <span className="text-[11px] text-[var(--text-muted)]/40 shrink-0 group-hover:text-[var(--text-secondary)]/60 transition-colors">
-                        {formatSearchDate(conv.lastMessageAt)}
-                      </span>
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        )
-      ) : (
-        <AnimatePresence>
-          {isSearchModalOpen && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] px-4"
-              onClick={closeSearchModal}
-            >
-              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-              <motion.div
-                initial={{ scale: 0.97, opacity: 0, y: -8 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.97, opacity: 0, y: -8 }}
-                transition={{ duration: 0.15 }}
-                className="relative w-full max-w-[720px] bg-[var(--bg-primary)]/95 backdrop-blur-2xl border border-[var(--surface-border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center gap-3 px-4 py-4 border-b border-[var(--surface-border)]">
-                  <IconSearch className="size-4 text-[var(--text-muted)] shrink-0" />
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    placeholder="Search chats and projects"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') { closeSearchModal(); return; }
-                      if (e.key === 'ArrowDown') {
-                        e.preventDefault();
-                        setSelectedIndex(i => Math.min(i + 1, modalResults.length - 1));
-                      }
-                      if (e.key === 'ArrowUp') {
-                        e.preventDefault();
-                        setSelectedIndex(i => Math.max(i - 1, -1));
-                      }
-                      if (e.key === 'Enter' && selectedIndex >= 0 && modalResults[selectedIndex]) {
-                        const conv = modalResults[selectedIndex];
-                        onSelectThread(conv.id);
-                        closeSearchModal();
-                      }
-                    }}
-                    className="flex-1 bg-transparent outline-none text-base text-[var(--text-primary)]/90 placeholder:text-[var(--text-muted)]/40 min-w-0"
-                  />
-                  <div className="flex items-center gap-1 shrink-0">
-                    {searchLoading && (
-                      <Loader2 className="size-4 animate-spin text-[var(--text-muted)]" />
-                    )}
-                    {search && !searchLoading && (
-                      <button
-                        type="button"
-                        onClick={() => setSearch("")}
-                        className="p-1 rounded-md hover:bg-[var(--surface-bg)] transition-colors"
-                      >
-                        <CircleX className="size-4 text-[var(--text-muted)]/60" />
-                      </button>
-                    )}
-                    <div className="w-px h-4 bg-[var(--surface-border)] mx-1" />
-                    <button
-                      type="button"
-                      onClick={closeSearchModal}
-                      className="p-1.5 rounded-lg hover:bg-[var(--surface-bg)] transition-colors"
-                      aria-label="Close search"
-                    >
-                      <X className="size-4 text-[var(--text-muted)]/60" />
-                    </button>
-                  </div>
-                </div>
-                <div
-                  ref={modalScrollContainerRef}
-                  onMouseMove={handleModalMouseMove}
-                  onMouseLeave={handleModalMouseLeave}
-                  className="overflow-y-auto max-h-[520px] py-1.5 scrollbar-none"
-                  style={{ scrollbarWidth: "none" }}
-                >
-                  {modalResults.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-48 gap-2">
-                      <History className="size-8 text-[var(--text-muted)]/20" />
-                      <p className="text-xs text-[var(--text-muted)]/40">
-                        {search.trim() ? "No results found" : "No conversations yet"}
-                      </p>
-                    </div>
-                  ) : (
-                    modalResults.map((conv, index) => (
-                      <button
-                        key={conv.id}
-                        onClick={() => {
-                          onSelectThread(conv.id);
-                          if (conv.messageId) {
-                            setTimeout(() => {
-                              const el = document.getElementById(`message-${conv.messageId}`);
-                              el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            }, 400);
-                          }
-                          closeSearchModal();
-                        }}
-                        className={`w-full flex items-center gap-3 px-4 py-3.5 transition-colors text-left group
-                          ${index === selectedIndex
-                            ? 'bg-[var(--surface-bg)]'
-                            : 'hover:bg-[var(--surface-bg)]/60'
-                          }`}
-                      >
-                        <MessageSquare className="size-4 text-[var(--text-muted)]/40 shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-[var(--text-secondary)]/80 group-hover:text-[var(--text-primary)] truncate transition-colors">
-                            {conv.title ?? "Untitled"}
-                          </p>
-                          {conv.snippet && (
-                            <p className="text-xs text-[var(--text-muted)]/50 truncate mt-0.5 group-hover:text-[var(--text-secondary)]/70 transition-colors">
-                              {conv.snippet}
-                            </p>
-                          )}
-                        </div>
-                        <span className="text-[11px] text-[var(--text-muted)]/40 shrink-0 group-hover:text-[var(--text-secondary)]/60 transition-colors">
-                          {formatSearchDate(conv.lastMessageAt)}
-                        </span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      )}
+            <SidebarSearchModal
+        isPerfLow={isPerfLow}
+        isOpen={isSearchModalOpen}
+        onClose={closeSearchModal}
+        search={search}
+        onSearchChange={setSearch}
+        searchLoading={searchLoading}
+        results={modalResults}
+        selectedIndex={selectedIndex}
+        onSelectIndex={setSelectedIndex}
+        onSelectThread={onSelectThread}
+        inputRef={searchInputRef}
+        scrollContainerRef={modalScroll.scrollContainerRef}
+        onScrollMouseMove={modalScroll.handleMouseMove}
+        onScrollMouseLeave={modalScroll.handleMouseLeave}
+      />
     </>
   );
 });
