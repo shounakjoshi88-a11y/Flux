@@ -250,7 +250,6 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
               if (node) itemElsRef.current.set(index, node);
               else itemElsRef.current.delete(index);
             }}
-            style={{ contentVisibility: "auto", containIntrinsicSize: "auto 320px" }}
           >
             <div className="mx-auto max-w-[768px] px-5 animate-in fade-in duration-500">
               <MessageItem

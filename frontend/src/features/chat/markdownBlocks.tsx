@@ -185,56 +185,126 @@ export function renderList(items: any[], onCitationClick: any, sources: Source[]
 }
 
 export function renderPlainBlocks(text: string, onCitationClick: any, sources: Source[], parentIdx: number) {
-  const lines = text.split("\n");
+  text = stripRedundantHtmlTags(text);
+  const detailsRegex = /<details([^>]*)>([\s\S]*?)<\/details>/gi;
+  const pieces: { type: 'text' | 'details'; value: string }[] = [];
+  let lastIdx = 0;
+  let m: RegExpExecArray | null;
+  while ((m = detailsRegex.exec(text)) !== null) {
+    if (m.index > lastIdx) pieces.push({ type: 'text', value: text.slice(lastIdx, m.index) });
+    const body = m[2];
+    pieces.push({ type: 'details', value: (body ?? '').trim() });
+    lastIdx = m.index + m[0].length;
+  }
+  if (lastIdx < text.length) pieces.push({ type: 'text', value: text.slice(lastIdx) });
+
   const elements: React.ReactNode[] = [];
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i]!;
-    const trimmed = line.trim();
-    if (!trimmed) { i++; continue; }
-    const hMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
-    if (hMatch) {
-      const Tag = `h${hMatch[1]!.length}` as any;
-      elements.push(<Tag key={`h-${parentIdx}-${i}`} className="font-bold text-foreground mt-6 mb-2 tracking-tight">{formatInlineText(hMatch[2]!, onCitationClick, sources, `h-${parentIdx}-${i}`)}</Tag>);
-      i++; continue;
+  pieces.forEach((piece, pi) => {
+    if (piece.type === 'details') {
+      const lines = piece.value.split('\n');
+      // Find the <summary> line. The model sometimes emits it bare
+      // ('<summary>' alone on a line) with the answer on the next line,
+      // or drops the closing tag entirely.
+      const summaryLineIdx = lines.findIndex(l => /^\s*<summary[^>]*>/i.test(l));
+      let summaryText = 'Show answer';
+      let bodyStartIdx = 0;
+      if (summaryLineIdx >= 0) {
+        const raw = lines[summaryLineIdx]!;
+        const open = raw.match(/<summary[^>]*>/i)?.[0] ?? '<summary>';
+        const rest = raw.slice(raw.indexOf(open) + open.length);
+        const restWithoutClose = rest.replace(/<\/summary>/i, '');
+        const sameLineHasText = restWithoutClose.replace(/<[^>]*>/g, '').trim().length > 0;
+        if (sameLineHasText) {
+          // <summary>ANSWER</summary> on one line
+          summaryText = stripRedundantHtmlTags(restWithoutClose.trim());
+          bodyStartIdx = summaryLineIdx + 1;
+        } else {
+          const nextLine = lines[summaryLineIdx + 1]?.trim() ?? '';
+          if (/<\/summary>/i.test(nextLine)) {
+            // <summary>\nANSWER</summary> — answer on the next line
+            summaryText = stripRedundantHtmlTags(nextLine.replace(/<\/summary>/i, '').trim());
+            bodyStartIdx = summaryLineIdx + 2;
+          } else {
+            // Bare <summary> with the answer inline on following lines — all body there
+            summaryText = 'Show answer';
+            bodyStartIdx = summaryLineIdx + 1;
+          }
+        }
+      }
+      const bodyLines = lines.slice(bodyStartIdx).join('\n').trim();
+      elements.push(
+        <details key={`det-${parentIdx}-${pi}`} className="my-3 rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2">
+          <summary className="cursor-pointer text-[13px] font-semibold text-[var(--text-secondary)] select-none">{summaryText || 'Show answer'}</summary>
+          <div className="pt-2">{renderBlocks(bodyLines, onCitationClick, sources)}</div>
+        </details>
+      );
+      return;
     }
-    if (trimmed.startsWith("|")) {
-      const { rows, nextIndex } = parseTable(lines, i);
-      if (rows.length > 1) {
-        const tblIdx = elements.length;
-        elements.push(
-          <div key={`tab-${parentIdx}-${i}`} className="group my-4 overflow-x-auto relative">
-            <table className="min-w-full text-sm">
-              <thead className="text-left border-b border-white/25"><tr>{rows[0]!.map((cell, ci) => (<th key={ci} className="px-4 py-3 font-semibold text-foreground text-sm">{formatInlineText(cell, onCitationClick, sources, `th-${parentIdx}-${i}-${ci}`)}</th>))}</tr></thead>
-              <tbody className="divide-y divide-white/30">{rows.slice(1).map((row, ri) => (<tr key={ri} className="hover:bg-white/[0.03] transition-colors">{row.map((cell, ci) => (<td key={ci} className="px-4 py-2.5 text-foreground/90 text-sm">{formatInlineText(cell, onCitationClick, sources, `td-${parentIdx}-${i}-${ri}-${ci}`)}</td>))}</tr>))}</tbody>
-            </table>
-            <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-1 right-1">
-              <button
-                title="Export as CSV"
-                onClick={() => downloadTableAsCsv(rows, tblIdx)}
-                className="p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              >
-                <IconDownload className="h-3.5 w-3.5" />
-              </button>
+    const lines = piece.value.split('\n');
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i]!;
+      const trimmed = line.trim();
+      if (!trimmed) { i++; continue; }
+      const hMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
+      if (hMatch) {
+        const Tag = `h${hMatch[1]!.length}` as any;
+        elements.push(<Tag key={`h-${parentIdx}-${pi}-${i}`} className="font-bold text-foreground mt-6 mb-2 tracking-tight">{formatInlineText(hMatch[2]!, onCitationClick, sources, `h-${parentIdx}-${pi}-${i}`)}</Tag>);
+        i++; continue;
+      }
+      if (trimmed.startsWith("|")) {
+        const { rows, nextIndex } = parseTable(lines, i);
+        if (rows.length > 1) {
+          const tblIdx = elements.length;
+          elements.push(
+            <div key={`tab-${parentIdx}-${pi}-${i}`} className="group my-4 overflow-x-auto relative">
+              <table className="min-w-full text-sm">
+                <thead className="text-left border-b border-white/25"><tr>{rows[0]!.map((cell, ci) => (<th key={ci} className="px-4 py-3 font-semibold text-foreground text-sm">{formatInlineText(cell, onCitationClick, sources, `th-${parentIdx}-${pi}-${i}-${ci}`)}</th>))}</tr></thead>
+                <tbody className="divide-y divide-white/30">{rows.slice(1).map((row, ri) => (<tr key={ri} className="hover:bg-white/[0.03] transition-colors">{row.map((cell, ci) => (<td key={ci} className="px-4 py-2.5 text-foreground/90 text-sm">{formatInlineText(cell, onCitationClick, sources, `td-${parentIdx}-${pi}-${i}-${ri}-${ci}`)}</td>))}</tr>))}</tbody>
+              </table>
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-1 right-1">
+                <button
+                  title="Export as CSV"
+                  onClick={() => downloadTableAsCsv(rows, tblIdx)}
+                  className="p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                >
+                  <IconDownload className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
-          </div>
-        );
+          );
+          i = nextIndex; continue;
+        }
+      }
+      if (trimmed.match(/^([-*•]|\d+\.)\s+/)) {
+        const { items, nextIndex } = parseList(lines, i);
+        elements.push(<div key={`lst-${parentIdx}-${pi}-${i}`}>{renderList(items, onCitationClick, sources, `lst-${parentIdx}-${pi}-${i}`)}</div>);
         i = nextIndex; continue;
       }
+      if (trimmed === "---") {
+        elements.push(<hr key={`hr-${parentIdx}-${pi}-${i}`} className="my-8 border-white/10" />);
+        i++; continue;
+      }
+      elements.push(<p key={`p-${parentIdx}-${pi}-${i}`} className="leading-[21px] mb-3 last:mb-0 text-[15px] text-[var(--text-primary)] break-words [overflow-wrap:anywhere]">{formatInlineText(line, onCitationClick, sources, `p-${parentIdx}-${pi}-${i}`)}</p>);
+      i++;
     }
-    if (trimmed.match(/^([-*•]|\d+\.)\s+/)) {
-      const { items, nextIndex } = parseList(lines, i);
-      elements.push(<div key={`lst-${parentIdx}-${i}`}>{renderList(items, onCitationClick, sources, `lst-${parentIdx}-${i}`)}</div>);
-      i = nextIndex; continue;
-    }
-    if (trimmed === "---") {
-      elements.push(<hr key={`hr-${parentIdx}-${i}`} className="my-8 border-white/10" />);
-      i++; continue;
-    }
-    elements.push(<p key={`p-${parentIdx}-${i}`} className="leading-[21px] mb-3 last:mb-0 text-[15px] text-[var(--text-primary)] break-words [overflow-wrap:anywhere]">{formatInlineText(line, onCitationClick, sources, `p-${parentIdx}-${i}`)}</p>);
-    i++;
-  }
+  });
   return elements;
+}
+
+// Drop HTML tags we don't render (keep markdown). Preserves nothing inside them.
+function stripRedundantHtmlTags(text: string): string {
+  return text
+    .replace(/<\/?strong>/gi, '')
+    .replace(/<\/?em>/gi, '')
+    .replace(/<\/?b>/gi, '')
+    .replace(/<\/?i>/gi, '')
+    .replace(/<\/?u>/gi, '')
+    .replace(/<\/?p>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/?li>/gi, '')
+    .replace(/<\/?ol>/gi, '\n')
+    .replace(/<\/?ul>/gi, '\n');
 }
 
 // ── XyMatrix standalone detection ─────────────────────────

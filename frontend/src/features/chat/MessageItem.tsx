@@ -216,7 +216,18 @@ export const MessageItem = memo(function MessageItem({
   const _lastTextPart = _hasParts
     ? (message.parts as MessagePart[]).slice().reverse().find((p): p is MessagePart & { type: "text" } => p.type === "text")
     : null;
-  const _typewriterText = _lastTextPart ? (_lastTextPart.text ?? parsedContentBundle.cleanDisplayAnswer) : parsedContentBundle.cleanDisplayAnswer;
+  // For completed messages the streamed parts can be a stale/partial suffix of
+  // the final answer (backend may replace a partial stream with a synthesis).
+  // The DB content is authoritative — prefer it when it is at least as long as
+  // the joined text parts.
+  const _joinedTextLen = _hasParts && Array.isArray(message.parts)
+    ? (message.parts as MessagePart[]).reduce((acc, p) => acc + ((p as any).type === "text" ? String((p as any).text ?? "").length : 0), 0)
+    : 0;
+  const _contentLen = (parsedContentBundle.cleanDisplayAnswer ?? "").trim().length;
+  const _preferContentText = !String(message.id).startsWith("temp-") && _contentLen > 0 && _contentLen >= _joinedTextLen;
+  const _typewriterText = _preferContentText
+    ? parsedContentBundle.cleanDisplayAnswer.trim()
+    : (_lastTextPart ? (_lastTextPart.text ?? parsedContentBundle.cleanDisplayAnswer) : parsedContentBundle.cleanDisplayAnswer);
   const typewriterContent = useTypewriter(_typewriterText, message.id);
 
   // ── User-message state (unconditional to avoid hook count violations) ──
@@ -512,6 +523,29 @@ export const MessageItem = memo(function MessageItem({
   const isStreaming = String(message.id).startsWith("temp-");
   const assistantContent = parsedContentBundle.cleanDisplayAnswer;
 
+  // When the content is authoritative (completed message), collapse any streamed
+  // text parts (including partial fragments left before/after tool sections) into a
+  // single text part so non-text parts (tools, images, files) still render in place.
+  const renderParts = useMemo(() => {
+    if (!_preferContentText || !_hasParts || !Array.isArray(message.parts)) {
+      return message.parts as MessagePart[] | undefined;
+    }
+    const fullText = (parsedContentBundle.cleanDisplayAnswer ?? "").trim();
+    const out: MessagePart[] = [];
+    let textInserted = false;
+    for (const p of message.parts as MessagePart[]) {
+      if (p && (p as any).type === "text") {
+        if (!textInserted) {
+          out.push({ ...(p as any), text: fullText } as MessagePart);
+          textInserted = true;
+        }
+      } else if (p) {
+        out.push(p);
+      }
+    }
+    return out.length > 0 ? out : message.parts;
+  }, [_preferContentText, _hasParts, message.parts, parsedContentBundle.cleanDisplayAnswer]);
+
   // ── For image-only responses, we still render the image even if content is empty ──
   const hasImages = generatedFiles.some(f => f.mime?.startsWith("image/"));
   const shouldShowMessageItem = assistantContent.trim() !== "" || hasImages || generatedFiles.length > 0;
@@ -526,7 +560,7 @@ export const MessageItem = memo(function MessageItem({
       {_hasParts ? (
         <>
           <PartsRenderer
-            parts={message.parts!}
+            parts={renderParts!}
             isStreaming={isStreaming}
             typewriterContent={typewriterContent}
             messageId={message.id}

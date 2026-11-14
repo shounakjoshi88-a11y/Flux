@@ -16,9 +16,21 @@ export function enrichConversationMessages(rawMessages: any[]): ConvCacheEntry {
             storedFollowUps && storedFollowUps.length > 0 ? storedFollowUps : parsedFollowUps;
 
           // Check localStorage for persisted parts first
+          // The backend may replace a partial stream with a synthesized answer
+          // (replace_text). Persisted parts can then be a stale/partial suffix of
+          // the final content — rendering them hides most of the answer. If the
+          // DB content is materially longer than the joined text parts, drop the
+          // stored parts and fall back to rendering the content directly.
           const storedParts = msg.id ? (() => { try { const p = localStorage.getItem(`flux-parts-${msg.id}`); return p ? JSON.parse(p) : null; } catch { return null; } })() : null;
           if (storedParts && Array.isArray(storedParts) && storedParts.length > 0) {
-            (msg as any).parts = storedParts;
+            const joinedTextLen = storedParts.reduce((acc: number, p: any) => acc + (p && p.type === "text" ? String(p.text ?? "").length : 0), 0);
+            const contentLen = typeof msg.content === "string" ? msg.content.trim().length : 0;
+            if (contentLen > joinedTextLen + 200) {
+              try { localStorage.removeItem(`flux-parts-${msg.id}`); } catch {}
+              // Do not attach stale parts — render content directly instead.
+            } else {
+              (msg as any).parts = storedParts;
+            }
           } else if (!(msg as any).parts && Array.isArray(storedThoughtProcess) && storedThoughtProcess.length) {
             const parts: MessagePart[] = [];
             let lastTodosIdx = -1;
