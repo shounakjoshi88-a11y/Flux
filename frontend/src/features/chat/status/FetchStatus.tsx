@@ -44,13 +44,16 @@ export function FetchStatus({
 
   const clean = cleanUrl(url);
   const domain = url ? getDomain(url) : "";
+  // Only a real page title (or PDF filename) makes a distinct heading —
+  // without one, show "Fetched: <host>" and keep the card to a single line.
+  const hasTitle = typeof title === "string" && title.trim().length > 0;
   const label = isFetching
     ? (typeof status.message === "string" && status.message.startsWith("Parsing")
         ? status.message
-        : `Fetching ${clean || "content"}…`)
+        : `Fetching ${clean || "content"}`)
     : isError
       ? `Couldn't fetch ${clean || "page"}`
-      : `Fetched: ${title || clean || "page"}`;
+      : `Fetched: ${hasTitle ? title : clean}`;
 
   if (isError) {
     return (
@@ -104,19 +107,25 @@ export function FetchStatus({
             rel="noreferrer noopener"
             className="group/cardrow -mx-1.5 flex items-center gap-3 rounded-md px-1.5 py-1.5 transition-colors hover:bg-white/[0.03]"
           >
-            <Favicon url={url} className="size-5" />
+            <Favicon url={url} size={20} />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[13px] font-medium leading-[18px] text-[var(--text-primary)]">
-                {title || clean}
+                {hasTitle ? title : clean}
               </span>
-              <span className="block truncate text-[12px] leading-[16px] text-[#eba188] underline-offset-2 group-hover/cardrow:underline">
-                {clean}
+              {hasTitle && (
+                <span className="block truncate text-[12px] leading-[16px] text-[#eba188] underline-offset-2 group-hover/cardrow:underline">
+                  {clean}
+                </span>
+              )}
+            </span>
+            {hasTitle ? (
+              <span className="flex shrink-0 items-center gap-1.5 font-mono text-[11px] text-[var(--text-secondary)]">
+                <span className="hidden sm:inline">{domain}</span>
+                <LinkIcon cls="size-3.5 opacity-70 transition-opacity group-hover/cardrow:opacity-100" />
               </span>
-            </span>
-            <span className="flex shrink-0 items-center gap-1.5 font-mono text-[11px] text-[var(--text-secondary)]">
-              <span className="hidden sm:inline">{domain}</span>
-              <LinkIcon cls="size-3.5 opacity-70 transition-opacity group-hover/cardrow:opacity-100" />
-            </span>
+            ) : (
+              <LinkIcon cls="size-3.5 shrink-0 text-[var(--text-secondary)] opacity-70 transition-opacity group-hover/cardrow:opacity-100" />
+            )}
           </a>
         </ToolSection>
       </ToolPanel>

@@ -125,17 +125,17 @@ export function createResearchTools(ctx: ToolContext) {
                     }
 
                     // Completed — emit the title so the UI renders
-                    // "Fetched: <title>" instead of the eternal "Fetching…".
+                    // "Fetched: <title>" instead of the eternal "Fetching".
+                    // Only a real page <title> (or a PDF/DOCX filename) counts —
+                    // no host+path pseudo-title; the UI shows the clean URL once.
                     const urlObj = (() => { try { return new URL(trimmed); } catch { return null; } })();
                     const seg = urlObj?.pathname.split('/').filter(Boolean).pop() ?? '';
                     const isFileish = /\.(pdf|docx?|txt|csv|json|md|html?|xlsx?|pptx?|zip)$/i.test(seg);
-                    const fallbackTitle = urlObj
-                        ? (isFileish ? seg : `${urlObj.host}${urlObj.pathname.replace(/\/+$/, '')}`.slice(0, 90))
-                        : trimmed.slice(0, 90);
+                    const finalTitle = pageTitle || (isFileish ? seg : '');
                     writer.status(
                         'reading',
                         'Fetched',
-                        { url: trimmed, title: pageTitle || fallbackTitle, kb: Math.round(rawBuf.length / 1024), phase: 'fetched' },
+                        { url: trimmed, ...(finalTitle ? { title: finalTitle } : {}), kb: Math.round(rawBuf.length / 1024), phase: 'fetched' },
                         state.thoughtProcess,
                     );
                     return `[CONTENT FROM ${trimmed}]\n${extracted}\n\n---\nUse this content to answer the user. It came directly from the URL, not from a search snippet.`;
