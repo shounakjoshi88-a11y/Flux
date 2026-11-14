@@ -5,22 +5,8 @@
  * manager mock, and the feature / use-case copy blocks.
  */
 import { motion } from "framer-motion";
-import {
-  ArrowRight,
-  Brain,
-  CheckCircle2,
-  ChevronDown,
-  Copy,
-  ExternalLink,
-  Globe,
-  Layers,
-  Network,
-  RefreshCw,
-  Search,
-  ThumbsDown,
-  ThumbsUp,
-  Volume2,
-} from "lucide-react";
+import { Brain, Layers, Network, RefreshCw, ThumbsDown, ThumbsUp, Volume2 } from "lucide-react";
+import { IconCheck, IconChevronDown, IconChevronRight, IconCopy, IconExternal, IconGlobe, IconSearch } from "../layout/anthropicIcons.tsx";
 import { EASE } from "./motion";
 
 export function DeepDiveGraphVisual() {
@@ -100,7 +86,7 @@ export function MemoryManagerMock() {
 
       <div className="relative rounded-xl border border-primary/40 bg-card backdrop-blur-xl shadow-[0_0_30px_rgba(204,120,92,0.15)] p-5 overflow-hidden">
         <div className="absolute top-0 right-0 px-2 py-1 bg-primary/10 text-primary text-[9px] font-mono tracking-wider flex items-center gap-1">
-          <CheckCircle2 className="size-2" /> VERIFIED
+          <IconCheck className="size-2" /> VERIFIED
         </div>
         <div className="flex items-center gap-2 mb-3">
           <Network className="size-4 text-primary" />
@@ -121,7 +107,7 @@ export function MemoryManagerMock() {
 
 export const FEATURES = [
   {
-    icon: Search,
+    icon: IconSearch,
     title: "Agentic Search",
     description: "Plans, searches, and checks its own findings before answering. Not a single guess, a verified one.",
   },
@@ -143,7 +129,7 @@ export const FEATURES = [
 ];
 
 export const USE_CASES = [
-  { icon: Search, title: "Research Copilot", desc: "For news, tech, and geopolitics." },
+  { icon: IconSearch, title: "Research Copilot", desc: "For news, tech, and geopolitics." },
   { icon: Layers, title: "System Design", desc: "For AI pipelines, caching, and routing." },
   { icon: Brain, title: "Learning Companion", desc: "For CS, math, and cybersecurity." },
   { icon: Network, title: "Misinformation Checker", desc: "Verify viral claims with citations." },

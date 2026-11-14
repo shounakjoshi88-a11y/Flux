@@ -1,5 +1,6 @@
+import { IconChevronDown } from "../layout/anthropicIcons.tsx";
 import React, { useState, useEffect, useRef } from "react";
-import { ChevronDown } from "lucide-react";
+
 import { LANG_COLORS } from "./icons";
 
 
@@ -321,7 +322,7 @@ export function TerminalOutputSection({
         <span className="text-[11px] text-[var(--text-muted)] font-mono tracking-wide">{title}</span>
         <span className="text-[10px] text-[var(--text-muted)]/60 font-mono">{lineCount} {lineCount === 1 ? 'line' : 'lines'}</span>
         <span className="ml-auto flex items-center gap-0.5 text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
-          <ChevronDown className={`size-3 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+          <IconChevronDown className={`size-3 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
           {isOpen ? 'hide' : 'show'}
         </span>
       </button>
@@ -479,7 +480,7 @@ export function FileCodeBlock({
           </span>
           {/* Expand chevron */}
           {hasContent && (
-            <ChevronDown
+            <IconChevronDown
               className={`size-3.5 text-[var(--text-muted)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
             />
           )}

@@ -1,7 +1,8 @@
 // src/components/MarkdownPreview.tsx
 import React from "react";
 import ReactMarkdown from "react-markdown";
-import { FileText, Download, X } from "lucide-react";
+import { FileText } from "lucide-react";
+import { IconClose, IconDownload } from "../layout/anthropicIcons.tsx";
 
 interface MarkdownPreviewProps {
   base64: string;
@@ -32,10 +33,10 @@ export function MarkdownPreview({ base64, filename, onClose, onDownload }: Markd
 
         <div className="flex items-center gap-2">
           <button onClick={onDownload} className="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-muted-foreground hover:text-foreground transition-all">
-            <Download className="size-4" />
+            <IconDownload className="size-4" />
           </button>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-muted-foreground hover:text-foreground transition-all">
-            <X className="size-4" />
+            <IconClose className="size-4" />
           </button>
         </div>
       </div>

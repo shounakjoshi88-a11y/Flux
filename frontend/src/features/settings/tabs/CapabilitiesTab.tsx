@@ -5,7 +5,8 @@
  * memory manager (which replaces the panel while `showMemoryManager` is
  * true), plus the tool-access and connector-discovery options.
  */
-import { ArrowLeft, Brain, Loader2, Trash2 } from "lucide-react";
+import { Brain, Loader2 } from "lucide-react";
+import { IconChevronLeft, IconTrash } from "../../layout/anthropicIcons.tsx";
 import type { MemoryItem } from "../settingsMemory";
 import { ToggleRow } from "../ToggleRow";
 /**
@@ -65,7 +66,7 @@ export function CapabilitiesTab({
     <div className="max-w-2xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <button onClick={() => setShowMemoryManager(false)} className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition">
-          <ArrowLeft className="size-4" />
+          <IconChevronLeft className="size-4" />
         </button>
         <h3 className="text-lg font-semibold text-[var(--text-primary)]">Memory Manager</h3>
       </div>
@@ -88,7 +89,7 @@ export function CapabilitiesTab({
           </button>
         </div>
       ) : (
-        <div className="space-y-2">{memories.map((memory) => (<div key={memory.id} className="flex items-start justify-between gap-4 p-4 rounded-lg bg-[var(--bg-secondary)] border border-[var(--surface-border)] hover:border-[var(--surface-border)] transition-all duration-200 group"><div className="flex-1 min-w-0"><div className="flex items-center gap-2 mb-1"><span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[var(--accent)]/10 text-[var(--accent)]">{memory.category}</span><span className="text-[10px] text-[var(--text-primary)]/40">{Math.round(memory.importance * 100)}% importance</span></div><p className="text-sm text-[var(--text-primary)] leading-relaxed">{memory.fact}</p><p className="text-[10px] text-[var(--text-primary)]/40 mt-1.5">{new Date((memory as any).createdAt || memory.created_at || new Date()).toLocaleString()}</p></div><button onClick={() => handleDeleteMemory(memory.id)} disabled={deletingMemoryId === memory.id} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-[var(--text-primary)]/40 hover:text-red-500 transition-all duration-200 opacity-0 group-hover:opacity-100 flex-shrink-0">{deletingMemoryId === memory.id ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}</button></div>))}</div>
+        <div className="space-y-2">{memories.map((memory) => (<div key={memory.id} className="flex items-start justify-between gap-4 p-4 rounded-lg bg-[var(--bg-secondary)] border border-[var(--surface-border)] hover:border-[var(--surface-border)] transition-all duration-200 group"><div className="flex-1 min-w-0"><div className="flex items-center gap-2 mb-1"><span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[var(--accent)]/10 text-[var(--accent)]">{memory.category}</span><span className="text-[10px] text-[var(--text-primary)]/40">{Math.round(memory.importance * 100)}% importance</span></div><p className="text-sm text-[var(--text-primary)] leading-relaxed">{memory.fact}</p><p className="text-[10px] text-[var(--text-primary)]/40 mt-1.5">{new Date((memory as any).createdAt || memory.created_at || new Date()).toLocaleString()}</p></div><button onClick={() => handleDeleteMemory(memory.id)} disabled={deletingMemoryId === memory.id} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-[var(--text-primary)]/40 hover:text-red-500 transition-all duration-200 opacity-0 group-hover:opacity-100 flex-shrink-0">{deletingMemoryId === memory.id ? <Loader2 className="size-4 animate-spin" /> : <IconTrash className="size-4" />}</button></div>))}</div>
       )}
     </div>
   );

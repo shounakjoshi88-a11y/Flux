@@ -1,16 +1,7 @@
 // Agent Status Bar ΓÇö shows session state, capabilities, mode switcher
 import { motion } from "framer-motion";
-import {
-  Radio,
-  Wifi,
-  WifiOff,
-  LoaderCircle,
-  CheckCircle2,
-  AlertCircle,
-  Zap,
-  ListChecks,
-  Shield,
-} from "lucide-react";
+import { Radio, Wifi, WifiOff, LoaderCircle, AlertCircle, Zap, ListChecks, Shield } from "lucide-react";
+import { IconCheck } from "../layout/anthropicIcons.tsx";
 import type { AgentMode } from "@/hooks/useAgentSession";
 
 type AgentStatusBarProps = {
@@ -29,7 +20,7 @@ const STATE_CONFIG: Record<string, { color: string; bg: string; icon: any; label
   awaiting_permission: { color: "text-amber-400", bg: "bg-amber-400/10", icon: Shield, label: "Awaiting approval" },
   cooldown: { color: "text-zinc-400", bg: "bg-zinc-400/10", icon: LoaderCircle, label: "Ending session..." },
   error: { color: "text-red-400", bg: "bg-red-400/10", icon: AlertCircle, label: "Error" },
-  finished: { color: "text-zinc-500", bg: "bg-zinc-500/10", icon: CheckCircle2, label: "Finished" },
+  finished: { color: "text-zinc-500", bg: "bg-zinc-500/10", icon: IconCheck, label: "Finished" },
 };
 
 export default function AgentStatusBar({

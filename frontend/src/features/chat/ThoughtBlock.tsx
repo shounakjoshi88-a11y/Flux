@@ -1,6 +1,7 @@
+import { IconChevronDown } from "../layout/anthropicIcons.tsx";
 import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { ChevronDown } from "lucide-react";
+
 import { MessageRenderer } from "./MessageRenderer";
 import { useElapsedSeconds } from "./TerminalBlock";
 import { ClockIcon } from "./icons";
@@ -271,7 +272,7 @@ export function ThoughtBlock({
                         ))}
                       </span>
                     )}
-                    <ChevronDown className={`size-3.5 text-[var(--text-secondary)]/70 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+                    <IconChevronDown className={`size-3.5 text-[var(--text-secondary)]/70 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
                   </span>
                 </button>
               </div>

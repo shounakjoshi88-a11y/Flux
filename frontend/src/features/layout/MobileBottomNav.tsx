@@ -1,5 +1,7 @@
-import { MessageSquare, History, Search, Plus, Component, Network, Newspaper, Bot, Users, Settings, LogOut, Sun, Moon, X } from "lucide-react";
+import { MessageSquare, Component, Network, Newspaper, Bot, Sun, Moon } from "lucide-react";
+import { IconClose, IconExternal, IconGear, IconHistory, IconPeople, IconPlus, IconSearch } from "./anthropicIcons";
 import { motion, AnimatePresence } from "framer-motion";
+import type { ComponentType } from "react";
 
 interface MobileBottomNavProps {
   activeScreen: "chat" | "history" | "search";
@@ -8,11 +10,11 @@ interface MobileBottomNavProps {
   onCreateThread: () => void;
 }
 
-const navItems = [
+const navItems: { key: "chat" | "history" | "search"; icon: ComponentType<{ className?: string }>; label: string }[] = [
   { key: "chat", icon: MessageSquare, label: "Chat" },
-  { key: "history", icon: History, label: "History" },
-  { key: "search", icon: Search, label: "Search" },
-] as const;
+  { key: "history", icon: IconHistory, label: "History" },
+  { key: "search", icon: IconSearch, label: "Search" },
+];
 
 export function MobileBottomNav({
   activeScreen,
@@ -98,7 +100,7 @@ export function MobileSidebarDrawer({
             <div className="flex items-center justify-between px-4 py-4 border-b border-sidebar-border">
               <span className="text-sm font-semibold text-sidebar-foreground">Flux</span>
               <button onClick={onClose} className="p-1.5 hover:bg-sidebar-accent rounded-lg text-sidebar-foreground/50 hover:text-sidebar-foreground">
-                <X className="size-4" />
+                <IconClose className="size-4" />
               </button>
             </div>
 
@@ -107,7 +109,7 @@ export function MobileSidebarDrawer({
                 { icon: Component, label: "Artifacts", onClick: onArtifactsOpen },
                 { icon: Network, label: "Knowledge Graph", onClick: onWikiOpen },
                 { icon: Newspaper, label: "Live News", onClick: onNewsOpen },
-                { icon: Users, label: "Team Mode", onClick: onTeamOpen },
+                { icon: IconPeople, label: "Team Mode", onClick: onTeamOpen },
                 { icon: Bot, label: "Custom Agents", onClick: onCustomAgentsOpen },
               ].map(({ icon: Icon, label, onClick }) => (
                 <button
@@ -133,13 +135,13 @@ export function MobileSidebarDrawer({
                 onClick={() => { onSettingsOpen(); onClose(); }}
                 className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition"
               >
-                <Settings className="size-4" /> Settings
+                <IconGear className="size-4" /> Settings
               </button>
               <button
                 onClick={onLogout}
                 className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm text-red-400/80 hover:text-red-400 hover:bg-red-500/10 transition"
               >
-                <LogOut className="size-4" /> Logout
+                <IconExternal className="size-4" /> Logout
               </button>
               {userEmail && (
                 <div className="px-3 py-2 text-xs text-sidebar-foreground/40 truncate">{userEmail}</div>

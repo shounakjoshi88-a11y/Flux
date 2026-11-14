@@ -2,19 +2,8 @@
 import { createClient } from "../lib/client";
 import { AnimatePresence, motion } from "framer-motion";
 import type { User } from "@supabase/supabase-js";
-import {
-  Globe,
-  Image,
-  Check,
-  LoaderCircle,
-  X,
-  FileText,
-  Users,
-  Bot,
-  Pencil,
-  Trash2,
-  ChevronDown,
-} from "lucide-react";
+import { LoaderCircle, FileText, Bot, Pencil } from "lucide-react";
+import { IconCheck, IconChevronDown, IconClose, IconGlobe, IconImage, IconPeople, IconTrash } from "../features/layout/anthropicIcons.tsx";
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -1223,7 +1212,7 @@ export default function Dashboard() {
           <SlideOverPanel
             isPerfLow={isPerfLow}
             title="HTML Preview"
-            icon={<Globe className="size-4 text-orange-500" />}
+            icon={<IconGlobe className="size-4 text-orange-500" />}
             widthClass="sm:w-[600px]"
             headerClassName="flex items-center justify-between px-4 py-3 border-b border-black/5 dark:border-white/10 shrink-0"
             bodyClassName="flex-1 bg-white"

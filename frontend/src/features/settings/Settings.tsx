@@ -7,14 +7,8 @@ import { CapabilitiesTab } from "./tabs/CapabilitiesTab";
 import { IntegrationsTab } from "./tabs/IntegrationsTab";
 import type { MemoryItem } from "./settingsMemory";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import {
-  User,
-  Shield,
-  X,
-  Check,
-  Brain,
-  Plug,
-} from "lucide-react";
+import { User, Shield, Brain, Plug } from "lucide-react";
+import { IconCheck, IconClose } from "../layout/anthropicIcons.tsx";
 import { createClient } from "../../lib/client";
 import { BACKEND_URL } from "../../lib/config";
 import { usePerformance } from "../../lib/performance-context";
@@ -528,7 +522,7 @@ export function Settings({
             <div className={`${isMobile ? "w-full border-b border-[var(--surface-border)] bg-[var(--bg-secondary)]/80 px-3 py-2.5 gap-1.5 overflow-x-auto no-scrollbar sticky top-0 z-10 flex items-center" : "w-56 flex-shrink-0 border-r border-white/10 dark:border-white/5 bg-white/60 dark:bg-[var(--bg-secondary)] backdrop-blur-xl p-2 flex flex-col h-full"}`}>
               <div className="flex items-center justify-between px-3 py-4">
                 <h2 className="text-lg font-semibold text-[var(--text-primary)]">Settings</h2>
-                <button onClick={onClose} className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition-all duration-200 text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]"><X className="size-5" /></button>
+                <button onClick={onClose} className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition-all duration-200 text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]"><IconClose className="size-5" /></button>
               </div>
               <div className="space-y-1 flex-1 overflow-y-auto custom-scrollbar">
                 {tabs.map(tab => (
@@ -543,7 +537,7 @@ export function Settings({
                   {savedMessage && (
                     <motion.div initial={{ opacity: 0, y: 6, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 6, scale: 0.95 }}
                       className={`flex items-center justify-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full ${savedMessage.startsWith("Error") ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400" : "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"}`}>
-                      <Check className="size-3" />{savedMessage}
+                      <IconCheck className="size-3" />{savedMessage}
                     </motion.div>
                   )}
                 </AnimatePresence>

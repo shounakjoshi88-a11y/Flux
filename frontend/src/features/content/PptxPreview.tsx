@@ -2,7 +2,8 @@
 // Enhanced In-house PPTX renderer — support for Tables, Lines, and Theme Colors
 import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, X, Download, Loader2, AlertCircle, Presentation as PresentationIcon } from "lucide-react";
+import { Loader2, AlertCircle, Presentation as PresentationIcon } from "lucide-react";
+import { IconChevronLeft, IconChevronRight, IconClose, IconDownload } from "../layout/anthropicIcons.tsx";
 import JSZip from "jszip";
 
 // ─── Types ────────────────────────────────────────────────────
@@ -320,8 +321,8 @@ export function PptxPreview({ base64, filename, onClose, onDownload }: { base64:
           <span className="text-sm font-medium truncate">{filename}</span>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={onDownload} className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5"><Download className="size-4" /></button>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5"><X className="size-4" /></button>
+          <button onClick={onDownload} className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5"><IconDownload className="size-4" /></button>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5"><IconClose className="size-4" /></button>
         </div>
       </div>
       
@@ -342,9 +343,9 @@ export function PptxPreview({ base64, filename, onClose, onDownload }: { base64:
               </motion.div>
             </AnimatePresence>
             <div className="flex items-center justify-center gap-4 mt-6">
-              <button disabled={slide === 0} onClick={() => setSlide(s => s - 1)} className="p-2 rounded-full hover:bg-black/5 disabled:opacity-20"><ChevronLeft /></button>
+              <button disabled={slide === 0} onClick={() => setSlide(s => s - 1)} className="p-2 rounded-full hover:bg-black/5 disabled:opacity-20"><IconChevronLeft /></button>
               <span className="text-xs font-medium tabular-nums">{slide + 1} / {pres.slides.length}</span>
-              <button disabled={slide === pres.slides.length - 1} onClick={() => setSlide(s => s + 1)} className="p-2 rounded-full hover:bg-black/5 disabled:opacity-20"><ChevronRight /></button>
+              <button disabled={slide === pres.slides.length - 1} onClick={() => setSlide(s => s + 1)} className="p-2 rounded-full hover:bg-black/5 disabled:opacity-20"><IconChevronRight /></button>
             </div>
           </div>
         </div>

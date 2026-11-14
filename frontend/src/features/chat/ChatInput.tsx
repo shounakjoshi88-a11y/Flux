@@ -1,14 +1,7 @@
 // src/components/ChatInput.tsx
 import { AnimatePresence, motion } from "framer-motion";
-import { HardDrive, X } from "lucide-react";
-import {
-  IconArrowUp,
-  IconChevronDown,
-  IconGlobe,
-  IconMic,
-  IconPlus,
-  IconStop,
-} from "../layout/anthropicIcons";
+import { HardDrive } from "lucide-react";
+import { IconArrowUp, IconChevronDown, IconGlobe, IconMic, IconPlus, IconStop, IconClose } from "../layout/anthropicIcons";
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import type { AttachedFile } from "@/types";
 import { marked } from "marked";
@@ -403,15 +396,28 @@ export function ChatInput({
      meta row under the box once a conversation is running. */
   const modelControl = (dense = false) => {
     if (hideModelSelector) return null;
+    // Two-tone label like claude.ai's chip: model name bright, tier dimmed
+    // ("DeepSeek V4" bright, "Pro" dimmed).
+    const bare = currentModelLabel.replace(/\s*\([^)]*\)/g, "");
+    const words = bare.split(" ");
+    const tier = words.length > 1 ? words.pop()! : "";
+    const main = words.join(" ");
     return (
       <div className="relative model-selector">
         <button
           onClick={() => setModelDropdownOpen((prev) => !prev)}
           className={dense
-            ? "flex items-center gap-1 text-[12px] leading-[16px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition"
+            ? "flex h-6 items-center gap-1 rounded-[6px] px-2 text-[13px] leading-[19px] font-[435] text-[var(--text-primary)]/90 hover:bg-[var(--surface-bg)] transition"
             : "flex h-7 items-center gap-1 rounded-full px-2 text-[14px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-bg)] transition"}
         >
-          <span className="max-w-[125px] truncate">{currentModelLabel.replace(/\s*\([^)]*\)/g, "")}</span>
+          {dense ? (
+            <span className="max-w-[140px] truncate">
+              <span className="text-[var(--text-primary)]/90">{main}</span>
+              {tier && <span className="text-[var(--text-muted)]"> {tier}</span>}
+            </span>
+          ) : (
+            <span className="max-w-[125px] truncate">{bare}</span>
+          )}
           {!dense && <IconChevronDown className="size-3.5 opacity-50" />}
         </button>
         {isPerfLow ? (
@@ -544,7 +550,7 @@ export function ChatInput({
               onClick={() => setPreviewImage(null)}
               className="absolute top-2 right-2 size-8 flex items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
             >
-              <X className="size-4" />
+              <IconClose className="size-4" />
             </button>
           </div>
         </div>
@@ -586,7 +592,7 @@ export function ChatInput({
                       onClick={() => setAttachedFiles(attachedFiles.filter((_, i) => i !== idx))}
                       className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-0.5 rounded hover:bg-[var(--surface-bg)]"
                     >
-                      <X className="size-3" />
+                      <IconClose className="size-3" />
                     </button>
                   </div>
                 </div>
@@ -614,7 +620,7 @@ export function ChatInput({
                       onClick={() => setAttachedFiles(attachedFiles.filter((_, i) => i !== idx))}
                       className="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80"
                     >
-                      <X className="size-3" />
+                      <IconClose className="size-3" />
                     </button>
                   </div>
                 ) : (
@@ -638,7 +644,7 @@ export function ChatInput({
                         onClick={() => setAttachedFiles(attachedFiles.filter((_, i) => i !== idx))}
                         className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-0.5 rounded hover:bg-[var(--surface-bg)]"
                       >
-                        <X className="size-3" />
+                        <IconClose className="size-3" />
                       </button>
                     </div>
                   </div>
@@ -675,10 +681,13 @@ export function ChatInput({
     </div>
 
     {/* Meta row: Claude keeps this below the composer box, not inside it.
-        In conversation the model picker lives here instead of in the box. */}
+        In conversation the model picker lives here instead of in the box.
+        Measured claude.ai: 13px/17px muted disclaimer with hover underline,
+        and an h24 br6 chip (fs13/19, weight 435) with the model name bright
+        and the effort/tier suffix dimmed. */}
     {!hero && (
-      <div className="mx-auto mt-2 flex w-full max-w-[768px] items-center justify-between px-1 text-[12px] leading-[16px] text-[var(--text-muted)]">
-        <span className="truncate">Flux can make mistakes. Please double-check responses.</span>
+      <div className="mx-auto mt-2 flex w-full max-w-[768px] items-center justify-between px-2 text-[13px] leading-[17px]">
+        <span className="truncate text-[var(--composer-meta)] hover:underline cursor-default">Flux is AI and can make mistakes. Please double-check responses.</span>
         {modelControl(true)}
       </div>
     )}

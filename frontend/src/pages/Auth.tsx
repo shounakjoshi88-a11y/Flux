@@ -1,6 +1,7 @@
 import { createClient } from "../lib/client";
 import { Button } from "../components/ui/button";
-import { Loader2, Search, Network, Brain, Layers, ChevronDown, ArrowRight, CheckCircle2, Globe, BookOpen, ExternalLink, Copy, Check, Volume2, RefreshCw, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Loader2, Network, Brain, Layers, BookOpen, Volume2, RefreshCw, ThumbsUp, ThumbsDown } from "lucide-react";
+import { IconCheck, IconChevronDown, IconChevronRight, IconCopy, IconExternal, IconGlobe, IconSearch } from "../features/layout/anthropicIcons.tsx";
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
@@ -193,7 +194,7 @@ export default function Auth() {
             animate={reducedMotion ? undefined : { y: [0, 6, 0] }}
             transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
           >
-            <ChevronDown className="size-5 text-muted-foreground/50" />
+            <IconChevronDown className="size-5 text-muted-foreground/50" />
           </motion.div>
         </motion.div>
       </section>
@@ -365,7 +366,7 @@ export default function Auth() {
                 </div>
                 <h3 className="text-sm font-medium text-foreground">{use_case.title}</h3>
                 <p className="text-xs text-muted-foreground mt-1">{use_case.desc}</p>
-                <ArrowRight className="size-4 mt-4 text-muted-foreground/50 group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                <IconChevronRight className="size-4 mt-4 text-muted-foreground/50 group-hover:text-primary group-hover:translate-x-1 transition-all" />
               </motion.div>
             ))}
           </div>

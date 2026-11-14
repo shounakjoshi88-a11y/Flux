@@ -7,19 +7,8 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  BookOpen,
-  Check,
-  Copy,
-  ExternalLink,
-  Globe,
-  Loader2,
-  RefreshCw,
-  Search,
-  ThumbsDown,
-  ThumbsUp,
-  Volume2,
-} from "lucide-react";
+import { BookOpen, Loader2, RefreshCw, ThumbsDown, ThumbsUp, Volume2 } from "lucide-react";
+import { IconCheck, IconCopy, IconExternal, IconGlobe, IconSearch } from "../layout/anthropicIcons.tsx";
 import { MessageRenderer } from "@/features/chat/MessageRenderer";
 import { EASE } from "./motion";
 import { FluxLogo } from "./FluxLogo";
@@ -314,7 +303,7 @@ export function LiveDemoChat() {
                       exit={{ opacity: 0, height: 0 }}
                       className="py-2 min-w-0 flex items-center gap-2"
                     >
-                      <Search className="size-3.5 text-primary animate-spin" style={{ animationDuration: '2s' }} />
+                      <IconSearch className="size-3.5 text-primary animate-spin" style={{ animationDuration: '2s' }} />
                       <span className="text-[13px] text-muted-foreground leading-snug font-medium">Searching live web for "DeepMind humanoid robots shut down"</span>
                     </motion.div>
                   )}
@@ -330,7 +319,7 @@ export function LiveDemoChat() {
                       className="space-y-2 py-2 min-w-0"
                     >
                       <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
-                        <Globe className="size-3.5 text-primary" />
+                        <IconGlobe className="size-3.5 text-primary" />
                         <span className="font-medium">Found 4 sources</span>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -367,7 +356,7 @@ export function LiveDemoChat() {
                       </div>
                       {MOCK_SOURCES.slice(0, 2).map((src, i) => (
                         <div key={i} className="flex items-center gap-2 text-xs text-foreground/80 hover:text-primary cursor-pointer group">
-                          <ExternalLink className="size-3 opacity-50 group-hover:opacity-100" />
+                          <IconExternal className="size-3 opacity-50 group-hover:opacity-100" />
                           <span className="truncate">{src.title}</span>
                         </div>
                       ))}
@@ -405,7 +394,7 @@ export function LiveDemoChat() {
                     >
                       <div className="flex items-center gap-0.5 pt-2">
                         <button onClick={handleCopy} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
-                          {copied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
+                          {copied ? <IconCheck className="size-3.5 text-emerald-500" /> : <IconCopy className="size-3.5" />}
                         </button>
                         <button className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
                           <Volume2 className="size-3.5" />

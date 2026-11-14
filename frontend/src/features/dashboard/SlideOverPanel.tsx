@@ -12,8 +12,9 @@
  * Public API:
  *   <SlideOverPanel {...props} />
  */
+import { IconClose } from "../layout/anthropicIcons.tsx";
 import { AnimatePresence, motion } from "framer-motion";
-import { X } from "lucide-react";
+
 import type { ReactNode } from "react";
 
 export interface SlideOverPanelProps {
@@ -63,7 +64,7 @@ export function SlideOverPanel({
           className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition"
           aria-label="Close"
         >
-          <X className="size-4" />
+          <IconClose className="size-4" />
         </button>
       </div>
     </div>

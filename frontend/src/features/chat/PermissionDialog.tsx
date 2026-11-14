@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Check, X, AlertTriangle } from "lucide-react";
+import { Shield, AlertTriangle } from "lucide-react";
+import { IconCheck, IconClose } from "../layout/anthropicIcons.tsx";
 import { BACKEND_URL } from "../../lib/config";
 import { createClient } from "../../lib/client";
 import type { PermissionRequest } from "../../types";
@@ -91,14 +92,14 @@ export default function PermissionDialog({ request, onRespond }: PermissionDialo
                 onClick={() => handleRespond(true)}
                 className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-sm font-medium transition-colors"
               >
-                <Check className="size-3.5" />
+                <IconCheck className="size-3.5" />
                 Allow
               </button>
               <button
                 onClick={() => handleRespond(false)}
                 className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium transition-colors"
               >
-                <X className="size-3.5" />
+                <IconClose className="size-3.5" />
                 Deny
               </button>
             </div>

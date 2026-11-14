@@ -1,5 +1,6 @@
+import { IconChevronDown, IconDownload } from "../layout/anthropicIcons.tsx";
 import React, { useState } from "react";
-import { ChevronDown, Download } from "lucide-react";
+
 import { getDomain, fixMalformedTags } from "../../lib/chat-utils";
 import DOMPurify from "dompurify";
 import { CodeBlock } from "./CodeRenderers";
@@ -213,7 +214,7 @@ export function renderPlainBlocks(text: string, onCitationClick: any, sources: S
                 onClick={() => downloadTableAsCsv(rows, tblIdx)}
                 className="p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               >
-                <Download className="h-3.5 w-3.5" />
+                <IconDownload className="h-3.5 w-3.5" />
               </button>
             </div>
           </div>

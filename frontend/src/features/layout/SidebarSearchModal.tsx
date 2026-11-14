@@ -10,9 +10,9 @@
  *   <SidebarSearchModal {...props} />
  */
 import { AnimatePresence, motion } from "framer-motion";
-import { CircleX, History, Loader2, MessageSquare, X } from "lucide-react";
+import { Loader2, MessageSquare } from "lucide-react";
 import type { RefObject } from "react";
-import { IconSearch } from "./anthropicIcons";
+import { IconSearch, IconClose, IconHistory } from "./anthropicIcons";
 import { formatSearchDate } from "./sidebar/timeGroups";
 import type { ConversationListItem } from "@/types";
 
@@ -96,7 +96,7 @@ export function SidebarSearchModal({
               onClick={() => onSearchChange("")}
               className="p-1 rounded-md hover:bg-[var(--surface-bg)] transition-colors"
             >
-              <CircleX className="size-4 text-[var(--text-muted)]/60" />
+              <IconClose className="size-4 text-[var(--text-muted)]/60" />
             </button>
           )}
           <div className="w-px h-4 bg-[var(--surface-border)] mx-1" />
@@ -106,7 +106,7 @@ export function SidebarSearchModal({
             className="p-1.5 rounded-lg hover:bg-[var(--surface-bg)] transition-colors"
             aria-label="Close search"
           >
-            <X className="size-4 text-[var(--text-muted)]/60" />
+            <IconClose className="size-4 text-[var(--text-muted)]/60" />
           </button>
         </div>
       </div>
@@ -119,7 +119,7 @@ export function SidebarSearchModal({
       >
         {results.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 gap-2">
-            <History className="size-8 text-[var(--text-muted)]/20" />
+            <IconHistory className="size-8 text-[var(--text-muted)]/20" />
             <p className="text-xs text-[var(--text-muted)]/40">
               {search.trim() ? "No results found" : "No conversations yet"}
             </p>

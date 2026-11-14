@@ -5,8 +5,9 @@
 // real-time, shows exit code + duration, and lists generated files.
 // Matches the TerminalBlock aesthetic from StatusMessage.tsx.
 // ─────────────────────────────────────────────────────────────────────────────
+import { IconChevronDown } from "../layout/anthropicIcons.tsx";
 import { useState, useEffect, useRef } from "react";
-import { ChevronDown } from "lucide-react";
+
 import type { CodeOutputLine } from "../../types";
 import { FileDownloadButton } from "./FileDownloadButton";
 
@@ -329,7 +330,7 @@ export function CodeOutputBlock({
               {outputLines.length} {outputLines.length === 1 ? 'line' : 'lines'}
             </span>
             <span className="ml-auto flex items-center gap-0.5 text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
-              <ChevronDown className={`size-3 transition-transform duration-200 ${showOutput ? 'rotate-180' : ''}`} />
+              <IconChevronDown className={`size-3 transition-transform duration-200 ${showOutput ? 'rotate-180' : ''}`} />
               {showOutput ? 'hide' : 'show'}
             </span>
           </button>

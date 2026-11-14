@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, useCallback, useMemo, createContext, useCo
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Text } from "@react-three/drei";
 import * as THREE from "three";
-import { X, Search, LoaderCircle, RefreshCw, AlertCircle, Network } from "lucide-react";
+import { LoaderCircle, RefreshCw, AlertCircle, Network } from "lucide-react";
+import { IconClose, IconSearch } from "../layout/anthropicIcons.tsx";
 import { BACKEND_URL } from "../../lib/config";
 import { createClient } from "../../lib/client";
 
@@ -730,7 +731,7 @@ export function WikiGraph({ isOpen, onClose }: WikiGraphProps) {
           <button onClick={onClose} style={{
             background: "none", border: "none", cursor: "pointer",
             color: txtMuted, padding: "4px", borderRadius: "4px", display: "flex",
-          }}><X size={17} /></button>
+          }}><IconClose size={17} /></button>
         </div>
       </div>
 
@@ -744,7 +745,7 @@ export function WikiGraph({ isOpen, onClose }: WikiGraphProps) {
           {/* Search */}
           <div style={{ padding: "12px 14px", borderBottom: `1px solid ${borderColor}`, flexShrink: 0 }}>
             <div style={{ position: "relative" }}>
-              <Search size={13} style={{ position: "absolute", left: "9px", top: "50%", transform: "translateY(-50%)", color: searchIcon }} />
+              <IconSearch size={13} style={{ position: "absolute", left: "9px", top: "50%", transform: "translateY(-50%)", color: searchIcon }} />
               <input
                 value={searchQuery}
                 onChange={e => { setSearchQuery(e.target.value); searchNodes(e.target.value); }}
@@ -829,7 +830,7 @@ export function WikiGraph({ isOpen, onClose }: WikiGraphProps) {
                 <button onClick={() => selectNode(null)} style={{
                   background: "none", border: "none", cursor: "pointer",
                   color: txtMuted, padding: "2px", display: "flex", flexShrink: 0,
-                }}><X size={13} /></button>
+                }}><IconClose size={13} /></button>
               </div>
               {selectedNode.description && (
                 <p style={{ fontSize: "11px", color: txtSec, marginTop: "10px", lineHeight: "1.6", fontFamily: "Inter, sans-serif" }}>

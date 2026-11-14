@@ -1,20 +1,8 @@
 // src/components/ArtifactsModal.tsx
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  X,
-  Search,
-  FileText,
-  Presentation,
-  FileType,
-  Download,
-  ExternalLink,
-  Loader2,
-  Inbox,
-  ArrowUpRight,
-  File,
-  Table,
-} from "lucide-react";
+import { FileText, Presentation, FileType, Loader2, Inbox, ArrowUpRight, File, Table } from "lucide-react";
+import { IconClose, IconDownload, IconExternal, IconSearch } from "../layout/anthropicIcons.tsx";
 import { BACKEND_URL } from "../../lib/config";
 import { createClient } from "../../lib/client";
 import mammoth from "mammoth";
@@ -212,7 +200,7 @@ function ArtifactCard({
           title="Download"
           className="p-1 rounded-lg bg-[var(--surface-bg)] hover:bg-[var(--surface-bg)]/80 border border-[var(--surface-border)] text-[var(--text-muted)]/50 hover:text-[var(--text-primary)]/70 transition-all"
         >
-          <Download className="size-3" />
+          <IconDownload className="size-3" />
         </motion.button>
       </div>
     </motion.div>
@@ -412,7 +400,7 @@ export function ArtifactsModal({ isOpen, onClose, onSelectConversation, onPrevie
             {/* Header */}
             <div className="flex items-center gap-3 px-5 py-3.5 border-b border-[var(--surface-border)] shrink-0">
               <div className="flex items-center gap-2 flex-1 bg-[var(--bg-secondary)] border border-[var(--surface-border)] rounded-lg px-3 py-2 focus-within:border-[var(--accent)]/40 transition-colors">
-                <Search className="size-3.5 text-[var(--text-muted)] shrink-0" />
+                <IconSearch className="size-3.5 text-[var(--text-muted)] shrink-0" />
                 <input
                   ref={searchRef}
                   type="text"
@@ -431,7 +419,7 @@ export function ArtifactsModal({ isOpen, onClose, onSelectConversation, onPrevie
                       onClick={() => setSearch("")}
                       className="p-0.5 rounded hover:bg-[var(--surface-bg)] transition-colors"
                     >
-                      <X className="size-3 text-[var(--text-muted)]/60" />
+                      <IconClose className="size-3 text-[var(--text-muted)]/60" />
                     </motion.button>
                   )}
                 </AnimatePresence>
@@ -471,7 +459,7 @@ export function ArtifactsModal({ isOpen, onClose, onSelectConversation, onPrevie
                 onClick={onClose}
                 className="p-1.5 rounded-lg hover:bg-[var(--surface-bg)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all shrink-0"
               >
-                <X className="size-4" />
+                <IconClose className="size-4" />
               </motion.button>
             </div>
 

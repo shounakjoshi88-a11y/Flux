@@ -3,9 +3,10 @@
 // Inline status renderer — redesigned terminal / thought / file / tool_call UIs.
 // Drop-in replacement: same props & exports as the previous version.
 // ─────────────────────────────────────────────────────────────────────────────
+import { IconChevronDown } from "../layout/anthropicIcons.tsx";
 import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { ChevronDown } from "lucide-react";
+
 import { MessageRenderer } from "./MessageRenderer";
 import { calculateReputationScore } from "../../utils/ReputationScore";
 import { SearchIcon, GlobeIcon, BookIcon, LinkIcon, WarnIcon, DoneIcon, ExtractIcon, TerminalIcon, FileIcon, ClockIcon, WikiIcon, PackageIcon, WeatherIcon, WandIcon, ImageIcon, ChartIcon, LANG_COLORS } from "./icons";
@@ -251,7 +252,7 @@ function StatusMessage({
           onClick={() => setDetailOpen(v => !v)}
           className="flex items-center gap-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors mt-1"
         >
-          <ChevronDown className={`size-3 transition-transform duration-200 ${detailOpen ? 'rotate-180' : ''}`} />
+          <IconChevronDown className={`size-3 transition-transform duration-200 ${detailOpen ? 'rotate-180' : ''}`} />
           {detailOpen ? 'Hide details' : 'Show details'}
         </button>
       )}

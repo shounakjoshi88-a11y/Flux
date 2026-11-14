@@ -1,4 +1,5 @@
-import { MessageSquare, X } from "lucide-react";
+import { MessageSquare } from "lucide-react";
+import { IconClose } from "./anthropicIcons";
 import type { ConversationListItem } from "../../types";
 import { SidebarThread } from "./SidebarThread";
 
@@ -38,7 +39,7 @@ export function MobileConversationList({
             New
           </button>
           <button onClick={onClose} className="p-1.5 rounded-lg text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent">
-            <X className="size-4" />
+            <IconClose className="size-4" />
           </button>
         </div>
       </div>

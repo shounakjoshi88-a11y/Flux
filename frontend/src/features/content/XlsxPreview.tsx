@@ -1,7 +1,8 @@
 // src/components/XlsxPreview.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Download, Search, Table as TableIcon, Loader2, X } from "lucide-react";
+import { Table as TableIcon, Loader2 } from "lucide-react";
+import { IconClose, IconDownload, IconSearch } from "../layout/anthropicIcons.tsx";
 import * as XLSX from "xlsx";
 
 interface XlsxPreviewProps {
@@ -70,7 +71,7 @@ export function XlsxPreview({ base64, filename, onClose, onDownload }: XlsxPrevi
 
         <div className="flex items-center gap-2">
           <div className="relative flex items-center bg-black/[0.03] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06] rounded-lg px-2.5 py-1.5 focus-within:border-emerald-500/30 transition-all">
-            <Search className="size-3 text-muted-foreground mr-2" />
+            <IconSearch className="size-3 text-muted-foreground mr-2" />
             <input 
               type="text" 
               placeholder="Search rows..." 
@@ -80,10 +81,10 @@ export function XlsxPreview({ base64, filename, onClose, onDownload }: XlsxPrevi
             />
           </div>
           <button onClick={onDownload} className="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-muted-foreground hover:text-foreground transition-all">
-            <Download className="size-4" />
+            <IconDownload className="size-4" />
           </button>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-muted-foreground hover:text-foreground transition-all">
-            <X className="size-4" />
+            <IconClose className="size-4" />
           </button>
         </div>
       </div>
@@ -116,7 +117,7 @@ export function XlsxPreview({ base64, filename, onClose, onDownload }: XlsxPrevi
         </table>
         {filteredData.length === 0 && (
           <div className="h-64 flex flex-col items-center justify-center opacity-20">
-            <Search className="size-12 mb-4" />
+            <IconSearch className="size-12 mb-4" />
             <p className="text-sm font-bold uppercase tracking-widest">No matching rows</p>
           </div>
         )}

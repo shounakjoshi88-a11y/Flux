@@ -12,12 +12,13 @@
 //   block — no CDN dependency, no network fallback.
 //
 // Unicode math (∮∯∰⨌⨝ℵ₀ℝℂℱ… and the entire Mathematical Alphanumeric Symbols
+import { IconCheck, IconChevronDown, IconCopy, IconDownload } from "../layout/anthropicIcons.tsx";
 // block U+1D400–U+1D7FF) is mapped to native LaTeX commands before rendering.
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { Copy, Check, ChevronDown, Download } from "lucide-react";
+
 import katex from "katex";
 import { InlineMath, DisplayMath } from "./MathRenderer";
 import { renderBlocks } from "./markdownBlocks";

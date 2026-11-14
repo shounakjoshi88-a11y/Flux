@@ -1,5 +1,6 @@
+import { IconChevronDown } from "../layout/anthropicIcons.tsx";
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { ChevronDown } from "lucide-react";
+
 import { StatusMessage } from "./StatusMessage";
 import { TimelineNode } from "./ThoughtBlock";
 import { ThoughtBlock } from "./ThoughtBlock";
@@ -55,7 +56,7 @@ export function SearchStepsGroup({
   }, [innerParts]);
 
   const chevron = (
-    <ChevronDown className={`size-3 text-[var(--text-muted)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+    <IconChevronDown className={`size-3 text-[var(--text-muted)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
   );
 
   return (

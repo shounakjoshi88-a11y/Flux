@@ -1,5 +1,6 @@
+import { IconCheck, IconChevronDown, IconCopy, IconDownload } from "../layout/anthropicIcons.tsx";
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { Copy, Check, ChevronDown, Download } from "lucide-react";
+
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import SmilesDrawer from "smiles-drawer";
@@ -330,7 +331,7 @@ export function CodeBlock({ language, code, onHtmlPreview }: { language: string;
           <span className="rounded-md bg-black/20 dark:bg-white/10 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{language || "text"}</span>
           {code.split("\n").length > 20 && (
             <button onClick={() => setCollapsed(!collapsed)} className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground">
-              <ChevronDown className={`size-3 transition-transform ${collapsed ? "" : "rotate-180"}`} />
+              <IconChevronDown className={`size-3 transition-transform ${collapsed ? "" : "rotate-180"}`} />
               {collapsed ? "Expand" : "Collapse"}
             </button>
           )}
@@ -347,7 +348,7 @@ export function CodeBlock({ language, code, onHtmlPreview }: { language: string;
             </button>
           )}
           <button onClick={handleCopy} className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground">
-            {copied ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+            {copied ? <IconCheck className="size-3.5 text-emerald-400" /> : <IconCopy className="size-3.5" />}
             {copied ? "Copied!" : "Copy"}
           </button>
         </div>

@@ -1,7 +1,8 @@
 // src/components/NewsModal.tsx
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Search, ExternalLink, RefreshCw, Clock, BookOpen } from "lucide-react";
+import { RefreshCw, Clock, BookOpen } from "lucide-react";
+import { IconClose, IconExternal, IconSearch } from "../layout/anthropicIcons.tsx";
 import { BACKEND_URL } from "../../lib/config";
 import { createClient } from "../../lib/client";
 import { MessageRenderer } from "../chat/MessageRenderer";
@@ -229,7 +230,7 @@ function NewsPeekPanel({ url, onClose }: { url: string; onClose: () => void }) {
           </span>
         </div>
         <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 rounded-lg font-semibold" style={{ fontSize: 12, color: P.verm, background: P.vermGlow, border: `1px solid ${P.vermBorder}`, padding: "6px 12px", textDecoration: "none" }}>
-          Open <ExternalLink size={12} />
+          Open <IconExternal size={12} />
         </a>
       </div>
       {/* Content */}
@@ -494,7 +495,7 @@ export function NewsModal({ isOpen, onClose }: NewsModalProps) {
                 )}
                 {search && !searching && (
                   <button onClick={() => handleSearchChange("")} className="rounded p-0.5 transition-colors" style={{ color: P.inkMid }}>
-                    <X size={12} />
+                    <IconClose size={12} />
                   </button>
                 )}
               </div>
@@ -512,7 +513,7 @@ export function NewsModal({ isOpen, onClose }: NewsModalProps) {
                 <span className="hidden sm:inline" style={{ fontSize: 11, fontWeight: 500 }}>Refresh</span>
               </button>
               <button onClick={onClose} className="flex items-center gap-1.5 rounded-lg transition-all" style={{ background: `${P.verm}15`, border: `1px solid ${P.vermBorder}`, padding: "6px 10px", color: P.verm }}>
-                <X size={14} />
+                <IconClose size={14} />
                 <span className="hidden sm:inline" style={{ fontSize: 11, fontWeight: 600 }}>Close</span>
               </button>
             </div>
@@ -600,7 +601,7 @@ export function NewsModal({ isOpen, onClose }: NewsModalProps) {
                               <div className="flex items-center justify-between mt-3 pt-3" style={{ borderTop: `1px solid ${P.borderFaint}` }}>
                                 <span className="font-medium" style={{ fontSize: 10, color: isHov ? P.verm : P.inkFaint }}> {readingTime(item.content)} </span>
                                 <div className="flex items-center justify-center rounded-md transition-all" style={{ width: 22, height: 22, background: isHov ? P.verm : P.inkGhost }}>
-                                  <ExternalLink size={10} color={isHov ? P.bg : P.inkFaint} />
+                                  <IconExternal size={10} color={isHov ? P.bg : P.inkFaint} />
                                 </div>
                               </div>
                             </div>
@@ -628,7 +629,7 @@ export function NewsModal({ isOpen, onClose }: NewsModalProps) {
                     <span className="font-bold tracking-wide" style={{ fontSize: 12, color: P.verm, fontFamily: "'Shippori Mincho', serif" }}> AI Summary </span>
                   </div>
                   <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }} onClick={() => setPeekUrl(selectedArticle.url)} className="flex items-center gap-2 rounded-lg font-semibold" style={{ fontSize: 12, color: P.verm, background: P.vermGlow, border: `1px solid ${P.vermBorder}`, padding: "6px 12px" }}>
-                    Open <ExternalLink size={12} />
+                    Open <IconExternal size={12} />
                   </motion.button>
                 </div>
                 {/* Article meta */}
@@ -682,7 +683,7 @@ export function NewsModal({ isOpen, onClose }: NewsModalProps) {
                 {/* Footer CTA */}
                 <div className="px-5 py-3.5 shrink-0" style={{ borderTop: `1px solid ${P.borderFaint}`, background: `${P.bgPanel}f2` }}>
                   <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.97 }} onClick={() => setPeekUrl(selectedArticle.url)} className="w-full flex items-center justify-center gap-2 font-semibold rounded-lg py-2.5" style={{ fontSize: 12, background: `linear-gradient(135deg, ${P.vermDim}, ${P.verm})`, color: "#fff", border: `1px solid ${P.vermBorder}` }}>
-                    <BookOpen size={14} /> Read Full Article <ExternalLink size={12} />
+                    <BookOpen size={14} /> Read Full Article <IconExternal size={12} />
                   </motion.button>
                 </div>
               </motion.div>

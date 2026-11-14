@@ -39,21 +39,8 @@ function useTypewriter(fullText: string, messageId: string | number): string {
 
   return safeText.slice(0, displayedLength);
 }
-import {
-  CornerDownRight,
-  RefreshCw,
-  ThumbsUp,
-  ThumbsDown,
-  Copy,
-  Check,
-  ChevronDown,
-  Trash2,
-  Headphones,
-  MoreVertical,
-  Pencil,
-  FileDown,
-  X,
-} from "lucide-react";
+import { CornerDownRight, RefreshCw, ThumbsUp, ThumbsDown, Headphones, Pencil, FileDown } from "lucide-react";
+import { IconCheck, IconChevronDown, IconClose, IconCopy, IconMore, IconTrash } from "../layout/anthropicIcons.tsx";
 
 import { FileDownloadButton } from "../content/FileDownloadButton";
 import { InlineImageDisplay, ImageGenerationSkeleton, InlineGenerationIndicator } from "./ImageDisplay";
@@ -374,7 +361,7 @@ export const MessageItem = memo(function MessageItem({
               className="p-1.5 rounded-lg bg-black/20 dark:bg-white/5 hover:bg-black/40 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"
               title="Copy message"
             >
-              {userCopied ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+              {userCopied ? <IconCheck className="size-3.5 text-emerald-400" /> : <IconCopy className="size-3.5" />}
             </button>
             {onDelete && (
               <button
@@ -382,7 +369,7 @@ export const MessageItem = memo(function MessageItem({
                 className="p-1.5 rounded-lg bg-black/20 dark:bg-white/5 hover:bg-red-500/15 text-muted-foreground hover:text-red-400"
                 title="Delete message"
               >
-                <Trash2 className="size-3.5" />
+                <IconTrash className="size-3.5" />
               </button>
             )}
           </div>
@@ -596,7 +583,7 @@ export const MessageItem = memo(function MessageItem({
           {!isStreaming && (
             <>
               <button onClick={handleCopyAnswer} className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/8 transition text-muted-foreground/60 hover:text-foreground" title="Copy">
-                {copied ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+                {copied ? <IconCheck className="size-3.5 text-emerald-400" /> : <IconCopy className="size-3.5" />}
               </button>
               <button onClick={handleTTS} className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/8 transition text-muted-foreground/60 hover:text-foreground" title={isSpeaking ? "Stop" : "Read aloud"}>
                 <Headphones className={`size-3.5 ${isSpeaking ? 'text-accent' : ''}`} />
@@ -606,7 +593,7 @@ export const MessageItem = memo(function MessageItem({
               </button>
               {onDelete && (
                 <button onClick={() => onDelete(message.id)} className="p-1.5 rounded-md hover:bg-red-500/10 transition text-muted-foreground/60 hover:text-red-400" title="Delete message">
-                  <Trash2 className="size-3.5" />
+                  <IconTrash className="size-3.5" />
                 </button>
               )}
             </>
@@ -633,7 +620,7 @@ export const MessageItem = memo(function MessageItem({
               className={`p-1.5 rounded-md transition-all duration-200 text-muted-foreground/60 hover:text-foreground ${liked ? 'text-accent' : ''}`}
               title="Feedback"
             >
-              <MoreVertical className="size-3.5" />
+              <IconMore className="size-3.5" />
             </button>
             {showFeedbackMenu && (
               <>

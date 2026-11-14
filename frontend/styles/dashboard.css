@@ -19,6 +19,7 @@
   --text-primary:      rgba(255,255,255,0.93); /* Claude body text */
   --text-secondary:    #a9a9a9; /* Soft slate grey */
   --text-muted:        #707070; /* Muted grey */
+  --composer-meta:     rgba(255,255,255,0.4); /* Claude disclaimer line */
 
   /* Brand accent - Claude Sunset Clay */
   --accent:            #d97757;
@@ -95,6 +96,7 @@
   --text-primary:      rgba(255,255,255,0.93);
   --text-secondary:    #a9a9a9;
   --text-muted:        #707070;
+  --composer-meta:     rgba(255,255,255,0.4); /* Claude disclaimer line */
   --accent:            #d97757;
   --accent-hover:      #c96647;
   --accent-subtle:     rgba(217,119,87,0.10);
@@ -159,6 +161,7 @@
   --text-primary:      #191919;
   --text-secondary:    rgba(0,0,0,0.75);
   --text-muted:        rgba(0,0,0,0.55);
+  --composer-meta:     rgba(0,0,0,0.45); /* Claude disclaimer line */
 
   /* Brand accent — Claude Light Terracotta */
   --accent:            #c15f3c;

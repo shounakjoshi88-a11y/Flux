@@ -1,6 +1,7 @@
 // src/components/PeekPanel.tsx
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ExternalLink, AlertTriangle, Globe, FileType, FileText, Table } from "lucide-react";
+import { AlertTriangle, FileType, FileText, Table } from "lucide-react";
+import { IconClose, IconExternal, IconGlobe } from "./anthropicIcons";
 import { useState, useEffect } from "react";
 import { PptxPreview } from "../content/PptxPreview";
 import { XlsxPreview } from "../content/XlsxPreview";
@@ -254,7 +255,7 @@ export function PeekPanel({ url, onClose, pdfData, docxData, pptxData, xlsxData,
             ) : isDocx ? (
               <FileText className="size-4 text-blue-500/80" />
             ) : (
-              <Globe className="size-4 text-indigo-500/80" />
+              <IconGlobe className="size-4 text-indigo-500/80" />
             )}
           </div>
           <div className="truncate">
@@ -276,7 +277,7 @@ export function PeekPanel({ url, onClose, pdfData, docxData, pptxData, xlsxData,
               className="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-muted-foreground hover:text-foreground"
               title="Open in new tab"
             >
-              <ExternalLink className="size-4" />
+              <IconExternal className="size-4" />
             </a>
           )}
           {isDocx && (
@@ -288,14 +289,14 @@ export function PeekPanel({ url, onClose, pdfData, docxData, pptxData, xlsxData,
               className="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-muted-foreground hover:text-foreground"
               title="Open in new tab"
             >
-              <ExternalLink className="size-4" />
+              <IconExternal className="size-4" />
             </button>
           )}
           <button
             onClick={onClose}
             className="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-muted-foreground hover:text-foreground"
           >
-            <X className="size-4" />
+            <IconClose className="size-4" />
           </button>
         </div>
       </div>
@@ -360,7 +361,7 @@ export function PeekPanel({ url, onClose, pdfData, docxData, pptxData, xlsxData,
                 className="inline-flex items-center gap-2 text-sm font-medium text-white bg-neutral-900 dark:bg-white dark:text-black rounded-full px-5 py-2.5 hover:opacity-90 transition-opacity shadow-sm"
               >
                 Open PDF in new tab
-                <ExternalLink className="size-3.5" />
+                <IconExternal className="size-3.5" />
               </a>
             ) : (!isPdf && url) && (
               <a
@@ -370,7 +371,7 @@ export function PeekPanel({ url, onClose, pdfData, docxData, pptxData, xlsxData,
                 className="inline-flex items-center gap-2 text-sm font-medium text-white bg-neutral-900 dark:bg-white dark:text-black rounded-full px-5 py-2.5 hover:opacity-90 transition-opacity shadow-sm"
               >
                 Open in new tab
-                <ExternalLink className="size-3.5" />
+                <IconExternal className="size-3.5" />
               </a>
             )}
           </div>

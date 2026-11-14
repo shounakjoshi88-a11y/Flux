@@ -1,5 +1,6 @@
+import { IconClose, IconTrash } from "../layout/anthropicIcons.tsx";
 import React, { useState, useEffect, useMemo } from "react";
-import { X, Trash2 } from "lucide-react";
+
 import { FileDownloadButton } from "../content/FileDownloadButton";
 import { MessageRenderer } from "./MessageRenderer";
 import { InlineMath } from "./MathRenderer";
@@ -73,7 +74,7 @@ export function UserFileAttachment({
               onClick={() => setPreviewOpen(false)}
               className="absolute top-2 right-2 size-8 flex items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
             >
-              <X className="size-4" />
+              <IconClose className="size-4" />
             </button>
           </div>
         </div>
@@ -115,7 +116,7 @@ export function UserFileAttachment({
               className="opacity-0 group-hover/file:opacity-100 p-1 rounded hover:bg-red-500/15 text-red-400 transition-all"
               title="Delete attachment"
             >
-              <Trash2 className="size-3" />
+              <IconTrash className="size-3" />
             </button>
           )}
         </div>

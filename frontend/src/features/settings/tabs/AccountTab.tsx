@@ -6,7 +6,8 @@
  * per-session revoke menus.
  */
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, LogOut, MoreVertical } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { IconExternal, IconMore } from "../../layout/anthropicIcons.tsx";
 /**
  * Props for AccountTab, threaded from the settings modal in
  * `features/settings/Settings.tsx`, which owns the state.
@@ -43,7 +44,7 @@ export function AccountTab({
       <div className="space-y-8 max-w-2xl mx-auto">
         <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Account</h3>
         <div className="space-y-5">
-          <div className="flex items-center justify-between py-1"><span className="text-sm font-medium text-[var(--text-primary)]">Log out of all devices</span><button onClick={handleLogoutAllDevices} disabled={loggingOutAllDevices} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--bg-secondary)] hover:bg-[var(--surface-border)]/50 text-[var(--text-primary)] text-sm font-medium transition-all duration-200 disabled:opacity-50">{loggingOutAllDevices ? <Loader2 className="size-4 animate-spin" /> : <LogOut className="size-4" />}Log out</button></div>
+          <div className="flex items-center justify-between py-1"><span className="text-sm font-medium text-[var(--text-primary)]">Log out of all devices</span><button onClick={handleLogoutAllDevices} disabled={loggingOutAllDevices} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--bg-secondary)] hover:bg-[var(--surface-border)]/50 text-[var(--text-primary)] text-sm font-medium transition-all duration-200 disabled:opacity-50">{loggingOutAllDevices ? <Loader2 className="size-4 animate-spin" /> : <IconExternal className="size-4" />}Log out</button></div>
           <div className="flex items-center justify-between py-1"><span className="text-sm font-medium text-[var(--text-primary)]">Delete your account</span><button onClick={handleDeleteAccount} disabled={deletingAccount} className="px-4 py-2 rounded-lg bg-[var(--bg-secondary)] hover:bg-[var(--surface-border)] text-[var(--text-primary)] text-sm font-medium transition-all duration-200 disabled:opacity-50 border border-[var(--surface-border)]">{deletingAccount ? <Loader2 className="size-4 animate-spin" /> : "Delete account"}</button></div>
           <div className="flex items-center justify-between py-1"><span className="text-sm font-medium text-[var(--text-primary)]">Organization ID</span><div className="px-4 py-2 rounded-lg bg-[var(--bg-secondary)] text-xs font-mono text-[var(--text-primary)]/50">{user?.id || "Not available"}</div></div>
         </div>
@@ -61,11 +62,11 @@ export function AccountTab({
                       <td className="px-5 py-3 text-right relative">
                         {!session.isCurrent && (
                           <div className="relative inline-block">
-                            <button onClick={() => setOpenMenuSessionId(openMenuSessionId === session.id ? null : session.id)} className="p-1.5 hover:bg-[var(--surface-border)]/50 rounded-lg transition-all duration-200 text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]"><MoreVertical className="size-4" /></button>
+                            <button onClick={() => setOpenMenuSessionId(openMenuSessionId === session.id ? null : session.id)} className="p-1.5 hover:bg-[var(--surface-border)]/50 rounded-lg transition-all duration-200 text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]"><IconMore className="size-4" /></button>
                             <AnimatePresence>
                               {openMenuSessionId === session.id && (
                                 <motion.div initial={{ opacity: 0, scale: 0.95, y: 4 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 4 }} className="absolute right-0 bottom-full mb-1 w-36 rounded-lg bg-[var(--bg-secondary)] border-[var(--surface-border)] shadow-xl z-10 overflow-hidden">
-                                  <button onClick={() => handleRevokeSession(session.id)} disabled={revokingSessionId === session.id} className="w-full text-left px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition flex items-center gap-2">{revokingSessionId === session.id ? <Loader2 className="size-4 animate-spin" /> : <LogOut className="size-4" />}Sign out</button>
+                                  <button onClick={() => handleRevokeSession(session.id)} disabled={revokingSessionId === session.id} className="w-full text-left px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition flex items-center gap-2">{revokingSessionId === session.id ? <Loader2 className="size-4 animate-spin" /> : <IconExternal className="size-4" />}Sign out</button>
                                 </motion.div>
                               )}
                             </AnimatePresence>

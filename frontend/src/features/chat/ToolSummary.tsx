@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronRight, CheckCircle2, XCircle, LoaderCircle, Clock } from "lucide-react";
+import { LoaderCircle, Clock } from "lucide-react";
+import { IconCheck, IconChevronDown, IconChevronRight, IconClose } from "../layout/anthropicIcons.tsx";
 import type { MessagePart } from "../../types";
 
 type ToolSummaryProps = {
@@ -8,8 +9,8 @@ type ToolSummaryProps = {
 };
 
 const STATUS_ICONS: Record<string, { icon: any; color: string }> = {
-  completed: { icon: CheckCircle2, color: "text-emerald-500" },
-  error: { icon: XCircle, color: "text-destructive" },
+  completed: { icon: IconCheck, color: "text-emerald-500" },
+  error: { icon: IconClose, color: "text-destructive" },
   running: { icon: LoaderCircle, color: "text-primary" },
   pending: { icon: Clock, color: "text-muted-foreground" },
 };
@@ -66,17 +67,17 @@ export default function ToolSummary({ tools }: ToolSummaryProps) {
         className="w-full flex items-center gap-2.5 px-4 py-2.5 hover:bg-accent transition-colors"
       >
         {isExpanded ? (
-          <ChevronDown className="size-3.5 text-muted-foreground shrink-0" />
+          <IconChevronDown className="size-3.5 text-muted-foreground shrink-0" />
         ) : (
-          <ChevronRight className="size-3.5 text-muted-foreground shrink-0" />
+          <IconChevronRight className="size-3.5 text-muted-foreground shrink-0" />
         )}
         <div className="flex items-center gap-2 text-xs">
           {running ? (
             <LoaderCircle className="size-3.5 text-primary animate-spin" />
           ) : errored ? (
-            <XCircle className="size-3.5 text-destructive" />
+            <IconClose className="size-3.5 text-destructive" />
           ) : (
-            <CheckCircle2 className="size-3.5 text-emerald-500" />
+            <IconCheck className="size-3.5 text-emerald-500" />
           )}
           <span className="text-foreground font-medium">
             {running ? "Running tools..." : `${completed} of ${total} tools`}

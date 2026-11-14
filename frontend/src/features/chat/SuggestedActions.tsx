@@ -1,14 +1,8 @@
 // src/components/SuggestedActions.tsx
 import { useState, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Sparkles,
-  BriefcaseBusiness,
-  CalendarCheck,
-  UserSearch,
-  Palette,
-  X,
-} from "lucide-react";
+import { Sparkles, BriefcaseBusiness, CalendarCheck, UserSearch, Palette } from "lucide-react";
+import { IconClose } from "../layout/anthropicIcons.tsx";
 import { suggestionsByCategory } from "../../data/suggestions";
 
 const categories = [
@@ -57,7 +51,7 @@ export const SuggestedActions = memo(function SuggestedActions({
                 className="text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-bg)] transition p-1 rounded-full cursor-pointer"
                 aria-label="Close suggestions"
               >
-                <X className="size-4" />
+                <IconClose className="size-4" />
               </button>
             </div>
 

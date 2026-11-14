@@ -8,8 +8,9 @@
  * Public API:
  *   <DeleteToast {...props} />
  */
+import { IconClose } from "../layout/anthropicIcons.tsx";
 import { AnimatePresence, motion } from "framer-motion";
-import { X } from "lucide-react";
+
 
 export interface DeleteToastProps {
   /** Low-performance mode renders the toast without animation. */
@@ -45,7 +46,7 @@ export function DeleteToast({
         className="text-stone-500 hover:text-stone-300 transition-colors"
         aria-label="Dismiss"
       >
-        <X className="size-3.5" />
+        <IconClose className="size-3.5" />
       </button>
     </>
   );

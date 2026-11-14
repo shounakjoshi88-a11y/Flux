@@ -1,5 +1,6 @@
+import { IconChevronDown } from "../layout/anthropicIcons.tsx";
 import React, { useState } from "react";
-import { ChevronDown } from "lucide-react";
+
 import { TerminalIcon, FileIcon, WikiIcon, SearchIcon, PackageIcon } from "./icons";
 import { SpinnerIcon } from "./ThoughtBlock";
 import { TerminalBlock, FileCodeBlock } from "./TerminalBlock";
@@ -217,7 +218,7 @@ export function PrettyArgsBlock({
             Output
             {isResultJson && <span className="text-[var(--text-muted)]/60 normal-case tracking-normal">json</span>}
             <span className="ml-auto flex items-center gap-0.5 normal-case tracking-normal text-[var(--text-muted)] hover:text-[var(--text-secondary)]">
-              <ChevronDown className={`size-3 transition-transform duration-200 ${showOutput ? 'rotate-180' : ''}`} />
+              <IconChevronDown className={`size-3 transition-transform duration-200 ${showOutput ? 'rotate-180' : ''}`} />
               {showOutput ? 'hide' : 'show'}
             </span>
           </button>

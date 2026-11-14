@@ -1,6 +1,7 @@
 // src/components/FileDownloadButton.tsx
 import { useState, useEffect, useRef } from "react";
-import { FileDown, Presentation, FileText, FileType, Loader2, Trash2, Table as TableIcon } from "lucide-react";
+import { FileDown, Presentation, FileText, FileType, Loader2, Table as TableIcon } from "lucide-react";
+import { IconTrash } from "../layout/anthropicIcons.tsx";
 import mammoth from "mammoth";
 
 type FileData = {
@@ -175,7 +176,7 @@ export function FileDownloadButton({ file, onDownload, onPreview, className = ""
               className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/10 text-red-400 opacity-0 group-hover/card:opacity-100 transition-all duration-200"
               title="Delete file"
             >
-              <Trash2 className="size-4" />
+              <IconTrash className="size-4" />
             </button>
           )}
           

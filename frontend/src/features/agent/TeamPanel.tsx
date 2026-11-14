@@ -1,24 +1,8 @@
 // Team Panel — real-time multi-agent orchestration via NVIDIA NIM
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Users,
-  UserCheck,
-  UserCog,
-  Play,
-  Square,
-  ListChecks,
-  ChevronDown,
-  Network,
-  LoaderCircle,
-  CheckCircle2,
-  XCircle,
-  Bot,
-  Sparkles,
-  ArrowRight,
-  Clock,
-  AlertCircle,
-} from "lucide-react";
+import { UserCheck, UserCog, Play, ListChecks, Network, LoaderCircle, Bot, Sparkles, Clock, AlertCircle } from "lucide-react";
+import { IconCheck, IconChevronDown, IconChevronRight, IconClose, IconPeople, IconStop } from "../layout/anthropicIcons.tsx";
 
 type TeamMemberStatus = "idle" | "working" | "waiting" | "completed" | "error";
 
@@ -75,13 +59,13 @@ const STATUS_CONFIG: Record<
     color: "text-emerald-400",
     bg: "bg-emerald-500/15",
     label: "Done",
-    icon: CheckCircle2,
+    icon: IconCheck,
   },
   error: {
     color: "text-rose-400",
     bg: "bg-rose-500/15",
     label: "Error",
-    icon: XCircle,
+    icon: IconClose,
   },
 };
 
@@ -142,9 +126,9 @@ function TeamMemberCard({ member }: { member: TeamMember }) {
               <LoaderCircle className="size-3 animate-spin" />
             )}
             {member.status === "completed" && (
-              <CheckCircle2 className="size-3" />
+              <IconCheck className="size-3" />
             )}
-            {member.status === "error" && <XCircle className="size-3" />}
+            {member.status === "error" && <IconClose className="size-3" />}
             {cfg.label}
           </span>
         </div>
@@ -192,11 +176,11 @@ function TaskItemView({ task }: { task: TaskItem }) {
           </div>
         ) : isComplete ? (
           <div className="rounded-full bg-emerald-500/20 p-1">
-            <CheckCircle2 className="size-3.5 text-emerald-400" />
+            <IconCheck className="size-3.5 text-emerald-400" />
           </div>
         ) : isFailed ? (
           <div className="rounded-full bg-rose-500/20 p-1">
-            <XCircle className="size-3.5 text-rose-400" />
+            <IconClose className="size-3.5 text-rose-400" />
           </div>
         ) : (
           <div className="size-4 rounded-full border-2 border-zinc-600" />
@@ -377,7 +361,7 @@ export default function TeamPanel({
                 onClick={onClose}
                 className="group flex size-8 items-center justify-center rounded-lg border border-zinc-700/50 bg-zinc-800/40 transition-all duration-200 hover:border-zinc-600 hover:bg-zinc-800"
               >
-                <ChevronDown className="size-4 text-zinc-400 transition-transform duration-200 group-hover:rotate-180" />
+                <IconChevronDown className="size-4 text-zinc-400 transition-transform duration-200 group-hover:rotate-180" />
               </button>
             </div>
           </div>
@@ -387,7 +371,7 @@ export default function TeamPanel({
             <section>
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <Users className="size-3.5 text-zinc-500" />
+                  <IconPeople className="size-3.5 text-zinc-500" />
                   <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
                     Team Members
                   </h3>
@@ -400,7 +384,7 @@ export default function TeamPanel({
                 {localMembers.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <div className="flex size-12 items-center justify-center rounded-full bg-zinc-800/50 border border-zinc-700/30 mb-3">
-                      <Users className="size-5 text-zinc-600" />
+                      <IconPeople className="size-5 text-zinc-600" />
                     </div>
                     <p className="text-xs text-zinc-500 max-w-[200px]">
                       No team members yet. Start a team task to add members.
@@ -507,7 +491,7 @@ export default function TeamPanel({
                       <>
                         <Play className="size-3 fill-current" />
                         <span>Start Team Task</span>
-                        <ArrowRight className="size-3 transition-transform duration-200 group-hover:translate-x-0.5" />
+                        <IconChevronRight className="size-3 transition-transform duration-200 group-hover:translate-x-0.5" />
                       </>
                     )}
                   </button>

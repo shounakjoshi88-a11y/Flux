@@ -2,7 +2,8 @@
 // Allows users to register custom agent backends
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Bot, Trash2, Terminal, ExternalLink } from "lucide-react";
+import { Bot } from "lucide-react";
+import { IconClose, IconExternal, IconPlus, IconTerminal, IconTrash } from "../layout/anthropicIcons.tsx";
 import type { CustomAgent } from "../../hooks/useCustomAgents";
 
 type CustomAgentsPanelProps = {
@@ -59,7 +60,7 @@ export default function CustomAgentsPanel({
               <span className="text-sm font-medium">Custom Agents</span>
             </div>
             <button onClick={onClose} className="p-1 rounded-lg hover:bg-zinc-800 transition-colors">
-              <X className="size-4 text-zinc-400" />
+              <IconClose className="size-4 text-zinc-400" />
             </button>
           </div>
 
@@ -76,7 +77,7 @@ export default function CustomAgentsPanel({
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-zinc-800/30 border border-zinc-700/30 hover:bg-zinc-800/50 transition-colors group"
               >
                 <div className="size-8 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
-                  <Terminal className="size-4 text-emerald-400" />
+                  <IconTerminal className="size-4 text-emerald-400" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-medium text-zinc-200 truncate">{agent.name}</div>
@@ -89,7 +90,7 @@ export default function CustomAgentsPanel({
                       className="p-1.5 rounded-lg hover:bg-zinc-700/50 transition-colors"
                       title="Use this agent"
                     >
-                      <ExternalLink className="size-3 text-zinc-400" />
+                      <IconExternal className="size-3 text-zinc-400" />
                     </button>
                   )}
                   <button
@@ -97,7 +98,7 @@ export default function CustomAgentsPanel({
                     className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
                     title="Delete agent"
                   >
-                    <Trash2 className="size-3 text-zinc-500 hover:text-red-400" />
+                    <IconTrash className="size-3 text-zinc-500 hover:text-red-400" />
                   </button>
                 </div>
               </div>
@@ -146,7 +147,7 @@ export default function CustomAgentsPanel({
                 onClick={() => setShowForm(true)}
                 className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-700/50 text-zinc-300 text-xs font-medium transition-colors"
               >
-                <Plus className="size-3" />
+                <IconPlus className="size-3" />
                 Add Custom Agent
               </button>
             )}

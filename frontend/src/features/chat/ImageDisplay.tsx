@@ -1,5 +1,6 @@
+import { IconChevronDown, IconTrash } from "../layout/anthropicIcons.tsx";
 import React, { useState, useEffect, useRef } from "react";
-import { Trash2, ChevronDown } from "lucide-react";
+
 import { createClient } from "../../lib/client";
 import { BACKEND_URL } from "../../lib/config";
 
@@ -172,7 +173,7 @@ export function InlineImageDisplay({
               className="p-1 rounded-md text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors"
               title="Delete"
             >
-              <Trash2 className="size-3" />
+              <IconTrash className="size-3" />
             </button>
           )}
         </div>
@@ -393,7 +394,7 @@ export function InlineGenerationIndicator({
         </div>
         <span className="text-xs font-medium text-stone-400 group-hover/gen:text-stone-300 transition-colors flex items-center gap-1.5 antialiased">
           {status.message}
-          <ChevronDown className={`size-3 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+          <IconChevronDown className={`size-3 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
         </span>
       </div>
 
