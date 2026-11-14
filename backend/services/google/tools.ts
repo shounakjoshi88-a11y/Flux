@@ -131,7 +131,7 @@ export function createGoogleTools(uid: string | undefined, res: any, _state: any
         maxResults: z.number().optional().describe('Maximum number of results to return (default 10, max 50)'),
       }),
       execute: async ({ query, maxResults }: any) => {
-        sendStatus(res, 'gmail', `Searching Gmail for "${query}"...`);
+        sendStatus(res, 'gmail', `Searching Gmail for "${query}"`);
         return withGoogleAuth(async ({ gmail }) => {
           const listRes = await gmail.users.messages.list({
             userId: 'me',
@@ -168,7 +168,7 @@ export function createGoogleTools(uid: string | undefined, res: any, _state: any
         messageId: z.string().describe('The Gmail message ID (from gmail_search or gmail_list_threads results)'),
       }),
       execute: async ({ messageId }: any) => {
-        sendStatus(res, 'gmail', 'Reading email...');
+        sendStatus(res, 'gmail', 'Reading email');
         return withGoogleAuth(async ({ gmail }) => {
           const detail = await gmail.users.messages.get({ userId: 'me', id: messageId, format: 'full' });
           const headers = detail.data.payload?.headers || [];
@@ -195,7 +195,7 @@ export function createGoogleTools(uid: string | undefined, res: any, _state: any
         body: z.string().describe('Email body text (plain text)'),
       }),
       execute: async ({ to, subject, body }: any) => {
-        sendStatus(res, 'gmail', `Sending email to ${to}...`);
+        sendStatus(res, 'gmail', `Sending email to ${to}`);
         return withGoogleAuth(async ({ gmail }) => {
           const mimeMsg = makeMimeEmail(to, subject, body);
           const encoded = Buffer.from(mimeMsg).toString('base64url');
@@ -212,7 +212,7 @@ export function createGoogleTools(uid: string | undefined, res: any, _state: any
         query: z.string().optional().describe('Optional search filter (same as Gmail search)'),
       }),
       execute: async ({ maxResults, query }: any) => {
-        sendStatus(res, 'gmail', 'Fetching inbox threads...');
+        sendStatus(res, 'gmail', 'Fetching inbox threads');
         return withGoogleAuth(async ({ gmail }) => {
           const listRes = await gmail.users.threads.list({
             userId: 'me',
@@ -253,7 +253,7 @@ export function createGoogleTools(uid: string | undefined, res: any, _state: any
         timeMax: z.string().optional().describe('End of time range in ISO 8601 format'),
       }),
       execute: async ({ maxResults, timeMin, timeMax }: any) => {
-        sendStatus(res, 'calendar', 'Fetching calendar events...');
+        sendStatus(res, 'calendar', 'Fetching calendar events');
         return withGoogleAuth(async ({ calendar }) => {
           const eventsRes = await calendar.events.list({
             calendarId: 'primary',
@@ -291,7 +291,7 @@ export function createGoogleTools(uid: string | undefined, res: any, _state: any
         attendees: z.array(z.string()).optional().describe('Optional list of attendee email addresses'),
       }),
       execute: async ({ summary, startTime, endTime, description, attendees }: any) => {
-        sendStatus(res, 'calendar', `Creating event "${summary}"...`);
+        sendStatus(res, 'calendar', `Creating event "${summary}"`);
         return withGoogleAuth(async ({ calendar }) => {
           const event: any = {
             summary,
@@ -316,7 +316,7 @@ export function createGoogleTools(uid: string | undefined, res: any, _state: any
         pageSize: z.number().optional().describe('Maximum results (default 10, max 50)'),
       }),
       execute: async ({ query, pageSize }: any) => {
-        sendStatus(res, 'drive', `Searching Drive for "${query}"...`);
+        sendStatus(res, 'drive', `Searching Drive for "${query}"`);
         return withGoogleAuth(async ({ drive }) => {
           const filesRes = await drive.files.list({
             q: `name contains '${query.replace(/'/g, "\\'")}' or fullText contains '${query.replace(/'/g, "\\'")}'`,
@@ -343,7 +343,7 @@ export function createGoogleTools(uid: string | undefined, res: any, _state: any
         fileId: z.string().describe('The Google Drive file ID (from drive_search_files or drive_list_folder results)'),
       }),
       execute: async ({ fileId }: any) => {
-        sendStatus(res, 'drive', 'Reading file...');
+        sendStatus(res, 'drive', 'Reading file');
         return withGoogleAuth(async ({ drive }) => {
           const meta = await drive.files.get({ fileId, fields: 'id,name,mimeType,size,modifiedTime,webViewLink,description' });
           const mimeType = meta.data.mimeType || '';
@@ -387,7 +387,7 @@ export function createGoogleTools(uid: string | undefined, res: any, _state: any
         folderId: z.string().optional().describe('The folder ID to list contents of (omit to list root)'),
       }),
       execute: async ({ folderId }: any) => {
-        sendStatus(res, 'drive', 'Listing folder contents...');
+        sendStatus(res, 'drive', 'Listing folder contents');
         return withGoogleAuth(async ({ drive }) => {
           const q = folderId
             ? `'${folderId}' in parents and trashed=false`

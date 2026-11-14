@@ -43,7 +43,8 @@ export function createResearchTools(ctx: ToolContext) {
                 const safe = await checkSsrFree(trimmed);
                 if (!safe) return 'This URL cannot be accessed - it points to a private or internal network address.';
 
-                writer.status('reading', `Fetching content from ${trimmed}...`, { url: trimmed }, state.thoughtProcess);
+                writer.status('reading', `Fetching content from ${trimmed}`, { url: trimmed, phase: 'fetching' }, state.thoughtProcess);
+                let pageTitle = '';
                 try {
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -53,7 +54,8 @@ export function createResearchTools(ctx: ToolContext) {
                     });
                     clearTimeout(timeoutId);
                     if (!resp.ok) {
-                        if (resp.status === 404) return `The URL "${trimmed}" returned 404 Not Found.`;
+                        if (resp.status === 404) { writer.status('reading', `Not found: ${trimmed}`, { url: trimmed, phase: 'error' }, state.thoughtProcess); return `The URL "${trimmed}" returned 404 Not Found.`; }
+                        writer.status('reading', `Fetch failed (${resp.status})`, { url: trimmed, phase: 'error' }, state.thoughtProcess);
                         return `Failed to fetch "${trimmed}" - HTTP ${resp.status} ${resp.statusText}`;
                     }
                     const contentType = (resp.headers.get('content-type') || '').toLowerCase();
@@ -65,7 +67,7 @@ export function createResearchTools(ctx: ToolContext) {
                     if (isPdf) {
                         writer.status(
                             'reading',
-                            `Parsing PDF (${(rawBuf.length / 1024).toFixed(0)} KB)...`,
+                            `Parsing PDF (${(rawBuf.length / 1024).toFixed(0)} KB)`,
                             undefined,
                             state.thoughtProcess,
                         );
@@ -78,14 +80,28 @@ export function createResearchTools(ctx: ToolContext) {
                     } else if (isDocx) {
                         writer.status(
                             'reading',
-                            `Parsing DOCX (${(rawBuf.length / 1024).toFixed(0)} KB)...`,
+                            `Parsing DOCX (${(rawBuf.length / 1024).toFixed(0)} KB)`,
                             undefined,
                             state.thoughtProcess,
                         );
                         extracted = await extractDocxText(rawBuf);
                     } else {
-                        let text = rawBuf.toString('utf-8');
-                        text = text
+                        const rawHtml = rawBuf.toString('utf-8');
+                        // Pull the <title> before stripping — the UI shows it as
+                        // "Fetched: <title>" on the completed row.
+                        const titleMatch = rawHtml.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+                        pageTitle = (titleMatch?.[1] ?? '')
+                            .replace(/<[^>]+>/g, ' ')
+                            .replace(/&nbsp;/g, ' ')
+                            .replace(/&amp;/g, '&')
+                            .replace(/&lt;/g, '<')
+                            .replace(/&gt;/g, '>')
+                            .replace(/&quot;/g, '"')
+                            .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+                            .replace(/\s+/g, ' ')
+                            .trim()
+                            .slice(0, 140);
+                        let text = rawHtml
                             .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
                             .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
                             .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
@@ -104,11 +120,27 @@ export function createResearchTools(ctx: ToolContext) {
                     }
 
                     if (!extracted.replace(/\s/g, '').length) {
+                        writer.status('reading', 'No readable text found', { url: trimmed, phase: 'error' }, state.thoughtProcess);
                         return `The URL "${trimmed}" returned content but no extractable text was found.`;
                     }
 
+                    // Completed — emit the title so the UI renders
+                    // "Fetched: <title>" instead of the eternal "Fetching…".
+                    const urlObj = (() => { try { return new URL(trimmed); } catch { return null; } })();
+                    const seg = urlObj?.pathname.split('/').filter(Boolean).pop() ?? '';
+                    const isFileish = /\.(pdf|docx?|txt|csv|json|md|html?|xlsx?|pptx?|zip)$/i.test(seg);
+                    const fallbackTitle = urlObj
+                        ? (isFileish ? seg : `${urlObj.host}${urlObj.pathname.replace(/\/+$/, '')}`.slice(0, 90))
+                        : trimmed.slice(0, 90);
+                    writer.status(
+                        'reading',
+                        'Fetched',
+                        { url: trimmed, title: pageTitle || fallbackTitle, kb: Math.round(rawBuf.length / 1024), phase: 'fetched' },
+                        state.thoughtProcess,
+                    );
                     return `[CONTENT FROM ${trimmed}]\n${extracted}\n\n---\nUse this content to answer the user. It came directly from the URL, not from a search snippet.`;
                 } catch (e: any) {
+                    writer.status('reading', 'Fetch failed', { url: trimmed, phase: 'error' }, state.thoughtProcess);
                     if (e.name === 'AbortError') {
                         return `Request to "${trimmed}" timed out. The site may be slow or unreachable.`;
                     }

@@ -13,6 +13,7 @@ import TodoList from "./TodoList";
 import PermissionDialog from "./PermissionDialog";
 import { CodeOutputBlock } from "../content/CodeOutputBlock";
 import { WebSearchSection } from "./status/WebSearchStatus";
+import { FetchStatus } from "./status/FetchStatus";
 import { ToolRow, ToolPanel } from "./ToolActivity";
 import { getDomain } from "../../lib/chat-utils";
 import type { MessagePart, Source } from "../../types";
@@ -21,6 +22,29 @@ const SEARCH_SUBTYPES = new Set(['searching', 'found_sources', 'no_results', 'er
 
 function isSearchStep(part: MessagePart | undefined): boolean {
   return !!part && part.type === 'tool_call' && SEARCH_SUBTYPES.has(part.name);
+}
+
+/** reading statuses are emitted twice per fetch (phase:'fetching' at start,
+ *  phase:'fetched' with the title at the end). Collapse each pair into the
+ *  latest part per URL so exactly one row renders, showing the done state
+ *  once it exists. Parts without a URL (e.g. "Parsing PDF") pass through. */
+function dedupeReadingParts(parts: MessagePart[]): MessagePart[] {
+  const lastIdxByUrl = new Map<string, number>();
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i] as any;
+    if (p?.type === 'tool_call' && p?.name === 'reading') {
+      const url = typeof p?.input?.url === 'string' ? p.input.url : '';
+      if (url) lastIdxByUrl.set(url, i);
+    }
+  }
+  if (lastIdxByUrl.size === 0) return parts;
+  return parts.filter((p: any, i: number) => {
+    if (p?.type === 'tool_call' && p?.name === 'reading') {
+      const url = typeof p?.input?.url === 'string' ? p.input.url : '';
+      return !url || lastIdxByUrl.get(url) === i;
+    }
+    return true;
+  });
 }
 
 export function SearchStepsGroup({
@@ -122,6 +146,9 @@ export function PartsRenderer({
   onHtmlPreview?: (html: string) => void;
   conversationId?: string | null;
 }) {
+  // Collapse duplicate reading-start parts superseded by a done part.
+  parts = useMemo(() => dedupeReadingParts(parts), [parts]);
+
   // Find the last text part index for typewriter treatment
   const lastTextPartIndex = (() => {
     let lastIdx = -1;
@@ -153,6 +180,24 @@ export function PartsRenderer({
         break;
       }
       case "tool_call": {
+        // URL fetch rows — claude.ai-style "Fetched: <title>" disclosure.
+        if (part.name === 'reading') {
+          renderedParts.push(
+            <div key={`fetch-${i}`} className="mb-0.5 min-w-0">
+              <FetchStatus
+                status={{
+                  type: "tool_call",
+                  subtype: "reading",
+                  message: part.output || "",
+                  data: (part as any).input ?? {},
+                }}
+                isActive={isStreaming && part.status === "running" && !((part as any).input?.phase)}
+              />
+            </div>
+          );
+          break;
+        }
+
         // Group consecutive search steps into collapsible section.
         // Split on each new 'searching' — each search cycle gets its own collapsible.
         if (isSearchStep(part)) {

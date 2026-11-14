@@ -89,6 +89,38 @@ export function enrichConversationMessages(rawMessages: any[]): ConvCacheEntry {
                   continue;
                 }
 
+                // URL fetch phases: collapse the start ('fetching') and completion
+                // ('fetched'/'error') events for the same URL into one part, so the
+                // row flips from "Fetching" to "Fetched: <title>" instead of
+                // rendering two rows.
+                if (sub === 'reading') {
+                  const url = (tp.data as any)?.url as string | undefined;
+                  const prevIdx = url
+                    ? parts.findIndex(
+                        (p: any) => p.type === 'tool_call' && p.name === 'reading' && p.input?.url === url,
+                      )
+                    : -1;
+                  const terminal = (tp.data as any)?.phase === 'fetched' || (tp.data as any)?.phase === 'error';
+                  const statusVal = terminal
+                    ? ((tp.data as any)?.phase === 'error' ? 'error' : 'completed')
+                    : 'running';
+                  if (prevIdx >= 0) {
+                    const existing = parts[prevIdx] as any;
+                    existing.input = { ...existing.input, ...tp.data };
+                    existing.output = tp.message || existing.output;
+                    existing.status = statusVal;
+                  } else {
+                    parts.push({
+                      type: 'tool_call',
+                      name: 'reading',
+                      input: tp.data || {},
+                      output: tp.message || '',
+                      status: statusVal,
+                    } as any);
+                  }
+                  continue;
+                }
+
                 if (isTerminal) {
                   const baseSub = sub.replace(/_(?:success|error|complete)$/, '');
                   let idx = parts.findIndex(

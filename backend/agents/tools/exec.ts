@@ -69,7 +69,7 @@ export function createExecTools(ctx: ToolContext) {
                 const cid = conversationKey(ctx);
                 // code_execution first so streaming output lines have a visible container.
                 writer.codeExecution(code || '', 'python');
-                writer.status('sandbox_start', 'Starting Python execution...', { tool: 'run_python' }, state.thoughtProcess);
+                writer.status('sandbox_start', 'Starting Python execution', { tool: 'run_python' }, state.thoughtProcess);
                 try {
                     const result = await codeExecutor.runPython(
                         cid,

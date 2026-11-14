@@ -35,7 +35,7 @@ export function createAppTools(ctx: ToolContext) {
 
                 const cid = conversationKey(ctx);
                 const projectDir = `/home/user/${name}`;
-                writer.status('generating_file', `Scaffolding project "${name}"...`, { name }, state.thoughtProcess);
+                writer.status('generating_file', `Scaffolding project "${name}"`, { name }, state.thoughtProcess);
                 try {
                     await codeExecutor.runBash(cid, `mkdir -p ${projectDir}`);
                     let created = 0;
@@ -79,7 +79,7 @@ export function createAppTools(ctx: ToolContext) {
             }),
             execute: async ({ name, command, cwd, port }: any) => {
                 const cid = conversationKey(ctx);
-                writer.status('sandbox_start', `Launching app "${name}"...`, { name, command, port }, state.thoughtProcess);
+                writer.status('sandbox_start', `Launching app "${name}"`, { name, command, port }, state.thoughtProcess);
                 try {
                     const app = await codeExecutor.startApp(cid, name || 'app', command, cwd || '/home/user', port);
                     writer.status(
@@ -156,7 +156,7 @@ export function createAppTools(ctx: ToolContext) {
             }),
             execute: async ({ app_id }: any) => {
                 const cid = conversationKey(ctx);
-                writer.status('searching', 'Generating public preview URL...', { app_id }, state.thoughtProcess);
+                writer.status('searching', 'Generating public preview URL', { app_id }, state.thoughtProcess);
                 try {
                     const url = await codeExecutor.getAppUrl(cid, app_id);
                     if (url) {

@@ -74,12 +74,12 @@ async function integrateSubagentResults(
   }
 
   const sandbox = await sandboxManager.getOrCreate(integrationId);
-  onStatus('integration_status', { message: 'Installing dependencies...' });
+  onStatus('integration_status', { message: 'Installing dependencies' });
   const install = await sandbox.commands.run('npm install', { cwd: '/home/user', timeoutMs: 120_000 }).catch((e: any) => ({ exitCode: 1, stdout: '', stderr: e.message }));
   if (install.exitCode !== 0) {
     return { success: false, output: `Install failed: ${install.stderr}` };
   }
-  onStatus('integration_status', { message: 'Running build...' });
+  onStatus('integration_status', { message: 'Running build' });
   const build = await sandbox.commands.run('npm run build', { cwd: '/home/user', timeoutMs: 60_000 }).catch((e: any) => ({ exitCode: 1, stdout: '', stderr: e.message }));
 
   return { success: build.exitCode === 0, output: build.stdout + build.stderr };

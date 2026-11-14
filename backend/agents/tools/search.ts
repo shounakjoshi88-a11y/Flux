@@ -191,7 +191,7 @@ THAT — or answer directly from the history without calling web_search again.`;
 
                 writer.status(
                     'searching',
-                    `Searching for: ${safeQueries.map((q) => `"${q}"`).join(', ')}...`,
+                    `Searching for: ${safeQueries.map((q) => `"${q}"`).join(', ')}`,
                     { query: safeQueries[0] || userQuery || '' },
                     state.thoughtProcess,
                 );

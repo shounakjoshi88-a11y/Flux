@@ -13,6 +13,13 @@ const URL_RE = /(https?:\/\/[^\s<>"'`)\]}]+)/g;
 const TRAILING_RE = /[.,;:!?…)\]}'*]+$/;
 const LEADING_RE = /^[('"\[{]+/;
 
+/** Display form of a URL: no protocol, no trailing slash —
+ *  "github.com/jigjoy-ai/mozaik-network" instead of the full https://… */
+export function cleanUrl(url: string): string {
+  if (!url) return '';
+  return url.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+}
+
 const DEFAULT_LINK_CLS =
   'text-[#eba188] hover:text-[#f4b8a3] underline-offset-2 hover:underline cursor-pointer transition-colors break-all';
 
@@ -49,7 +56,7 @@ export function linkifyText(
           rel="noreferrer noopener"
           className={linkClassName}
         >
-          {url}
+          {cleanUrl(url)}
         </a>
         {tail}
       </React.Fragment>

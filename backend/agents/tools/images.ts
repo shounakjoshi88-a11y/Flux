@@ -23,7 +23,7 @@ export function createImageTools(ctx: ToolContext) {
                 prompt: z.string().describe('Description of the image to generate'),
             }),
             execute: async ({ prompt }: any) => {
-                writer.status('image_enhancing', 'Enhancing image prompt with AI...', undefined, state.thoughtProcess);
+                writer.status('image_enhancing', 'Enhancing image prompt with AI', undefined, state.thoughtProcess);
                 const enhanced = await enhanceImagePrompt(prompt, model);
                 writer.status('image_enhancing_success', 'Image prompt enhanced', undefined, state.thoughtProcess);
 
@@ -31,7 +31,7 @@ export function createImageTools(ctx: ToolContext) {
                 state.thoughtProcess.push(thoughtEvent);
                 writer.thought(`Enhanced prompt: ${enhanced}`);
 
-                writer.status('image_generating', 'Generating image with Bonsai...', undefined, state.thoughtProcess);
+                writer.status('image_generating', 'Generating image with Bonsai', undefined, state.thoughtProcess);
                 try {
                     const health = await fetch(`${IMAGE_SERVICE_URL}/health`, {
                         signal: AbortSignal.timeout(3000),

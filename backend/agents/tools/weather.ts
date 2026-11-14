@@ -46,7 +46,7 @@ export function createWeatherTools(ctx: ToolContext) {
                 if (state.weatherDone) {
                     return `Weather already fetched for this conversation turn. Answer the user using that data.`;
                 }
-                writer.status('weather', `Fetching weather for ${safeCity}...`, undefined, state.thoughtProcess);
+                writer.status('weather', `Fetching weather for ${safeCity}`, undefined, state.thoughtProcess);
                 const result = await fetchWeatherFromAPI(sanitizeLocation(safeCity));
                 if (!result) {
                     writer.status('weather_error', `Weather unavailable for ${safeCity}.`, undefined, state.thoughtProcess);

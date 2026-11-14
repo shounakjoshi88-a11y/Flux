@@ -575,7 +575,7 @@ IMPORTANT: After step 3, ALL subsequent operations use /home/user/edits/. Never 
                     } catch { /* ignore */ }
 
                     if (rawBuf && rawBuf.length > 50) {
-                        sendStatus(res, 'parsing', `Parsing ${att.name} (${(rawBuf.length / 1024).toFixed(0)} KB)...`, { name: att.name }, agentState.thoughtProcess);
+                        sendStatus(res, 'parsing', `Parsing ${att.name} (${(rawBuf.length / 1024).toFixed(0)} KB)`, { name: att.name }, agentState.thoughtProcess);
                         let parseError: string | null = null;
                         if (isPdfAtt) {
                             const pdfResult = await extractPdf(rawBuf);

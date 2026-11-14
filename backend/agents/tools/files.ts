@@ -24,7 +24,7 @@ export function createFileTools(ctx: ToolContext) {
             execute: async ({ path }: any) => {
                 const cid = conversationKey(ctx);
                 const filename = path.split('/').pop() || 'file';
-                writer.status('reading_file', `Reading ${filename}...`, { path, filename }, state.thoughtProcess);
+                writer.status('reading_file', `Reading ${filename}`, { path, filename }, state.thoughtProcess);
                 try {
                     const content = await codeExecutor.readFile(cid, path);
                     writer.status(
@@ -75,7 +75,7 @@ export function createFileTools(ctx: ToolContext) {
                     java: 'java',
                 };
                 const language = langMap[ext] || 'text';
-                writer.status('generating_file', `Writing ${filename}...`, { path, filename, content, language }, state.thoughtProcess);
+                writer.status('generating_file', `Writing ${filename}`, { path, filename, content, language }, state.thoughtProcess);
                 try {
                     await codeExecutor.writeFile(cid, path, content);
                     writer.status(
@@ -121,7 +121,7 @@ export function createFileTools(ctx: ToolContext) {
                 if (shouldBlockFurtherTools(ctx)) return TOOL_BLOCKED_MESSAGE;
 
                 const cid = conversationKey(ctx);
-                writer.status('sandbox_start', `Installing ${pkg}...`, { tool: 'install_package' }, state.thoughtProcess);
+                writer.status('sandbox_start', `Installing ${pkg}`, { tool: 'install_package' }, state.thoughtProcess);
                 try {
                     await codeExecutor.installPackage(cid, pkg || '', (type, line) => {
                         writer.codeOutput(type, line);
@@ -157,7 +157,7 @@ export function createFileTools(ctx: ToolContext) {
                     diffAdded: addedLines,
                     diffRemoved: removedLines,
                 };
-                writer.status('generating_file', `Editing ${filename}...`, diff, state.thoughtProcess);
+                writer.status('generating_file', `Editing ${filename}`, diff, state.thoughtProcess);
                 try {
                     const result = await codeExecutor.editFile(cid, path, old_str || '', new_str || '');
                     if (result.success) {
@@ -184,7 +184,7 @@ export function createFileTools(ctx: ToolContext) {
             execute: async ({ path }: any) => {
                 const cid = conversationKey(ctx);
                 const filename = path.split('/').pop() || 'file';
-                writer.status('generating_file', `Delivering ${filename}...`, { path, filename }, state.thoughtProcess);
+                writer.status('generating_file', `Delivering ${filename}`, { path, filename }, state.thoughtProcess);
                 try {
                     const { base64, mimeType } = await codeExecutor.getGeneratedFile(cid, path);
                     writer.file({
