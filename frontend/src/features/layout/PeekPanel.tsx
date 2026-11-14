@@ -2,7 +2,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, FileType, FileText, Table } from "lucide-react";
 import { IconClose, IconExternal, IconGlobe } from "./anthropicIcons";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { PptxPreview } from "../content/PptxPreview";
 import { XlsxPreview } from "../content/XlsxPreview";
 import { MarkdownPreview } from "../content/MarkdownPreview";
@@ -58,6 +58,19 @@ export function PeekPanel({ url, onClose, pdfData, docxData, pptxData, xlsxData,
   const [isProxying, setIsProxying] = useState(false);
   const { isLow: isPerfLow } = usePerformance();
 
+  // Panels open synchronously from the opening gesture's mousedown, so the
+  // trailing `click` can land on the backdrop and instantly close the panel the
+  // user just opened. Ignore backdrop clicks within 350ms of the panel mounting.
+  const openedAtRef = useRef(0);
+  const panelOpen = !!(url || pdfData || docxData || pptxData || xlsxData || mdData);
+  useEffect(() => {
+    if (panelOpen) openedAtRef.current = Date.now();
+  }, [panelOpen]);
+  const handleBackdropClick = () => {
+    if (Date.now() - openedAtRef.current < 350) return;
+    onClose();
+  };
+
   // Determine what to display
   const isPdf = !!pdfData;
   const isDocx = !!docxData;
@@ -97,6 +110,24 @@ export function PeekPanel({ url, onClose, pdfData, docxData, pptxData, xlsxData,
       setIframeError(true);
     }
   }, [pdfData]);
+
+  // Real browsers use a native/privileged PDF viewer inside the iframe, where
+  // contentDocument access throws. If this browser lacks a viewer (e.g. embedded
+  // Chromium), the iframe loads a same-origin EMPTY document — detect that and
+  // show the fallback actions instead of a dead dark panel.
+  const isEmptyViewerDocument = (iframe: HTMLIFrameElement | null): boolean => {
+    if (!iframe) return false;
+    try {
+      const doc = iframe.contentDocument;
+      if (!doc) return false;
+      const body = doc.body;
+      if (!body) return false;
+      return body.children.length === 0 && body.textContent?.trim().length === 0;
+    } catch {
+      // Same-origin access blocked → a native viewer is present (Chrome/Firefox).
+      return false;
+    }
+  };
 
   // ── Web URL: fetch through authenticated proxy ───────────
   useEffect(() => {
@@ -190,7 +221,7 @@ export function PeekPanel({ url, onClose, pdfData, docxData, pptxData, xlsxData,
     return (
       <>
         {isPerfLow ? (
-          <div className="fixed inset-0 z-[105] bg-black/30" onClick={onClose} />
+          <div className="fixed inset-0 z-[105] bg-black/30" onClick={handleBackdropClick} />
         ) : (
           <AnimatePresence>
             <motion.div
@@ -198,7 +229,7 @@ export function PeekPanel({ url, onClose, pdfData, docxData, pptxData, xlsxData,
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-[105] bg-black/30 backdrop-blur-sm"
-              onClick={onClose}
+              onClick={handleBackdropClick}
             />
           </AnimatePresence>
         )}
@@ -331,7 +362,14 @@ export function PeekPanel({ url, onClose, pdfData, docxData, pptxData, xlsxData,
               isDocx ? `Preview of ${docxData?.filename}` :
               `Preview of ${displayTitle}`
             }
-            onLoad={() => setIframeLoading(false)}
+            onLoad={(e) => {
+              setIframeLoading(false);
+              // PDF: detect a browser without an inline viewer (empty same-origin doc).
+              if (isPdf && isEmptyViewerDocument(e.currentTarget as HTMLIFrameElement)) {
+                console.warn('[PeekPanel] Inline PDF viewer unavailable — showing fallback actions.');
+                setIframeError(true);
+              }
+            }}
             onError={() => {
               setIframeError(true);
               setIframeLoading(false);
@@ -345,24 +383,33 @@ export function PeekPanel({ url, onClose, pdfData, docxData, pptxData, xlsxData,
             </div>
             <div className="space-y-1">
               <p className="text-sm font-semibold text-foreground">
-                {isPdf ? "Failed to load PDF" : "Can't preview this page"}
+                {isPdf ? "Preview unavailable in this browser" : "Can't preview this page"}
               </p>
               <p className="text-xs text-muted-foreground max-w-xs">
                 {isPdf
-                  ? "The PDF may be corrupted or unsupported."
+                  ? "Your browser has no inline PDF viewer. Open the file in a tab or download it instead."
                   : "This site may block embedding or have a restrictive content security policy."}
               </p>
             </div>
             {(isPdf && blobUrl) ? (
-              <a
-                href={blobUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-sm font-medium text-white bg-neutral-900 dark:bg-white dark:text-black rounded-full px-5 py-2.5 hover:opacity-90 transition-opacity shadow-sm"
-              >
-                Open PDF in new tab
-                <IconExternal className="size-3.5" />
-              </a>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <a
+                  href={blobUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-white bg-neutral-900 dark:bg-white dark:text-black rounded-full px-5 py-2.5 hover:opacity-90 transition-opacity shadow-sm"
+                >
+                  Open PDF in new tab
+                  <IconExternal className="size-3.5" />
+                </a>
+                <a
+                  href={blobUrl}
+                  download={pdfData?.filename ?? "document.pdf"}
+                  className="inline-flex items-center gap-2 text-sm font-medium text-foreground border border-black/10 dark:border-white/15 rounded-full px-5 py-2.5 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                >
+                  Download PDF
+                </a>
+              </div>
             ) : (!isPdf && url) && (
               <a
                 href={url}
@@ -385,7 +432,7 @@ export function PeekPanel({ url, onClose, pdfData, docxData, pptxData, xlsxData,
       {(url || pdfData || docxData) && (
         <>
           {isPerfLow ? (
-            <div className="fixed inset-0 z-[105] bg-black/30" onClick={onClose} />
+            <div className="fixed inset-0 z-[105] bg-black/30" onClick={handleBackdropClick} />
           ) : (
             <AnimatePresence>
               <motion.div
@@ -394,7 +441,7 @@ export function PeekPanel({ url, onClose, pdfData, docxData, pptxData, xlsxData,
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.25 }}
                 className="fixed inset-0 z-[105] bg-black/30 backdrop-blur-sm"
-                onClick={onClose}
+                onClick={handleBackdropClick}
               />
             </AnimatePresence>
           )}

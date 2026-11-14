@@ -39,6 +39,56 @@ export function fixMalformedTags(text: string): string {
   return s;
 }
 
+/** Split a possible data URL into mime + raw payload. Raw base64 passes through. */
+export function splitDataUrl(content: string): { mime: string | null; base64: string } {
+  const s = content ?? "";
+  const m = /^data:([^;,]*)?(;base64)?,([\s\S]*)$/.exec(s);
+  if (m) {
+    const isB64 = !!m[2];
+    const payload = (m[3] ?? "").replace(/\s+/g, "");
+    return isB64 ? { mime: m[1] || null, base64: payload } : { mime: m[1] || null, base64: "" };
+  }
+  return { mime: null, base64: s.replace(/\s+/g, "") };
+}
+
+export function isBase64DataUrl(content: string): boolean {
+  return /^data:[^;,]*;base64,/i.test(content ?? "");
+}
+
+/** Decode byte length of a base64 string (no need to materialise bytes). */
+export function byteLengthOfBase64(b64: string): number {
+  const clean = (b64 ?? "").replace(/[^A-Za-z0-9+/=]/g, "");
+  const padding = clean.endsWith("==") ? 2 : clean.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.floor((clean.length * 3) / 4) - padding);
+}
+
+export function formatFileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return "";
+  const units = ["B", "KB", "MB", "GB"];
+  let v = bytes;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+  return `${v >= 100 ? Math.round(v) : v.toFixed(v >= 10 ? 0 : 1)} ${units[i]}`;
+}
+
+/** UTF-8-safe text → base64 (for markdown/text payloads that must be base64). */
+export function toBase64Utf8(text: string): string {
+  try {
+    return btoa(unescape(encodeURIComponent(text)));
+  } catch {
+    try { return btoa(text); } catch { return ""; }
+  }
+}
+
+/** Materialise bytes from a base64 string. */
+export function base64ToBytes(b64: string): Uint8Array {
+  const clean = (b64 ?? "").replace(/\s+/g, "");
+  const bin = atob(clean);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
 export function parseAssistantContent(raw: string) {
   const sourcesRegex = /<SOURCES>([\s\S]*?)<\/SOURCES>/;
   const sourcesMatch = raw.match(sourcesRegex);

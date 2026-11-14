@@ -313,6 +313,7 @@ export const MessageItem = memo(function MessageItem({
                 index={idx}
                 onFileClick={onFileClick}
                 onFileDelete={onFileDelete ? (name) => onFileDelete(message.id, name, 'fileAttachment') : undefined}
+                onPreview={onPreview}
               />
             ))}
           </div>
