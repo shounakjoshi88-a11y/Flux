@@ -3,7 +3,7 @@ import { createClient } from "../lib/client";
 import { AnimatePresence, motion } from "framer-motion";
 import type { User } from "@supabase/supabase-js";
 import { LoaderCircle, FileText, Bot, Pencil } from "lucide-react";
-import { IconCheck, IconChevronDown, IconClose, IconGlobe, IconImage, IconPeople, IconTrash } from "../features/layout/anthropicIcons.tsx";
+import { IconCheck, IconChevronDown, IconClose, IconGlobe, IconImage, IconPeople, IconTrash } from "../features/layout/anthropicIcons";
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -34,23 +34,21 @@ import AgentStatusBar from "../features/agent/AgentStatusBar";
 import TeamPanel from "../features/agent/TeamPanel";
 import CustomAgentsPanel from "../features/agent/CustomAgentsPanel";
 import { useTheme } from "../hooks/useTheme";
-import { slugifyFriendly } from "../utils/slugify";
-import { getGreeting } from "../utils/greeting";
-import { enrichConversationMessages, type ConvCacheEntry } from "../utils/enrichMessages";
+import { useAccessToken } from "../hooks/useAccessToken";
+import { useTransportAutoDetect } from "../hooks/useTransportAutoDetect";
+import { useConversations } from "../hooks/useConversations";
+import { useConversationActions } from "../hooks/useConversationActions";
+import { usePeekPanelState, type PreviewPayload } from "../hooks/usePeekPanelState";
 import { readAttachedFiles } from "../utils/fileHandling";
 import { fetchImagesForQuery as fetchImagesForQueryUtil } from "../utils/imageSearch";
 import { useSessionRevocationListener } from "../hooks/useSessionRevocationListener";
 import { useSync } from "../hooks/useSync";
 import type {
-  ConversationListItem,
   Message,
-  ConversationDetail,
   Source,
   AttachedFile,
-  MessagePart,
 } from "../types";
-import { parseAssistantContent, extractLiveContent } from "../lib/chat-utils";
-import { BACKEND_URL, UNSPLASH_ACCESS_KEY } from "../lib/config";
+import { BACKEND_URL } from "../lib/config";
 import { conversationCache } from "../lib/conversation-cache";
 import { useAdaptiveQuality } from "../hooks/useAdaptiveQuality";
 import { usePerformance } from "../lib/performance-context";
@@ -70,61 +68,37 @@ export default function Dashboard() {
 
   // ─── ALL HOOKS ──────────────────────────────────────────────
   const supabase = useMemo(() => createClient(), []);
+  // Cached-token accessor shared by every backend call on this page.
+  const getAccessToken = useAccessToken(supabase);
   const [user, setUser] = useState<User | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
-  // ─── Seed conversations from localStorage for instant sidebar render ────────
-  const [conversations, setConversations] = useState<ConversationListItem[]>(() => {
-    try {
-      const saved = localStorage.getItem("flux-conversations");
-      return saved ? (JSON.parse(saved) as ConversationListItem[]) : [];
-    } catch {
-      return [];
-    }
-  });
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
-  const activeConversationIdRef = useRef(activeConversationId);
-  useEffect(() => {
-    activeConversationIdRef.current = activeConversationId;
-  }, [activeConversationId]);
-  useEffect(() => {
-    if (activeConversationId) {
-      const conv = conversations.find(c => c.id === activeConversationId);
-      document.title = conv?.title ? `${conv.title} - Flux` : "Flux";
-    } else {
-      document.title = "New Chat - Flux";
-    }
-  }, [activeConversationId, conversations]);
-  const isInitialMountRef = useRef(true);
-
-  // ─── Conversation cache (avoids re-fetching recently opened threads) ──────
-  type ConvCacheEntry = { enriched: Message[]; ts: number };
-  const conversationCacheRef = useRef<Map<string, ConvCacheEntry>>(new Map());
-  const CONV_CACHE_TTL = 45_000; // 45 s – stale after this; background-refreshed on next open
-
-  // ─── Token cache (avoids a Supabase round-trip on every action) ──────────
-  const tokenCacheRef = useRef<{ token: string; expiresAt: number } | null>(null);
 
   const [activeSources, setActiveSources] = useState<Source[]>([]);
   const [activeCitationIndex, setActiveCitationIndex] = useState<number | null>(null);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [selectedModel, setSelectedModel] = useState<string>("deepseek-v4-pro");
+  const [selectedModel, setSelectedModel] = useState<string>("nemotron-3-ultra-550b");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
-  const [peekUrl, setPeekUrl] = useState<string | null>(null);
-  const [peekPdf, setPeekPdf] = useState<{ base64: string; filename: string } | null>(null);
-  const [peekDocx, setPeekDocx] = useState<{ html: string; filename: string } | null>(null);
-  const [peekPptx, setPeekPptx] = useState<{ base64: string; filename: string } | null>(null);
-  const [peekXlsx, setPeekXlsx] = useState<{ base64: string; filename: string } | null>(null);
-  const [peekMd, setPeekMd] = useState<{ base64: string; filename: string } | null>(null);
-  const [peekFile, setPeekFile] = useState<{ name: string; content: string } | null>(null);
-  const [htmlPreviewContent, setHtmlPreviewContent] = useState<string | null>(null);
+  // ─── Peek-panel state (URLs, documents, generated code, raw files) ───
+  const {
+    peekUrl, setPeekUrl,
+    peekPdf, setPeekPdf,
+    peekDocx, setPeekDocx,
+    peekPptx, setPeekPptx,
+    peekXlsx, setPeekXlsx,
+    peekMd, setPeekMd,
+    peekFile, setPeekFile,
+    htmlPreviewContent, setHtmlPreviewContent,
+    closeDocumentPeeks,
+    handleHtmlPreview,
+    handlePreview: previewArtifact,
+  } = usePeekPanelState();
   const [isArtifactsOpen, setIsArtifactsOpen] = useState(false);
   const isMobile = useIsMobile();
   const [mobileScreen, setMobileScreen] = useState<"chat" | "history" | "search">("chat");
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [isNewsOpen, setIsNewsOpen] = useState(false);
   const [isWikiOpen, setIsWikiOpen] = useState(false);
-  const [toast, setToast] = useState<{ conversationId: string; title: string } | null>(null);
   const [activeImages, setActiveImages] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"answer" | "links" | "images">("answer");
@@ -132,12 +106,7 @@ export default function Dashboard() {
 
   // ─── Thread title menu state/refs (handlers defined after getAccessToken) ───
   const [threadMenuOpen, setThreadMenuOpen] = useState(false);
-  const [isRenaming, setIsRenaming] = useState(false);
-  const [renameValue, setRenameValue] = useState("");
-  /** Which conversation the open rename input targets (header menu = active thread). */
-  const [renameTargetId, setRenameTargetId] = useState<string | null>(null);
   const threadMenuRef = useRef<HTMLDivElement>(null);
-  const renameInputRef = useRef<HTMLInputElement>(null);
 
   // Close thread menu on outside click
   useEffect(() => {
@@ -150,11 +119,6 @@ export default function Dashboard() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [threadMenuOpen]);
-
-  // Focus rename input when it opens
-  useEffect(() => {
-    if (isRenaming) setTimeout(() => renameInputRef.current?.select(), 50);
-  }, [isRenaming]);
 
   const handleShare = useCallback(async () => {
     try {
@@ -203,47 +167,38 @@ export default function Dashboard() {
 
   const [isTeamPanelOpen, setIsTeamPanelOpen] = useState(false);
   const [isCustomAgentsOpen, setIsCustomAgentsOpen] = useState(false);
-  const [activeTransport, setActiveTransport] = useState<"sse" | "ws">("sse");
+  // WS-vs-SSE auto-detection lives in its own hook (see hooks/useTransportAutoDetect)
+  const { activeTransport, setActiveTransport, wsAvailableRef } = useTransportAutoDetect(ws);
   const [visibleRange, setVisibleRange] = useState({ startIndex: 0, endIndex: 0 });
   /** Imperative handle into MessageList for the prompt-history card's jump. */
   const messageListRef = useRef<MessageListHandle>(null);
-
-// ── Auto-detect transport: try WS, fall back to SSE ──
-  const wsAvailableRef = useRef(false);
-  const wsRef = useRef(ws);
-  wsRef.current = ws;
-  useEffect(() => {
-    let cancelled = false;
-    const tryWs = async () => {
-      const instance = wsRef.current;
-      try {
-        instance.connect();
-        // Wait up to 5s for WS to reach "ready"
-        await new Promise<void>((resolve, reject) => {
-          const check = setInterval(() => {
-            if (cancelled) { clearInterval(check); reject(new Error("cancelled")); return; }
-            if (instance.sessionState === "ready" || instance.sessionState === "processing") {
-              clearInterval(check);
-              wsAvailableRef.current = true;
-              if (!cancelled) setActiveTransport("ws");
-              resolve();
-            }
-          }, 200);
-          setTimeout(() => { clearInterval(check); reject(new Error("timeout")); }, 5000);
-        });
-      } catch {
-        wsAvailableRef.current = false;
-        setActiveTransport("sse");
-      }
-    };
-    tryWs();
-    return () => { cancelled = true; };
-  }, []);
 
   const messages = activeTransport === "ws" ? ws.messages : sseMessages;
   const setMessages = activeTransport === "ws" ? ws.setMessages : setSseMessages;
   const isLoading = activeTransport === "ws" ? ws.isLoading : sseLoading;
   const sessionState = ws.sessionState;
+
+  // ── Hydrate the WS store from the SSE store ─────────────────────────
+  // Cold-loading a thread writes history into the SSE store via
+  // openConversation(); if the WS transport wins the race and flips to
+  // "ws" before/after that fetch lands, Virtuoso would otherwise render
+  // the empty WS store forever (the intermittent "thread opens blank"
+  // bug). Until the WS store holds anything, migrate the SSE history
+  // over once. The flag resets when both stores are empty (New chat),
+  // so a cleared thread is never re-hydrated.
+  const wsHydratedRef = useRef(false);
+  useEffect(() => {
+    if (activeTransport !== "ws") return;
+    if (ws.messages.length === 0 && sseMessages.length === 0) {
+      wsHydratedRef.current = false;
+      return;
+    }
+    if (wsHydratedRef.current) return;
+    if (ws.messages.length === 0 && sseMessages.length > 0) {
+      ws.setMessages(sseMessages);
+      wsHydratedRef.current = true;
+    }
+  }, [activeTransport, sseMessages, ws]);
 
   const previousSidebarOpen = useRef(isSidebarOpen);
 
@@ -256,7 +211,7 @@ export default function Dashboard() {
   }, [isMobile, mobileScreen]);
 
   const currentModelLabel = useMemo(
-    () => (Array.isArray(allModels) ? allModels.find((m) => m.id === selectedModel)?.label : null) ?? "DeepSeek V4 Pro (DeepSeek)",
+    () => (Array.isArray(allModels) ? allModels.find((m) => m.id === selectedModel)?.label : null) ?? "Nemotron 3 Ultra 550B (NVIDIA)",
     [selectedModel, allModels]
   );
 
@@ -271,22 +226,9 @@ export default function Dashboard() {
   }, [navigate]);
 
   useEffect(() => {
-    if (user) loadConversations();
-  }, [user]);
-
-  useEffect(() => {
-    if (isInitialMountRef.current) {
-      isInitialMountRef.current = false;
-      return;
-    }
-    if (activeConversationId)
-      localStorage.setItem("flux-active-conversation", activeConversationId);
-    else localStorage.removeItem("flux-active-conversation");
-  }, [activeConversationId]);
-
-  useEffect(() => {
     const savedId = localStorage.getItem("flux-active-conversation");
     if (savedId && user) openConversation(savedId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   useEffect(() => {
@@ -298,64 +240,6 @@ export default function Dashboard() {
     document.addEventListener("click", click);
     return () => document.removeEventListener("click", click);
   }, [modelDropdownOpen]);
-
-  // ── Cached access token helper ──
-  const getAccessToken = useCallback(async () => {
-    const now = Date.now();
-    // Return cached token if it still has >15 s left
-    if (tokenCacheRef.current && tokenCacheRef.current.expiresAt > now + 15_000) {
-      return tokenCacheRef.current.token;
-    }
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.access_token) {
-      tokenCacheRef.current = {
-        token: session.access_token,
-        expiresAt: session.expires_at ? session.expires_at * 1000 : now + 3_600_000,
-      };
-      return session.access_token;
-    }
-    await supabase.auth.refreshSession();
-    const { data: { session: fresh } } = await supabase.auth.getSession();
-    const t = fresh?.access_token ?? "";
-    if (t) {
-      tokenCacheRef.current = {
-        token: t,
-        expiresAt: fresh?.expires_at ? fresh.expires_at * 1000 : now + 3_600_000,
-      };
-    }
-    return t;
-  }, []);
-
-  // ─── Rename handlers (after getAccessToken) ──────────────
-  const handleRenameOpen = useCallback((id?: string) => {
-    const target = id ?? activeConversationId;
-    if (!target) return;
-    const conv = conversations.find(c => c.id === target);
-    setRenameValue(conv?.title || '');
-    setRenameTargetId(target);
-    setThreadMenuOpen(false);
-    setIsRenaming(true);
-  }, [conversations, activeConversationId]);
-
-  const handleRenameSubmit = useCallback(async () => {
-    const targetId = renameTargetId ?? activeConversationId;
-    if (!targetId || !renameValue.trim()) { setIsRenaming(false); return; }
-    const token = await getAccessToken();
-    if (!token) return;
-    try {
-      const res = await fetch(`${BACKEND_URL}/conversations/${targetId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ title: renameValue.trim() }),
-      });
-      if (res.ok) {
-        const { conversation: updated } = await res.json();
-        setConversations(prev => prev.map(c => c.id === targetId ? { ...c, title: updated.title, slug: updated.slug } : c));
-        if (targetId === activeConversationId) document.title = `${updated.title} - Flux`;
-      }
-    } catch (err) { console.error('Rename failed:', err); }
-    setIsRenaming(false);
-  }, [renameTargetId, activeConversationId, renameValue, getAccessToken]);
 
   const createNewThread = useCallback(() => {
     resetMessages();
@@ -372,50 +256,32 @@ export default function Dashboard() {
     navigate("/new", { replace: true });
   }, [resetMessages, ws, navigate]);
 
-  // ── Search conversations ──
-  const searchConversations = useCallback(async (query: string) => {
-    const token = await getAccessToken();
-    if (!token) return [];
-    const res = await fetch(`${BACKEND_URL}/conversations/search?q=${encodeURIComponent(query)}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.conversations as ConversationListItem[];
-  }, [getAccessToken]);
+  // ── Conversation lifecycle: list, open, prefetch ──────────────────────────
+  const {
+    conversations, setConversations,
+    activeConversationId, setActiveConversationId, activeConversationIdRef,
+    conversationCacheRef,
+    loadConversations, searchConversations,
+    openConversation, prefetchConversation,
+  } = useConversations({
+    user, navigate, getAccessToken,
+    setMessages, setActiveSources,
+    setActiveCitationIndex, setActiveTab, setActiveImages,
+    createNewThread,
+    cachePreference: adaptive.cachePreference,
+  });
 
-  // ── Debounced load conversations ──
-  const loadConversationsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const loadConversations = useCallback(async (forceRefresh?: boolean) => {
-    if (!user) return;
-
-    // Debounce: cancel previous timer; schedule actual fetch 1s after last call
-    if (loadConversationsTimerRef.current) {
-      clearTimeout(loadConversationsTimerRef.current);
-    }
-    loadConversationsTimerRef.current = setTimeout(async () => {
-      if (!forceRefresh && adaptive.cachePreference === 'cache-first') {
-        const cached = await conversationCache.getConversations();
-        if (cached && cached.length > 0) {
-          setConversations(cached);
-          try { localStorage.setItem("flux-conversations", JSON.stringify(cached)); } catch {}
-          return;
-        }
-      }
-
-      const token = await getAccessToken();
-      if (!token) return;
-      const res = await fetch(`${BACKEND_URL}/conversations`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) return;
-      const data = (await res.json()) as { conversations: ConversationListItem[] };
-      const list = data.conversations ?? [];
-      setConversations(list);
-      try { localStorage.setItem("flux-conversations", JSON.stringify(list)); } catch {}
-      conversationCache.putConversations(list).catch(() => {});
-    }, 1000);
-  }, [user, getAccessToken, adaptive.cachePreference]);
+  // ── Conversation actions: rename, delete, undo toast ────────────────────
+  const {
+    isRenaming, renameValue, setRenameValue, renameInputRef,
+    handleRenameOpen, handleRenameSubmit, cancelRename,
+    deleteConversation, toast, undoDelete, dismissToast,
+  } = useConversationActions({
+    user, conversations, setConversations,
+    activeConversationId, createNewThread,
+    getAccessToken, loadConversations,
+    closeThreadMenu: () => setThreadMenuOpen(false),
+  });
 
   // ── Wire offline queue flush to refresh conversation list ────────────────
   useEffect(() => {
@@ -447,85 +313,6 @@ export default function Dashboard() {
   });
 
 
-  // ── Open conversation (instant from cache, network on miss) ───────────────
-  const openConversation = useCallback(
-    async (id: string) => {
-      // ── 0. Update active state immediately so the sidebar highlights at once ──
-      setActiveConversationId(id);
-      setActiveCitationIndex(null);
-      setActiveTab("answer");
-      setActiveImages([]);
-      const conv = conversations.find(c => c.id === id);
-      if (conv?.slug) {
-        navigate(`/c/${conv.slug}`, { replace: true });
-      }
-
-      // ── 1. Serve instantly from in-memory cache if still fresh ────────────
-      const cached = conversationCacheRef.current.get(id);
-      if (cached && Date.now() - cached.ts < CONV_CACHE_TTL) {
-        setMessages(cached.enriched);
-        const last = [...cached.enriched].reverse().find((m) => m.role === "Assistant");
-        setActiveSources(last?.sources ?? []);
-        return;
-      }
-
-      // ── 2. Try IndexedDB cache (instant for repeat visits on slow connections) ──
-      const cachedMessages = await conversationCache.getMessages(id);
-      if (cachedMessages && cachedMessages.length > 0) {
-        const entry = enrichConversationMessages(cachedMessages);
-        conversationCacheRef.current.set(id, entry);
-        if (activeConversationIdRef.current === id) {
-          setMessages(entry.enriched);
-          const last = [...entry.enriched].reverse().find((m) => m.role === "Assistant");
-          setActiveSources(last?.sources ?? []);
-        }
-      } else {
-        setMessages([]);
-      }
-
-      // ── 3. Network fetch in background (always, to get freshest data) ─────
-      const token = await getAccessToken();
-      if (!token) return;
-      const res = await fetch(`${BACKEND_URL}/conversation/${id}`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        if (res.status === 404) {
-          console.warn("Conversation not found, removing from local state");
-          setConversations((prev) => prev.filter((c) => c.id !== id));
-          if (activeConversationIdRef.current === id) createNewThread();
-          return;
-        }
-        return;
-      }
-      const data = (await res.json()) as { conversation: ConversationDetail };
-      if (!data?.conversation?.messages) {
-        console.warn('Conversation data is empty or malformed', data);
-        return;
-      }
-
-      // Update URL with the real slug from the server
-      if (data.conversation.slug && activeConversationIdRef.current === id) {
-        navigate(`/c/${data.conversation.slug}`, { replace: true });
-      }
-
-      const entry = enrichConversationMessages(data.conversation.messages);
-
-      // ── 4. Store in both caches ──────────────────────────────────────────
-      conversationCacheRef.current.set(id, entry);
-      conversationCache.putMessages(id, data.conversation.messages).catch(() => {});
-
-      // Only apply if the user hasn't navigated away while we were fetching
-      if (activeConversationIdRef.current === id) {
-        setMessages(entry.enriched);
-        const last = [...entry.enriched].reverse().find((m) => m.role === "Assistant");
-        setActiveSources(last?.sources ?? []);
-      }
-    },
-    [getAccessToken, setMessages, enrichConversationMessages, createNewThread]
-  );
-
   // ── Open conversation from URL param ──
   const { slug } = useParams<{ slug: string }>();
   const slugHandled = useRef(false);
@@ -551,31 +338,6 @@ export default function Dashboard() {
     }
   }, [slug, conversations, openConversation, navigate]);
 
-  // ── Prefetch on hover (best-effort, fires before the user clicks) ─────────
-  const prefetchConversation = useCallback(
-    async (id: string) => {
-      // Skip if already cached and fresh
-      const cached = conversationCacheRef.current.get(id);
-      if (cached && Date.now() - cached.ts < CONV_CACHE_TTL) return;
-      try {
-        const token = await getAccessToken();
-        if (!token) return;
-        const res = await fetch(`${BACKEND_URL}/conversation/${id}`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) return;
-        const data = (await res.json()) as { conversation: ConversationDetail };
-        if (!data?.conversation?.messages) return;
-        const entry = enrichConversationMessages(data.conversation.messages);
-        conversationCacheRef.current.set(id, entry);
-      } catch {
-        // silent – prefetch is best-effort
-      }
-    },
-    [getAccessToken, enrichConversationMessages]
-  );
-
   // ── File handling ──
   const handleAttachFiles = useCallback(async (files: FileList | null) => {
     const newFiles = await readAttachedFiles(files);
@@ -588,40 +350,12 @@ export default function Dashboard() {
     setActiveImages(urls);
   }, []);
 
-  // ── HTML preview handler ────────────────────────────────
-  const handleHtmlPreview = useCallback((html: string) => {
-    setHtmlPreviewContent(html);
-  }, []);
-
-  // ── Artifact preview handler ─────────────────────────────
-  const handlePreview = useCallback((data: { 
-    type: 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'md'; 
-    base64?: string; 
-    html?: string; 
-    filename: string 
-  }) => {
-    // Clear ALL peek states (including any open URL panel) before showing artifact
-    setPeekUrl(null);
-    setPeekPdf(null);
-    setPeekDocx(null);
-    setPeekPptx(null);
-    setPeekXlsx(null);
-    setPeekMd(null);
-
-    if (data.type === 'pdf' && data.base64) {
-      setPeekPdf({ base64: data.base64, filename: data.filename });
-    } else if (data.type === 'docx' && data.html) {
-      setPeekDocx({ html: data.html, filename: data.filename });
-    } else if (data.type === 'pptx' && data.base64) {
-      setPeekPptx({ base64: data.base64, filename: data.filename });
-    } else if (data.type === 'xlsx' && data.base64) {
-      setPeekXlsx({ base64: data.base64, filename: data.filename });
-    } else if (data.type === 'md' && data.base64) {
-      setPeekMd({ base64: data.base64, filename: data.filename });
-    }
+  // ── Artifact preview handler: show the document peek + close the modal ──
+  const handlePreview = useCallback((data: PreviewPayload) => {
+    previewArtifact(data);
     // Close artifacts modal to show preview side-by-side with chat
     setIsArtifactsOpen(false);
-  }, []);
+  }, [previewArtifact]);
 
   // ── Slash command dispatch ──
   const dispatchSlashCommand = useCallback(
@@ -821,39 +555,6 @@ export default function Dashboard() {
     messageListRef.current?.jumpToMessage(messageId);
   }, []);
 
-  // ── Delete conversation ──
-  const deleteConversation = useCallback(
-    async (id: string) => {
-      if (!user) return;
-      const token = await getAccessToken();
-      if (!token) {
-        console.warn('Cannot delete conversation: no access token');
-        return;
-      }
-      try {
-        const res = await fetch(`${BACKEND_URL}/conversations/${id}`, {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          console.error('Delete failed with status', res.status, body);
-          throw new Error("Delete failed");
-        }
-        const conv = conversations.find((c) => c.id === id);
-        const title = conv?.title ?? "Untitled conversation";
-        setConversations((prev) => prev.filter((c) => c.id !== id));
-        if (activeConversationId === id) createNewThread();
-        setToast({ conversationId: id, title });
-        conversationCache.removeConversation(id).catch(() => {});
-        loadConversations();
-      } catch (err) {
-        console.error("Deletion error:", err);
-      }
-    },
-    [user, getAccessToken, conversations, activeConversationId, createNewThread, loadConversations]
-  );
-
   const handleDeleteFile = useCallback(async (messageId: string | number, filename: string, type: 'fileAttachment' | 'generatedFiles') => {
     if (!activeConversationId) return;
     try {
@@ -882,27 +583,6 @@ export default function Dashboard() {
       console.error("Failed to delete file:", err);
     }
   }, [activeConversationId, getAccessToken]);
-
-  const undoDelete = useCallback(() => {
-    if (!toast) return;
-    setConversations((prev) => [
-      {
-        id: toast.conversationId,
-        title: toast.title,
-        slug: toast.title ? slugifyFriendly(toast.title) : `restored-${Date.now()}`,
-        lastMessageAt: new Date().toISOString(),
-      },
-      ...prev,
-    ]);
-    setToast(null);
-  }, [toast]);
-
-  const TOAST_DURATION = 3500;
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), TOAST_DURATION);
-    return () => clearTimeout(t);
-  }, [toast]);
 
   // ── Tab styling ──
   const tabClass = useCallback(
@@ -944,7 +624,7 @@ export default function Dashboard() {
     onCreateThread: createNewThread,
     onSelectThread: openConversation,
     onDeleteThread: deleteConversation,
-    onRenameThread: (id: string) => handleRenameOpen(id),
+    onRenameThread: (id?: string) => handleRenameOpen(id),
     onPrefetchThread: prefetchConversation,
     onArtifactsPrefetch: () => prefetchArtifacts(BACKEND_URL),
     isDarkMode: isDark,
@@ -1038,7 +718,7 @@ export default function Dashboard() {
               onRenameChange={setRenameValue}
               onRenameSubmit={handleRenameSubmit}
               onRenameOpen={handleRenameOpen}
-              onCancelRename={() => setIsRenaming(false)}
+              onCancelRename={cancelRename}
               renameInputRef={renameInputRef}
               onDeleteConversation={deleteConversation}
               activeTab={activeTab}
@@ -1158,14 +838,7 @@ export default function Dashboard() {
         {/* PeekPanel supports URLs, PDF, DOCX, PPTX, XLSX, and MD data */}
         <PeekPanel
           url={peekUrl}
-          onClose={() => {
-            setPeekUrl(null);
-            setPeekPdf(null);
-            setPeekDocx(null);
-            setPeekPptx(null);
-            setPeekXlsx(null);
-            setPeekMd(null);
-          }}
+          onClose={closeDocumentPeeks}
           pdfData={peekPdf}
           docxData={peekDocx}
           pptxData={peekPptx}
@@ -1244,7 +917,7 @@ export default function Dashboard() {
           <DeleteToast
             isPerfLow={isPerfLow}
             onUndo={undoDelete}
-            onDismiss={() => setToast(null)}
+            onDismiss={dismissToast}
           />
         )}
 

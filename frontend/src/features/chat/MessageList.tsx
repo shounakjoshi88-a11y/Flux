@@ -1,7 +1,5 @@
 // src/components/MessageList.tsx
-import { useRef, useEffect, forwardRef, useImperativeHandle } from "react";
-import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
-import { motion } from "framer-motion";
+import { useRef, useEffect, useCallback, useLayoutEffect, forwardRef, useImperativeHandle } from "react";
 import { MessageItem } from "./MessageItem";
 import { SourceCard } from "../content/SourceCard";
 import { getDomain } from "../../lib/chat-utils";
@@ -42,9 +40,9 @@ type MessageListProps = {
 
 // ─── Main component ────────────────────────────────────────
 /**
- * Imperative handle so the dashboard can jump the virtualized list to a
- * message (the prompt-history card's click-to-scroll) even when the target
- * item is not rendered by Virtuoso yet.
+ * Imperative handle so the dashboard can jump the scroll container to a
+ * message (the prompt-history card's click-to-scroll). All items are
+ * rendered in the DOM, so this is a plain scrollIntoView.
  */
 export type MessageListHandle = {
   jumpToMessage: (messageId: string | number) => void;
@@ -75,25 +73,43 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
 }: MessageListProps,
   ref,
 ) {
-  const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
   const prevLenRef = useRef(messages.length);
-  const scrollThrottleRef = useRef(0);
   const messagesRef = useRef(messages);
+  const itemElsRef = useRef<Map<number, HTMLElement>>(new Map());
+  const visibleRangeRef = useRef({ startIndex: 0, endIndex: 0 });
 
-  // Click-to-scroll for the prompt-history card: rendered items scroll
-  // natively; virtualized-out items go through Virtuoso's scrollToIndex.
+  // Report which messages overlap the viewport (for the prompt-history card).
+  const reportVisibleRange = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    let start = -1;
+    let end = -1;
+    for (const [index, node] of itemElsRef.current) {
+      const r = node.getBoundingClientRect();
+      if (r.bottom > rect.top && r.top < rect.bottom) {
+        if (start === -1 || index < start) start = index;
+        if (index > end) end = index;
+      }
+    }
+    if (start === -1) {
+      start = Math.min(visibleRangeRef.current.startIndex, Math.max(0, messages.length - 1));
+      end = start;
+    }
+    const prev = visibleRangeRef.current;
+    if (start !== prev.startIndex || end !== prev.endIndex) {
+      visibleRangeRef.current = { startIndex: start, endIndex: end };
+      onVisibleRangeChange?.({ startIndex: start, endIndex: end });
+    }
+  }, [messages.length, onVisibleRangeChange]);
+
+  // Click-to-scroll for the prompt-history card.
   useImperativeHandle(ref, () => ({
     jumpToMessage: (messageId: string | number) => {
-      const el = document.querySelector(`[data-message-id="${messageId}"]`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        return;
-      }
-      const idx = messages.findIndex((m) => String(m.id) === String(messageId));
-      if (idx >= 0) {
-        virtuosoRef.current?.scrollToIndex({ index: idx, align: "center", behavior: "smooth" });
-      }
+      const el = scrollRef.current?.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(String(messageId))}"]`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
     },
   }));
 
@@ -109,16 +125,17 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
       messagesRef.current[messagesRef.current.length - 1] !== messages[messages.length - 1];
 
     if (atBottomRef.current && (lenChanged || lastMsgChanged)) {
-      const now = Date.now();
-      if (now - scrollThrottleRef.current < 80) return;
-      scrollThrottleRef.current = now;
-      setTimeout(() => {
-        virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, align: "end", behavior: "auto" });
-      }, 30);
+      const el = scrollRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
     }
     prevLenRef.current = messages.length;
     messagesRef.current = messages;
   }, [messages]);
+
+  // Report the visible range after items mount/resize/stream.
+  useLayoutEffect(() => {
+    reportVisibleRange();
+  }, [messages, reportVisibleRange]);
 
   // ─── Links tab ────────────────────────────────────────────
   if (activeTab === "links") {
@@ -196,65 +213,72 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   }
 
   // ─── Answer tab ───────────────────────────────────────────
+  // Plain scrolling list — every message renders in the DOM, so streaming
+  // output paints token-by-token immediately with no virtualizer to fight.
+  // Offscreen items use content-visibility so layout/paint stay cheap.
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    reportVisibleRange();
+  }, [reportVisibleRange]);
+
   return (
-    <div className="flex-1 relative custom-scrollbar" style={{ minHeight: 0 }}>
-      <Virtuoso
-        ref={virtuosoRef}
-        followOutput={(isAtBottom) => isAtBottom ? "smooth" : false}
-        overscan={400}
-        totalCount={messages.length}
-        increaseViewportBy={{ top: 400, bottom: 600 }}
-        rangeChanged={(range) => {
-          onVisibleRangeChange?.(range);
-        }}
-        itemContent={(index) => {
-          const message = messages[index]!;
-          let retryPrompt: string | undefined;
-          if (message.role === "Assistant") {
-            for (let j = index - 1; j >= 0; j--) {
-              const prev = messages[j];
-              if (prev && prev.role === "User") {
-                retryPrompt = prev.content;
-                break;
-              }
+    <div
+      ref={scrollRef}
+      onScroll={handleScroll}
+      className="flex-1 relative overflow-y-auto custom-scrollbar"
+      style={{ minHeight: 0 }}
+    >
+      {messages.map((message, index) => {
+        let retryPrompt: string | undefined;
+        if (message.role === "Assistant") {
+          for (let j = index - 1; j >= 0; j--) {
+            const prev = messages[j];
+            if (prev && prev.role === "User") {
+              retryPrompt = prev.content;
+              break;
             }
           }
-          return (
-            <div data-message-id={message.id}>
-              <div className="mx-auto max-w-[768px] px-5 animate-in fade-in duration-500">
-                <MessageItem
-                  message={message}
-                  sources={
-                    message.sources && message.sources.length > 0
-                      ? message.sources
-                      : String(message.id).startsWith("temp-") ? activeSources : []
-                  }
-                  onCitationClick={(index) => setActiveCitationIndex(index)}
-                  onFollowUpClick={onFollowUpClick}
-                  onRetry={() => onRetry?.(retryPrompt)}
-                  onEdit={onEdit}
-                  onSourceClick={setPeekUrl}
-                  onFileClick={onFileClick}
-                  onPreview={onPreview}
-                  onFileDelete={onFileDelete}
-                  onDelete={onDelete}
-                  activeGenerationStatus={activeGenerationStatus}
-                  onHtmlPreview={onHtmlPreview}
-                  conversationId={conversationId}
-                />
-              </div>
+        }
+        return (
+          <div
+            key={message.id}
+            data-message-id={message.id}
+            data-message-index={index}
+            ref={(node) => {
+              if (node) itemElsRef.current.set(index, node);
+              else itemElsRef.current.delete(index);
+            }}
+            style={{ contentVisibility: "auto", containIntrinsicSize: "auto 320px" }}
+          >
+            <div className="mx-auto max-w-[768px] px-5 animate-in fade-in duration-500">
+              <MessageItem
+                message={message}
+                sources={
+                  message.sources && message.sources.length > 0
+                    ? message.sources
+                    : String(message.id).startsWith("temp-") ? activeSources : []
+                }
+                onCitationClick={(citationIndex) => setActiveCitationIndex(citationIndex)}
+                onFollowUpClick={onFollowUpClick}
+                onRetry={() => onRetry?.(retryPrompt)}
+                onEdit={onEdit}
+                onSourceClick={setPeekUrl}
+                onFileClick={onFileClick}
+                onPreview={onPreview}
+                onFileDelete={onFileDelete}
+                onDelete={onDelete}
+                activeGenerationStatus={activeGenerationStatus}
+                onHtmlPreview={onHtmlPreview}
+                conversationId={conversationId}
+              />
             </div>
-          );
-        }}
-        components={{
-          Footer: () => (
-            <div
-              className="w-full shrink-0"
-              style={{ height: "calc(env(safe-area-inset-bottom, 0px) + 50vh)" }}
-            />
-          ),
-        }}
-      />
+          </div>
+        );
+      })}
+      {/* Spacer so the last message sits above the fixed input (like the old Footer) */}
+      <div className="w-full shrink-0" style={{ height: "calc(env(safe-area-inset-bottom, 0px) + 50vh)" }} />
     </div>
   );
 });
