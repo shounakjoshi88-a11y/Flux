@@ -44,8 +44,9 @@ export function enrichConversationMessages(rawMessages: any[]): ConvCacheEntry {
                 // Map/merge sandbox status events into code_execution blocks
                 if (sub.startsWith('sandbox_')) {
                   const isStart = sub === 'sandbox_start';
+                  const isOutput = sub === 'sandbox_output';
                   const lastCodeExec = [...parts].reverse().find(p => p.type === 'code_execution') as any;
-                  
+
                   if (isStart) {
                     parts.push({
                       type: "code_execution",
@@ -57,15 +58,44 @@ export function enrichConversationMessages(rawMessages: any[]): ConvCacheEntry {
                         generatedFiles: []
                       }
                     } as any);
-                  } else {
+                  } else if (isOutput) {
+                    const stdoutArr: string[] = tp.data?.stdout ?? [];
+                    const stderrArr: string[] = tp.data?.stderr ?? [];
+                    const outputLines = [
+                      ...stdoutArr.map((line: any) => ({ type: 'stdout', content: String(line) })),
+                      ...stderrArr.map((line: any) => ({ type: 'stderr', content: String(line) })),
+                    ];
                     if (lastCodeExec && lastCodeExec.block) {
                       lastCodeExec.block.isRunning = false;
-                      lastCodeExec.block.exitCode = tp.data?.exitCode ?? (sub === 'sandbox_error' ? 1 : 0);
-                      lastCodeExec.block.duration = tp.data?.duration;
-                      if (tp.data?.stdout || tp.data?.stderr) {
+                      lastCodeExec.block.outputLines = outputLines;
+                      if (typeof tp.data?.exitCode === 'number') lastCodeExec.block.exitCode = tp.data.exitCode;
+                      if (tp.data?.duration != null) lastCodeExec.block.duration = tp.data.duration;
+                    } else {
+                      parts.push({
+                        type: "code_execution",
+                        block: {
+                          code: tp.data?.command ?? tp.data?.code ?? "",
+                          language: tp.data?.tool === "run_python" ? "python" : "bash",
+                          outputLines,
+                          isRunning: false,
+                          exitCode: typeof tp.data?.exitCode === 'number' ? tp.data.exitCode : undefined,
+                          duration: tp.data?.duration,
+                          generatedFiles: []
+                        }
+                      } as any);
+                    }
+                  } else {
+                    // Summary/terminal events: close the block out — but never
+                    // invent an exit code. Badge shows only when a real one ran.
+                    if (lastCodeExec && lastCodeExec.block) {
+                      lastCodeExec.block.isRunning = false;
+                      if (typeof tp.data?.exitCode === 'number') lastCodeExec.block.exitCode = tp.data.exitCode;
+                      else if (sub === 'sandbox_error' && lastCodeExec.block.exitCode === undefined) lastCodeExec.block.exitCode = 1;
+                      if (tp.data?.duration != null) lastCodeExec.block.duration = tp.data.duration;
+                      if (!lastCodeExec.block.outputLines?.length && tp.data?.stdout) {
                         lastCodeExec.block.outputLines = [
-                          ...(tp.data.stdout ? tp.data.stdout.split('\n').map((line: string) => ({ type: 'stdout', content: line })) : []),
-                          ...(tp.data.stderr ? tp.data.stderr.split('\n').map((line: string) => ({ type: 'stderr', content: line })) : [])
+                          ...(tp.data.stdout ? String(tp.data.stdout).split('\n').map((line: string) => ({ type: 'stdout', content: line })) : []),
+                          ...(tp.data.stderr ? String(tp.data.stderr).split('\n').map((line: string) => ({ type: 'stderr', content: line })) : [])
                         ];
                       }
                     } else {
@@ -75,11 +105,11 @@ export function enrichConversationMessages(rawMessages: any[]): ConvCacheEntry {
                           code: tp.data?.command ?? tp.data?.code ?? "",
                           language: tp.data?.tool === "run_python" ? "python" : "bash",
                           outputLines: [
-                            ...(tp.data?.stdout ? tp.data.stdout.split('\n').map((line: string) => ({ type: 'stdout', content: line })) : []),
-                            ...(tp.data?.stderr ? tp.data.stderr.split('\n').map((line: string) => ({ type: 'stderr', content: line })) : [])
+                            ...(tp.data?.stdout ? String(tp.data.stdout).split('\n').map((line: string) => ({ type: 'stdout', content: line })) : []),
+                            ...(tp.data?.stderr ? String(tp.data.stderr).split('\n').map((line: string) => ({ type: 'stderr', content: line })) : [])
                           ],
                           isRunning: false,
-                          exitCode: tp.data?.exitCode,
+                          exitCode: typeof tp.data?.exitCode === 'number' ? tp.data.exitCode : undefined,
                           duration: tp.data?.duration,
                           generatedFiles: []
                         }

@@ -32,6 +32,17 @@ export interface SandboxHandle {
   sandboxDomain: string;
 }
 
+/** The SDK does NOT throw on connection failure — it returns
+ *  { ok: false, error: { content: { errorMessage } } }. Unwrap to the real
+ *  reason: throws with the actual message, or returns the data payload. */
+function unwrapSandbox(res: any, op: string): any {
+  if (res && res.ok === false) {
+    const msg = res?.error?.content?.errorMessage || res?.error?.errorMessage || `sandbox ${op} failed`;
+    throw new Error(`[sandbox ${op}] ${msg}`);
+  }
+  return (res as any)?.data ?? res;
+}
+
 export class SandboxManager {
   private client: SandboxClient;
   private base: string;
@@ -52,11 +63,12 @@ export class SandboxManager {
     }
 
     const workdir = `/home/user/${conversationId}`;
-    // Ensure the working directory exists.
+    // Ensure the working directory exists — surface failure loudly.
     try {
-      await this.client.shell.execCommand({ command: `mkdir -p ${workdir}` });
-    } catch {
-      /* ignore */
+      const mk = await this.client.shell.execCommand({ command: `mkdir -p ${workdir}` });
+      if (mk && (mk as any).ok === false) throw new Error((mk as any)?.error?.content?.errorMessage ?? 'mkdir failed');
+    } catch (e: any) {
+      console.warn(`[sandbox] cannot reach ${this.base} — commands will fail with the real reason (${e?.message ?? e})`);
     }
 
     const handle: SandboxHandle = {
@@ -66,46 +78,54 @@ export class SandboxManager {
       commands: {
         run: async (command: string, options?: any) => {
           const timeout = options?.timeoutMs ?? 120_000;
-          const res = await this.client.shell.execCommand({
-            command,
-            exec_dir: options?.cwd ?? workdir,
-            timeout: Math.round(timeout / 1000),
-          });
-          const data = (res as any)?.data ?? res;
-          // Stream output to callbacks if provided.
-          if (options?.onStdout && data?.output) {
-            for (const line of String(data.output).split('\n')) {
-              if (line) options.onStdout(line);
+          try {
+            const res = await this.client.shell.execCommand({
+              command,
+              exec_dir: options?.cwd ?? workdir,
+              timeout: Math.round(timeout / 1000),
+            });
+            const data = unwrapSandbox(res, 'exec');
+            // Stream output to callbacks if provided.
+            if (options?.onStdout && data?.output) {
+              for (const line of String(data.output).split('\n')) {
+                if (line) options.onStdout(line);
+              }
             }
-          }
-          if (options?.onStderr && data?.stderr) {
-            for (const line of String(data.stderr).split('\n')) {
-              if (line) options.onStderr(line);
+            if (options?.onStderr && data?.stderr) {
+              for (const line of String(data.stderr).split('\n')) {
+                if (line) options.onStderr(line);
+              }
             }
+            // Background processes: fire and forget.
+            if (options?.background) {
+              return { stdout: data?.output ?? '', stderr: data?.stderr ?? '', exitCode: data?.exit_code ?? 1 };
+            }
+            return {
+              stdout: data?.output ?? '',
+              stderr: data?.stderr ?? '',
+              exitCode: typeof data?.exit_code === 'number' ? data.exit_code : 1,
+            };
+          } catch (e: any) {
+            // Honest failure — never fake exit 0.
+            const msg = e?.message ?? String(e);
+            if (options?.onStderr) options.onStderr(msg);
+            return { stdout: '', stderr: msg, exitCode: 1 };
           }
-          // Background processes: fire and forget.
-          if (options?.background) {
-            return { stdout: data?.output ?? '', stderr: data?.stderr ?? '', exitCode: data?.exit_code ?? 0 };
-          }
-          return {
-            stdout: data?.output ?? '',
-            stderr: data?.stderr ?? '',
-            exitCode: data?.exit_code ?? 0,
-          };
         },
       },
       files: {
         read: async (filePath: string) => {
           const res = await this.client.file.readFile({ file: filePath });
-          const data = (res as any)?.data ?? res;
+          const data = unwrapSandbox(res, 'read');
           return data?.content ?? '';
         },
         write: async (filePath: string, content: string | Buffer) => {
-          await this.client.file.writeFile({ file: filePath, content: String(content) });
+          const res = await this.client.file.writeFile({ file: filePath, content: String(content) });
+          unwrapSandbox(res, 'write');
         },
         list: async (dirPath: string) => {
           const res = await this.client.file.listPath({ path: dirPath });
-          const data = (res as any)?.data ?? res;
+          const data = unwrapSandbox(res, 'list');
           const files = data?.files ?? [];
           return files.map((f: any) => ({ path: f.name ?? f.path ?? '' }));
         },
@@ -115,7 +135,7 @@ export class SandboxManager {
         // Use jupyter for Python execution.
         try {
           const res = await this.client.jupyter.executeCode({ code });
-          const data = (res as any)?.data ?? res;
+          const data = unwrapSandbox(res, 'execute');
           const stdout: string[] = [];
           const stderr: string[] = [];
           if (data?.outputs) {

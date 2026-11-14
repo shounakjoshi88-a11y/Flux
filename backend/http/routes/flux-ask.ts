@@ -1077,6 +1077,36 @@ ${memCtx}
                                     res.write(`event: code_output\ndata: ${JSON.stringify({ type, content: line })}\n\n`);
                                 }
                             }, abortController.signal);
+                            // Persist the transcript into thoughtProcess so the
+                            // tool block survives reloads. The SSE stream only
+                            // reaches the live client; without this, the block
+                            // comes back empty after a refresh.
+                            const MAX_LINE = 200;
+                            const MAX_CHARS = 24_000;
+                            const clip = (arr: string[]): string[] => {
+                                const kept: string[] = [];
+                                let total = 0;
+                                for (const line of (arr ?? [])) {
+                                    if (kept.length >= MAX_LINE || total > MAX_CHARS) { kept.push(`… ${(arr?.length ?? 0) - kept.length} more lines`); break; }
+                                    kept.push(String(line));
+                                    total += String(line).length + 1;
+                                }
+                                return kept;
+                            };
+                            sendStatus(
+                                res,
+                                'sandbox_output',
+                                `$ ${cmd.slice(0, 80)}`,
+                                {
+                                    tool: 'bash_fallback',
+                                    command: cmd,
+                                    stdout: clip(result.stdout ?? []),
+                                    stderr: clip(result.stderr ?? []),
+                                    exitCode: result.exitCode,
+                                    duration: result.duration,
+                                },
+                                agentState.thoughtProcess,
+                            );
                             if (!res.writableEnded) {
                                 res.write(`event: code_done\ndata: ${JSON.stringify({ exitCode: result.exitCode, duration: result.duration })}\n\n`);
                             }

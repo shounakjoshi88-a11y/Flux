@@ -513,7 +513,7 @@ export function useChat(user: any) {
                     }
                   }
                 } else {
-                  if (sub !== 'sandbox_start') {
+                  if (sub !== 'sandbox_start' && sub !== 'sandbox_output') {
                     streamingPartsRef.current = [...streamingPartsRef.current, {
                       type: "tool_call",
                       name: sub,
