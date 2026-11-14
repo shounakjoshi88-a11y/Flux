@@ -22,8 +22,21 @@ const tls = certExists && keyExists
 async function serveFile(filePath: string): Promise<Response> {
   const buf = await Bun.file(filePath).bytes();
   const ext = filePath.substring(filePath.lastIndexOf("."));
+  const isShell = ext === ".html" || ext === ".json";
+  // Content-hashed JS/CSS: immutable, cache forever. The HTML shell must
+  // always be revalidated — otherwise browsers pin whatever bundle name
+  // was current at first visit, and users keep seeing stale builds.
+  const cache = isShell
+    ? "no-store"
+    : ext === ".js" || ext === ".css" || ext === ".map"
+      ? "public, max-age=31536000, immutable"
+      : "no-store";
   return new Response(buf, {
-    headers: { "Content-Type": MIME[ext] || "application/octet-stream" },
+    headers: {
+      "Content-Type": MIME[ext] || "application/octet-stream",
+      "Cache-Control": cache,
+      ...(filePath.endsWith("index.html") ? { "X-Accel-Buffering": "no" } : {}),
+    },
   });
 }
 
