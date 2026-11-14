@@ -553,9 +553,9 @@ export default function Dashboard() {
 
   const handleDeleteMessage = useCallback((messageId: string | number) => {
     if (activeTransport === "ws") {
-      ws.deleteMessage?.(messageId);
+      ws.deleteMessage?.(messageId, activeConversationId);
     } else {
-      sseDeleteMessage(messageId);
+      sseDeleteMessage(messageId, activeConversationId);
     }
     const idx = messages.findIndex(m => m.id === messageId);
     if (idx >= 0) {
@@ -571,7 +571,7 @@ export default function Dashboard() {
         createNewThread();
       }
     }
-  }, [activeTransport, ws, sseDeleteMessage, messages, createNewThread]);
+  }, [activeTransport, ws, sseDeleteMessage, messages, createNewThread, activeConversationId]);
 
   // ── Jump to prompt ──
   const handleJumpToPrompt = useCallback((messageId: string | number) => {

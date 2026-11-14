@@ -980,7 +980,7 @@ export function useChat(user: any) {
     );
   }, [isLoading, handleSubmit]);
 
-  const deleteMessage = useCallback(async (messageId: string | number) => {
+  const deleteMessage = useCallback(async (messageId: string | number, conversationId?: string | null) => {
     let pairedId: string | number | null = null;
     setMessages((prev) => {
       const idx = prev.findIndex(m => m.id === messageId);
@@ -1001,8 +1001,13 @@ export function useChat(user: any) {
     if (typeof messageId === 'number' && messageId > 0) {
       try {
         const token = await getAccessToken();
-        const convId = lastRequestRef.current?.activeConversationId;
-        if (!convId) return;
+        // Prefer the explicit id passed by the caller (it survives page reload;
+        // lastRequestRef.current is null until the first send).
+        const convId = conversationId ?? lastRequestRef.current?.activeConversationId;
+        if (!convId) {
+          console.warn('[DELETE] No conversation id available — message was removed from view only');
+          return;
+        }
         await fetch(`${BACKEND_URL}/conversations/${convId}/messages/${messageId}`, {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}` },

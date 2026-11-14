@@ -679,7 +679,7 @@ export function useAgentSession(user: any) {
     };
   }, [disconnect, stopThoughtTimer]);
 
-  const deleteMessage = useCallback(async (messageId: string | number) => {
+  const deleteMessage = useCallback(async (messageId: string | number, conversationId?: string | null) => {
     let pairedId: string | number | null = null;
     setMessages((prev) => {
       const idx = prev.findIndex(m => m.id === messageId);
@@ -696,8 +696,11 @@ export function useAgentSession(user: any) {
     if (typeof messageId === 'number' && messageId > 0) {
       try {
         const token = await getAccessToken();
-        const convId = conversationIdRef.current;
-        if (!convId) return;
+        const convId = conversationId ?? conversationIdRef.current;
+        if (!convId) {
+          console.warn('[DELETE] No conversation id available — message was removed from view only');
+          return;
+        }
         await fetch(`${BACKEND_URL}/conversations/${convId}/messages/${messageId}`, {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}` },
