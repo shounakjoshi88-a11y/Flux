@@ -22,7 +22,23 @@ export function applySecurityMiddleware(app: Express): void {
     app.set('trust proxy', 1);
 
     app.use(helmet());
-    app.use(compression({ level: 6, threshold: 512 }));
+
+    // Skip compression on event streams: compression() buffers writes
+    // internally, so SSE chunks don't reach the client until the response
+    // ends ("answer appears all at once at the end"). Everything else is
+    // compressed exactly as before.
+    const SSE_PATHS = new Set([
+        '/flux_ask',
+        '/api/chat-sdk',
+        '/v1/chat/completions',
+        '/api/multiagent-build',
+        '/summarize',
+    ]);
+    const compressionMiddleware = compression({ level: 6, threshold: 512 });
+    app.use((req, res, next) => {
+        if (SSE_PATHS.has(req.path)) return next();
+        return compressionMiddleware(req, res, next);
+    });
     app.use(cors(corsOptions));
     app.use(express.json({ limit: BODY_LIMIT }));
 }

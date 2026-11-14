@@ -167,8 +167,9 @@ export default function Dashboard() {
 
   const [isTeamPanelOpen, setIsTeamPanelOpen] = useState(false);
   const [isCustomAgentsOpen, setIsCustomAgentsOpen] = useState(false);
-  // WS-vs-SSE auto-detection lives in its own hook (see hooks/useTransportAutoDetect)
-  const { activeTransport, setActiveTransport, wsAvailableRef } = useTransportAutoDetect(ws);
+  // WS-vs-SSE auto-detection lives in its own hook (see hooks/useTransportAutoDetect).
+  // Passing the streaming flag so the flip to WS never happens mid-stream.
+  const { activeTransport, setActiveTransport, wsAvailableRef } = useTransportAutoDetect(ws, sseLoading || ws.isLoading);
   const [visibleRange, setVisibleRange] = useState({ startIndex: 0, endIndex: 0 });
   /** Imperative handle into MessageList for the prompt-history card's jump. */
   const messageListRef = useRef<MessageListHandle>(null);
@@ -177,28 +178,6 @@ export default function Dashboard() {
   const setMessages = activeTransport === "ws" ? ws.setMessages : setSseMessages;
   const isLoading = activeTransport === "ws" ? ws.isLoading : sseLoading;
   const sessionState = ws.sessionState;
-
-  // ── Hydrate the WS store from the SSE store ─────────────────────────
-  // Cold-loading a thread writes history into the SSE store via
-  // openConversation(); if the WS transport wins the race and flips to
-  // "ws" before/after that fetch lands, Virtuoso would otherwise render
-  // the empty WS store forever (the intermittent "thread opens blank"
-  // bug). Until the WS store holds anything, migrate the SSE history
-  // over once. The flag resets when both stores are empty (New chat),
-  // so a cleared thread is never re-hydrated.
-  const wsHydratedRef = useRef(false);
-  useEffect(() => {
-    if (activeTransport !== "ws") return;
-    if (ws.messages.length === 0 && sseMessages.length === 0) {
-      wsHydratedRef.current = false;
-      return;
-    }
-    if (wsHydratedRef.current) return;
-    if (ws.messages.length === 0 && sseMessages.length > 0) {
-      ws.setMessages(sseMessages);
-      wsHydratedRef.current = true;
-    }
-  }, [activeTransport, sseMessages, ws]);
 
   const previousSidebarOpen = useRef(isSidebarOpen);
 
@@ -389,10 +368,24 @@ export default function Dashboard() {
   );
 
   // ── Main send handler ──
+  /** Synchronous guard against a double-click/double-submit within one frame
+   *  (isLoading from state lags one render). Reset when the stream ends —
+   *  and as a belt-and-braces, after 15s regardless, so a path that never
+   *  flips isLoading can't wedge the composer permanently. */
+  const sendInFlightRef = useRef(false);
+  useEffect(() => {
+    if (!isLoading) sendInFlightRef.current = false;
+  }, [isLoading]);
+  useEffect(() => {
+    if (!sendInFlightRef.current) return;
+    const t = setTimeout(() => { sendInFlightRef.current = false; }, 15_000);
+    return () => clearTimeout(t);
+  }, [isLoading]);
+
   const handleSend = useCallback(
     (nextQuery?: string) => {
       const prompt = (nextQuery ?? query).trim();
-      if (!prompt || isLoading) return;
+      if (!prompt || isLoading || sendInFlightRef.current) return;
 
       // Check for slash commands — always use WS
       const cmdMatch = prompt.match(/^\/(plan|yolo|team)\b\s*(.*)/);
@@ -403,6 +396,7 @@ export default function Dashboard() {
         dispatchSlashCommand(cmd, rest);
         return;
       }
+      sendInFlightRef.current = true;
 
       setQuery("");
 

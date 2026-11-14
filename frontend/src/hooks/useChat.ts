@@ -337,7 +337,10 @@ export function useChat(user: any) {
         sources: [],
         followUps: [],
         generatedFiles: [],
-        parts: [{ type: "agent_status", status: "processing", message: "Thinking..." }],
+        // No placeholder parts — the assistant message stays blank until a
+        // real part (thought/text/tool_call) arrives from the stream. A
+        // canned "Thinking..." shimmer reads as fake output to the user.
+        parts: [],
       };
 
       setMessages((prev) => {
