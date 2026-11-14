@@ -5,6 +5,7 @@ import { broadcastSyncEvent } from '../../sync/broadcast';
 import { autoRenameConversation } from '../../services/conversations/rename';
 import { slugify } from '../../http/util/slug';
 import { sanitizeLocation } from '../../http/util/sanitize';
+import { stripEmDashes } from '../../prompts/sanitize';
 import { AGENT_SYSTEM_EXTENSION, VISUAL_INSTRUCTIONS } from '../../prompts/agent-extension';
 import { extractTopicFromQuery } from '../../services/documents/intent';
 import { generateDocumentWithSkill, fetchSkillFile, SKILL_REGISTRY } from '../../services/documents/generate';
@@ -267,7 +268,7 @@ export function createFluxAskRouter(): Router {
               })
             : '';
 
-        // Auto-write attached text files to the E2B sandbox so run_bash can reference them
+        // Auto-write attached text files to the sandbox so run_bash can reference them
         let sandboxFileNotice = '';
         if (hasAnyFile && activeConversationId) {
             try {
@@ -1231,7 +1232,7 @@ ${memCtx}
                     try {
                         const synthRes = await generateText({
                             model,
-                            system: `You are Flux's synthesis engine. Transform raw context into a precise, high-value answer. Be warm and conversational with a touch of wit — use playful analogies, light sarcasm, and the occasional dad joke when appropriate. Can be real sarcastic sometimes too for better personality. Don't use em dashes 99% of the time.
+                            system: `You are Flux's synthesis engine. Transform raw context into a precise, high-value answer. Be warm and conversational with a touch of wit — use playful analogies, light sarcasm, and the occasional dad joke when appropriate. Can be real sarcastic sometimes too for better personality. NO em dashes, ever — use commas, periods, or colons instead.
 
 STEP 1 — DETECT QUERY TYPE and adapt your output:
 • FACTUAL/DIRECT (confirmations, quick lookups): One bold direct answer → tight supporting table or 3–5 bullets.
@@ -1377,10 +1378,10 @@ CROSS-FILE RULES (when multiple files provided):
 
         // ── Clean text for DB ─────────────────────────────────────────
         // Rewrite sandbox:/home/user/... links to proper download URLs
-        let cleanText = fullText.replace(
+        let cleanText = stripEmDashes(fullText.replace(
             /sandbox:\/home\/user\/(?:uploads\/|edits\/)?([^\s)\]]+)/gi,
             (_match, filename) => `/api/sandbox/download/${activeConversationId}/${filename}`
-        );
+        ));
         const cleanAnswer = cleanText
             .replace(/<FOLLOW_UPS>[\s\S]*?<\/FOLLOW_UPS>/gi, '')
             .replace(/<FOLLOW_UPS>[\s\S]*/gi, '')

@@ -8,7 +8,7 @@ import { MessageRenderer } from "./MessageRenderer";
 import { InlineMath } from "./MathRenderer";
 import { BACKEND_URL } from "../../lib/config";
 import { createClient } from "../../lib/client";
-import { getDomain, rewriteSandboxUrls, isBase64DataUrl, splitDataUrl, byteLengthOfBase64, formatFileSize, toBase64Utf8, base64ToBytes } from "../../lib/chat-utils";
+import { getDomain, rewriteSandboxUrls, isBase64DataUrl, splitDataUrl, byteLengthOfBase64, formatFileSize, toBase64Utf8, base64ToBytes, stripEmDashes } from "../../lib/chat-utils";
 import type { Source } from "../../types";
 
 export function UserFileAttachment({
@@ -236,6 +236,7 @@ export function RenderFollowUpText({ text }: { text: string }) {
 /* ─── Ultimate answer cleaner ─── */
 export function deepCleanAnswer(raw: string): string {
   if (typeof raw !== 'string' || !raw.trim()) return "";
+  raw = stripEmDashes(raw);
   let clean = raw
     // First, completely remove follow-up questions block and anything after it (including unclosed <FOLLOW_UPS)
     .replace(/<FOLLOW_UPS>[\s\S]*?(?:<\/FOLLOW_UPS>|$)/gi, "")

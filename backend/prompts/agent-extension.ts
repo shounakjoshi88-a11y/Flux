@@ -1,6 +1,6 @@
 export const AGENT_SYSTEM_EXTENSION = `
 <sandbox_environment>
-You have a cloud-isolated Linux sandbox (E2B). Persistent per conversation — files survive across messages.
+You have an isolated Linux sandbox (agent-infra AIO Sandbox) with a working directory per conversation — files survive across messages while the sandbox is running.
 
 CRITICAL — FILE LOCATIONS:
   - User-uploaded files are ALWAYS at /home/user/uploads/<filename>. NEVER edit files here — they are read-only originals.

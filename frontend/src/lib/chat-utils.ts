@@ -89,6 +89,13 @@ export function base64ToBytes(b64: string): Uint8Array {
   return bytes;
 }
 
+/** Strip em/en dashes from PROSE only — code spans (fenced or inline) are left untouched. */
+export function stripEmDashes(text: string): string {
+  if (!text || !/[\u2013\u2014\u2015]/.test(text)) return text;
+  const parts = text.split(/(```[\s\S]*?```|`[^`\n]*`)/g);
+  return parts.map((p, i) => (i % 2 === 1 ? p : p.replace(/[ \t]*[\u2013\u2014\u2015][ \t]*/g, ' - '))).join('');
+}
+
 export function parseAssistantContent(raw: string) {
   const sourcesRegex = /<SOURCES>([\s\S]*?)<\/SOURCES>/;
   const sourcesMatch = raw.match(sourcesRegex);
@@ -202,6 +209,7 @@ export function extractLiveContent(raw: string): {
 
 export function deepCleanAnswer(raw: string): string {
   if (typeof raw !== 'string' || !raw.trim()) return "";
+  raw = stripEmDashes(raw);
   let clean = fixMalformedTags(raw)
     .replace(/<FOLLOW_UPS>[\s\S]*?(?:<\/FOLLOW_UPS>|$)/gi, "")
     .replace(/<FOLLOW_UPS[\s\S]*/gi, "")
