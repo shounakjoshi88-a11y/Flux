@@ -1,6 +1,6 @@
 // Dynamic model discovery — fetches models from backend API
 // Inspired by AionUi's useAcpModelInfo with polling fallback
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { BACKEND_URL } from "../lib/config";
 
 export interface ModelOption {
@@ -32,10 +32,10 @@ export function useModels(): ModelDiscoveryResult {
   const [all, setAll] = useState<ModelOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const refreshRef = useRef(0);
+  const [refreshCount, setRefreshCount] = useState(0);
 
   const refresh = useCallback(() => {
-    refreshRef.current++;
+    setRefreshCount((c) => c + 1);
   }, []);
 
   useEffect(() => {
@@ -77,7 +77,7 @@ export function useModels(): ModelDiscoveryResult {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [refreshRef.current]);
+  }, [refreshCount]);
 
   return { categories, all, isLoading, error, refresh };
 }

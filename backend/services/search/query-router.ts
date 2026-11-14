@@ -1,6 +1,11 @@
 // query-router.ts — Classifies queries and routes to appropriate model
 
-const CHEAP_MODEL_ID = "nemotron-3-nano-omni-30b-a3b-reasoning";
+// Simple and complex queries were different tiers pre-retirement, but the
+// cheap tier was only ever a reasoning model (nemotron-3-nano-omni), which
+// emits only ~9 chars of visible text — the reason simple answers came
+// back blank. The only verified live model is 550b-a55b, so both tiers
+// share it until a cheaper live general model appears.
+const CHEAP_MODEL_ID = "nemotron-3-ultra-550b";
 const EXPENSIVE_MODELS = new Set([
   "nemotron-3-ultra-550b",
   "laguna-xs-2.1",

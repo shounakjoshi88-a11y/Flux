@@ -121,8 +121,7 @@ let mjPromise: Promise<any> | null = null;
 let mjReady = false;
 
 export function needsMathJax(formula: string): boolean {
-  if (/\\xymatrix\b/.test(formula)) return true;
-  return false;
+  return /\\(multicolumn|intertext|genfrac|xymatrix|halign)\b/.test(formula);
 }
 
 function MathJaxRenderer({ formula, display }: { formula: string; display: boolean }) {
@@ -332,6 +331,9 @@ function parseCDArrow(arrow: string): string {
 export function repairLatex(formula: string): string {
   if (!formula) return "";
   let s = formula;
+
+  // If the formula needs MathJax, return it untouched — MathJax will handle it
+  if (needsMathJax(s)) return s;
 
   // ── 0. Convert \begin{CD}...\end{CD} to KaTeX-compatible matrix ──
   s = convertCDtoMatrix(s);

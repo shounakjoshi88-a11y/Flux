@@ -12,7 +12,7 @@ interface PendingMessage {
   timestamp: number;
 }
 
-function openDB(): Promise<IDBObjectStore> {
+function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
@@ -23,54 +23,57 @@ function openDB(): Promise<IDBObjectStore> {
       }
     };
     request.onsuccess = () => {
-      const db = request.result;
-      const tx = db.transaction(STORE_NAME, "readwrite");
-      resolve(tx.objectStore(STORE_NAME));
+      resolve(request.result);
     };
     request.onerror = () => reject(request.error);
   });
 }
 
 export async function queueMessage(msg: PendingMessage): Promise<void> {
-  const store = await openDB();
+  const db = await openDB();
   return new Promise((resolve, reject) => {
-    const req = store.add(msg);
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const req = tx.objectStore(STORE_NAME).add(msg);
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
   });
 }
 
 export async function getQueuedMessages(): Promise<PendingMessage[]> {
-  const store = await openDB();
+  const db = await openDB();
   return new Promise((resolve, reject) => {
-    const req = store.getAll();
+    const tx = db.transaction(STORE_NAME, "readonly");
+    const req = tx.objectStore(STORE_NAME).getAll();
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
 }
 
 export async function removeQueuedMessage(id: string): Promise<void> {
-  const store = await openDB();
+  const db = await openDB();
   return new Promise((resolve, reject) => {
-    const req = store.delete(id);
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const req = tx.objectStore(STORE_NAME).delete(id);
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
   });
 }
 
 export async function clearQueue(): Promise<void> {
-  const store = await openDB();
+  const db = await openDB();
   return new Promise((resolve, reject) => {
-    const req = store.clear();
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const req = tx.objectStore(STORE_NAME).clear();
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
   });
 }
 
 export async function getQueueLength(): Promise<number> {
-  const store = await openDB();
+  const db = await openDB();
   return new Promise((resolve, reject) => {
-    const req = store.count();
+    const tx = db.transaction(STORE_NAME, "readonly");
+    const req = tx.objectStore(STORE_NAME).count();
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });

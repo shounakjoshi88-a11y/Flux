@@ -158,7 +158,15 @@ export function useChat(user: any) {
   }, []);
 
   const resetMessages = useCallback(() => {
-    setMessages([]);
+    setMessages((prev) => {
+      // Clean up localStorage for all current messages
+      for (const m of prev) {
+        if (m.id && m.id !== -1 && m.id !== "-1") {
+          try { localStorage.removeItem(`flux-parts-${m.id}`); } catch {}
+        }
+      }
+      return [];
+    });
     setIsLoading(false);
     isLoadingRef.current = false;
     abortControllerRef.current?.abort();
@@ -981,6 +989,10 @@ export function useChat(user: any) {
         pairedId = prev[idx - 1]!.id;
       }
       const idsToDelete = pairedId ? [messageId, pairedId] : [messageId];
+      // Clean up localStorage for deleted messages
+      for (const id of idsToDelete) {
+        try { localStorage.removeItem(`flux-parts-${id}`); } catch {}
+      }
       return prev.filter((m) => !idsToDelete.includes(m.id));
     });
     if (typeof messageId === 'number' && messageId > 0) {

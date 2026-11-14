@@ -38,7 +38,7 @@ function jsonSchemaToZod(schema: any): z.ZodTypeAny {
   if (schema.type === 'integer') return z.number().int();
   if (schema.type === 'boolean') return z.boolean();
   if (schema.type === 'array') {
-    return z.array(jsonSchemaToZod(schema.items || z.any()));
+    return z.array(jsonSchemaToZod(schema.items || {}));
   }
   if (schema.type === 'object' || schema.properties) {
     const shape: Record<string, z.ZodTypeAny> = {};
@@ -52,7 +52,7 @@ function jsonSchemaToZod(schema: any): z.ZodTypeAny {
       const requiredSet = new Set(schema.required);
       for (const key of Object.keys(shape)) {
         if (!requiredSet.has(key)) {
-          shape[key] = shape[key].optional();
+          shape[key] = shape[key]!.optional();
         }
       }
       obj = z.object(shape);

@@ -184,11 +184,12 @@ export function createFluxAskRouter(): Router {
                 },
             });
         }
-        const convIsNew = !existingConv && !conversationId;
+        const convIsNew = !existingConv;
         const newConv = convIsNew ? await prisma.conversation.create({
             data: { title: nq.slice(0, 120), slug: slugify(nq), userId: uid },
         }) : null;
-        activeConversationId = existingConv?.id ?? newConv!.id;
+        const activeConversation = existingConv ?? newConv!;
+        activeConversationId = activeConversation.id;
         if (convIsNew) broadcastSyncEvent(suid, { type: 'conversation_created' });
 
         // ── SSE setup ───────────────────────────────────────────────────
@@ -243,7 +244,7 @@ export function createFluxAskRouter(): Router {
         }
 
         // ── Save user message (fire-and-forget — don't block streaming) ──
-        const userMsgFileText = '';
+        const userMsgFileText = safeFile || (safeAtt.filter(f => f.content && !f.type?.startsWith('image/') && !f.type?.startsWith('video/')).map(f => `[${f.name}]\n${f.content}`).join('\n\n'));
         prisma.message.create({
             data: {
                 content: userMsgFileText ? `${userMsgFileText}\n--\n${nq}` : nq,

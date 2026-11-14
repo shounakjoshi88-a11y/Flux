@@ -206,7 +206,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const savedId = localStorage.getItem("flux-active-conversation");
-    if (savedId && user) openConversation(savedId);
+    if (savedId && user) openConversationGuarded(savedId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
@@ -250,6 +250,19 @@ export default function Dashboard() {
     cachePreference: adaptive.cachePreference,
   });
 
+  // Gate the DB-refresh behind isLoading: a fresh /flux_ask round advances the
+  // optimistic messages while a fetch in openConversation would SET messages
+  // from the DB to a partial record (the assistant message isn't persisted
+  // yet) - wiping the streamed answer out of the UI the moment the answer is
+  // about to land.
+  const openConversationGuarded = useCallback(
+    (id: string) => {
+      if (isLoading) return; // streaming owns the UI until the stream ends
+      openConversation(id);
+    },
+    [openConversation, isLoading],
+  );
+
   // ── Conversation actions: rename, delete, undo toast ────────────────────
   const {
     isRenaming, renameValue, setRenameValue, renameInputRef,
@@ -279,7 +292,7 @@ export default function Dashboard() {
       if (activeConversationId === conversationId) {
         // Refresh active conversation to show new messages from other devices
         conversationCacheRef.current.delete(conversationId);
-        openConversation(conversationId);
+        openConversationGuarded(conversationId);
       }
       // Also refresh sidebar to update the conversation list order
       loadConversations(true);
@@ -300,22 +313,22 @@ export default function Dashboard() {
       slugHandled.current = true;
       const match = conversations.find(c => c.slug === slug);
       if (match) {
-        openConversation(match.id);
+        openConversationGuarded(match.id);
       } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)) {
         // URL has a raw UUID (from a previous bug) — try to find by ID
         const idMatch = conversations.find(c => c.id === slug);
         if (idMatch) {
           navigate(`/c/${idMatch.slug}`, { replace: true });
-          openConversation(idMatch.id);
+          openConversationGuarded(idMatch.id);
         } else {
           // Fetch from backend directly
-          openConversation(slug);
+          openConversationGuarded(slug);
         }
       } else {
         navigate("/", { replace: true });
       }
     }
-  }, [slug, conversations, openConversation, navigate]);
+  }, [slug, conversations, openConversationGuarded, navigate]);
 
   // ── File handling ──
   const handleAttachFiles = useCallback(async (files: FileList | null) => {
@@ -616,7 +629,7 @@ export default function Dashboard() {
     conversations,
     activeConversationId,
     onCreateThread: createNewThread,
-    onSelectThread: openConversation,
+    onSelectThread: openConversationGuarded,
     onDeleteThread: deleteConversation,
     onRenameThread: (id?: string) => handleRenameOpen(id),
     onPrefetchThread: prefetchConversation,
@@ -662,7 +675,7 @@ export default function Dashboard() {
       <ArtifactsModal 
         isOpen={isArtifactsOpen}
         onClose={() => setIsArtifactsOpen(false)}
-        onSelectConversation={openConversation}
+        onSelectConversation={openConversationGuarded}
         onPreview={handlePreview}
       />
 
@@ -922,7 +935,7 @@ export default function Dashboard() {
         <MobileConversationList
           conversations={conversations}
           activeConversationId={activeConversationId}
-          onSelectThread={openConversation}
+          onSelectThread={openConversationGuarded}
           onDeleteThread={deleteConversation}
           onNewChat={createNewThread}
           onClose={() => setMobileScreen("chat")}

@@ -47,6 +47,10 @@ export function createConversationsRouter(ctx: RoutesContext): Router {
         try {
             const uid = req.appUserId!;
             const page = Math.max(1, parseInt(req.query.page as string) || 1);
+            // Sorting by id desc would return an arbitrary 50-of-N threads
+            // (UUIDv4 order) and hide the newest conversation entirely —
+            // that was the "new thread never shows up" bug.
+            // Sort by the latest message in JS after a single join.
             const convs = await prisma.conversation.findMany({
                 where: { userId: uid },
                 orderBy: { id: 'desc' },
@@ -56,15 +60,21 @@ export function createConversationsRouter(ctx: RoutesContext): Router {
                     slug: true,
                     messages: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } },
                 },
-                take: PAGE_SIZE,
-                skip: (page - 1) * PAGE_SIZE,
+                take: 1000,
             });
-            const mapped = convs.map((c) => ({
-                id: c.id,
-                title: c.title,
-                slug: c.slug,
-                lastMessageAt: c.messages[0]?.createdAt ?? null,
-            }));
+            const mapped = convs
+              .map((c) => ({
+                  id: c.id,
+                  title: c.title,
+                  slug: c.slug,
+                  lastMessageAt: c.messages[0]?.createdAt ?? null,
+              }))
+              .sort((a, b) => {
+                  const ta = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+                  const tb = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+                  return tb - ta;
+              })
+              .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
             return res.json({ conversations: mapped, page, take: PAGE_SIZE });
         } catch (e) {
             console.error(e);
