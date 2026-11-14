@@ -185,8 +185,8 @@ export function TerminalBlock({
     // secondary) on the left, live timer / exit badge on the right, no
     // window chrome dots. Body is the raw highlighted command at 12.5px
     // with a 200px max height and an inner scrollbar.
-    <div className={`mt-1.5 overflow-hidden rounded-md border transition-all duration-200 ${borderClass}`}
-      style={{ background: 'var(--bg-primary)' }}>
+    <div className={`mt-1.5 overflow-hidden rounded-md transition-all duration-200 ${borderClass}`}
+      style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.04)' }}>
 
       {/* ── Block header bar */}
       <div className="flex h-7 items-center justify-between gap-2 border-b border-white/[0.04] px-3">

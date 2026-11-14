@@ -140,8 +140,17 @@ export function enrichConversationMessages(rawMessages: any[]): ConvCacheEntry {
               }
               parts.push(lastEntry);
             }
+            // Place the text right after the last search-related tool call, so the
+            // visible order is: search disclosure → prose/answer → read/fetch tool
+            // disclosures — matching how the streaming UI rendered it.
             if (answer.trim()) {
-              parts.push({ type: "text", text: answer });
+              const SEARCH_NAMES = new Set(['searching', 'found_sources', 'no_results', 'web_search', 'wiki_search']);
+              let insertAt = 0;
+              for (let i = parts.length - 1; i >= 0; i--) {
+                const p: any = parts[i];
+                if (p?.type === 'tool_call' && SEARCH_NAMES.has(p.name)) { insertAt = i + 1; break; }
+              }
+              parts.splice(insertAt, 0, { type: "text", text: answer });
             }
             (msg as any).parts = parts;
           }

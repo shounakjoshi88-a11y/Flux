@@ -70,7 +70,7 @@ export function ToolRow({ label, open, onToggle, isActive, rightSlot, className 
       aria-expanded={open}
       className={`group/toolrow relative flex w-stretch items-center gap-1.5 rounded-[8px] py-0 pl-1.5 pr-1 text-left outline-none transition-colors hover:bg-white/[0.04] focus-visible:bg-white/[0.05] select-none ${className ?? ""}`}
     >
-      <span className="min-w-0 flex-1 truncate whitespace-nowrap py-[1px] text-[14px] leading-[20px] font-[400] text-[var(--text-primary)]">
+      <span className="min-w-0 flex-1 truncate whitespace-nowrap py-[1px] text-[14px] leading-[20px] font-[400] text-[var(--text-secondary)] group-hover/toolrow:text-[var(--text-primary)] transition-colors">
         {label}
       </span>
       {rightSlot && <span className="shrink-0">{rightSlot}</span>}
@@ -97,7 +97,7 @@ export function ToolPanel({ open, children }: { open: boolean; children: React.R
           transition={{ type: "spring", stiffness: 260, damping: 26, mass: 0.8 }}
           className="overflow-hidden"
         >
-          <div className="mt-1 overflow-hidden rounded-xl divide-y divide-white/[0.05] border border-white/[0.05] bg-[var(--bg-secondary)]/60">
+          <div className="mt-1 overflow-hidden rounded-lg divide-y divide-white/[0.04] border border-white/[0.04] bg-black/25">
             {children}
           </div>
         </motion.div>

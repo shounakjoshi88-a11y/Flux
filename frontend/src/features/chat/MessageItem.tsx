@@ -524,27 +524,31 @@ export const MessageItem = memo(function MessageItem({
   const isStreaming = String(message.id).startsWith("temp-");
   const assistantContent = parsedContentBundle.cleanDisplayAnswer;
 
-  // When the content is authoritative (completed message), collapse any streamed
-  // text parts (including partial fragments left before/after tool sections) into a
-  // single text part so non-text parts (tools, images, files) still render in place.
+  // When the content is authoritative (completed message), replace the text parts
+  // with the final answer. Keep chronological order: if there are MULTIPLE text
+  // parts (thought → tools → answer), only hydrate the LAST one to the full clean
+  // text; earlier parts stay where they are. Collapse to a single part ONLY when
+  // there's exactly one text part — this preserves interleaved tool-call order.
   const renderParts = useMemo(() => {
     if (!_preferContentText || !_hasParts || !Array.isArray(message.parts)) {
       return message.parts as MessagePart[] | undefined;
     }
+    const textIndices = message.parts
+      .map((p, i) => (p && (p as any).type === "text" ? i : -1))
+      .filter((i) => i >= 0);
+    if (textIndices.length === 0) return message.parts;
     const fullText = (parsedContentBundle.cleanDisplayAnswer ?? "").trim();
-    const out: MessagePart[] = [];
-    let textInserted = false;
-    for (const p of message.parts as MessagePart[]) {
-      if (p && (p as any).type === "text") {
-        if (!textInserted) {
-          out.push({ ...(p as any), text: fullText } as MessagePart);
-          textInserted = true;
-        }
-      } else if (p) {
-        out.push(p);
-      }
+    if (textIndices.length === 1) {
+      const idx = textIndices[0]!;
+      return message.parts.map((p, i) =>
+        i === idx ? { ...(p as any), text: fullText } as MessagePart : p,
+      );
     }
-    return out.length > 0 ? out : message.parts;
+    // Multiple text parts — keep every one in order; hydrate only the final one.
+    const lastIdx = textIndices[textIndices.length - 1]!;
+    return message.parts.map((p, i) =>
+      i === lastIdx ? { ...(p as any), text: fullText } as MessagePart : p,
+    );
   }, [_preferContentText, _hasParts, message.parts, parsedContentBundle.cleanDisplayAnswer]);
 
   // ── For image-only responses, we still render the image even if content is empty ──
