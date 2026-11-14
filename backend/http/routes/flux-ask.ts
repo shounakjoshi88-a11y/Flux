@@ -38,7 +38,7 @@ import type { StreamWriter } from '../../agents/orchestrator';
 import type { AgentState } from '../../agents/tools/state';
 import { createFluxTools } from '../../agents/tools/factory';
 import { withToolTimeout, TOOL_TIMEOUTS } from '../../agents/tools/timeout';
-import { routeModel, selectModel, VISION_MODELS, getProviderOptions } from '../../agents/model-router';
+import { routeModel, selectModel, VISION_MODELS, VISION_NIM_PROVIDER_ID, getProviderOptions } from '../../agents/model-router';
 import { SYSTEM_PROMPT } from '../../prompts/prompt';
 import { tavilyClient } from '../../services/search/tavily';
 export function createFluxAskRouter(): Router {
@@ -489,6 +489,42 @@ IMPORTANT: After step 3, ALL subsequent operations use /home/user/edits/. Never 
         const isVisionModel = pref ? VISION_MODELS.has(pref) : false;
         const hasImages = imageAttachments.length > 0 && isVisionModel;
 
+        // ── Two-pass image analysis ─────────────────────────────
+        // If the selected model can't see (everything except nano-omni today),
+        // a vision pass describes the image exhaustively; the strong model then
+        // answers from that description. If the vision pass fails, the user gets
+        // an honest can't-see notice instead of a hallucinated scene.
+        let imageDescriptionContext = '';
+        if (imageAttachments.length > 0 && !isVisionModel) {
+            let descText = '';
+            try {
+                sendStatus(res, 'parsing', imageAttachments.length === 1
+                    ? 'Analyzing the attached image...'
+                    : `Analyzing ${imageAttachments.length} attached images...`,
+                    { tool: 'vision', name: imageAttachments.map(f => f.name).join(', ') }, agentState.thoughtProcess);
+                console.log(`[VISION] image analysis pass for ${imageAttachments.length} image(s)`);
+                const visionResult = await generateText({
+                    model: nim.chatModel(VISION_NIM_PROVIDER_ID),
+                    messages: [{
+                        role: 'user',
+                        content: [
+                            ...imageAttachments.map(f => ({ type: 'image' as const, image: f.content, mimeType: f.type })),
+                            { type: 'text' as const, text: 'Extract the key facts from this image as terse bullet points. Cover: exact page/test title, course name, status badge text, score/percentage, date+time, voucher codes, pass/fail. Max 120 words. No extra commentary.' },
+                        ],
+                    }],
+                    maxOutputTokens: 1800,
+                } as any);
+                descText = ((visionResult as any)?.text ?? '').trim()
+                    || String((visionResult as any)?.reasoningText ?? '').trim();
+                console.log(`[VISION] analysis pass -> ${descText.length} chars`);
+            } catch (visionErr: any) {
+                console.warn('[VISION] image analysis pass failed:', visionErr?.message ?? visionErr);
+            }
+            imageDescriptionContext = descText
+                ? `[The user attached ${imageAttachments.length} image(s). A vision model analyzed them:]\n${descText.slice(0, 6000)}\n\n`
+                : `[The user attached ${imageAttachments.length} image(s), but the vision subsystem could not read them. Answer from what the user typed; if the image content matters, say explicitly that you cannot see the image and ask for the key detail.]\n\n`;
+        }
+
         const videoNotice = videoAttachments.length > 0
             ? `[The user attached ${videoAttachments.length} video(s)]\n\n`
             : '';
@@ -545,7 +581,7 @@ IMPORTANT: After step 3, ALL subsequent operations use /home/user/edits/. Never 
 ${memCtx}
 ---\n\n` : '';
         const userText = !isVisionModel && imageAttachments.length > 0
-            ? `[The user attached ${imageAttachments.length} image(s)]\n\n${videoNotice}${attachedFilesText}${memPrefix}${nq}`
+            ? `${imageDescriptionContext}${videoNotice}${attachedFilesText}${memPrefix}${nq}`
             : `${videoNotice}${attachedFilesText}${memPrefix}${nq}`;
 
         const userContent: any = hasImages

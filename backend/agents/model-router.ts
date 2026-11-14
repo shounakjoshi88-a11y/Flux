@@ -19,10 +19,14 @@ export const NIM_MODELS: Record<string, string> = {
 };
 
 // ── Vision-capable models ──────────────────────────────────
-// No live vision-capable model in the verified NIM catalog right now —
-// every previously-listed VL model is retired. Kept as an (empty) set so
-// vision routing simply never triggers until a VL model returns.
-export const VISION_MODELS = new Set<string>([]);
+// Verified live on NIM (2026-11-14): nemotron-3-nano-omni-30b-a3b-reasoning
+// accepts image content parts and reads screenshots correctly. It emits
+// reasoning-heavy output, so for image questions the backend runs a two-pass
+// flow: this model describes the image, then the user's selected model writes
+// the answer from that description.
+export const VISION_MODEL_ID = 'nemotron-3-nano-omni-30b-a3b-reasoning';
+export const VISION_NIM_PROVIDER_ID = 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning';
+export const VISION_MODELS = new Set<string>([VISION_MODEL_ID]);
 
 // ── selectModel returns a proper AI SDK model instance ──
 export function createFallbackModel(primaryModel: any, preferredModelId: string | undefined, modelsMap: Record<string, string>): any {
