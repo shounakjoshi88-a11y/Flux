@@ -641,6 +641,7 @@ ${memCtx}
         let hasBackgroundDocGen = false;
         let forceSynthesis = false;
         let partialThought = ''; // Buffer for <THOUGHT> blocks that span multiple text-delta chunks
+        let reasoningAccum = ''; // Buffer for reasoning-delta chunks (NIM models reasoning-stream everything) — consolidated into ONE thought event at stream end
         let synthesisWritten = false; // Suppress model output after fallback synthesis takes over
 
         // ── LLM streaming (skipped when orchestrator handled the workflow) ──
@@ -828,6 +829,16 @@ ${memCtx}
                     }
                 }
 
+                if (event.type === 'reasoning-delta') {
+                    // NIM models reasoning-stream everything; the AI SDK forwards
+                    // it as reasoning-delta. Previously this went nowhere and the
+                    // UI showed a frozen answer bubble while the model thought for
+                    // minutes. Buffer the full reasoning and emit ONE consolidated
+                    // thought event at stream end (same shape the frontend renders).
+                    const delta = (event as any).delta ?? '';
+                    if (delta) reasoningAccum += delta;
+                }
+
                 if (event.type === 'text-delta') {
                     const delta = (event as any).textDelta ?? (event as any).text ?? '';
                     const oldLength = fullText.length;
@@ -955,6 +966,15 @@ ${memCtx}
                 if (!res.writableEnded) {
                     res.write(`event: error\ndata: ${JSON.stringify({ message: streamErr?.message || 'Stream error' })}\n\n`);
                 }
+            }
+
+            // Consolidated reasoning → thought for the client.
+            if (reasoningAccum.trim() && !res.writableEnded) {
+                const thoughtText = reasoningAccum.trim();
+                const ev = { type: 'thought', content: thoughtText };
+                agentState.thoughtProcess.push(ev);
+                res.write(`event: thought\ndata: ${JSON.stringify(ev)}\n\n`);
+                console.log(`[ASK] reasoning-delta consolidated -> ${thoughtText.length} chars thought`);
             }
 
             drainPreToolBuf(true); // flush buffer if no tool call ever arrived
