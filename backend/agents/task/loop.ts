@@ -51,7 +51,7 @@ export async function planTask(taskId: string): Promise<void> {
       model,
       system: TASK_PLANNER_SYSTEM,
       prompt: `Goal: ${task.goal}`,
-      maxTokens: 4096,
+      maxTokens: Number(process.env.AGENT_MAX_OUTPUT_TOKENS) || 32768,
     } as any);
     try {
       const cleaned = res.text
@@ -207,7 +207,7 @@ async function executeStep(
         prompt: `Context from previous steps:\n${contextSummary || '(no previous steps)'}\n\nCurrent step to execute:\n${step.title} — ${step.title}`,
         tools: sandboxTools,
         toolChoice: 'auto',
-        maxTokens: 4096,
+        maxTokens: Number(process.env.AGENT_MAX_OUTPUT_TOKENS) || 32768,
         temperature: 0.3,
       } as any);
 

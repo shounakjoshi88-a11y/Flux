@@ -648,6 +648,11 @@ ${memCtx}
             const modelName = route.modelId || pref || 'unknown';
             console.log(`[LLM_STREAM] Starting streamText with model=${modelName} at ${new Date().toISOString()}`);
             const streamStart = Date.now();
+            // Output budget. NIM models spend a big slice of it on reasoning_content —
+            // an 8192 cap let the ~12.5k-token system prompt + reasoning starve the
+            // model before it emitted a tool call for real-sized work (verified:
+            // every full-page build died finish=length with zero text).
+            const AGENT_MAX_OUTPUT_TOKENS = Number(process.env.AGENT_MAX_OUTPUT_TOKENS) || 32768;
             const agentStream = streamText({
                 model,
                 system: dynSys,
@@ -656,7 +661,7 @@ ${memCtx}
                 stopWhen: stepCountIs(50),
                 toolChoice: 'auto',
                 temperature: 0.35,
-                maxOutputTokens: 8192,
+                maxOutputTokens: AGENT_MAX_OUTPUT_TOKENS,
                 abortSignal: abortController.signal,
                 providerOptions: getProviderOptions(pref),
                 onStepFinish: (step: any) => {
