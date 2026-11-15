@@ -6,7 +6,7 @@ import { autoRenameConversation } from '../../services/conversations/rename';
 import { slugify } from '../../http/util/slug';
 import { sanitizeLocation } from '../../http/util/sanitize';
 import { stripEmDashes } from '../../prompts/sanitize';
-import { AGENT_SYSTEM_EXTENSION, VISUAL_INSTRUCTIONS } from '../../prompts/agent-extension';
+import { SLIM_SYSTEM_PROMPT } from '../../prompts/slim-system';
 import { extractTopicFromQuery } from '../../services/documents/intent';
 import { generateDocumentWithSkill } from '../../services/documents/generate';
 import { resolveSkill, skillBodyForDocType, listSkillsForUser, skillsCatalogText } from '../../services/skills/registry';
@@ -411,8 +411,14 @@ IMPORTANT: After step 3, ALL subsequent operations use /home/gem/edits/. Never g
             console.warn('[SKILLS] catalog build failed:', e?.message);
         }
 
+        // Always-on prompt KEPT UNDER ~4 KB — NVIDIA NIM's content-safety
+        // screening edge rejects/silently dead-ends larger prompts on this
+        // account (every 12 KB+ system prompt we tested 503'd or stalled
+        // token-less; the 47 KB one always starved tool calls). Full rules
+        // are on-demand as read_skill({ skill: "flux-rules" }) — progressive
+        // disclosure, the same model as every other skill.
         const dynSys = [
-            SYSTEM_PROMPT
+            SLIM_SYSTEM_PROMPT
                 .replaceAll('{{CURRENT_DATETIME}}', nowStr)
                 .replaceAll('{{LOCATION_INFO}}', locInfo)
                 .replaceAll('{{MEMORY_CONTEXT}}', memCtx),
@@ -421,8 +427,8 @@ IMPORTANT: After step 3, ALL subsequent operations use /home/gem/edits/. Never g
             systemGuard,
             searchGuard,
             skillsSection,
-            VISUAL_INSTRUCTIONS,
-            isSystemQuery ? '' : AGENT_SYSTEM_EXTENSION,
+            // VISUAL_INSTRUCTIONS moved into the flux-rules skill on demand;
+            // the screener ceiling for always-on is what rules here, not want.
         ].join('\n\n');
 
         // ── Abort Controller setup ──────────────────────────────────────

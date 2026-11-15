@@ -11,15 +11,17 @@ import { isModelHealthy, recordFailure, recordSuccess, getShortTimeout } from '.
 
 // Only models verified live on NVIDIA NIM (verified 2026-11-15; see
 // RETIRED_MODELS in model-health.ts).
-// minimax-m3.1-flash's safety screening lane fails on every request (HTTP
-// 503 "content safety screening is temporarily unavailable"), so it is
-// retired. Re-test with a fresh call before re-adding any entry.
+// nemotron-3.5-bolt-e4b and poolside/laguna-xs-2.1 pass the safety-screening
+// edge and emit complete write_file tool calls in ~1s on the always-on
+// prompt (~3.7 KB); the others we tried at this size either 503, accept
+// headers then stream nothing, or wander into pseudo-JSON tool-call text.
+// Re-verify with a fresh call before re-adding any entry.
 export const NIM_MODELS: Record<string, string> = {
-    "step-5-preview": "stepfun-ai/step-5-preview",
-    "laguna-xs-2.1": "poolside/laguna-xs-2.1",
-    "nemotron-3.5-lightning-30b-a3b": "nvidia/nemotron-3.5-lightning-30b-a3b",
     "nemotron-3.5-bolt-e4b": "nvidia/nemotron-3.5-bolt-e4b",
+    "laguna-xs-2.1": "poolside/laguna-xs-2.1",
     "nemotron-3-nano-omni-30b-a3b-reasoning": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+    "nemotron-3.5-lightning-30b-a3b": "nvidia/nemotron-3.5-lightning-30b-a3b",
+    "step-5-preview": "stepfun-ai/step-5-preview",
     "nemotron-3-ultra-550b": "nvidia/nemotron-3-ultra-550b-a55b",
 };
 
@@ -129,8 +131,8 @@ export function selectModel(preferredModel: string | undefined): any {
         primaryModel = nim.chatModel(NIM_MODELS[preferredModel]);
         actualPref = preferredModel;
     } else {
-        primaryModel = nim.chatModel('stepfun-ai/step-5-preview');
-        actualPref = 'step-5-preview';
+        primaryModel = nim.chatModel('nvidia/nemotron-3.5-bolt-e4b');
+        actualPref = 'nemotron-3.5-bolt-e4b';
     }
     return createFallbackModel(primaryModel, actualPref, NIM_MODELS);
 }
@@ -146,7 +148,7 @@ export function routeModel(preferredModel: string | undefined, query: string, pr
         const { routeModel: rm } = require('../services/search/query-router');
         return rm(preferredModel, query, previousQuery);
     } catch {
-        return { modelId: preferredModel || "step-5-preview", tier: "general", score: 0.5, wasRouted: false };
+        return { modelId: preferredModel || "nemotron-3.5-bolt-e4b", tier: "general", score: 0.5, wasRouted: false };
     }
 }
 
@@ -163,7 +165,7 @@ export function getProviderOptions(_modelId: string | undefined) {
 export const AVAILABLE_MODELS = [
     {
         category: "General Purpose", models: [
-            { id: "step-5-preview", label: "Step-5 Preview (StepFun)" },
+            { id: "nemotron-3.5-bolt-e4b", label: "Nemotron 3.5 Bolt E4B (NVIDIA)" },
             { id: "laguna-xs-2.1", label: "Laguna XS 2.1 (Poolside)" },
             { id: "nemotron-3-ultra-550b", label: "Nemotron 3 Ultra 550B (NVIDIA)" },
         ]
@@ -172,7 +174,6 @@ export const AVAILABLE_MODELS = [
         category: "Reasoning & Agents", models: [
             { id: "nemotron-3-nano-omni-30b-a3b-reasoning", label: "Nemotron 3 Nano Omni 30B Reasoning (NVIDIA)" },
             { id: "nemotron-3.5-lightning-30b-a3b", label: "Nemotron 3.5 Lightning 30B A3B (NVIDIA)" },
-            { id: "nemotron-3.5-bolt-e4b", label: "Nemotron 3.5 Bolt E4B (NVIDIA)" },
         ]
     },
 ];

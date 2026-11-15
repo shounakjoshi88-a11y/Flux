@@ -112,6 +112,9 @@ const CURATED: Record<string, { description: string; docType?: string }> = {
         docType: 'file',
         description: 'Use FIRST when a user uploads a file. Per-type rules for PDF, DOCX, XLSX, CSV, code and archives.',
     },
+    'flux-rules': {
+        description: 'Full sandbox, file-reading, verification and delivery rules. Call when handling uploads, archives, office docs, document generation or anything uncertain about how tools should be used.',
+    },
     'frontend-design': {
         docType: 'design',
         description: 'Use when building or styling any web UI or component. Distinctive, production-grade design that avoids generic AI aesthetics.',
