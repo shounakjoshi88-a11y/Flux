@@ -1,0 +1,24 @@
+fix(sandbox): serve binary deliverables + let the model zip and deliver
+
+User's Flux conversation 2609: the model could not produce the website
+zip. Two real bugs made it impossible, plus one tooling myth the model
+had to invent:
+
+1. sandboxManager.downloadFile used files.read, which returns utf-8 text
+   only. Any binary (zip PK header, PDF, image, exe) crashed with
+   "'utf-8' codec can't decode byte 0xfe" or silent data corruption.
+   downloadFile now base64s through the shell and decodes locally, so
+   every file type round-trips byte-exactly. Verified: zip created via
+   run_bash comes back with PK\\x03\\x04 magic.
+
+2. /api/sandbox/download only resolved /home/gem/<filename> (flat root),
+   so deliverables in subdirectories (e.g. website/site.zip) 404'd. The
+   route now falls back to a bounded find by basename before serving.
+
+3. The prompt and get_generated_file's tool description said
+   "images, PDFs, CSVs ... only" - the model concluded binary archives
+   were undeliverable. Rewrote both: zip via run_bash + bytes for the
+   download route work, so the model knows to do it. Added an explicit
+   ZIP / ARCHIVES / BINARY DELIVERABLES section to the agent extension.
+
+Backend restarted on the patched code, ping 200, tsc clean.

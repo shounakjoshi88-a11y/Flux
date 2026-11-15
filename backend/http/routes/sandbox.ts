@@ -37,7 +37,15 @@ export function createSandboxRouter(ctx: RoutesContext): Router {
             const conv = await prisma.conversation.findFirst({ where: { id: conversationId, userId: uid }, select: { id: true } });
             if (!conv) return res.status(404).json({ error: 'Conversation not found' });
             const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-            const remotePath = `/home/gem/${safeName}`;
+            let remotePath = `/home/gem/${safeName}`;
+            // Deliverables may live in a subdirectory (e.g. website/site.zip) —
+            // fall back to a bounded find by basename.
+            try {
+                await sandboxManager.downloadFile(conversationId, remotePath);
+            } catch {
+                const hits = await sandboxManager.findFile(conversationId, safeName);
+                if (hits[0]) remotePath = hits[0]!;
+            }
             const buffer = await sandboxManager.downloadFile(conversationId, remotePath);
             res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
             res.setHeader('Content-Type', 'application/octet-stream');

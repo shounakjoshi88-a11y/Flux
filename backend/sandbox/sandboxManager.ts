@@ -192,16 +192,38 @@ export class SandboxManager {
     return remotePath;
   }
 
+  // files.read returns utf-8 text and explodes on binaries. Stream through
+  // the shell with base64 instead, so any file type (zip, pdf, images, …)
+  // round-trips byte-exactly.
   async downloadFile(conversationId: string, remotePath: string): Promise<Buffer> {
-    const sandbox = await this.getOrCreate(conversationId);
-    const content = await sandbox.files.read(remotePath);
-    return Buffer.from(content);
+    const handle = await this.getOrCreate(conversationId);
+    const escaped = remotePath.replace(/(["$`\\])/g, '\\$1');
+    const result = await handle.commands.run(`base64 "${escaped}"`, { timeoutMs: 60_000 });
+    if (result.exitCode !== 0) {
+      throw new Error(`downloadFile: base64 exited ${result.exitCode}: ${result.stderr || 'unknown error'}`);
+    }
+    const b64 = (result.stdout || '').replace(/\s+/g, '');
+    if (!b64) throw new Error('downloadFile: empty payload (file missing or unreadable)');
+    return Buffer.from(b64, 'base64');
   }
 
   async listFiles(conversationId: string, dir = '/home/gem'): Promise<string[]> {
     const sandbox = await this.getOrCreate(conversationId);
     try {
       return (await sandbox.files.list(dir)).map((f) => f.path);
+    } catch {
+      return [];
+    }
+  }
+
+  /** List absolute paths of files whose basename matches `filename`, anywhere
+   *  under `dir`. Uses a bounded find so it cannot run forever. */
+  async findFile(conversationId: string, filename: string, dir = '/home/gem'): Promise<string[]> {
+    const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+    try {
+      const handle = await this.getOrCreate(conversationId);
+      const result = await handle.commands.run(`find ${dir} -maxdepth 6 -type f -name "${safeName}" 2>/dev/null`, { timeoutMs: 10_000 });
+      return (result.stdout || '').split('\n').map(s => s.trim()).filter(Boolean);
     } catch {
       return [];
     }

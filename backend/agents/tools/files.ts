@@ -175,10 +175,10 @@ export function createFileTools(ctx: ToolContext) {
 
         get_generated_file: (tool as any)({
             description:
-                'Download a file from the sandbox and return its base64-encoded content with MIME type. Use this to return files (images, PDFs, CSVs, code files, edited documents) directly to the user in chat. Call this AFTER you finish editing or generating a file the user should receive.',
+                'Deliver ANY file from the sandbox to the user for download — images, PDFs, CSVs, code, archives (.zip/.tar), binaries and documents alike. Call this AFTER the user should receive the file. To send a zip: run_bash `cd /home/gem && zip -r <name>.zip <dir>/` first, then call this with the .zip path.',
             inputSchema: z.object({
                 path: z.string().describe(
-                    'Absolute path to the file in the sandbox. For edited files use /home/gem/edits/<filename>, for originals use /home/gem/uploads/<filename>, for new files use /home/gem/<filename>.',
+                    'Absolute path to the file in the sandbox (e.g. /home/gem/site.zip, /home/gem/edits/<name>/<file>).',
                 ),
             }),
             execute: async ({ path }: any) => {
