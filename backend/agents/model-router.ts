@@ -9,14 +9,12 @@
 import { nim } from '../services/models/nim-client';
 import { isModelHealthy, recordFailure, recordSuccess, getShortTimeout } from './model-health';
 
-// Only models verified live on NVIDIA NIM (verified 2026-11-15).
-// Order doubles as the fallback chain priority — agentic tasks fail on
-// nemotron-3-ultra-550b (it emits tool calls as raw pseudo-JSON text
-// instead of structured calls and starves to token cap), so the fast,
-// structured-tool-call models come first. Ultra stays selectable for
-// plain chat. Re-verify with a fresh call before re-adding any entry.
+// Only models verified live on NVIDIA NIM (verified 2026-11-15; see
+// RETIRED_MODELS in model-health.ts).
+// minimax-m3.1-flash's safety screening lane fails on every request (HTTP
+// 503 "content safety screening is temporarily unavailable"), so it is
+// retired. Re-test with a fresh call before re-adding any entry.
 export const NIM_MODELS: Record<string, string> = {
-    "minimax-m3.1-flash": "minimaxai/minimax-m3.1-flash",
     "step-5-preview": "stepfun-ai/step-5-preview",
     "laguna-xs-2.1": "poolside/laguna-xs-2.1",
     "nemotron-3.5-lightning-30b-a3b": "nvidia/nemotron-3.5-lightning-30b-a3b",
@@ -131,8 +129,8 @@ export function selectModel(preferredModel: string | undefined): any {
         primaryModel = nim.chatModel(NIM_MODELS[preferredModel]);
         actualPref = preferredModel;
     } else {
-        primaryModel = nim.chatModel('minimaxai/minimax-m3.1-flash');
-        actualPref = 'minimax-m3.1-flash';
+        primaryModel = nim.chatModel('stepfun-ai/step-5-preview');
+        actualPref = 'step-5-preview';
     }
     return createFallbackModel(primaryModel, actualPref, NIM_MODELS);
 }
@@ -148,7 +146,7 @@ export function routeModel(preferredModel: string | undefined, query: string, pr
         const { routeModel: rm } = require('../services/search/query-router');
         return rm(preferredModel, query, previousQuery);
     } catch {
-        return { modelId: preferredModel || "minimax-m3.1-flash", tier: "general", score: 0.5, wasRouted: false };
+        return { modelId: preferredModel || "step-5-preview", tier: "general", score: 0.5, wasRouted: false };
     }
 }
 
@@ -165,7 +163,6 @@ export function getProviderOptions(_modelId: string | undefined) {
 export const AVAILABLE_MODELS = [
     {
         category: "General Purpose", models: [
-            { id: "minimax-m3.1-flash", label: "MiniMax M3.1 Flash (MiniMax)" },
             { id: "step-5-preview", label: "Step-5 Preview (StepFun)" },
             { id: "laguna-xs-2.1", label: "Laguna XS 2.1 (Poolside)" },
             { id: "nemotron-3-ultra-550b", label: "Nemotron 3 Ultra 550B (NVIDIA)" },

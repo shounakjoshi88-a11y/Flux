@@ -10,6 +10,7 @@ const HEALTHY_COOLDOWN_MS = 5 * 60 * 1000;
 // every single user message. Re-test with a fresh call before re-adding.
 const RETIRED_MODELS = new Set([
   'deepseek-coder-6.7b-instruct',
+  'minimax-m3.1-flash',
   'deepseek-v4-pro',
   'deepseek-v4-flash',
   'deepseek-v4.1-flash',
