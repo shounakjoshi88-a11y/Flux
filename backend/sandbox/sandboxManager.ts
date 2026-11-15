@@ -32,15 +32,28 @@ export interface SandboxHandle {
   sandboxDomain: string;
 }
 
-/** The SDK does NOT throw on connection failure — it returns
- *  { ok: false, error: { content: { errorMessage } } }. Unwrap to the real
- *  reason: throws with the actual message, or returns the data payload. */
+/** The SDK does not throw on failure and does not expose the API body at a
+ *  stable path. Awaited shell/file/jupyter calls return
+ *    { ok: true,  body: { success, message, data: <payload> }, headers, rawResponse }
+ *    { ok: false, error: { reason, statusCode?, body?, errorMessage? }, rawResponse }
+ *  The API payload lives at res.body.data. Unwrap to it, throwing the real
+ *  reason on failure. Never default exit_code to 0. */
 function unwrapSandbox(res: any, op: string): any {
-  if (res && res.ok === false) {
-    const msg = res?.error?.content?.errorMessage || res?.error?.errorMessage || `sandbox ${op} failed`;
-    throw new Error(`[sandbox ${op}] ${msg}`);
+  if (res?.ok === false) {
+    const err = res?.error;
+    let msg = err?.errorMessage ?? '';
+    if (err?.reason === 'status-code') {
+      const body = err?.body;
+      const bodyMsg = typeof body === 'string' ? body : body?.message ?? JSON.stringify(body ?? {});
+      msg = `HTTP ${err?.statusCode ?? 'error'} ${bodyMsg}`.trim();
+    }
+    throw new Error(`[sandbox ${op}] ${msg || 'unknown error'}`);
   }
-  return (res as any)?.data ?? res;
+  const body = res?.body ?? res; // API response body, or res itself if already unwrapped
+  if (body && body.success === false) {
+    throw new Error(`[sandbox ${op}] ${body?.message ?? 'request failed'}`);
+  }
+  return body?.data ?? body;
 }
 
 export class SandboxManager {
