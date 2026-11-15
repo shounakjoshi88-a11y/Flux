@@ -6,28 +6,32 @@
  * leaving the stream open forever.
  */
 
-/** Budgets in milliseconds. Tools not listed here are not limited. */
+import { EXEC_TIMEOUT_MS } from '../../config/constants';
+
+/** Budgets in milliseconds. Code execution gets a serious-work wall
+ *  (30 min default, SANDBOX_EXEC_TIMEOUT_MS); web/API tools stay snappy.
+ *  Tools not listed here are not limited. */
 export const TOOL_TIMEOUTS: Record<string, number> = {
     web_search: 30_000,
     read_skill: 10_000,
-    generate_document: 60_000,
+    generate_document: 120_000,
     get_weather: 10_000,
-    generate_image: 90_000,
+    generate_image: 180_000,
     wiki_search: 10_000,
-    read_url: 10_000,
-    run_bash: 60_000,
-    run_python: 60_000,
-    shell_execute: 30_000,
-    create_project: 30_000,
-    start_app: 30_000,
+    read_url: 30_000,
+    run_bash: EXEC_TIMEOUT_MS,
+    run_python: EXEC_TIMEOUT_MS,
+    shell_execute: EXEC_TIMEOUT_MS,
+    create_project: 300_000,
+    start_app: 120_000,
     stop_app: 10_000,
     list_apps: 10_000,
     get_app_logs: 10_000,
     get_app_url: 10_000,
     get_generated_file: 10_000,
     file_list: 10_000,
-    file_read: 10_000,
-    file_write: 10_000,
+    file_read: 30_000,
+    file_write: 60_000,
     gmail_search: 30_000,
     gmail_read: 30_000,
     gmail_send: 30_000,

@@ -11,6 +11,7 @@
  */
 import { SandboxClient } from '@agent-infra/sandbox';
 import { env } from '../config/env';
+import { EXEC_TIMEOUT_MS } from '../config/constants';
 
 export interface SandboxHandle {
   /** Conversation-scoped working directory. */
@@ -90,7 +91,7 @@ export class SandboxManager {
       sandboxDomain: new URL(this.base).host,
       commands: {
         run: async (command: string, options?: any) => {
-          const timeout = options?.timeoutMs ?? 120_000;
+          const timeout = options?.timeoutMs ?? EXEC_TIMEOUT_MS;
           try {
             // The SDK's own HTTP wait (timeoutInSeconds, default 60s) is what
             // previously killed long commands with a bare "unknown error".

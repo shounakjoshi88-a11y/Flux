@@ -22,6 +22,13 @@ export const RATE_LIMITS = {
 /** Headers the frontend is allowed to read off a response. */
 export const CORS_EXPOSED_HEADERS = ['X-Conversation-Id', 'X-Conversation-Slug'];
 
+/** Default wall for sandboxed code execution (pip, builds, test suites,
+ *  game engines). 30 minutes; override with SANDBOX_EXEC_TIMEOUT_MS. */
+export const EXEC_TIMEOUT_MS = Number.parseInt(process.env.SANDBOX_EXEC_TIMEOUT_MS ?? '1800000', 10) || 1800000;
+
+/** Wall for heavy orchestrator phases (npm install, npm run build). */
+export const ORCHESTRATOR_TIMEOUT_MS = Number.parseInt(process.env.ORCHESTRATOR_TIMEOUT_MS ?? '900000', 10) || 900000;
+
 export const CORS_ALLOWED_HEADERS = [
   'Content-Type',
   'Authorization',

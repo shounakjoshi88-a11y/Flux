@@ -1,4 +1,5 @@
 import { sandboxManager } from './sandboxManager';
+import { EXEC_TIMEOUT_MS } from '../config/constants';
 
 export interface CodeExecutionResult {
   stdout: string[];
@@ -50,7 +51,7 @@ export class CodeExecutor {
           const line = typeof output === 'string' ? output : (output?.line ?? output?.stderr ?? '');
           if (line) onOutput?.('stderr', line);
         },
-        timeoutMs: 120_000,
+        timeoutMs: EXEC_TIMEOUT_MS,
         signal,
       } as any);
       const filesAfter = await this._listFiles(sandbox, '/home/user');
@@ -87,7 +88,7 @@ export class CodeExecutor {
           const line = typeof data === 'string' ? data : (data ?? '');
           if (line) onOutput?.('stderr', line);
         },
-        timeoutMs: 120_000,
+        timeoutMs: EXEC_TIMEOUT_MS,
         signal,
       });
       const filesAfter = await this._listFiles(sandbox, '/home/user');
