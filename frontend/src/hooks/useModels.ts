@@ -90,10 +90,10 @@ function getFallbackModels(): ModelCategory[] {
     {
       category: "General Purpose",
       models: [
-        { id: "nemotron-3-ultra-550b", label: "Nemotron 3 Ultra 550B (NVIDIA)" },
-        { id: "step-5-preview", label: "Step-5 Preview (StepFun)" },
         { id: "minimax-m3.1-flash", label: "MiniMax M3.1 Flash (MiniMax)" },
+        { id: "step-5-preview", label: "Step-5 Preview (StepFun)" },
         { id: "laguna-xs-2.1", label: "Laguna XS 2.1 (Poolside)" },
+        { id: "nemotron-3-ultra-550b", label: "Nemotron 3 Ultra 550B (NVIDIA)" },
       ],
     },
     {

@@ -86,7 +86,7 @@ const CURATED: Record<string, { description: string; docType?: string }> = {
     },
     'html-skill': {
         docType: 'html',
-        description: 'Use when generating a standalone HTML page/mockup as a deliverable file.',
+        description: 'Use for ALL HTML/website work. Design + code-quality rules plus mandatory sandbox delivery (write_file → run_bash verify → get_generated_file or zip). Never via generate_document.',
     },
     'tech-writer-skill': {
         docType: 'tech',

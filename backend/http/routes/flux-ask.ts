@@ -328,8 +328,11 @@ EDITING WORKFLOW (strict order):
 IMPORTANT: After step 3, ALL subsequent operations use /home/gem/edits/. Never go back to /home/gem/uploads/. The uploads/ original may not persist.\n`
             : '';
 
-        // Detect system/architecture/code-review questions — strip execution tools
-        const systemQueryRE = /\b(architecture|design|codebase|how.*(work|built|implement|structur)|your (code|design|architecture|system)|this (system|code|function|class|file|router))\b/i;
+        // Detect system/architecture questions — strip execution tools.
+        // IMPORTANT: do NOT match bare "design" — building a website/UI is a file task,
+        // not a question about Flux's own architecture; the bare word was neutering every
+        // design/web build by stripping the sandbox tools.
+        const systemQueryRE = /\b(architecture|codebase|how.*(work|built|implement|structur)|your (code|design|architecture|system)|this (system|code|function|class|file|router))\b/i;
         let isSystemQuery = systemQueryRE.test(nq);
         if (!isSystemQuery && previousQuery) isSystemQuery = systemQueryRE.test(previousQuery);
         if (!isSystemQuery && existingConv?.messages?.length) {
@@ -349,6 +352,15 @@ IMPORTANT: After step 3, ALL subsequent operations use /home/gem/edits/. Never g
         if (!isSearchQuery && previousQuery) {
             const prevWeather = /\b(weather|temperature|forecast|humidity|rain|sunny|cloudy|wind|how.*hot|how.*cold)\b/i.test(previousQuery);
             isSearchQuery = searchQueryRE.test(previousQuery) && !codeExecRE.test(previousQuery) && !conversationalRE.test(previousQuery) && !prevWeather;
+        }
+
+        // When the user names a tool literally (run_bash, write_file, …) the message is
+        // an instruction to USE it, not a research/architecture question. Never strip
+        // tools in that case.
+        const toolMentionedRE = /\b(run_bash|run_python|write_file|edit_file|create_project|install_package|get_generated_file|read_skill|read_file|list_files|read_url|web_search|generate_document|generate_image)\b/i;
+        if (toolMentionedRE.test(nq) || (previousQuery && toolMentionedRE.test(previousQuery))) {
+          isSystemQuery = false;
+          isSearchQuery = false;
         }
 
         // When a file is attached and the query mentions verifying/analyzing it,

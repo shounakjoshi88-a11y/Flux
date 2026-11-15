@@ -49,27 +49,38 @@ You are a Principal Frontend Engineer and UI Architect with a passion for buildi
 
 ---
 
-## Deep Output Schema
+## How the Page Ships (sandbox delivery — mandatory)
 
-### Fields
-- `title`: The filename ending in `.html`.
-- `content`: The complete HTML source code, including an internal `<style>` block in the `<head>` for single-file delivery.
+A website is code, not a document. Do NOT put the HTML inside a tool-call JSON blob, a
+`content` field, or hand it to a document generator — that path cannot execute, cannot
+verify, and ships mangled one-pass HTML. Build it like a real developer:
 
-### Edge Case Handling
-- **Missing Images:** Provide stylized `<svg>` placeholders or CSS-based shapes with descriptive `alt` text.
-- **Form Validation:** Include native HTML5 validation (`required`, `pattern`) and CSS `:invalid` states.
-- **Browser Compatibility:** Use `-webkit-` and `-moz-` prefixes only where strictly necessary for critical legacy support.
+1. **Write the file(s).** One self-contained page → `write_file({ path: "/home/gem/<slug>/index.html", content: "..." })`. Multi-file → `create_project({ name: "<slug>", files: [...] })`. All CSS inline in `<style>`, all JS inline in `<script>` unless the user asked otherwise.
+2. **Verify with the sandbox, never by vibes.** `run_bash`: `wc -c /home/gem/<slug>/index.html` (must be comfortably over ~15 KB for a real page) and `grep -c '</html>' /home/gem/<slug>/index.html` (must be ≥ 1). For JS, at minimum `node --check` the inline script if you can extract it, or open and read the produced file back.
+3. **Link assets correctly.** Relative paths only (`./assets/...`). If you generate images/CSS/JS files, write them, then reference them — never reference files that don't exist on disk.
+4. **Deliver.** Single page: `get_generated_file({ path: "/home/gem/<slug>/index.html" })`. Multi-file or user asked for a zip: `run_bash` → `cd /home/gem/<slug> && zip -r ../<slug>.zip .`, then `get_generated_file({ path: "/home/gem/<slug>.zip" })`.
+5. **Claim success only when the sandbox proved it.** If `wc -c` / `zip` / `get_generated_file` failed, fix the cause and rerun — never tell the user "it's built" when the file does not exist.
+
+Use this skill to guide the *design and code quality* only. The delivery mechanism is the sandbox, every time.
 
 ---
 
 ## Complex Example (Accessible Multi-Step Form)
 
-```json
-{
-  "title": "accessible-registration-form.html",
-  "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>Enterprise Registration | Flux</title>\n    <style>\n        :root {\n            --primary: #2563eb;\n            --bg: #f8fafc;\n            --text: #1e293b;\n            --error: #dc2626;\n            --spacing: 1.5rem;\n        }\n        body {\n            font-family: 'Inter', system-ui, sans-serif;\n            background: var(--bg);\n            color: var(--text);\n            display: flex;\n            justify-content: center;\n            padding: var(--spacing);\n        }\n        .form-card {\n            background: white;\n            padding: 2rem;\n            border-radius: 12px;\n            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);\n            max-width: 450px;\n            width: 100%;\n        }\n        .form-group {\n            margin-bottom: var(--spacing);\n        }\n        label {\n            display: block;\n            font-weight: 600;\n            margin-bottom: 0.5rem;\n        }\n        input {\n            width: 100%;\n            padding: 0.75rem;\n            border: 1px solid #cbd5e1;\n            border-radius: 6px;\n            box-sizing: border-box;\n        }\n        input:focus {\n            outline: 2px solid var(--primary);\n            outline-offset: 2px;\n        }\n        .error-msg {\n            color: var(--error);\n            font-size: 0.875rem;\n            margin-top: 0.25rem;\n            display: none;\n        }\n        input:invalid:not(:placeholder-shown) {\n            border-color: var(--error);\n        }\n        input:invalid:not(:placeholder-shown) + .error-msg {\n            display: block;\n        }\n        .btn-primary {\n            background: var(--primary);\n            color: white;\n            padding: 0.75rem 1.5rem;\n            border: none;\n            border-radius: 6px;\n            cursor: pointer;\n            width: 100%;\n            font-weight: 600;\n            transition: opacity 0.2s;\n        }\n        .btn-primary:hover { opacity: 0.9; }\n    </style>\n</head>\n<body>\n    <main class=\"form-card\">\n        <h1>Create Account</h1>\n        <p>Join Flux for enterprise-grade intelligence.</p>\n        \n        <form action=\"#\" method=\"POST\">\n            <div class=\"form-group\">\n                <label for=\"email\">Work Email</label>\n                <input type=\"email\" id=\"email\" name=\"email\" required placeholder=\"you@company.com\" aria-describedby=\"email-error\">\n                <span id=\"email-error\" class=\"error-msg\" aria-live=\"polite\">Please enter a valid work email.</span>\n            </div>\n\n            <div class=\"form-group\">\n                <label for=\"password\">Password</label>\n                <input type=\"password\" id=\"password\" name=\"password\" required minlength=\"8\" placeholder=\"Min. 8 characters\">\n                <span class=\"error-msg\" aria-live=\"polite\">Password must be at least 8 characters.</span>\n            </div>\n\n            <div class=\"form-group\" style=\"display: flex; align-items: center; gap: 0.5rem;\">\n                <input type=\"checkbox\" id=\"terms\" name=\"terms\" required style=\"width: auto;\">\n                <label for=\"terms\" style=\"margin: 0; font-weight: normal;\">I agree to the <a href=\"#\">Terms of Service</a></label>\n            </div>\n\n            <button type=\"submit\" class=\"btn-primary\">Get Started</button>\n        </form>\n    </main>\n</body>\n</html>"
-}
+Build a registration form like this with exactly these tool calls, never a JSON blob:
+
+```text
+1. write_file({ path: "/home/gem/accessible-registration-form/index.html",
+     content: "<!DOCTYPE html>...a complete, valid page with an accessible form..." })
+2. run_bash("wc -c /home/gem/accessible-registration-form/index.html && grep -c '</html>' /home/gem/accessible-registration-form/index.html")
+3. get_generated_file({ path: "/home/gem/accessible-registration-form/index.html" })
 ```
+
+Guideposts for the HTML itself:
+- Semantic structure: <main>, <form>, a real <label> per input, aria-describedby wired to error text with aria-live="polite".
+- Native validation (required, pattern, minlength, type=email) styled via :invalid — no JS needed for simple cases.
+- CSS variables for theme; visible focus rings; contrast >= 4.5:1; mobile-first @media queries.
+- Keep JS tiny and dependency-free.
 
 ---
 

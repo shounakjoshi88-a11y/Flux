@@ -387,7 +387,6 @@ function detectSimpleDocType(query: string): string | null {
   if (/\bmd\b|\bmarkdown\b/.test(q)) return "md";
   if (/\bjson\b/.test(q)) return "json";
   if (/\bsql\b/.test(q)) return "sql";
-  if (/\bhtml\b/.test(q)) return "html";
   if (/\bpdf\b/.test(q)) return "pdf";
   return null;
 }

@@ -98,7 +98,7 @@ export function createHeadlessFluxTools(
     generate_document: (tool as any)({
       description: 'Generate a downloadable document file.',
       inputSchema: z.object({
-        doc_type: z.enum(['pdf', 'pptx', 'docx', 'xlsx', 'csv', 'tsv', 'md', 'json', 'sql', 'html', 'tech', 'finance', 'coder', 'creative', 'legal']),
+        doc_type: z.enum(['pdf', 'pptx', 'docx', 'xlsx', 'csv', 'tsv', 'md', 'json', 'sql', 'tech', 'finance', 'coder', 'creative', 'legal']),
         topic: z.string(),
         skill_content: z.string().optional(),
       }),

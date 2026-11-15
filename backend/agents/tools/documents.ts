@@ -107,7 +107,8 @@ export function createDocumentTools(ctx: ToolContext) {
                     'md',
                     'json',
                     'sql',
-                    'html',
+                    // No 'html' option: web deliverables must be real code built and
+                    // verified in the sandbox, delivered via get_generated_file (or zip).
                     'tech',
                     'finance',
                     'coder',
