@@ -90,6 +90,9 @@ function getFallbackModels(): ModelCategory[] {
       category: "General Purpose",
       models: [
         { id: "nemotron-3-ultra-550b", label: "Nemotron 3 Ultra 550B (NVIDIA)" },
+        { id: "mistral-large-4-1t-a52b", label: "Mistral Large 4 1T A52B (Mistral)" },
+        { id: "step-5-preview", label: "Step-5 Preview (StepFun)" },
+        { id: "minimax-m3.1-flash", label: "MiniMax M3.1 Flash (MiniMax)" },
         { id: "laguna-xs-2.1", label: "Laguna XS 2.1 (Poolside)" },
       ],
     },
@@ -97,6 +100,8 @@ function getFallbackModels(): ModelCategory[] {
       category: "Reasoning & Agents",
       models: [
         { id: "nemotron-3-nano-omni-30b-a3b-reasoning", label: "Nemotron 3 Nano Omni 30B Reasoning (NVIDIA)" },
+        { id: "nemotron-3.5-lightning-30b-a3b", label: "Nemotron 3.5 Lightning 30B A3B (NVIDIA)" },
+        { id: "nemotron-3.5-bolt-e4b", label: "Nemotron 3.5 Bolt E4B (NVIDIA)" },
       ],
     },
   ];

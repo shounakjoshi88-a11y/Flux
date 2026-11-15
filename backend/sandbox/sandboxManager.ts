@@ -2,7 +2,7 @@
  * Sandbox manager backed by agent-infra/sandbox (AIO Sandbox).
  *
  * Unlike the previous E2B backend, this is a single shared container: every
- * conversation gets its own working directory under /home/user/<id>, and all
+ * conversation gets its own working directory under /home/gem/<id>, and all
  * file and shell operations are scoped to that directory.
  *
  * The container is expected to be running at SANDBOX_BASE_URL (default
@@ -76,7 +76,7 @@ export class SandboxManager {
       return existing.handle;
     }
 
-    const workdir = `/home/user/${conversationId}`;
+    const workdir = `/home/gem/${conversationId}`;
     // Ensure the working directory exists — surface failure loudly.
     try {
       const mk = await this.client.shell.execCommand({ command: `mkdir -p ${workdir}` });
@@ -198,7 +198,7 @@ export class SandboxManager {
     return Buffer.from(content);
   }
 
-  async listFiles(conversationId: string, dir = '/home/user'): Promise<string[]> {
+  async listFiles(conversationId: string, dir = '/home/gem'): Promise<string[]> {
     const sandbox = await this.getOrCreate(conversationId);
     try {
       return (await sandbox.files.list(dir)).map((f) => f.path);

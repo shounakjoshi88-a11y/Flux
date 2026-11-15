@@ -221,8 +221,8 @@ export function createHeadlessFluxTools(
       execute: async ({ path }: any) => {
         const cid = activeConversationId || 'default';
         try {
-          const files = await codeExecutor.listFiles(cid, path || '/home/user');
-          return `Files in ${path || '/home/user'}:\n${files.join('\n') || '(empty)'}`;
+          const files = await codeExecutor.listFiles(cid, path || '/home/gem');
+          return `Files in ${path || '/home/gem'}:\n${files.join('\n') || '(empty)'}`;
         } catch (e: any) {
           return `Failed to list files: ${e.message}`;
         }
@@ -288,7 +288,7 @@ export function createHeadlessFluxTools(
       }),
       execute: async ({ name, files }: any) => {
         const cid = activeConversationId || 'default';
-        const projectDir = `/home/user/${name}`;
+        const projectDir = `/home/gem/${name}`;
         onStatus('generating_file', { tool: 'create_project', name });
         try {
           await codeExecutor.runBash(cid, `mkdir -p ${projectDir}`);
@@ -320,7 +320,7 @@ export function createHeadlessFluxTools(
         const cid = activeConversationId || 'default';
         onStatus('sandbox_start', { tool: 'start_app', name });
         try {
-          const app = await codeExecutor.startApp(cid, name || 'app', command, cwd || '/home/user', port);
+          const app = await codeExecutor.startApp(cid, name || 'app', command, cwd || '/home/gem', port);
           onStatus('sandbox_success', { tool: 'start_app', name, app_id: app.id });
           return `App "${app.name}" started (ID: ${app.id}).`;
         } catch (e: any) {

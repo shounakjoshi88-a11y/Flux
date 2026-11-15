@@ -52,7 +52,7 @@ export async function runSubagent(
       messages: [
         {
           role: 'system',
-          content: `You are the "${task.id}" subagent. Write ALL files under /home/user/${task.id}/. Do NOT create files outside this directory. ${task.instructions}`,
+          content: `You are the "${task.id}" subagent. Write ALL files under /home/gem/${task.id}/. Do NOT create files outside this directory. ${task.instructions}`,
         },
         { role: 'user', content: task.instructions },
       ],
@@ -65,7 +65,7 @@ export async function runSubagent(
     for await (const _ of (result as any).fullStream) {
     }
 
-    const filesWritten = await sandboxManager.listFiles(sandboxId, `/home/user/${task.id}`);
+    const filesWritten = await sandboxManager.listFiles(sandboxId, `/home/gem/${task.id}`);
     return {
       id: task.id,
       sandboxId,

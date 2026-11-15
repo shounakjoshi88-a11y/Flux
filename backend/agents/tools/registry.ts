@@ -180,7 +180,7 @@ toolRegistry.register('create_project', {
   name: 'create_project',
   description: 'Scaffold a full project directory with files in the sandbox.',
   parameters: z.object({
-    name: z.string().describe('Project name (folder name under /home/user)'),
+    name: z.string().describe('Project name (folder name under /home/gem)'),
     files: z.array(z.object({
       path: z.string().describe('Relative file path within the project'),
       content: z.string().describe('Full file content'),

@@ -279,7 +279,7 @@ export function createFluxAskRouter(): Router {
                 const cid = activeConversationId;
                 const paths: string[] = [];
                 // Ensure uploads directory exists
-                await codeExecutor.runBash(cid, 'mkdir -p /home/user/uploads /home/user/edits');
+                await codeExecutor.runBash(cid, 'mkdir -p /home/gem/uploads /home/gem/edits');
                 for (const att of safeAtt) {
                     if (!att.content) continue;
                     const fn = att.name || 'attached.bin';
@@ -287,19 +287,19 @@ export function createFluxAskRouter(): Router {
                     if (isBinary) {
                         const rawBase64 = att.content.startsWith('data:') ? (att.content.split(',')[1] || '') : att.content;
                         if (rawBase64) {
-                            await codeExecutor.writeFile(cid, `/home/user/uploads/${fn}`, rawBase64);
-                            paths.push(`/home/user/uploads/${fn}`);
+                            await codeExecutor.writeFile(cid, `/home/gem/uploads/${fn}`, rawBase64);
+                            paths.push(`/home/gem/uploads/${fn}`);
                         }
                     } else {
                         const raw = typeof att.content === 'string' ? att.content : '';
                         if (raw) {
-                            await codeExecutor.writeFile(cid, `/home/user/uploads/${fn}`, raw);
-                            paths.push(`/home/user/uploads/${fn}`);
+                            await codeExecutor.writeFile(cid, `/home/gem/uploads/${fn}`, raw);
+                            paths.push(`/home/gem/uploads/${fn}`);
                         }
                     }
                 }
                 if (paths.length) {
-                    sandboxFileNotice = `\n📁 Uploaded file(s) available in sandbox at:\n${paths.map(p => `  - ${p}`).join('\n')}\nIMPORTANT: These files are in /home/user/uploads/. When reading, editing, or running commands, always use the full /home/user/uploads/<filename> path.\n`;
+                    sandboxFileNotice = `\n📁 Uploaded file(s) available in sandbox at:\n${paths.map(p => `  - ${p}`).join('\n')}\nIMPORTANT: These files are in /home/gem/uploads/. When reading, editing, or running commands, always use the full /home/gem/uploads/<filename> path.\n`;
                     console.log(`[SANDBOX_WRITE] Successfully wrote ${paths.length} file(s) to sandbox:`, paths.join(', '));
                 }
             } catch (e: any) {
@@ -309,23 +309,23 @@ export function createFluxAskRouter(): Router {
 
         // When the user provides a file, prepend a hard instruction to stop the model searching
         const fileGuard = hasAnyFile
-            ? `\n⚠️ FILE ATTACHED: The user's file(s) are below (truncated). The FULL file is at /home/user/uploads/<filename> in the sandbox.${sandboxFileNotice}
+            ? `\n⚠️ FILE ATTACHED: The user's file(s) are below (truncated). The FULL file is at /home/gem/uploads/<filename> in the sandbox.${sandboxFileNotice}
 CRITICAL — FIRST STEP: Call read_skill({ doc_type: "file" }) IMMEDIATELY before doing anything else. This loads the file-reading rules that tell you how to handle each file type (PDF, DOCX, XLSX, code, etc.). Do NOT skip this.
 CRITICAL — SEARCH RULES: You may call web_search at most 2 times. Each call must have targeted, specific queries (not broad). After 2 searches, STOP and answer with what you found. Do NOT search again.
-CRITICAL — FILE LOCATION: Uploaded originals are at /home/user/uploads/. To edit, FIRST copy to /home/user/edits/ (run_bash: cp /home/user/uploads/<file> /home/user/edits/<file>). All editing happens in /home/user/edits/ — NEVER edit files in uploads/. Deliver from /home/user/edits/ when done.
+CRITICAL — FILE LOCATION: Uploaded originals are at /home/gem/uploads/. To edit, FIRST copy to /home/gem/edits/ (run_bash: cp /home/gem/uploads/<file> /home/gem/edits/<file>). All editing happens in /home/gem/edits/ — NEVER edit files in uploads/. Deliver from /home/gem/edits/ when done.
 CRITICAL — You MUST only work on the uploaded file(s). Do NOT create, scaffold, or generate new files or projects unless the user explicitly asks.
-CRITICAL — ALWAYS call get_generated_file({ path: "/home/user/edits/<filename>" }) after editing — files left in sandbox are invisible.
+CRITICAL — ALWAYS call get_generated_file({ path: "/home/gem/edits/<filename>" }) after editing — files left in sandbox are invisible.
 CRITICAL — NEVER install packages (pip, npm, apt). Everything is pre-installed.
 
 EDITING WORKFLOW (strict order):
-  1. list_files({ path: "/home/user/edits/" }) — see working copies (or list_files({ path: "/home/user/uploads/" }) for originals)
-  2. If file is inline text (no upload), write to /home/user/edits/ first via write_file
-  3. If file was uploaded as attachment, run_bash({ command: "mkdir -p /home/user/edits && cp /home/user/uploads/<file> /home/user/edits/<file>" }) — copy to edits/
-  4. read_file({ path: "/home/user/edits/<filename>" }) — read the copy
-  5. edit_file({ path: "/home/user/edits/<filename>", old_str: "...", new_str: "..." }) — edit the copy
-  6. run_bash with compile/lint/verify using /home/user/edits/<filename> paths
-  7. get_generated_file({ path: "/home/user/edits/<filename>" }) — deliver to user
-IMPORTANT: After step 3, ALL subsequent operations use /home/user/edits/. Never go back to /home/user/uploads/. The uploads/ original may not persist.\n`
+  1. list_files({ path: "/home/gem/edits/" }) — see working copies (or list_files({ path: "/home/gem/uploads/" }) for originals)
+  2. If file is inline text (no upload), write to /home/gem/edits/ first via write_file
+  3. If file was uploaded as attachment, run_bash({ command: "mkdir -p /home/gem/edits && cp /home/gem/uploads/<file> /home/gem/edits/<file>" }) — copy to edits/
+  4. read_file({ path: "/home/gem/edits/<filename>" }) — read the copy
+  5. edit_file({ path: "/home/gem/edits/<filename>", old_str: "...", new_str: "..." }) — edit the copy
+  6. run_bash with compile/lint/verify using /home/gem/edits/<filename> paths
+  7. get_generated_file({ path: "/home/gem/edits/<filename>" }) — deliver to user
+IMPORTANT: After step 3, ALL subsequent operations use /home/gem/edits/. Never go back to /home/gem/uploads/. The uploads/ original may not persist.\n`
             : '';
 
         // Detect system/architecture/code-review questions — strip execution tools
@@ -582,7 +582,7 @@ IMPORTANT: After step 3, ALL subsequent operations use /home/user/edits/. Never 
                             parsedContent = pdfResult.markdown || pdfResult.text || '';
                             if (parsedContent.startsWith('[PDF parsing')) {
                                 parseError = parsedContent.replace(/\[PDF parsing (failed|error):\s*/, '').replace(/\]$/, '');
-                                parsedContent = `[PDF file: ${att.name}]\nThe automated parser failed to extract text from this PDF (${parseError}). The raw file is at /home/user/uploads/${att.name}. Run Python with PyMuPDF (fitz) to extract its text content, then answer based on that.`;
+                                parsedContent = `[PDF file: ${att.name}]\nThe automated parser failed to extract text from this PDF (${parseError}). The raw file is at /home/gem/uploads/${att.name}. Run Python with PyMuPDF (fitz) to extract its text content, then answer based on that.`;
                             } else if (pdfResult.token_count >= 4000 && uid) {
                                 await processLargeDocument(pdfResult, uid, att.name || 'document', 'upload');
                                 const preview = (pdfResult.pages?.[0]?.text ?? parsedContent).slice(0, 1500);
@@ -1136,7 +1136,7 @@ ${memCtx}
 
             // ── Plain-text tool call fallback handler ──────────────────────────
             // Some NIM models output tool calls as raw text like
-            //   readfile({ path: "/home/user/file.md" })
+            //   readfile({ path: "/home/gem/file.md" })
             // instead of using the function-calling API.
             if (!closedRef.v) {
                 const toolNameMap: Record<string, string> = {
@@ -1456,7 +1456,7 @@ CROSS-FILE RULES (when multiple files provided):
         }
 
         // ── Clean text for DB ─────────────────────────────────────────
-        // Rewrite sandbox:/home/user/... links to proper download URLs
+        // Rewrite sandbox:/home/gem/... links to proper download URLs
         let cleanText = stripEmDashes(fullText.replace(
             /sandbox:\/home\/user\/(?:uploads\/|edits\/)?([^\s)\]]+)/gi,
             (_match, filename) => `/api/sandbox/download/${activeConversationId}/${filename}`

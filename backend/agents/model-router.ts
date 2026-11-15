@@ -15,6 +15,11 @@ import { isModelHealthy, recordFailure, recordSuccess, getShortTimeout } from '.
 export const NIM_MODELS: Record<string, string> = {
     "nemotron-3-ultra-550b": "nvidia/nemotron-3-ultra-550b-a55b",
     "nemotron-3-nano-omni-30b-a3b-reasoning": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+    "nemotron-3.5-lightning-30b-a3b": "nvidia/nemotron-3.5-lightning-30b-a3b",
+    "nemotron-3.5-bolt-e4b": "nvidia/nemotron-3.5-bolt-e4b",
+    "mistral-large-4-1t-a52b": "mistralai/mistral-large-4-1t-a52b",
+    "minimax-m3.1-flash": "minimaxai/minimax-m3.1-flash",
+    "step-5-preview": "stepfun-ai/step-5-preview",
     "laguna-xs-2.1": "poolside/laguna-xs-2.1",
 };
 
@@ -159,12 +164,17 @@ export const AVAILABLE_MODELS = [
     {
         category: "General Purpose", models: [
             { id: "nemotron-3-ultra-550b", label: "Nemotron 3 Ultra 550B (NVIDIA)" },
+            { id: "mistral-large-4-1t-a52b", label: "Mistral Large 4 1T A52B (Mistral)" },
+            { id: "step-5-preview", label: "Step-5 Preview (StepFun)" },
+            { id: "minimax-m3.1-flash", label: "MiniMax M3.1 Flash (MiniMax)" },
             { id: "laguna-xs-2.1", label: "Laguna XS 2.1 (Poolside)" },
         ]
     },
     {
         category: "Reasoning & Agents", models: [
             { id: "nemotron-3-nano-omni-30b-a3b-reasoning", label: "Nemotron 3 Nano Omni 30B Reasoning (NVIDIA)" },
+            { id: "nemotron-3.5-lightning-30b-a3b", label: "Nemotron 3.5 Lightning 30B A3B (NVIDIA)" },
+            { id: "nemotron-3.5-bolt-e4b", label: "Nemotron 3.5 Bolt E4B (NVIDIA)" },
         ]
     },
 ];

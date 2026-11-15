@@ -58,7 +58,7 @@ export function createDocumentTools(ctx: ToolContext) {
                 const files = resolved.files ?? {};
                 const filePaths = Object.keys(files);
                 if (filePaths.length > 0 && ctx.activeConversationId) {
-                    const base = `/home/user/.skills/${resolved.name}`;
+                    const base = `/home/gem/.skills/${resolved.name}`;
                     try {
                         await codeExecutor.runBash(ctx.activeConversationId, `mkdir -p "${base}"`);
                         for (const relPath of filePaths) {

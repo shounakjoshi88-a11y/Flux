@@ -41,7 +41,7 @@ export class CodeExecutor {
     const startTime = Date.now();
     const sandbox = await sandboxManager.getOrCreate(conversationId);
     try {
-      const filesBefore = await this._listFiles(sandbox, '/home/user');
+      const filesBefore = await this._listFiles(sandbox, '/home/gem');
       const result = await sandbox.runCode(code, {
         onStdout: (output: any) => {
           const line = typeof output === 'string' ? output : (output?.line ?? output?.text ?? '');
@@ -54,7 +54,7 @@ export class CodeExecutor {
         timeoutMs: EXEC_TIMEOUT_MS,
         signal,
       } as any);
-      const filesAfter = await this._listFiles(sandbox, '/home/user');
+      const filesAfter = await this._listFiles(sandbox, '/home/gem');
       const newFiles = filesAfter.filter(f => !filesBefore.includes(f));
       return {
         stdout: result.logs.stdout,
@@ -78,7 +78,7 @@ export class CodeExecutor {
     const startTime = Date.now();
     const sandbox = await sandboxManager.getOrCreate(conversationId);
     try {
-      const filesBefore = await this._listFiles(sandbox, '/home/user');
+      const filesBefore = await this._listFiles(sandbox, '/home/gem');
       const result = await sandbox.commands.run(command, {
         onStdout: (data: any) => {
           const line = typeof data === 'string' ? data : (data ?? '');
@@ -91,7 +91,7 @@ export class CodeExecutor {
         timeoutMs: EXEC_TIMEOUT_MS,
         signal,
       });
-      const filesAfter = await this._listFiles(sandbox, '/home/user');
+      const filesAfter = await this._listFiles(sandbox, '/home/gem');
       const newFiles = filesAfter.filter(f => !filesBefore.includes(f));
       return {
         stdout: [result.stdout],
@@ -109,7 +109,7 @@ export class CodeExecutor {
     conversationId: string,
     name: string,
     command: string,
-    cwd: string = '/home/user',
+    cwd: string = '/home/gem',
     port?: number,
   ): Promise<AppProcess> {
     const sandbox = await sandboxManager.getOrCreate(conversationId);
@@ -215,7 +215,7 @@ export class CodeExecutor {
     }
   }
 
-  async listFiles(conversationId: string, path = '/home/user'): Promise<string[]> {
+  async listFiles(conversationId: string, path = '/home/gem'): Promise<string[]> {
     try {
       const sandbox = await sandboxManager.getOrCreate(conversationId);
       return (await sandbox.files.list(path)).map(f => f.path);

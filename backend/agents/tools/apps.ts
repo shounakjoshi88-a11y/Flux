@@ -20,7 +20,7 @@ export function createAppTools(ctx: ToolContext) {
             description:
                 'Scaffold a full project directory with files in the sandbox. Use this when building a complete app (HTML/CSS/JS, React, Python web app, etc.). Provide the project name and an array of { path, content } objects.',
             inputSchema: z.object({
-                name: z.string().describe('Project name (folder name under /home/user)'),
+                name: z.string().describe('Project name (folder name under /home/gem)'),
                 files: z
                     .array(
                         z.object({
@@ -34,7 +34,7 @@ export function createAppTools(ctx: ToolContext) {
                 if (shouldBlockFurtherTools(ctx)) return TOOL_BLOCKED_MESSAGE;
 
                 const cid = conversationKey(ctx);
-                const projectDir = `/home/user/${name}`;
+                const projectDir = `/home/gem/${name}`;
                 writer.status('generating_file', `Scaffolding project "${name}"`, { name }, state.thoughtProcess);
                 try {
                     await codeExecutor.runBash(cid, `mkdir -p ${projectDir}`);
@@ -71,7 +71,7 @@ export function createAppTools(ctx: ToolContext) {
             inputSchema: z.object({
                 name: z.string().describe('A human-readable name for this app/process'),
                 command: z.string().describe('The command to run (e.g. "python3 app.py", "npm start", "node server.js")'),
-                cwd: z.string().optional().describe('Working directory (default: /home/user)'),
+                cwd: z.string().optional().describe('Working directory (default: /home/gem)'),
                 port: z
                     .number()
                     .optional()
@@ -81,7 +81,7 @@ export function createAppTools(ctx: ToolContext) {
                 const cid = conversationKey(ctx);
                 writer.status('sandbox_start', `Launching app "${name}"`, { name, command, port }, state.thoughtProcess);
                 try {
-                    const app = await codeExecutor.startApp(cid, name || 'app', command, cwd || '/home/user', port);
+                    const app = await codeExecutor.startApp(cid, name || 'app', command, cwd || '/home/gem', port);
                     writer.status(
                         'sandbox_success',
                         `App "${name}" launched on port ${port || 'auto'}`,

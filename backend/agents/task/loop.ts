@@ -172,7 +172,7 @@ async function executeStep(
     }),
     list_files: (tool as any)({
       description: 'List files in a directory',
-      parameters: z.object({ path: z.string().optional().default('/home/user') }),
+      parameters: z.object({ path: z.string().optional().default('/home/gem') }),
       execute: async ({ path }: { path: string }) => {
         const files = await codeExecutor.listFiles(conversationId, path);
         return files.join('\n');

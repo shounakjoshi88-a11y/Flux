@@ -19,7 +19,7 @@ export function createFileTools(ctx: ToolContext) {
             description:
                 'Read contents of a TEXT or CODE file from the sandbox. Do NOT use on binary files (PDF, DOCX, XLSX, PPTX, images, archives) — use run_bash with Python tools instead (pandas for CSV, pymupdf for PDF, openpyxl for XLSX, python-docx for DOCX, python-pptx for PPTX).',
             inputSchema: z.object({
-                path: z.string().describe('Absolute path like /home/user/data.csv'),
+                path: z.string().describe('Absolute path like /home/gem/data.csv'),
             }),
             execute: async ({ path }: any) => {
                 const cid = conversationKey(ctx);
@@ -50,7 +50,7 @@ export function createFileTools(ctx: ToolContext) {
             description:
                 'ONLY use for NEW files (creating from scratch). For editing existing files, ALWAYS prefer edit_file (surgical string replacement) instead. After writing a code file, call run_bash next to compile and execute it.',
             inputSchema: z.object({
-                path: z.string().describe('File path like /home/user/output.csv'),
+                path: z.string().describe('File path like /home/gem/output.csv'),
                 content: z.string().describe('Full file content'),
             }),
             execute: async ({ path, content }: any) => {
@@ -99,13 +99,13 @@ export function createFileTools(ctx: ToolContext) {
         list_files: (tool as any)({
             description: 'List files in a sandbox directory.',
             inputSchema: z.object({
-                path: z.string().optional().describe('Directory path, default /home/user'),
+                path: z.string().optional().describe('Directory path, default /home/gem'),
             }),
             execute: async ({ path }: any) => {
                 const cid = conversationKey(ctx);
                 try {
-                    const files = await codeExecutor.listFiles(cid, path || '/home/user');
-                    return `Files in ${path || '/home/user'}:\n${files.join('\n') || '(empty)'}`;
+                    const files = await codeExecutor.listFiles(cid, path || '/home/gem');
+                    return `Files in ${path || '/home/gem'}:\n${files.join('\n') || '(empty)'}`;
                 } catch (e: any) {
                     return `Failed to list files: ${e.message}`;
                 }
@@ -178,7 +178,7 @@ export function createFileTools(ctx: ToolContext) {
                 'Download a file from the sandbox and return its base64-encoded content with MIME type. Use this to return files (images, PDFs, CSVs, code files, edited documents) directly to the user in chat. Call this AFTER you finish editing or generating a file the user should receive.',
             inputSchema: z.object({
                 path: z.string().describe(
-                    'Absolute path to the file in the sandbox. For edited files use /home/user/edits/<filename>, for originals use /home/user/uploads/<filename>, for new files use /home/user/<filename>.',
+                    'Absolute path to the file in the sandbox. For edited files use /home/gem/edits/<filename>, for originals use /home/gem/uploads/<filename>, for new files use /home/gem/<filename>.',
                 ),
             }),
             execute: async ({ path }: any) => {

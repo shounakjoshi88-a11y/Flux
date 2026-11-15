@@ -66,7 +66,7 @@ async function integrateSubagentResults(
     for (const filePath of result.filesWritten) {
       try {
         const content = await sandboxManager.downloadFile(result.sandboxId, filePath);
-        const relativePath = filePath.replace('/home/user/', '');
+        const relativePath = filePath.replace('/home/gem/', '');
         await sandboxManager.uploadFile(integrationId, relativePath, content);
       } catch (e: any) {
         onStatus('integration_warning', { file: filePath, error: e?.message });
@@ -76,12 +76,12 @@ async function integrateSubagentResults(
 
   const sandbox = await sandboxManager.getOrCreate(integrationId);
   onStatus('integration_status', { message: 'Installing dependencies' });
-  const install = await sandbox.commands.run('npm install', { cwd: '/home/user', timeoutMs: ORCHESTRATOR_TIMEOUT_MS }).catch((e: any) => ({ exitCode: 1, stdout: '', stderr: e.message }));
+  const install = await sandbox.commands.run('npm install', { cwd: '/home/gem', timeoutMs: ORCHESTRATOR_TIMEOUT_MS }).catch((e: any) => ({ exitCode: 1, stdout: '', stderr: e.message }));
   if (install.exitCode !== 0) {
     return { success: false, output: `Install failed: ${install.stderr}` };
   }
   onStatus('integration_status', { message: 'Running build' });
-  const build = await sandbox.commands.run('npm run build', { cwd: '/home/user', timeoutMs: ORCHESTRATOR_TIMEOUT_MS }).catch((e: any) => ({ exitCode: 1, stdout: '', stderr: e.message }));
+  const build = await sandbox.commands.run('npm run build', { cwd: '/home/gem', timeoutMs: ORCHESTRATOR_TIMEOUT_MS }).catch((e: any) => ({ exitCode: 1, stdout: '', stderr: e.message }));
 
   return { success: build.exitCode === 0, output: build.stdout + build.stderr };
 }

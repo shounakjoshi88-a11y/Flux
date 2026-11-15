@@ -1,0 +1,39 @@
+feat(nim): add five more verified-live free endpoints + fix sandbox paths prompt/code
+
+Verified live on NIM this session (HTTP 200 + content):
+mistralai/mistral-large-4-1t-a52b, stepfun-ai/step-5-preview,
+minimaxai/minimax-m3.1-flash (General Purpose) and
+nvidia/nemotron-3.5-lightning-30b-a3b, nvidia/nemotron-3.5-bolt-e4b
+(Reasoning & Agents). Wired into NIM_MODELS + AVAILABLE_MODELS (backend)
+and the unreachable-backend fallback list (frontend useModels.ts).
+Models that 404 (nemotron-3-super-120b-a12b, palmyra-creative-122b,
+llama-3.1-nemotron-ultra-253b, llama-3.1-nemotron-70b) or hang >60s
+(deepseek-v4.1-flash, glm-5.3-flash, gemma-4-31b-it, gpt-oss-20b) were
+excluded rather than listed-and-broken.
+
+Sandbox paths - the live 1.10.0 image runs as user gem with HOME
+/home/gem (uid 1000); /home/user does not exist and is unwritable by
+the sandbox user. This broke every file operation that depended on it
+and misled the model via the prompt/tools paths.
+
+- Swept all hardcoded /home/user -> /home/gem across backend source,
+  the agent extension prompt, and skills/file-reading.md. No remaining
+  references in runtime code or prompts.
+- The Flux workdir (/home/gem/<conversationId>) is created by the
+  sandbox's own user at runtime - mkdir -p works, verified via API:
+  /v1/shell/exec runs as gem; /v1/file/write to /home/user/* fails with
+  EACCES 13; /home/gem/* works.
+- Prompt NO-HALLUCINATED-CAPABILITIES claim about "cannot download
+  PDFs" was stale - documents generated in the sandbox are downloadable
+  via get_generated_file. Updated to match reality (cannot access
+  private DBs/private APIs, CAN deliver generated files).
+- agent-extension: "NEVER install packages" no longer true - pip + pypi
+  are reachable in this image; recipe replaced with "prefer the
+  pre-installed stack, install only when the task genuinely needs it, do
+  not reinstall the base stack."
+- prompt.ts: "visual style rules" references now point at the
+  VISUAL_INSTRUCTIONS section explicitly (RULES section with CHART
+  blocks).
+
+Sandbox SDK removal earlier this session exposed fabricated success;
+this sweep closes the complementary path-mismatch half of that class.
