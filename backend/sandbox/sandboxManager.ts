@@ -92,11 +92,20 @@ export class SandboxManager {
         run: async (command: string, options?: any) => {
           const timeout = options?.timeoutMs ?? 120_000;
           try {
-            const res = await this.client.shell.execCommand({
-              command,
-              exec_dir: options?.cwd ?? workdir,
-              timeout: Math.round(timeout / 1000),
-            });
+            // The SDK's own HTTP wait (timeoutInSeconds, default 60s) is what
+            // previously killed long commands with a bare "unknown error".
+            // Keep it comfortably above the sandbox's own command timeout so a
+            // slow tool (pip install, model downloads) returns the sandbox's
+            // real result instead of an aborted fetch.
+            const httpTimeoutSeconds = Math.ceil(timeout / 1000) + 60;
+            const res = await this.client.shell.execCommand(
+              {
+                command,
+                exec_dir: options?.cwd ?? workdir,
+                timeout: Math.round(timeout / 1000),
+              },
+              { timeoutInSeconds: httpTimeoutSeconds },
+            );
             const data = unwrapSandbox(res, 'exec');
             // Stream output to callbacks if provided.
             if (options?.onStdout && data?.output) {
