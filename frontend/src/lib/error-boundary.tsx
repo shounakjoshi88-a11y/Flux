@@ -22,6 +22,19 @@ export class ErrorBoundary extends Component<Props, State> {
 
   override componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("[ErrorBoundary]", error, info.componentStack);
+    // Persist the crash so a reload doesn't flush the evidence. The user can
+    // read `flux-boundary-last-crash` in DevTools → Application → LocalStorage.
+    try {
+      const stack = info?.componentStack ?? null;
+      localStorage.setItem("flux-boundary-last-crash", JSON.stringify({
+        message: error?.message || String(error),
+        stack: error?.stack ?? null,
+        componentStack: stack,
+        at: new Date().toISOString(),
+      }));
+    } catch {
+      // ignore if storage is full/blocked
+    }
   }
 
   override render() {

@@ -78,6 +78,14 @@ export function createFileTools(ctx: ToolContext) {
                 writer.status('generating_file', `Writing ${filename}`, { path, filename, content, language }, state.thoughtProcess);
                 try {
                     await codeExecutor.writeFile(cid, path, content);
+                    // Verify the write round-tripped. A sandbox flap that drops
+                    // mid-write otherwise looks like success to the model
+                    // (it was reported as "file written" while nothing landed).
+                    const verify = await codeExecutor.readFile(cid, path).catch(() => null);
+                    if (verify !== content) {
+                        writer.status('generating_file_error', `Failed to write ${filename}: write did not round-trip`, { path }, state.thoughtProcess);
+                        return `Write verification failed for ${path}: content did not round-trip. The sandbox may be unavailable — retry the write.`;
+                    }
                     writer.status(
                         'generating_file_success',
                         `Wrote ${filename}`,

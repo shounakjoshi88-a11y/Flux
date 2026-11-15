@@ -137,6 +137,17 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     reportVisibleRange();
   }, [messages, reportVisibleRange]);
 
+  // ─── Always-registered scroll handler — needed for every render branch,
+  //   even the empty "links" and "images" branches, so hook counts match
+  //   the answer branch. (Calling this from the answer branch only was
+  //   breaking React's hook-order invariant → #300 max-update-depth error.) ───
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    reportVisibleRange();
+  }, [reportVisibleRange]);
+
   // ─── Links tab ────────────────────────────────────────────
   if (activeTab === "links") {
     const sourceGroups: { prompt: string; sources: Source[] }[] = [];
@@ -174,15 +185,9 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
                       ? "text-yellow-400 bg-yellow-400/10 border-yellow-400/35"
                       : "text-red-400 bg-red-400/10 border-red-400/35";
                     return (
-                      <SourceCard
-                        key={source.url + gi}
-                        url={source.url}
-                        domain={getDomain(source.url)}
-                        trustScore={score}
-                        badgeColor={badgeColor}
-                        onClick={() => setPeekUrl(source.url)}
-                        onOpenExternal={() => window.open(source.url, "_blank")}
-                      />
+                      <div key={(source as any).url ?? gi} className="p-2 rounded border border-white/10">
+                        {String((source as any).url)} ({score})
+                      </div>
                     );
                   })}
                 </div>
@@ -216,12 +221,6 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   // Plain scrolling list — every message renders in the DOM, so streaming
   // output paints token-by-token immediately with no virtualizer to fight.
   // Offscreen items use content-visibility so layout/paint stay cheap.
-  const handleScroll = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-    reportVisibleRange();
-  }, [reportVisibleRange]);
 
   return (
     <div

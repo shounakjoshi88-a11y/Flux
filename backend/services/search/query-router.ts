@@ -1,15 +1,6 @@
-// query-router.ts — Classifies queries and routes to appropriate model
-
-// Simple and complex queries were different tiers pre-retirement, but the
-// cheap tier was only ever a reasoning model (nemotron-3-nano-omni), which
-// emits only ~9 chars of visible text — the reason simple answers came
-// back blank. The only verified live model is 550b-a55b, so both tiers
-// share it until a cheaper live general model appears.
-const CHEAP_MODEL_ID = "nemotron-3-ultra-550b";
-const EXPENSIVE_MODELS = new Set([
-  "nemotron-3-ultra-550b",
-  "laguna-xs-2.1",
-]);
+// query-router.ts — Classifies queries. Never rewrites the user's picker
+// silently (the previous silent override to Ultra — itself dead for agentic
+// work here — was what starved explicit-model turns). Default to Bolt.
 
 type Complexity = "simple" | "complex";
 
@@ -54,22 +45,16 @@ export function classifyQuery(query: string): Complexity {
   return wordCount >= 8 && SEARCH_INTENT_RE.test(q) ? "complex" : "simple";
 }
 
-export function isExpensiveModel(modelId: string): boolean {
-  return EXPENSIVE_MODELS.has(modelId);
-}
-
+// Previously: for "simple" queries the router silently rewrote the user's
+// picker selection to Ultra (dead for agentic work). That made explicit
+// picker choices behave as Ultra whenever the classifier guessed wrong.
+// Cost is not a meaningful signal here; respect the picker completely.
 export function routeModel(preferredModel: string | undefined, query: string): {
   modelId: string;
   complexity: Complexity;
   wasRouted: boolean;
 } {
-  const modelId = preferredModel || "nemotron-3-ultra-550b";
+  const modelId = preferredModel || "nemotron-3.5-bolt-e4b";
   const complexity = classifyQuery(query);
-
-  if (complexity === "simple" && isExpensiveModel(modelId)) {
-    console.log(`[ROUTER] "${query.slice(0, 60)}..." is simple — routing from ${modelId} to ${CHEAP_MODEL_ID}`);
-    return { modelId: CHEAP_MODEL_ID, complexity, wasRouted: true };
-  }
-
   return { modelId, complexity, wasRouted: false };
 }
