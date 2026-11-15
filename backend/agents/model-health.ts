@@ -3,18 +3,22 @@ const FAILURE_WINDOW_MS = 5 * 60 * 1000;
 const MAX_FAILURES = 3;
 const HEALTHY_COOLDOWN_MS = 5 * 60 * 1000;
 
-// Models retired/unavailable on NVIDIA NIM as of 2026-11-14 (all return
-// Gone / Not Found). Marked permanently unhealthy so the fallback chain
-// does not spend a failed request on every one of them before reaching a
-// live model on every single user message. Re-test with a fresh call
-// before re-adding.
+// Models retired/unavailable on NVIDIA NIM as of 2026-11-15 (all return
+// Gone / Not Found or accept the connection but never return a byte).
+// Marked permanently unhealthy so the fallback chain does not spend a
+// failed request on every one of them before reaching a live model on
+// every single user message. Re-test with a fresh call before re-adding.
 const RETIRED_MODELS = new Set([
+  'deepseek-coder-6.7b-instruct',
   'deepseek-v4-pro',
   'deepseek-v4-flash',
+  'deepseek-v4.1-flash',
   'kimi-k2.6',
   'llama-4-maverick',
   'mistral-large-675b',
   'mistral-medium-3.5-128b',
+  'mistral-large-4-1t-a52b',
+  'glm-5.3-flash',
   'glm-5.2',
   'nemotron-3-super-120b-a12b',
   'nemotron-nano-12b-v2-vl',
@@ -68,6 +72,14 @@ export function isModelHealthy(modelId: string): boolean {
     return true;
 }
 
+// Cap on how long a healthy model may take to start responding (headers /
+// first stream). NIM cold starts for large models routinely exceed 30 s,
+// so the old 30 s default cut off models that were alive but slow — with
+// zero output produced and an automatic fallback to another maybe-dead
+// model. Override with MODEL_STREAM_TIMEOUT_MS. Unhealthy models stay
+// on a short leash so a known-dead endpoint fails fast.
+const MODEL_STREAM_TIMEOUT_MS = Number(process.env.MODEL_STREAM_TIMEOUT_MS) || 180_000;
+
 export function getShortTimeout(modelId: string): number {
-    return isModelHealthy(modelId) ? 30000 : 10000;
+    return isModelHealthy(modelId) ? MODEL_STREAM_TIMEOUT_MS : 10_000;
 }

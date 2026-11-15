@@ -83,14 +83,14 @@ export function useModels(): ModelDiscoveryResult {
 }
 
 // Last-resort catalog shown when /api/models is unreachable. Mirrors the
-// backend: only models verified live on NVIDIA NIM (2026-11-14) are listed.
+// backend: only models verified live on NVIDIA NIM (verified 2026-11-15)
+// are listed.
 function getFallbackModels(): ModelCategory[] {
   return [
     {
       category: "General Purpose",
       models: [
         { id: "nemotron-3-ultra-550b", label: "Nemotron 3 Ultra 550B (NVIDIA)" },
-        { id: "mistral-large-4-1t-a52b", label: "Mistral Large 4 1T A52B (Mistral)" },
         { id: "step-5-preview", label: "Step-5 Preview (StepFun)" },
         { id: "minimax-m3.1-flash", label: "MiniMax M3.1 Flash (MiniMax)" },
         { id: "laguna-xs-2.1", label: "Laguna XS 2.1 (Poolside)" },

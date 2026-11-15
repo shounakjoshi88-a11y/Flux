@@ -39,6 +39,13 @@ type UseChatCallbacks = {
 
 let nextId = 1;
 
+// Silence budget for the SSE stream: if no bytes arrive for this long, the
+// request is assumed wedged and aborted. A live model resets this on every
+// chunk, so a slow first-token cold start does not count against it.
+const STREAM_INACTIVITY_TIMEOUT_MS = 180_000;
+// Absolute ceiling for one generation (matches SANDBOX_EXEC_TIMEOUT_MS).
+const STREAM_HARD_TIMEOUT_MS = 30 * 60_000;
+
 export function useChat(user: any) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -386,9 +393,18 @@ export function useChat(user: any) {
       });
 
       let finalAssistantId: string | null = null;
+      let hardTimeoutId: ReturnType<typeof setTimeout> | null = null;
+      let inactivityTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
       try {
-        const timeoutId = setTimeout(() => controller.abort(), 120_000);
+        hardTimeoutId = setTimeout(() => controller.abort(), STREAM_HARD_TIMEOUT_MS);
+        // Re-arming silence watchdog: covers waiting for headers and any
+        // stall in the middle of the stream. Bytes arriving reset it.
+        const armInactivityTimeout = () => {
+          if (inactivityTimeoutId !== null) clearTimeout(inactivityTimeoutId);
+          inactivityTimeoutId = setTimeout(() => controller.abort(), STREAM_INACTIVITY_TIMEOUT_MS);
+        };
+        armInactivityTimeout();
 
         const response = await fetch(endpoint, {
           method: "POST",
@@ -399,7 +415,8 @@ export function useChat(user: any) {
           body: JSON.stringify(body),
           signal: controller.signal,
         });
-        clearTimeout(timeoutId);
+        // The silence watchdog stays armed past the fetch resolve: it fires
+        // if the stream goes quiet for STREAM_INACTIVITY_TIMEOUT_MS.
         if (!response.ok || !response.body) throw new Error("Request failed");
 
         const incomingConversationId = response.headers.get("X-Conversation-Id");
@@ -423,6 +440,7 @@ export function useChat(user: any) {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
+          armInactivityTimeout(); // bytes arrived — reset the silence budget
           buffer += decoder.decode(value, { stream: true });
 
           while (true) {
@@ -946,6 +964,8 @@ export function useChat(user: any) {
           ]);
         }
       } finally {
+        if (inactivityTimeoutId !== null) clearTimeout(inactivityTimeoutId);
+        if (hardTimeoutId !== null) clearTimeout(hardTimeoutId);
         setIsLoading(false);
         isLoadingRef.current = false;
         abortControllerRef.current = null;
