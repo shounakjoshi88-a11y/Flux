@@ -51,7 +51,7 @@ export function createDocumentTools(ctx: ToolContext) {
                 if (!resolved) {
                     return `No skill named "${name}" exists. Available skills are listed in the <skills> catalog.`;
                 }
-                writer.status('reading_skill', `Reading ${resolved.source === 'custom' ? 'your' : ''} "${resolved.name}" skill…`, { docType: resolved.name }, state.thoughtProcess);
+                writer.status('reading_skill', `Reading ${resolved.source === 'custom' ? 'your' : ''} "${resolved.name}" skill…`, { docType: resolved.name, name: resolved.name, source: resolved.source, description: resolved.description }, state.thoughtProcess);
 
                 // Materialise bundled files into the sandbox so skill scripts can run.
                 let materialisedNote = '';
@@ -75,7 +75,19 @@ export function createDocumentTools(ctx: ToolContext) {
                         console.warn('[SKILLS] Could not materialise skill files:', e?.message);
                     }
                 }
-                writer.status('reading_skill_success', `Skill "${resolved.name}" loaded`, { docType: resolved.name }, state.thoughtProcess);
+                // Ship a bounded slice of the skill body so the UI can render the
+                // actual file inline (Claude-style readable artifact) once loading completes.
+                const BODY_CAP = 24_000;
+                const bodyFull = resolved.body ?? '';
+                const body = bodyFull.length > BODY_CAP ? bodyFull.slice(0, BODY_CAP) + `\n\n… (${bodyFull.length - BODY_CAP} more bytes)` : bodyFull;
+                writer.status('reading_skill_success', `Skill "${resolved.name}" loaded`, {
+                    docType: resolved.name,
+                    name: resolved.name,
+                    source: resolved.source,
+                    description: resolved.description,
+                    body,
+                    files: filePaths,
+                }, state.thoughtProcess);
                 return resolved.body + materialisedNote;
             },
         }),
